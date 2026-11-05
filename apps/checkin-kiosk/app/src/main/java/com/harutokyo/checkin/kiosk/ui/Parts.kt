@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -105,7 +106,7 @@ fun PrimaryButton(text: String, modifier: Modifier = Modifier, enabled: Boolean 
 
 /** 테두리만 있는 버튼(시안 .g-call · .g-back). */
 @Composable
-fun OutlineButton(text: String, modifier: Modifier = Modifier, sub: String? = null, onClick: () -> Unit) {
+fun OutlineButton(text: String, modifier: Modifier = Modifier, sub: String? = null, center: Boolean = false, onClick: () -> Unit) {
     Row(
         modifier
             .heightIn(min = if (sub == null) 64.dp else 72.dp)
@@ -113,9 +114,10 @@ fun OutlineButton(text: String, modifier: Modifier = Modifier, sub: String? = nu
             .clickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = 24.dp),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = if (center) Arrangement.Center else Arrangement.Start,
     ) {
         Column {
-            Text(text, color = G.Text, fontSize = 17.sp, fontWeight = FontWeight.Medium)
+            Text(text, color = G.Text, fontSize = 20.sp, fontWeight = FontWeight.Medium, textAlign = if (center) TextAlign.Center else TextAlign.Start)
             if (sub != null) Text(sub, color = G.Muted, fontSize = 13.sp)
         }
     }

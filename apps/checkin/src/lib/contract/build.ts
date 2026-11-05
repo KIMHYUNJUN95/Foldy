@@ -3,6 +3,7 @@ import { z } from "zod";
 import { parseStaffPin } from "../device/pin";
 import { getDictionary, LOCALES, type Locale } from "../i18n";
 
+import { ADDRESS_MAX, ADDRESS_MIN_FOREIGN, ADDRESS_MIN_JAPAN } from "../guest/address";
 import { CONTRACT_VERSION, fieldKeySchema, type Contract } from "./schema";
 
 // 건물 설정 줄(checkin.property_settings) → 계약 JSON. 줄이 없으면 기본값(43 §8-6(3) · 신주쿠 구 명부 규칙).
@@ -101,6 +102,7 @@ export function buildContract(row: PropertySettingsRow | null): Contract {
     idleSecondsInput: row?.idle_seconds_input ?? 240,
     idleSecondsDone: row?.idle_seconds_done ?? 30,
     mrzAutofill: row?.mrz_autofill ?? true,
+    addressRules: { maxLength: ADDRESS_MAX, minLengthForeign: ADDRESS_MIN_FOREIGN, minLengthJapan: ADDRESS_MIN_JAPAN, foreignScript: "latin" },
     supportContacts: contacts(row?.support_contacts),
     staffPin: parseStaffPin(row?.staff_pin_hash),
   };

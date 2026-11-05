@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { buildContract } from "@/lib/contract/build";
 import { CONTRACT_VERSION, contractSchema } from "@/lib/contract/schema";
 
 describe("checkin contract", () => {
@@ -15,6 +16,7 @@ describe("checkin contract", () => {
     idleSecondsInput: 240,
     idleSecondsDone: 30,
     mrzAutofill: true,
+    addressRules: { maxLength: 200, minLengthForeign: 8, minLengthJapan: 5, foreignScript: "latin" },
     supportContacts: {},
     staffPin: null,
   };
@@ -26,5 +28,10 @@ describe("checkin contract", () => {
   it("다른 계약 버전 · 지원하지 않는 언어는 막는다", () => {
     expect(contractSchema.safeParse({ ...valid, contractVersion: 99 }).success).toBe(false);
     expect(contractSchema.safeParse({ ...valid, languages: ["fr"] }).success).toBe(false);
+  });
+
+  it("주소 규칙은 서버 검사 값 그대로 계약에 실린다", () => {
+    const contract = buildContract(null);
+    expect(contractSchema.parse(contract).addressRules).toEqual({ maxLength: 200, minLengthForeign: 8, minLengthJapan: 5, foreignScript: "latin" });
   });
 });

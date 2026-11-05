@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 
 import { PersonForm, type PersonInitial } from "@/components/person-form";
 import { COUNTRIES } from "@/lib/guest/countries";
-import { getStayOr404, guestEntries } from "@/lib/guest/page";
+import { afterPeopleHref, getStayOr404, guestEntries, needsAddress } from "@/lib/guest/page";
 import { currentPassportPath, PASSPORT_BUCKET } from "@/lib/guest/store";
 import { fmt, getDictionary, intlTag } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/server";
@@ -41,7 +41,8 @@ export default async function GuestPage({ params }: { params: Promise<{ token: s
 
   // 저장한 뒤 갈 곳: 다른 사람 중 아직 안 끝난 첫 사람 → 없으면 동의 → 끝.
   const nextEntry = entries.find((entry) => !entry.done && entry.key !== guestId && !(isNew && entry.placeholder && entry.key === `new-${position}`));
-  const nextHref = nextEntry ? nextEntry.href : stay.consented ? `/r/${token}` : `/r/${token}/terms`;
+  // 새 사람이나 주소가 비어 있던 사람이면 저장 뒤에도 주소 화면이 남는다(화면을 그린 뒤라 서버 값이 아직 옛것).
+  const nextHref = nextEntry ? nextEntry.href : afterPeopleHref(token, needsAddress(stay) || isNew, stay.consented);
 
   let photoUrl: string | null = null;
   if (guest?.hasPassportPhoto) {
@@ -72,7 +73,6 @@ export default async function GuestPage({ params }: { params: Promise<{ token: s
     contact: guest?.contact ?? "",
     gender: (guest?.gender as "male" | "female" | null) ?? null,
     noPassport: !!guest?.no_passport_reason,
-    address: guest?.address ?? (isRepresentative ? "" : (representative?.address ?? "")),
     prevStay: guest?.prev_stay ?? (isRepresentative ? "" : (representative?.prev_stay ?? "")),
     nextDest: guest?.next_dest ?? (isRepresentative ? "" : (representative?.next_dest ?? "")),
   };
@@ -89,7 +89,7 @@ export default async function GuestPage({ params }: { params: Promise<{ token: s
       representativeName={representative?.name_roman ?? ""}
       sharedFromRep={
         !isRepresentative
-          ? { address: representative?.address ?? "", prevStay: representative?.prev_stay ?? "", nextDest: representative?.next_dest ?? "" }
+          ? { prevStay: representative?.prev_stay ?? "", nextDest: representative?.next_dest ?? "" }
           : null
       }
       photoUrl={photoUrl}

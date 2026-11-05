@@ -312,12 +312,20 @@ export type KioskGuest = {
   hasFaceVideo: boolean;
   missing: string[];
   hasJapanAddress: boolean;
-  /** 대표자만 — 확인 화면에서 주소 · 연락처를 미리 채우려고. */
-  address?: string | null;
+  /**
+   * 사람마다 지금 저장된 집 주소(없으면 null) — 「다른 분」 목록을 미리 채우고, `POST /api/kiosk/address` 가 미리 등록된 동행자의
+   * 주소를 대표자 글로 덮지 않게 `others` 로 되돌려 보내려고(2026-11-06). 증명(본인 확인)이 끝난 세션의 응답에만 실린다.
+   */
+  address: string | null;
+  /** 대표자만 — 확인 화면에서 연락처를 미리 채우려고. */
   contact?: string | null;
 };
 
-/** 태블릿에 넘기는 예약 모양(시안 T2). 여권 번호 같은 칸 값은 넘기지 않는다 — 주소만 대표자 것 하나. */
+/**
+ * 태블릿에 넘기는 예약 모양(시안 T2). 여권 번호 같은 칸 값은 넘기지 않는다 — 주소는 사람마다, 연락처는 대표자 것만.
+ * 부르는 곳은 모두 증명된 세션 뒤다: 쓰기 라우트는 `openProvenKioskStay`, `find` 는 코드 · 여권으로 찾았을 때만(이름은 `proof_needed` 로
+ * 예약 내용 없이 답함), `prove` 는 `proven`/`already` 일 때만. 증명 전에 부르는 곳이 생기면 이 모양을 나눈다.
+ */
 export function kioskStayOf(stay: StayView) {
   const nights = Math.round((Date.parse(stay.checkOutDate) - Date.parse(stay.checkInDate)) / 86_400_000);
   return {
@@ -339,7 +347,8 @@ export function kioskStayOf(stay: StayView) {
         hasFaceVideo: guest.hasFaceVideo,
         missing: guest.missing,
         hasJapanAddress: guest.has_japan_address === true,
-        ...(guest.is_representative ? { address: guest.address, contact: guest.contact } : {}),
+        address: guest.address,
+        ...(guest.is_representative ? { contact: guest.contact } : {}),
       }),
     ),
   };

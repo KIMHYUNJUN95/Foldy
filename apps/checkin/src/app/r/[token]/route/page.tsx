@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { RouteForm } from "@/components/route-form";
-import { getStayOr404, guestEntries } from "@/lib/guest/page";
+import { afterPeopleHref, getStayOr404, guestEntries, needsAddress } from "@/lib/guest/page";
 import { fmt, getDictionary } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/server";
 
@@ -19,7 +19,7 @@ export default async function RoutePage({ params }: { params: Promise<{ token: s
   const entries = guestEntries(stay, token, ordinal);
   // 대표자 명부 다음 화면이라 목록의 첫 번째(대표자)를 빼고 아직 안 끝난 첫 사람 → 없으면 동의 → 끝.
   const nextIndex = entries.findIndex((entry) => !entry.done && entry.key !== representative.id);
-  const nextHref = nextIndex >= 0 ? entries[nextIndex].href : stay.consented ? `/r/${token}` : `/r/${token}/terms`;
+  const nextHref = nextIndex >= 0 ? entries[nextIndex].href : afterPeopleHref(token, needsAddress(stay), stay.consented);
 
   return (
     <RouteForm

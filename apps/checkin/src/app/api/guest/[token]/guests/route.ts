@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { japanFlagChanged } from "@/lib/guest/address";
+import { companionsSharingOldAddress } from "@/lib/guest/address-plan";
 import { guestInputSchema, nameRomanOf } from "@/lib/guest/fields";
 import { partyAfterRemoval } from "@/lib/guest/party";
 import { json, readJson, serverError } from "@/lib/guest/request";
@@ -7,12 +9,12 @@ import { loadStayByToken, PASSPORT_BUCKET, refreshPreRegStatus } from "@/lib/gue
 import { createCheckinServiceClient } from "@/lib/supabase/service";
 
 // PUT /api/guest/[token]/guests — 한 사람 명부 저장(시안 W3). 서버가 다시 검사하고, 체크인 뒤에는 막는다(FR-W03).
-// 동행자의 주소 · 전 숙박지 · 다음 행선지는 화면이 대표자 값을 채워 보낸다(사람마다 저장, 44 FR-W02).
+// 동행자의 전 숙박지 · 다음 행선지는 화면이 대표자 값을 채워 보낸다(사람마다 저장, 44 FR-W02).
 // 대표자가 그 값을 바꾸면, 같은 값을 쓰던 동행자도 같이 바꾼다.
 export const dynamic = "force-dynamic";
 
 const MAX_GUESTS = 20;
-const SHARED = ["address", "prev_stay", "next_dest"] as const;
+const SHARED = ["prev_stay", "next_dest"] as const;
 
 export async function PUT(request: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
@@ -43,7 +45,6 @@ export async function PUT(request: Request, { params }: { params: Promise<{ toke
       no_passport_reason: isChild && input.noPassport ? "child" : null,
       age: input.age,
       gender: input.gender,
-      address: input.address,
       // 연락처는 대표자만(동행자는 대표자 것 — 43 §2-1). 동행자가 보낸 값은 버린다.
       contact: existing?.is_representative ? input.contact : null,
       prev_stay: input.prevStay,
@@ -52,9 +53,26 @@ export async function PUT(request: Request, { params }: { params: Promise<{ toke
       updated_at: new Date().toISOString(),
     };
 
+    // 주소는 PUT /api/guest/[token]/address 가 저장한다 — 이 화면은 안 보내므로 칸을 건드리지 않는다(보냈을 때만 저장).
+    // 일본 거주 여부가 실제로 바뀌면 옛 주소는 다른 글자 규칙으로 받은 것이라 비워 다시 묻는다(missingFields 는 글자를 따지지 않음).
+    const flagChanged = !!existing && japanFlagChanged(existing.has_japan_address, input.hasJapanAddress);
+    const rowWithAddress = input.address !== null ? { ...row, address: input.address } : flagChanged ? { ...row, address: null } : row;
+
     let guestId = existing?.id ?? null;
     if (existing) {
-      const { error } = await db.from("guests").update(row).eq("id", existing.id).eq("stay_id", stay.id);
+      // 대표자의 주소가 비워질 때(일본 거주 여부가 바뀜) 옛 글을 그대로 쓰던 동행자도 비운다 — 대표자 쓰기보다 먼저(다시 보내도 같은 판정).
+      if (existing.is_representative && flagChanged) {
+        const stale = companionsSharingOldAddress(stay.guests, existing.address);
+        if (stale.length) {
+          const { error: staleError } = await db
+            .from("guests")
+            .update({ address: null, updated_at: row.updated_at })
+            .eq("stay_id", stay.id)
+            .in("id", stale);
+          if (staleError) throw new Error(staleError.message);
+        }
+      }
+      const { error } = await db.from("guests").update(rowWithAddress).eq("id", existing.id).eq("stay_id", stay.id);
       if (error) throw new Error(error.message);
       if (existing.is_representative) {
         for (const field of SHARED) {
@@ -74,7 +92,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ toke
     } else {
       const { data, error } = await db
         .from("guests")
-        .insert({ ...row, organization_id: stay.organizationId, stay_id: stay.id, is_representative: false })
+        .insert({ ...rowWithAddress, organization_id: stay.organizationId, stay_id: stay.id, is_representative: false })
         .select("id")
         .single();
       if (error) throw new Error(error.message);

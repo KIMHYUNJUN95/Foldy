@@ -19,6 +19,8 @@ import com.harutokyo.checkin.kiosk.contract.CompleteResponse
 import com.harutokyo.checkin.kiosk.contract.CompleteResult
 import com.harutokyo.checkin.kiosk.contract.completeResultOf
 import com.harutokyo.checkin.kiosk.contract.ConsentBody
+import com.harutokyo.checkin.kiosk.contract.AddressBody
+import com.harutokyo.checkin.kiosk.contract.GuestAddress
 import com.harutokyo.checkin.kiosk.contract.GuestInput
 import com.harutokyo.checkin.kiosk.contract.RouteBody
 import com.harutokyo.checkin.kiosk.contract.SaveGuestBody
@@ -199,6 +201,10 @@ class KioskViewModel(application: Application) : AndroidViewModel(application) {
     /** 시안 T3s — 전 숙박지 · 다음 행선지(대표자, 같은 값을 쓰는 동행자도). */
     suspend fun saveRoute(sessionId: String, prevStay: String, nextDest: String): SaveResult =
         post("/api/kiosk/route", Api.json.encodeToString(RouteBody(sessionId, prevStay, nextDest)))
+
+    /** 집 주소 — 대표자 주소 + 다른 분 주소를 한 번에. 주소는 로그에 남기지 않는다. */
+    suspend fun saveAddress(sessionId: String, representativeAddress: String, others: List<GuestAddress>): SaveResult =
+        post("/api/kiosk/address", Api.json.encodeToString(AddressBody(sessionId, representativeAddress, others)))
 
     /** 시안 G3b — 약관 · 개인정보 두 칸 동의(대표자 이름으로 한 줄). */
     suspend fun saveConsent(sessionId: String, locale: String): SaveResult =

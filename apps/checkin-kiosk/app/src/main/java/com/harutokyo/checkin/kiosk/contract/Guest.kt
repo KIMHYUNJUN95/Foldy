@@ -3,7 +3,7 @@ package com.harutokyo.checkin.kiosk.contract
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-// 명부 저장(apps/checkin `/api/kiosk/guests` · `/api/kiosk/passport` · `/api/kiosk/route` · `/api/kiosk/consent`)과 1:1. 시안 T3c · T3n · T3s · G3b.
+// 명부 저장(apps/checkin `/api/kiosk/guests` · `/api/kiosk/passport` · `/api/kiosk/route` · `/api/kiosk/address` · `/api/kiosk/consent`)과 1:1. 시안 T3c · T3n · T3s · G3b.
 
 @Serializable
 data class MrzPayload(val raw: String, val valid: Boolean)
@@ -23,7 +23,6 @@ data class GuestInput(
     /** 만 나이(0..130). 생년월일은 보내지 않는다 — 명부엔 나이만. */
     val age: Int? = null,
     val gender: String? = null,
-    val address: String? = null,
     /** 전화나 이메일 하나 — 대표자만 보낸다(동행자는 대표자 값을 쓴다). */
     val contact: String? = null,
     val noPassportReason: String? = null,
@@ -35,6 +34,13 @@ data class SaveGuestBody(val sessionId: String, val guest: GuestInput)
 
 @Serializable
 data class ConsentBody(val sessionId: String, val terms: Boolean, val locale: String)
+
+/** 집 주소 저장 한 번(`POST /api/kiosk/address`) — 대표자 주소 + 다른 분 주소. 서버 오류 칸은 `address` · `address.<guestId>`. */
+@Serializable
+data class GuestAddress(val guestId: String, val address: String)
+
+@Serializable
+data class AddressBody(val sessionId: String, val representativeAddress: String, val others: List<GuestAddress>)
 
 @Serializable
 data class RouteBody(val sessionId: String, val prevStay: String, val nextDest: String)

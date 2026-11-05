@@ -22,24 +22,22 @@ data class PersonDraft(
     val number: String = "",
     val age: String = "",
     val gender: String? = null,
-    val address: String = "",
     val contact: String = "",
 )
 
-fun draftOf(mrz: MrzResult, address: String?, contact: String? = null, today: LocalDate = Mrz.tokyoToday()): PersonDraft = PersonDraft(
+fun draftOf(mrz: MrzResult, contact: String? = null, today: LocalDate = Mrz.tokyoToday()): PersonDraft = PersonDraft(
     surname = mrz.surname,
     given = mrz.givenNames,
     nationality = mrz.nationality,
     number = mrz.documentNumber,
     age = Mrz.ageOn(mrz.birthDate, today)?.toString().orEmpty(),
     gender = mrz.sex,
-    address = address.orEmpty(),
     contact = contact.orEmpty(),
 )
 
-/** 이 화면 흐름에서 채우는 칸만(전 숙박지 · 다음 행선지는 T3s, 동행자 주소는 대표자 값을 서버가 이어 준다). */
+/** 이 흐름에서 자리마다 채우는 칸만(전 숙박지 · 다음 행선지는 T3s, 집 주소는 전용 주소 화면 — ui/AddressFlow.kt). */
 fun personMissing(guest: KioskGuest): List<String> =
-    guest.missing.filter { it != "prev_stay" && it != "next_dest" && (guest.isRepresentative || it != "address") }
+    guest.missing.filter { it != "prev_stay" && it != "next_dest" && it != "address" }
 
 /** 다음에 할 자리(0부터). 이번에 이미 저장한 분은 다시 묻지 않는다 — 서버가 아직 빠졌다고 해도(직원 확인). 없으면 null. */
 fun nextSeat(stay: KioskStay, done: Set<String>): Int? {
@@ -63,7 +61,7 @@ fun needsRoute(stay: KioskStay): Boolean {
 fun parseAge(text: String): Int? = text.trim().takeIf { Regex("^\\d{1,3}$").matches(it) }?.toInt()?.takeIf { it in 0..130 }
 
 /** 화면에서 빈 칸(빨간 칸) — 서버도 다시 검사한다. 칸 이름은 서버 `fields` 와 같게. */
-fun requiredMissing(draft: PersonDraft, mode: FormMode, askAddress: Boolean, askContact: Boolean = false): List<String> = buildList {
+fun requiredMissing(draft: PersonDraft, mode: FormMode, askContact: Boolean = false): List<String> = buildList {
     if (draft.surname.isBlank()) add("lastName")
     if (draft.given.isBlank()) add("firstName")
     if (mode != FormMode.Resident) {
@@ -72,20 +70,18 @@ fun requiredMissing(draft: PersonDraft, mode: FormMode, askAddress: Boolean, ask
     }
     if (parseAge(draft.age) == null) add("age")
     if (draft.gender == null) add("gender")
-    if (askAddress && draft.address.isBlank()) add("address")
     if (askContact && draft.contact.isBlank()) add("contact")
 }
 
 private fun cleanNumber(value: String) = value.uppercase().replace(Regex("[\\s-]"), "")
 
-/** 저장할 몸통. 동행자는 주소를 보내지 않는다(서버가 대표자 값을 이어 준다) — 일본에 사는 분은 본인 주소. */
+/** 저장할 몸통. 집 주소는 여기서 보내지 않는다 — 전용 주소 화면이 `POST /api/kiosk/address` 로 한 번에 보낸다. */
 fun guestInputOf(
     guest: KioskGuest?,
     draft: PersonDraft,
     mode: FormMode,
     reason: NoPassport?,
     mrz: MrzResult?,
-    askAddress: Boolean,
     askContact: Boolean = false,
 ): GuestInput {
     val resident = mode == FormMode.Resident
@@ -100,7 +96,6 @@ fun guestInputOf(
         passportNumber = if (passport) cleanNumber(draft.number).ifEmpty { null } else null,
         age = parseAge(draft.age),
         gender = draft.gender,
-        address = if (askAddress) draft.address.trim().ifEmpty { null } else null,
         contact = if (askContact) draft.contact.trim().take(120).ifEmpty { null } else null,
         noPassportReason = reason?.code,
         mrz = if (mode == FormMode.Mrz && mrz != null) MrzPayload(mrz.raw, mrz.valid) else null,
@@ -141,10 +136,6 @@ fun passportsToShow(stay: KioskStay, repShot: Boolean): Int {
     return count
 }
 
-/** 사는 곳 한 줄 「도시, 나라」 — 빈 쪽은 뺀다. 둘 다 비면 null. */
-fun addressOf(city: String, country: String): String? =
-    listOf(city.trim(), country.trim()).filter { it.isNotEmpty() }.joinToString(", ").ifEmpty { null }
-
 /** ISO3 국가 코드 → 그 언어 나라 이름. 모르는 코드(UNO 등)는 코드 그대로. */
 fun countryName(code3: String, locale: java.util.Locale): String {
     val code = code3.trim().uppercase()
@@ -169,30 +160,22 @@ enum class ReviewWarn { None, Digits, Missing }
 fun reviewWarnOf(person: SavedPerson?): ReviewWarn = when {
     person == null -> ReviewWarn.None
     person.confirmed -> ReviewWarn.None
-    requiredMissing(person.draft, person.mode, askAddress = false).isNotEmpty() -> ReviewWarn.Missing
+    requiredMissing(person.draft, person.mode).isNotEmpty() -> ReviewWarn.Missing
     person.mrz?.valid == false -> ReviewWarn.Digits
     else -> ReviewWarn.None
 }
 
 /** 이 분의 필수 칸이 다 찼는가 — 안 찼으면 저장하지 않고(자리를 끝낸 것으로 치지 않고) 확인 화면에서 채우게 한다. */
-fun seatComplete(person: SavedPerson): Boolean = requiredMissing(person.draft, person.mode, askAddress = false).isEmpty()
+fun seatComplete(person: SavedPerson): Boolean = requiredMissing(person.draft, person.mode).isEmpty()
 
 /** 여권에서 읽은 것만으로 저장해도 되는가(성별 X · 읽히지 않은 생년월일이면 아니오 → 확인 화면). */
-fun mrzDraftComplete(mrz: MrzResult): Boolean = seatComplete(SavedPerson(draftOf(mrz, null), FormMode.Mrz, null, mrz))
+fun mrzDraftComplete(mrz: MrzResult): Boolean = seatComplete(SavedPerson(draftOf(mrz), FormMode.Mrz, null, mrz))
 
 /** 검토 화면 「맞아요」 — 필수 칸이 빈 분이 한 명이라도 있으면 막는다. 이번에 저장한 분은 화면 입력으로, 아닌 분은 서버가 알려 준 빈 칸으로 본다. */
 fun reviewReady(stay: KioskStay, people: Map<String, SavedPerson>): Boolean = stay.guests.none { guest ->
     val person = people[guest.id]
-    if (person != null) !person.confirmed && requiredMissing(person.draft, person.mode, askAddress = false).isNotEmpty()
+    if (person != null) !person.confirmed && requiredMissing(person.draft, person.mode).isNotEmpty()
     else personMissing(guest).isNotEmpty()
-}
-
-/** 대표자 사는 곳 칸을 묻는지 — 일본에 사는 분이 이미 주소를 썼거나, 서버에 주소가 있으면 묻지 않는다. */
-fun needsLivingPlace(representative: KioskGuest?, saved: SavedPerson?): Boolean {
-    if (representative == null) return false
-    if (saved?.mode == FormMode.Resident && saved.draft.address.isNotBlank()) return false
-    if (representative.hasJapanAddress && !representative.address.isNullOrBlank()) return false
-    return saved != null || "address" in representative.missing
 }
 
 /** F2 명단 한 줄의 상태 — 대표자는 F1 에서 여권을 이미 찍었으면 RepShot(얼굴만 남음). */

@@ -39,6 +39,14 @@ export const contractSchema = z.object({
   idleSecondsInput: z.number().int().min(30).max(900),
   idleSecondsDone: z.number().int().min(5).max(120),
   mrzAutofill: z.boolean(),
+  // 집 주소 입력 규칙(2026-11-06). 서버 `addressError` 와 같은 값 — 태블릿은 같은 사례표(`guest/address-cases.json`)로 맞춘다.
+  // 외국인(일본 주소 없음)은 라틴 글자만, 일본 거주자는 아무 글자. 운영 선택이지 법 해석이 아니다.
+  addressRules: z.object({
+    maxLength: z.number().int().positive(),
+    minLengthForeign: z.number().int().positive(),
+    minLengthJapan: z.number().int().positive(),
+    foreignScript: z.literal("latin"),
+  }),
   // 「직원에게 연락」 — 값은 건물 설정 그대로(전화 · LINE · WhatsApp). 비어 있으면 버튼만 숨긴다.
   supportContacts: z.partialRecord(z.enum(["phone", "line", "whatsapp"]), z.string()),
   // 직원 해제 PIN — 원문은 없다. 기기가 오프라인에서도 같은 방식(PBKDF2-SHA256)으로 대조한다. 설정 전이면 null.

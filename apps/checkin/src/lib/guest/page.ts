@@ -25,13 +25,24 @@ export type GuestEntry = {
   placeholder: boolean;
 };
 
+/** 주소 화면이 남았나 — 누구든 주소가 비어 있으면(2026-11-04: 전원 집 주소는 사람 칸이 아니라 /address 한 화면에서 받는다). */
+export function needsAddress(stay: Pick<StayView, "guests">): boolean {
+  return stay.guests.some((guest) => guest.missing.includes("address"));
+}
+
+/** 사람을 다 넣은 뒤 갈 곳: 주소가 남았으면 주소 화면 → 동의 전이면 약관 → 끝. */
+export function afterPeopleHref(token: string, addressPending: boolean, consented: boolean): string {
+  if (addressPending) return `/r/${token}/address`;
+  return consented ? `/r/${token}` : `/r/${token}/terms`;
+}
+
 /** 사람 목록(시안 W2) — 저장한 사람 + 손님이 말한 인원(없으면 예약 인원)만큼 빈 자리. 빈 자리를 누르면 새 사람. */
 export function guestEntries(stay: StayView, token: string, ordinal: (n: number) => string): GuestEntry[] {
   const entries: GuestEntry[] = stay.guests.map((guest, index) => ({
     key: guest.id,
     href: `/r/${token}/guest/${guest.id}`,
     label: guest.name_roman || ordinal(index + 1),
-    done: guest.missing.length === 0,
+    done: guest.missing.every((field) => field === "address"),
     isRepresentative: guest.is_representative,
     isChild: guest.guest_type === "child",
     hasPhoto: guest.hasPassportPhoto,

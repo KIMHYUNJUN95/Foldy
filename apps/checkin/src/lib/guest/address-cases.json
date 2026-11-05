@@ -1,0 +1,230 @@
+[
+  {
+    "name": "영문 주소",
+    "text": "USA, Boston, 12 Main St #4",
+    "hasJapanAddress": false,
+    "error": null
+  },
+  {
+    "name": "악센트(미리 합친 é ü)",
+    "text": "Germany, Düsseldorf, Königsallee 1",
+    "hasJapanAddress": false,
+    "error": null
+  },
+  {
+    "name": "악센트(분해된 e + U+0301)",
+    "text": "France, Paris, 5 Rue de l'E\u0301glise",
+    "hasJapanAddress": false,
+    "error": null
+  },
+  {
+    "name": "스페인어 ñ",
+    "text": "España, Málaga, Calle Ñandú 5",
+    "hasJapanAddress": false,
+    "error": null
+  },
+  {
+    "name": "서수 º (U+00BA) 허용",
+    "text": "Portugal, Lisboa, Rua Augusta 2º andar",
+    "hasJapanAddress": false,
+    "error": null
+  },
+  {
+    "name": "서수 ª (U+00AA) 허용",
+    "text": "Brasil, Sao Paulo, Av Paulista 3ª",
+    "hasJapanAddress": false,
+    "error": null
+  },
+  {
+    "name": "베트남어",
+    "text": "Vietnam, Hanoi, Nguyễn Huệ 12",
+    "hasJapanAddress": false,
+    "error": null
+  },
+  {
+    "name": "곡선 따옴표 ’ 는 '로",
+    "text": "Ireland, Dublin, O’Connell St 5",
+    "hasJapanAddress": false,
+    "error": null
+  },
+  {
+    "name": "NBSP 는 공백으로",
+    "text": "USA,\u00A0Boston,\u00A012 Main St",
+    "hasJapanAddress": false,
+    "error": null
+  },
+  {
+    "name": "줄바꿈",
+    "text": "USA\nBoston\n12 Main St",
+    "hasJapanAddress": false,
+    "error": null
+  },
+  {
+    "name": "끝 줄바꿈 · 쉼표는 길이에 안 셈",
+    "text": "USA, Bo\n",
+    "hasJapanAddress": false,
+    "error": "too_short"
+  },
+  {
+    "name": "정확히 8자(끝 쉼표 제외)",
+    "text": "12345678,\n",
+    "hasJapanAddress": false,
+    "error": null
+  },
+  {
+    "name": "한글",
+    "text": "대한민국 서울시 강남구 1번지",
+    "hasJapanAddress": false,
+    "error": "not_latin"
+  },
+  {
+    "name": "가나",
+    "text": "Japan, Tokyo, シンジュク 1-2-3",
+    "hasJapanAddress": false,
+    "error": "not_latin"
+  },
+  {
+    "name": "한자",
+    "text": "Japan, Tokyo, 新宿区 1-2-3",
+    "hasJapanAddress": false,
+    "error": "not_latin"
+  },
+  {
+    "name": "전각 영문",
+    "text": "Ｊａｐａｎ Ｔｏｋｙｏ １２３",
+    "hasJapanAddress": false,
+    "error": "not_latin"
+  },
+  {
+    "name": "곱셈 기호 ×",
+    "text": "Math × 12 Street City",
+    "hasJapanAddress": false,
+    "error": "not_latin"
+  },
+  {
+    "name": "키릴 글자",
+    "text": "Россия, Москва, ул. Тверская 7",
+    "hasJapanAddress": false,
+    "error": "not_latin"
+  },
+  {
+    "name": "이모지",
+    "text": "USA, Boston, 12 Main St 🏠",
+    "hasJapanAddress": false,
+    "error": "not_latin"
+  },
+  {
+    "name": "한 단어 USA",
+    "text": "USA",
+    "hasJapanAddress": false,
+    "error": "too_short"
+  },
+  {
+    "name": "한 단어 Tokyo",
+    "text": "Tokyo",
+    "hasJapanAddress": false,
+    "error": "too_short"
+  },
+  {
+    "name": "7자",
+    "text": "1234567",
+    "hasJapanAddress": false,
+    "error": "too_short"
+  },
+  {
+    "name": "공백만",
+    "text": "   ",
+    "hasJapanAddress": false,
+    "error": "too_short"
+  },
+  {
+    "name": "200자",
+    "text": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "hasJapanAddress": false,
+    "error": null
+  },
+  {
+    "name": "201자",
+    "text": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "hasJapanAddress": false,
+    "error": "too_long"
+  },
+  {
+    "name": "일본 거주자 일본어",
+    "text": "東京都新宿区1-2-3",
+    "hasJapanAddress": true,
+    "error": null
+  },
+  {
+    "name": "일본 거주자 영문",
+    "text": "Tokyo, Shinjuku",
+    "hasJapanAddress": true,
+    "error": null
+  },
+  {
+    "name": "일본 거주자 4자",
+    "text": "東京都新",
+    "hasJapanAddress": true,
+    "error": "too_short"
+  },
+  {
+    "name": "일본 거주자 5자",
+    "text": "東京都新宿",
+    "hasJapanAddress": true,
+    "error": null
+  },
+  {
+    "name": "일본 거주자 201자",
+    "text": "あああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああ",
+    "hasJapanAddress": true,
+    "error": "too_long"
+  },
+  {
+    "name": "(태블릿 표) Straße Łódź",
+    "text": "Poland, Łódź, Straße 12",
+    "hasJapanAddress": false,
+    "error": null
+  },
+  {
+    "name": "(태블릿 표) 분해된 ễ",
+    "text": "Vietnam, Hanoi, Nguye\u0302\u0303n 12",
+    "hasJapanAddress": false,
+    "error": null
+  },
+  {
+    "name": "(태블릿 표) 그리스",
+    "text": "Αθήνα 1 Greece",
+    "hasJapanAddress": false,
+    "error": "not_latin"
+  },
+  {
+    "name": "(태블릿 표) 키릴 대문자",
+    "text": "Москва 1 Russia",
+    "hasJapanAddress": false,
+    "error": "not_latin"
+  },
+  {
+    "name": "(태블릿 표) 나눗셈 ÷",
+    "text": "10 ÷ 2 street city",
+    "hasJapanAddress": false,
+    "error": "not_latin"
+  },
+  {
+    "name": "(태블릿 표) 2º",
+    "text": "Rua Augusta 2º",
+    "hasJapanAddress": false,
+    "error": null
+  },
+  {
+    "name": "(태블릿 표) 긴 줄표 – 는 -로",
+    "text": "UK, London, Block 1\u20132 Street",
+    "hasJapanAddress": false,
+    "error": null
+  },
+  {
+    "name": "(태블릿 표) 끝 쉼표는 길이에 안 셈(7자)",
+    "text": "1234567,",
+    "hasJapanAddress": false,
+    "error": "too_short"
+  }
+]

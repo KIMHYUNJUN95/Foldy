@@ -1,7 +1,8 @@
 // 태블릿 명부 저장 판정(DB 없음 — 테스트로 덮는다). 44 FR-K06 · K07 · K08 · K16 · K21.
 import { z } from "zod";
 
-import { guestInputSchema, nameRomanOf, type MissingField } from "../guest/fields";
+import { japanFlagChanged } from "../guest/address";
+import { guestInputBase, nameRomanOf, withAddressCheck, type MissingField } from "../guest/fields";
 
 export const KIOSK_MAX_GUESTS = 20;
 
@@ -9,13 +10,12 @@ export const KIOSK_MAX_GUESTS = 20;
 export const NO_PASSPORT_REASONS = ["child", "japan_resident", "not_shown", "camera_off"] as const;
 export type NoPassportReason = (typeof NO_PASSPORT_REASONS)[number];
 
-const kioskGuestSchema = guestInputSchema
-  .omit({ noPassport: true, prevStay: true, nextDest: true })
-  .extend({
+const kioskGuestSchema = withAddressCheck(
+  guestInputBase.omit({ noPassport: true, prevStay: true, nextDest: true }).extend({
     noPassportReason: z.enum(NO_PASSPORT_REASONS).optional(),
     mrz: z.object({ raw: z.string().trim().min(1).max(200), valid: z.boolean() }).optional(),
-  })
-  .refine((guest) => guest.noPassportReason !== "child" || guest.guestType === "child", {
+  }),
+).refine((guest) => guest.noPassportReason !== "child" || guest.guestType === "child", {
     path: ["noPassportReason"],
     message: "noPassportReason",
   });
@@ -31,13 +31,14 @@ export function invalidFieldsOf(error: z.ZodError): string[] {
   });
 }
 
-export const SHARED_FIELDS = ["address", "prev_stay", "next_dest"] as const;
+// 주소는 이어받지 않는다(2026-11-04 — 전원 집 주소 전체, 명시적으로만 저장: POST /api/kiosk/address). 숙박지는 이어받는다.
+export const SHARED_FIELDS = ["prev_stay", "next_dest"] as const;
 export type SharedField = (typeof SHARED_FIELDS)[number];
 type Shared = Record<SharedField, string | null>;
 type SharingGuest = Shared & { id: string; is_representative: boolean };
 
 /**
- * 저장할 칸(사람 하나). 주소 · 연락처를 안 보냈으면 칸을 비우지 않는다 — 새 사람이면 대표자 주소 · 숙박지를 이어받는다.
+ * 저장할 칸(사람 하나). 주소 · 연락처를 안 보냈으면 칸을 비우지 않는다 — 새 사람이면 대표자 숙박지를 이어받는다(주소는 아님).
  * 연락처는 대표자만 저장한다(동행자는 대표자 것 — 43 §2-1).
  */
 export function kioskGuestRow(
@@ -46,6 +47,8 @@ export function kioskGuestRow(
   isNew: boolean,
   nowIso: string,
   isRepresentative = false,
+  /** 고치는 사람의 저장돼 있던 일본 거주 여부 — 바뀌었으면 옛 주소를 비워 다시 묻는다. */
+  previous?: { has_japan_address: boolean | null } | null,
 ) {
   const noPassport = !!input.noPassportReason;
   const row: Record<string, unknown> = {
@@ -65,9 +68,9 @@ export function kioskGuestRow(
     row.mrz_valid = input.mrz.valid;
   }
   if (input.address !== null) row.address = input.address;
+  else if (previous && japanFlagChanged(previous.has_japan_address, input.hasJapanAddress)) row.address = null;
   if (isRepresentative && input.contact !== null) row.contact = input.contact;
   if (isNew && representative) {
-    row.address ??= representative.address;
     row.prev_stay = representative.prev_stay;
     row.next_dest = representative.next_dest;
   }
@@ -104,4 +107,11 @@ export const routeBodySchema = z.object({
   sessionId: z.uuid(),
   prevStay: z.string().trim().min(1).max(120),
   nextDest: z.string().trim().min(1).max(120),
+});
+
+const uuid = z.uuid();
+export const addressBodySchema = z.object({
+  sessionId: uuid,
+  representativeAddress: z.string().max(400),
+  others: z.array(z.object({ guestId: uuid, address: z.string().max(400) })).max(KIOSK_MAX_GUESTS),
 });

@@ -12,7 +12,7 @@ import { RouteQuestions, routeSummary } from "./route-questions";
 import { SeatRemover } from "./seat-remover";
 
 // 한 사람 명부(시안 W3). 웹은 여권을 판독하지 않는다 — 사진을 보며 손으로 넣는다(16 §6).
-// 동행자의 주소 · 숙박지는 대표자 값을 그대로 저장하고(「바꾸기」로 따로), 서버가 다시 검사한다.
+// 동행자의 숙박지는 대표자 값을 그대로 저장하고(「바꾸기」로 따로), 서버가 다시 검사한다. 주소는 이 화면에서 받지 않는다 — 전원 끝난 뒤 /address 한 화면(2026-11-04).
 // 받는 칸은 법에 있는 것만(43 §2-1): 성별 · 나이 · 숙박지는 모두, 연락처는 대표자만, 국적 · 여권은 외국인만.
 
 export type PersonInitial = {
@@ -27,7 +27,6 @@ export type PersonInitial = {
   contact: string;
   gender: "male" | "female" | null;
   noPassport: boolean;
-  address: string;
   prevStay: string;
   nextDest: string;
 };
@@ -41,7 +40,7 @@ type Props = {
   initial: PersonInitial;
   isRepresentative: boolean;
   representativeName: string;
-  sharedFromRep: { address: string; prevStay: string; nextDest: string } | null;
+  sharedFromRep: { prevStay: string; nextDest: string } | null;
   photoUrl: string | null;
   countries: { code: string; name: string }[];
   editable: boolean;
@@ -77,9 +76,7 @@ export function PersonForm(props: Props) {
   const [ownShared, setOwnShared] = useState(
     !sharedFromRep ||
       (!!initial.id &&
-        (initial.address !== sharedFromRep.address ||
-          initial.prevStay !== sharedFromRep.prevStay ||
-          initial.nextDest !== sharedFromRep.nextDest)),
+        (initial.prevStay !== sharedFromRep.prevStay || initial.nextDest !== sharedFromRep.nextDest)),
   );
   const [photo, setPhoto] = useState<{ blob: Blob; preview: string } | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -145,7 +142,6 @@ export function PersonForm(props: Props) {
             age: shared.age ?? undefined,
             gender: shared.gender ?? undefined,
             noPassport: shared.guestType === "child" && shared.noPassport,
-            address: shared.address || undefined,
             contact: isRepresentative ? shared.contact || undefined : undefined,
             prevStay: shared.prevStay || undefined,
             nextDest: shared.nextDest || undefined,
@@ -390,9 +386,7 @@ export function PersonForm(props: Props) {
               <div>
                 <p className="text-[15px]">{fmt(dict.person.sameAsRep, { name: props.representativeName })}</p>
                 <p className="mt-1 text-[15px] text-[var(--muted)]">
-                  {[sharedFromRep.address, routeSummary(dict.route, sharedFromRep.prevStay, sharedFromRep.nextDest)]
-                    .filter(Boolean)
-                    .join(" · ")}
+                  {routeSummary(dict.route, sharedFromRep.prevStay, sharedFromRep.nextDest)}
                 </p>
               </div>
               <button
@@ -405,16 +399,6 @@ export function PersonForm(props: Props) {
             </div>
           ) : (
             <>
-              <label>
-                <span className="w-lab">{dict.person.address}</span>
-                <input
-                  className="w-in"
-                  autoComplete="street-address"
-                  placeholder={foreign ? dict.person.addressHelp : undefined}
-                  value={form.address}
-                  onChange={(event) => set("address", event.target.value)}
-                />
-              </label>
               {isRepresentative ? (
                 <label>
                   <span className="w-lab">{dict.person.contact}</span>

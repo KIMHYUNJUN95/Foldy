@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,6 +41,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -54,6 +57,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.intl.LocaleList
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -232,7 +236,6 @@ internal fun ConfirmScreen(
     mode: FormMode,
     mrzValid: Boolean?,
     initial: PersonDraft,
-    askAddress: Boolean,
     askContact: Boolean,
     representativeName: String?,
     last: Boolean,
@@ -247,7 +250,7 @@ internal fun ConfirmScreen(
     var saving by remember(key) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val submit = {
-        val empty = requiredMissing(draft, mode, askAddress, askContact)
+        val empty = requiredMissing(draft, mode, askContact)
         if (empty.isNotEmpty()) {
             bad = empty
             failed = false
@@ -330,13 +333,7 @@ internal fun ConfirmScreen(
                 ) { female -> update(draft.copy(gender = if (female) "female" else "male")) }
             }
         }
-        if (askAddress) {
-            Spacer(Modifier.height(18.dp))
-            Field(
-                str(if (mode == FormMode.Resident) R.string.field_address_jp else R.string.field_address),
-                draft.address, "address" in bad, Modifier.fillMaxWidth(), hint = str(R.string.field_tap), max = 200, single = false,
-            ) { update(draft.copy(address = it)) }
-        } else if (representativeName != null) {
+        if (representativeName != null) {
             Spacer(Modifier.height(24.dp))
             Column(Modifier.fillMaxWidth().border(BorderStroke(1.dp, Edge), Radius).padding(horizontal = 22.dp, vertical = 18.dp)) {
                 Text(str(R.string.shared_title), color = G.Text, fontSize = 18.sp, fontWeight = FontWeight.Medium)
@@ -367,8 +364,20 @@ internal fun Field(
     plain: Boolean = false,
     /** 라벨 오른쪽 작은 표시(예: 「예약에서」). */
     tag: String? = null,
+    /** 자판 언어 힌트(예: "en-US" · "ja-JP") — 기기 자판이 그 언어로 열리게 한다(그 언어가 자판에 켜져 있어야 한다). */
+    keyboardLocale: String? = null,
+    /** 들어온 글을 걸러낸다(예: 영어 자판 전용 칸). 걸러낸 뒤 길이를 자른다. */
+    filter: ((String) -> String)? = null,
+    ime: ImeAction = ImeAction.Next,
+    /** 자판의 완료 키 — ime = Done 일 때 자판을 닫는 일을 맡는다. */
+    onDone: (() -> Unit)? = null,
+    minLines: Int = 1,
+    /** 칸이 나타나면 바로 눌려 자판이 뜨게 한다. */
+    autoFocus: Boolean = false,
     onChange: (String) -> Unit,
 ) {
+    val requester = remember { FocusRequester() }
+    if (autoFocus) LaunchedEffect(Unit) { requester.requestFocus() }
     Column(modifier) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(label, color = if (bad) G.Error else G.Muted, fontSize = 16.sp, modifier = Modifier.weight(1f, fill = false))
@@ -380,16 +389,20 @@ internal fun Field(
         Spacer(Modifier.height(10.dp))
         BasicTextField(
             value = value,
-            onValueChange = { onChange(it.take(max)) },
+            onValueChange = { onChange((filter?.invoke(it) ?: it).take(max)) },
+            modifier = Modifier.focusRequester(requester),
             singleLine = single,
+            minLines = if (single) 1 else minLines,
             textStyle = TextStyle(color = G.Text, fontSize = 24.sp),
             cursorBrush = SolidColor(G.Text),
             keyboardOptions = KeyboardOptions(
                 capitalization = if (plain) KeyboardCapitalization.None else if (single) KeyboardCapitalization.Characters else KeyboardCapitalization.Sentences,
                 autoCorrectEnabled = false,
                 keyboardType = if (number) KeyboardType.Number else KeyboardType.Text,
-                imeAction = ImeAction.Next,
+                imeAction = ime,
+                hintLocales = keyboardLocale?.let { LocaleList(it) },
             ),
+            keyboardActions = KeyboardActions(onDone = { onDone?.invoke() }),
             decorationBox = { inner ->
                 Box(
                     Modifier.fillMaxWidth().heightIn(min = 72.dp).background(G.Surface, Radius)

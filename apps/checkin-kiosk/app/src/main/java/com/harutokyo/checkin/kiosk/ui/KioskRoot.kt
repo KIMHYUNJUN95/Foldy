@@ -403,6 +403,7 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
                                         save = { model.saveGuest(id, it) },
                                         setParty = { model.setParty(id, it) },
                                         saveRoute = { prev, next -> model.saveRoute(id, prev, next) },
+                                        saveAddress = { rep, others -> model.saveAddress(id, rep, others) },
                                         saveConsent = { model.saveConsent(id, language) },
                                         enqueuePassport = { guestId, jpeg -> model.enqueuePassport(id, guestId, jpeg) },
                                         enqueueFace = { guestId, file -> model.enqueueFace(id, guestId, file) },

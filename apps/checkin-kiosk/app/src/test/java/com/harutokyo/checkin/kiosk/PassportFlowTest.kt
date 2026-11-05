@@ -10,10 +10,8 @@ import com.harutokyo.checkin.kiosk.ui.SavedPerson
 import com.harutokyo.checkin.kiosk.ui.SeatLine
 import com.harutokyo.checkin.kiosk.ui.SeatPlan
 import com.harutokyo.checkin.kiosk.ui.SeatTask
-import com.harutokyo.checkin.kiosk.ui.addressOf
 import com.harutokyo.checkin.kiosk.ui.countryName
 import com.harutokyo.checkin.kiosk.ui.matchSavedGuest
-import com.harutokyo.checkin.kiosk.ui.needsLivingPlace
 import com.harutokyo.checkin.kiosk.ui.nextSeatPlan
 import com.harutokyo.checkin.kiosk.ui.passportsToShow
 import com.harutokyo.checkin.kiosk.ui.reviewWarnOf
@@ -38,7 +36,7 @@ class PassportFlowTest {
 
     @Test
     fun skipsRouteAndCompanionAddressWhenPickingNextSeat() {
-        // 동행자의 주소 · 대표자의 행선지는 이 흐름에서 묻지 않는다 → 대표자(사진)만, 그다음 빈 자리.
+        // 집 주소(전용 화면) · 대표자의 행선지는 자리 흐름에서 묻지 않는다 → 대표자(사진)만, 그다음 빈 자리.
         assertEquals(0, nextSeat(stay(3, rep, companion), emptySet()))
         assertEquals(2, nextSeat(stay(3, rep, companion), setOf("r")))
         assertNull(nextSeat(stay(2, rep, companion), setOf("r")))
@@ -54,30 +52,29 @@ class PassportFlowTest {
     @Test
     fun formRulesFollowMode() {
         val empty = PersonDraft()
-        assertEquals(listOf("lastName", "firstName", "nationality", "passportNumber", "age", "gender", "address", "contact"), requiredMissing(empty, FormMode.Mrz, true, true))
-        assertEquals(listOf("lastName", "firstName", "nationality", "age", "gender"), requiredMissing(empty, FormMode.Child, false))
-        assertEquals(listOf("lastName", "firstName", "age", "gender", "address"), requiredMissing(empty, FormMode.Resident, true))
-        assertEquals(listOf("age"), requiredMissing(PersonDraft("A", "B", "KOR", "X1234567", "131", "male"), FormMode.Mrz, false))
+        assertEquals(listOf("lastName", "firstName", "nationality", "passportNumber", "age", "gender", "contact"), requiredMissing(empty, FormMode.Mrz, true))
+        assertEquals(listOf("lastName", "firstName", "nationality", "age", "gender"), requiredMissing(empty, FormMode.Child))
+        // 일본 거주도 집 주소를 이 칸에서 받지 않는다(전용 주소 화면).
+        assertEquals(listOf("lastName", "firstName", "age", "gender"), requiredMissing(empty, FormMode.Resident))
+        assertEquals(listOf("age"), requiredMissing(PersonDraft("A", "B", "KOR", "X1234567", "131", "male"), FormMode.Mrz))
     }
 
     @Test
-    fun companionDoesNotSendAddressAndChildReasonMarksChild() {
-        val draft = PersonDraft("kim", "b", "kor", "", "7", "female", "Seoul", "a@b.c")
-        val input = guestInputOf(companion, draft, FormMode.Child, NoPassport.Child, null, askAddress = false)
+    fun companionDoesNotSendContactAndChildReasonMarksChild() {
+        val draft = PersonDraft("kim", "b", "kor", "", "7", "female", "a@b.c")
+        val input = guestInputOf(companion, draft, FormMode.Child, NoPassport.Child, null)
         assertEquals("child", input.guestType)
         assertEquals("child", input.noPassportReason)
-        assertNull(input.address)
         assertNull(input.contact)
         assertEquals(7, input.age)
         assertNull(input.passportNumber)
         assertEquals("KOR", input.nationality)
-        val resident = guestInputOf(null, draft, FormMode.Resident, NoPassport.JapanResident, null, askAddress = true)
+        val resident = guestInputOf(null, draft, FormMode.Resident, NoPassport.JapanResident, null)
         assertTrue(resident.hasJapanAddress)
         assertNull(resident.nationality)
-        assertEquals("Seoul", resident.address)
         assertEquals("female", resident.gender)
         assertEquals(7, resident.age)
-        val repInput = guestInputOf(null, draft, FormMode.Manual, null, null, askAddress = true, askContact = true)
+        val repInput = guestInputOf(null, draft, FormMode.Manual, null, null, askContact = true)
         assertEquals("a@b.c", repInput.contact)
     }
 }
@@ -103,7 +100,7 @@ class FastFlowTest {
 
     @Test
     fun savedGuestIsNotAskedAgainEvenIfServerStillListsMissing() {
-        // 대표자를 방금 저장했지만 주소는 검토 화면에서 받는다 — 서버 missing 에 address 가 남아도 같은 자리를 다시 묻지 않는다.
+        // 대표자를 방금 저장했지만 주소는 전용 주소 화면에서 받는다 — 서버 missing 에 address 가 남아도 같은 자리를 다시 묻지 않는다.
         assertEquals(SeatPlan(1, SeatTask.FaceOnly), nextSeatPlan(stay(2, rep, preNoFace), setOf("r")))
     }
 
@@ -135,14 +132,6 @@ class FastFlowTest {
     }
 
     @Test
-    fun livingPlaceAddressIsCityThenCountry() {
-        assertEquals("Chicago, United States", addressOf(" Chicago ", "United States"))
-        assertEquals("Chicago", addressOf("Chicago", ""))
-        assertEquals("United States", addressOf("", "United States"))
-        assertNull(addressOf("  ", ""))
-    }
-
-    @Test
     fun countryNameFollowsLocaleAndFallsBackToCode() {
         assertEquals("United States", countryName("USA", java.util.Locale.ENGLISH))
         assertEquals("미국", countryName("usa", java.util.Locale.KOREAN))
@@ -160,16 +149,6 @@ class FastFlowTest {
         assertEquals(ReviewWarn.Missing, reviewWarnOf(SavedPerson(good.copy(age = ""), FormMode.Mrz, null, mrz(true))))
         assertEquals(ReviewWarn.None, reviewWarnOf(SavedPerson(good, FormMode.Mrz, null, mrz(false), confirmed = true)))
         assertEquals(ReviewWarn.None, reviewWarnOf(null))
-    }
-
-    @Test
-    fun livingPlaceIsSkippedForJapanResidentWithAddress() {
-        val saved = SavedPerson(PersonDraft("KIM", "A", address = "Tokyo"), FormMode.Resident, null, null)
-        assertFalse(needsLivingPlace(rep, saved))
-        assertTrue(needsLivingPlace(rep, SavedPerson(PersonDraft("KIM", "A"), FormMode.Mrz, null, null)))
-        // 웹으로 이미 끝난 대표자(저장한 입력 없음, 서버에 주소 있음)는 묻지 않는다.
-        assertFalse(needsLivingPlace(rep.copy(missing = emptyList()), null))
-        assertFalse(needsLivingPlace(null, null))
     }
 }
 

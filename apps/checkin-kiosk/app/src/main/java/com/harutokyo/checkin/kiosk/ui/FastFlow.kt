@@ -52,6 +52,7 @@ import com.harutokyo.checkin.kiosk.R
 import com.harutokyo.checkin.kiosk.camera.Captured
 import com.harutokyo.checkin.kiosk.camera.FaceRecorder
 import com.harutokyo.checkin.kiosk.camera.PassportScanner
+import com.harutokyo.checkin.kiosk.contract.GuestAddress
 import com.harutokyo.checkin.kiosk.contract.GuestInput
 import com.harutokyo.checkin.kiosk.contract.KioskGuest
 import com.harutokyo.checkin.kiosk.contract.KioskStay
@@ -66,17 +67,19 @@ import java.util.Locale
 
 // 빠른 체크인(F1~F7b, 목표: 4명 약 3분). 로그인 흐름 요약:
 //   F1 여권 비추기(ScanScreen — 예약 찾기) → F2 예약 찾음 · 여권 N개 안내 → 자리마다 [F3 여권 → (저장) → F4 얼굴 5초] 반복
-//   → F6b 한 번에 검토(사는 곳 · 연락처) → F7b 마지막 질문 + 약관 동의 → 올리기 끝나면 완료.
+//   → F6b 한 번에 검토(연락처) → 집 주소(대표자 한 칸 + 「모두 같아요」 / 다른 분 — ui/AddressScreens.kt, 모두 주소가 있으면 건너뜀) → F7b 마지막 질문 + 약관 동의 → 올리기 끝나면 완료.
 // 자리마다 소개 · 「읽는 중」 · 확인 화면이 없다 — 여권이 읽히면 바로 저장하고 얼굴로 넘어간다. 읽지 못한 분만 T3x → 직접 입력(ConfirmScreen).
 // 여권 사진 · 얼굴 영상은 뒤에서 차례로 올린다(data/UploadQueue.kt). 손님 정보는 로그에 남기지 않는다.
 
-enum class FastPhase { Ready, Passport, NoPassport, Failed, Confirm, Face, Review, Edit, Final }
+enum class FastPhase { Ready, Passport, NoPassport, Failed, Confirm, Face, Review, Edit, Address, Final }
 
 /** 이 흐름이 서버 · 올리기 줄에 시키는 일(KioskRoot 가 ViewModel 에 이어 준다). */
 class FastActions(
     val save: suspend (GuestInput) -> SaveResult,
     val setParty: suspend (Int) -> KioskStay?,
     val saveRoute: suspend (String, String) -> SaveResult,
+    /** 집 주소 한 번에: 대표자 주소 + 다른 분 주소(명시). */
+    val saveAddress: suspend (representativeAddress: String, others: List<GuestAddress>) -> SaveResult,
     val saveConsent: suspend () -> SaveResult,
     val enqueuePassport: (guestId: String, jpeg: ByteArray) -> Unit,
     val enqueueFace: (guestId: String, file: File) -> Unit,
@@ -134,6 +137,10 @@ fun FastCheckin(
     var uncertainSave by remember { mutableStateOf(false) }
     // 얼굴만 하는 자리(웹 사전 등록 동행자)는 이름을 보여 주고 손님이 「시작」을 눌러야 녹화한다 — 앞사람 얼굴이 이 분 이름으로 저장되지 않게.
     var faceGate by remember { mutableStateOf(false) }
+    // 집 주소를 이번에 적었다 — 검토 화면으로 돌아갔다 다시 와도 주소 화면을 거치게 한다(주소 고치기).
+    var addressVisited by remember { mutableStateOf(false) }
+    // 주소 화면 입력 — 나갔다 다시 들어와도(뒤로 · 주소 고치기) 동행자가 따로 적은 주소가 사라지지 않게 여기서 들고 있는다.
+    var addressDraft by remember { mutableStateOf<AddressDraft?>(null) }
 
     val seats = maxOf(stay.partySize, stay.guests.size)
     val representative = stay.guests.firstOrNull { it.isRepresentative }
@@ -185,8 +192,8 @@ fun FastCheckin(
         savingCapture = true
         reason = null
         faceBroken = false
-        val draft = draftOf(mrz, null)
-        val input = guestInputOf(guest, draft, FormMode.Mrz, null, mrz, askAddress = false)
+        val draft = draftOf(mrz)
+        val input = guestInputOf(guest, draft, FormMode.Mrz, null, mrz)
         captured = c
         mode = FormMode.Mrz
         passportRead = true
@@ -274,6 +281,7 @@ fun FastCheckin(
                 FastPhase.Passport, FastPhase.NoPassport, FastPhase.Failed, FastPhase.Confirm -> "passport $seatNo"
                 FastPhase.Face -> "face $seatNo"
                 FastPhase.Review, FastPhase.Edit -> "review"
+                FastPhase.Address -> "address"
                 FastPhase.Final -> "final"
             },
         )
@@ -354,14 +362,12 @@ fun FastCheckin(
             },
         )
         FastPhase.Confirm -> {
-            val askAddress = mode == FormMode.Resident
             ConfirmScreen(
                 key = "$seatIndex-$mode-${captured?.mrz?.raw}",
                 who = header,
                 mode = mode,
                 mrzValid = captured?.mrz?.valid,
-                initial = captured?.mrz?.let { draftOf(it, null) } ?: PersonDraft(),
-                askAddress = askAddress,
+                initial = captured?.mrz?.let { draftOf(it) } ?: PersonDraft(),
                 askContact = false,
                 representativeName = if (!seatIsRep && mode != FormMode.Resident) representative?.name else null,
                 last = false,
@@ -372,7 +378,7 @@ fun FastCheckin(
                     phase = FastPhase.Passport
                 },
                 onSubmit = { draft ->
-                    val input = guestInputOf(seatGuest, draft, mode, reason, captured?.mrz, askAddress)
+                    val input = guestInputOf(seatGuest, draft, mode, reason, captured?.mrz)
                     when (val result = saveOnce(input, draft)) {
                         is SaveResult.Saved -> {
                             val id = result.guestId ?: input.id
@@ -434,23 +440,20 @@ fun FastCheckin(
                 editId = id
                 phase = FastPhase.Edit
             },
-            onSave = { address, contact ->
+            onSave = { contact ->
                 val rep = representative
                 val savedRep = rep?.let { people[it.id] }
                 if (rep == null || savedRep == null) {
-                    phase = FastPhase.Final
+                    phase = if (needsAddress(stayNow) || addressVisited) FastPhase.Address else FastPhase.Final
                     true
                 } else {
-                    val draft = savedRep.draft.copy(
-                        address = address ?: savedRep.draft.address,
-                        contact = contact ?: savedRep.draft.contact,
-                    )
-                    val input = guestInputOf(rep, draft, savedRep.mode, savedRep.reason, savedRep.mrz, askAddress = address != null || savedRep.mode == FormMode.Resident, askContact = contact != null)
+                    val draft = savedRep.draft.copy(contact = contact ?: savedRep.draft.contact)
+                    val input = guestInputOf(rep, draft, savedRep.mode, savedRep.reason, savedRep.mrz, askContact = contact != null)
                     when (val result = actions.save(input)) {
                         is SaveResult.Saved -> {
                             onStay(result.stay)
                             people = people + (rep.id to savedRep.copy(draft = draft))
-                            phase = FastPhase.Final
+                            phase = if (needsAddress(result.stay) || addressVisited) FastPhase.Address else FastPhase.Final
                             true
                         }
                         SaveResult.SessionGone -> {
@@ -475,7 +478,6 @@ fun FastCheckin(
                     mode = person.mode,
                     mrzValid = person.mrz?.valid,
                     initial = person.draft,
-                    askAddress = person.mode == FormMode.Resident,
                     askContact = false,
                     representativeName = null,
                     last = true,
@@ -483,7 +485,7 @@ fun FastCheckin(
                     onBack = { phase = FastPhase.Review },
                     onRetake = {},
                     onSubmit = { draft ->
-                        val input = guestInputOf(guest, draft, person.mode, person.reason, person.mrz, person.mode == FormMode.Resident)
+                        val input = guestInputOf(guest, draft, person.mode, person.reason, person.mrz)
                         when (val result = actions.save(input)) {
                             is SaveResult.Saved -> {
                                 onStay(result.stay)
@@ -502,6 +504,26 @@ fun FastCheckin(
                 )
             }
         }
+        FastPhase.Address -> AddressScreens(
+            stay = stay,
+            people = people,
+            nameOf = ::nameOf,
+            draft = addressDraft,
+            onDraft = { addressDraft = it },
+            onBack = { phase = FastPhase.Review },
+            onCall = onCall,
+            onSave = { rep, others ->
+                val result = actions.saveAddress(rep, others)
+                if (result is SaveResult.Saved) {
+                    onStay(result.stay)
+                    addressVisited = true
+                    phase = FastPhase.Final
+                } else if (result is SaveResult.SessionGone) {
+                    onSessionGone()
+                }
+                result
+            },
+        )
         FastPhase.Final -> FinalScreen(
             stay = stayNow,
             language = language,
@@ -509,7 +531,7 @@ fun FastCheckin(
             actions = actions,
             onStay = onStay,
             onSessionGone = onSessionGone,
-            onBack = { phase = FastPhase.Review },
+            onBack = { phase = if (addressVisited) FastPhase.Address else FastPhase.Review },
             onCall = onCall,
             onDone = onDone,
         )
@@ -862,7 +884,7 @@ private fun FaceScreen(
 
 // ── F6b ─────────────────────────────────────────────────────────────────────────────────────────────
 
-/** F6b — 모두 한 번에 검토. 사는 곳(도시) · 연락처는 대표자 것만 받아 「맞아요」로 저장한다. */
+/** F6b — 모두 한 번에 검토. 연락처는 대표자 것만 받아 「맞아요」로 저장한다(집 주소는 다음 화면 — AddressScreens). */
 @Composable
 private fun ReviewScreen(
     stay: KioskStay,
@@ -871,26 +893,20 @@ private fun ReviewScreen(
     onBack: () -> Unit,
     onCall: () -> Unit,
     onEdit: (String) -> Unit,
-    onSave: suspend (address: String?, contact: String?) -> Boolean,
+    onSave: suspend (contact: String?) -> Boolean,
 ) {
     val locale = localeOf(language)
     val representative = stay.guests.firstOrNull { it.isRepresentative }
     val repSaved = representative?.let { people[it.id] }
-    // 대표자를 이번에 저장한 경우에만 사는 곳 · 연락처를 받는다(웹 사전 등록으로 끝난 대표자는 이미 있다).
-    val askPlace = needsLivingPlace(representative, repSaved)
     val askContact = repSaved != null
-    val countryCode = repSaved?.draft?.nationality.orEmpty()
-    var city by remember { mutableStateOf("") }
-    var typedCountry by remember { mutableStateOf("") }
     val initialContact = remember { representative?.contact.orEmpty() }
     var contact by remember { mutableStateOf(initialContact) }
+    // 예약에서 받은 연락처는 한 줄로 보여 주고 눌러야 고친다. 비어 있으면 처음부터 입력칸.
+    var editingContact by remember { mutableStateOf(initialContact.isBlank()) }
     var saving by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    // 나라 이름: 여권 국적을 그 언어로 보여 주고, 명부에는 영어 이름으로 쓴다. 국적을 모르면 직접 쓴다.
-    val countryShown = if (countryCode.isNotBlank()) countryName(countryCode, locale) else ""
-    val countryStored = if (countryCode.isNotBlank()) countryName(countryCode, Locale.ENGLISH) else typedCountry
-    val ready = reviewReady(stay, people) && (!askPlace || (city.isNotBlank() && countryStored.isNotBlank())) && (!askContact || contact.isNotBlank())
+    val ready = reviewReady(stay, people) && (!askContact || contact.isNotBlank())
 
     ScrollPage(bottom = {
         Column {
@@ -902,7 +918,7 @@ private fun ReviewScreen(
                 saving = true
                 failed = false
                 scope.launch {
-                    val ok = onSave(if (askPlace) addressOf(city, countryStored) else null, if (askContact) contact.trim() else null)
+                    val ok = onSave(if (askContact) contact.trim() else null)
                     failed = !ok
                     saving = false
                 }
@@ -953,41 +969,32 @@ private fun ReviewScreen(
                 }
             }
         }
-        if (askPlace) {
+        if (askContact) {
             Spacer(Modifier.height(24.dp))
-            Text(str(R.string.fast_place_title), color = G.Text, fontSize = 24.sp, fontWeight = FontWeight.Medium)
-            Spacer(Modifier.height(14.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                if (countryCode.isNotBlank()) {
-                    Column(Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(str(R.string.fast_place_country), color = G.Muted, fontSize = 16.sp)
-                            Spacer(Modifier.width(12.dp))
-                            Text(str(R.string.fast_place_country_tag), color = G.Sage, fontSize = 14.sp)
-                        }
-                        Spacer(Modifier.height(10.dp))
-                        Box(Modifier.fillMaxWidth().heightIn(min = 72.dp).background(G.Surface, Radius).padding(horizontal = 20.dp, vertical = 12.dp), contentAlignment = Alignment.CenterStart) {
-                            Text(countryShown, color = G.Text, fontSize = 24.sp)
-                        }
-                    }
-                } else {
-                    Field(str(R.string.fast_place_country), typedCountry, false, Modifier.weight(1f), max = 60, plain = true) { typedCountry = it }
-                }
-                Field(str(R.string.fast_place_city), city, false, Modifier.weight(1f), hint = str(R.string.fast_place_city_hint), max = 80, plain = true) {
-                    city = it
+            if (editingContact) {
+                Field(
+                    str(R.string.fast_contact), contact, false, Modifier.fillMaxWidth(),
+                    hint = str(R.string.field_contact_hint), max = 120, plain = true,
+                    tag = if (initialContact.isNotBlank() && contact == initialContact) str(R.string.fast_contact_tag) else null,
+                ) {
+                    contact = it
                     failed = false
                 }
-            }
-        }
-        if (askContact) {
-            Spacer(Modifier.height(18.dp))
-            Field(
-                str(R.string.fast_contact), contact, false, Modifier.fillMaxWidth(),
-                hint = str(R.string.field_contact_hint), max = 120, plain = true,
-                tag = if (initialContact.isNotBlank() && contact == initialContact) str(R.string.fast_contact_tag) else null,
-            ) {
-                contact = it
-                failed = false
+            } else {
+                Row(
+                    Modifier.fillMaxWidth().background(G.Surface, Radius)
+                        .clickable(role = Role.Button) { editingContact = true }
+                        .heightIn(min = 92.dp).padding(horizontal = 22.dp, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(str(R.string.fast_contact), color = G.Muted, fontSize = 16.sp)
+                        Spacer(Modifier.height(4.dp))
+                        Text(contact, color = G.Text, fontSize = 24.sp, fontWeight = FontWeight.Medium)
+                    }
+                    Spacer(Modifier.width(16.dp))
+                    Text(str(R.string.fast_tap_fix), color = G.Sand, fontSize = 16.sp)
+                }
             }
         }
         Spacer(Modifier.height(18.dp))

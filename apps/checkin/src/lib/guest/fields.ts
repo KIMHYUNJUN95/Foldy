@@ -1,6 +1,9 @@
 import { z } from "zod";
 
+import { addressError, normalizeAddress } from "./address";
 import { isCountryCode } from "./countries";
+
+export { addressError, normalizeAddress };
 
 // 사전 등록 웹 한 사람 명부(시안 W3). 서버가 다시 검사한다 — 화면 검사는 편의일 뿐(16 §2).
 const text = (max: number) => z.string().trim().max(max);
@@ -12,7 +15,7 @@ const optionalText = (max: number) =>
     .optional()
     .transform((value) => (value ? value : null));
 
-export const guestInputSchema = z.object({
+export const guestInputBase = z.object({
   id: z.uuid().optional(),
   lastName: text(60).min(1),
   firstName: text(60).min(1),
@@ -42,12 +45,28 @@ export const guestInputSchema = z.object({
     .optional()
     .transform((value) => value ?? null),
   noPassport: z.boolean().default(false),
-  address: optionalText(200),
+  // 보내면 검사한다(아래 withAddressCheck) — 길이 · 글자 규칙은 address.ts. 줄바꿈은 「, 」로 바꿔 저장.
+  address: z
+    .string()
+    .max(400)
+    .optional()
+    .transform((value) => (value && normalizeAddress(value) ? normalizeAddress(value) : null)),
   // 대표자만 — 전화 또는 이메일 하나(동행자는 대표자 것). 서버가 동행자 값은 버린다.
   contact: optionalText(120),
   prevStay: optionalText(120),
   nextDest: optionalText(120),
 });
+
+/** 주소를 보냈으면 그 사람의 hasJapanAddress 로 검사한다(칸 이름 `address`). */
+export function withAddressCheck<T extends z.ZodType<{ address: string | null; hasJapanAddress: boolean }>>(schema: T) {
+  return schema.superRefine((value, ctx) => {
+    if (value.address !== null && addressError(value.address, value.hasJapanAddress)) {
+      ctx.addIssue({ code: "custom", path: ["address"], message: "address" });
+    }
+  });
+}
+
+export const guestInputSchema = withAddressCheck(guestInputBase);
 
 export type GuestInput = z.output<typeof guestInputSchema>;
 

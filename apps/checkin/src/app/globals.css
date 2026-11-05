@@ -173,3 +173,13 @@ input[type="date"].w-in {
     transition: none;
   }
 }
+
+/* 여러 줄 입력(주소) — .w-in 의 고정 높이를 풀고 줄바꿈 · 큰 글자에서도 가로로 넘치지 않게. */
+.w-in.w-ta {
+  height: auto;
+  min-height: 112px;
+  padding: 14px 16px;
+  line-height: 1.4;
+  resize: none;
+  overflow-wrap: anywhere;
+}

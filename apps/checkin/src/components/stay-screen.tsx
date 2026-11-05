@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { guestEntries } from "@/lib/guest/page";
+import { afterPeopleHref, guestEntries, needsAddress } from "@/lib/guest/page";
 import type { StayView } from "@/lib/guest/store";
 import { fmt, formatStayDate, formatTokyoTime, getDictionary, nightsBetween, type Locale } from "@/lib/i18n";
 
@@ -17,7 +17,8 @@ export function StayScreen({ stay, token, locale, view }: { stay: StayView; toke
   const ordinal = (n: number) => fmt(dict.guests.ordinal, { n });
   const entries = guestEntries(stay, token, ordinal);
   const doneCount = entries.filter((entry) => entry.done).length;
-  const allDone = entries.length > 0 && doneCount === entries.length;
+  const addressPending = needsAddress(stay);
+  const allDone = entries.length > 0 && doneCount === entries.length && !addressPending;
   const representative = stay.guests.find((guest) => guest.is_representative);
 
   const top = (
@@ -196,6 +197,11 @@ export function StayScreen({ stay, token, locale, view }: { stay: StayView; toke
               />
             </div>
           ) : null}
+          {entries.every((entry) => entry.done) && !addressPending ? (
+            <Link href={`/r/${token}/address`} className="w-ghost mt-3">
+              {dict.guests.editAddress}
+            </Link>
+          ) : null}
           <p className="mt-4 text-[15px] leading-relaxed text-[var(--muted)]">{dict.guests.share}</p>
         </>
       ) : null}
@@ -204,6 +210,10 @@ export function StayScreen({ stay, token, locale, view }: { stay: StayView; toke
         nextEntry ? (
           <Link href={nextEntry.href} className="w-btn mt-8">
             {fmt(dict.guests.fillNext, { label: nextEntry.label })}
+          </Link>
+        ) : addressPending ? (
+          <Link href={afterPeopleHref(token, true, stay.consented)} className="w-btn mt-8">
+            {dict.guests.toAddress}
           </Link>
         ) : !stay.consented ? (
           <Link href={`/r/${token}/terms`} className="w-btn mt-8">

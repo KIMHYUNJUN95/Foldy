@@ -1,4 +1,5 @@
-import { buildContract, type PropertySettingsRow } from "@/lib/contract/build";
+import { buildContract, settingsVersionOf, type PropertySettingsRow } from "@/lib/contract/build";
+import { readDeviceSettings } from "@/lib/contract/read-settings";
 import { authenticateDevice } from "@/lib/device/auth";
 import { json, serverError } from "@/lib/guest/request";
 import { createCheckinServiceClient } from "@/lib/supabase/service";
@@ -17,19 +18,13 @@ export async function GET(request: Request) {
     if ("error" in auth) return json({ ok: false, error: auth.error }, 401);
     const { device } = auth;
 
-    const { data, error } = await db
-      .from("property_settings")
-      .select(COLUMNS)
-      .eq("organization_id", device.organization_id)
-      .eq("property_key", device.property_key)
-      .maybeSingle();
-    if (error) throw new Error(error.message);
+    const data = await readDeviceSettings(db, device, COLUMNS);
 
     return json({
       ok: true,
       device: { id: device.id, propertyKey: device.property_key, name: device.name },
-      settingsVersion: (data?.updated_at as string | undefined) ?? "default",
-      contract: buildContract((data as PropertySettingsRow | null) ?? null),
+      settingsVersion: settingsVersionOf(data as { updated_at?: string | null; staff_call_enabled: boolean } | null),
+      contract: buildContract(data as unknown as PropertySettingsRow | null),
     });
   } catch (error) {
     return serverError("kiosk-settings", error);

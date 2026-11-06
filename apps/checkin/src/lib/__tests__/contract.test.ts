@@ -19,6 +19,7 @@ describe("checkin contract", () => {
     addressRules: { maxLength: 200, minLengthForeign: 8, minLengthJapan: 5, foreignScript: "latin" },
     supportContacts: {},
     staffPin: null,
+    staffCallEnabled: false,
   };
 
   it("맞는 계약은 통과한다", () => {
@@ -33,5 +34,11 @@ describe("checkin contract", () => {
   it("주소 규칙은 서버 검사 값 그대로 계약에 실린다", () => {
     const contract = buildContract(null);
     expect(contractSchema.parse(contract).addressRules).toEqual({ maxLength: 200, minLengthForeign: 8, minLengthJapan: 5, foreignScript: "latin" });
+  });
+
+  it("직원 통화는 기본 꺼짐, 건물 설정을 그대로 싣는다", () => {
+    expect(buildContract(null).staffCallEnabled).toBe(false);
+    const row = { staff_call_enabled: true } as unknown as Parameters<typeof buildContract>[0];
+    expect(contractSchema.parse(buildContract(row)).staffCallEnabled).toBe(true);
   });
 });

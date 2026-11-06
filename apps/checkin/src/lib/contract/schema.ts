@@ -53,6 +53,8 @@ export const contractSchema = z.object({
   staffPin: z
     .object({ algorithm: z.literal("pbkdf2-sha256"), iterations: z.number().int().positive(), salt: z.string(), hash: z.string() })
     .nullable(),
+  // 직원 통화(2026-11-06, 46 §4). 옛 앱은 모르는 키를 무시하므로 버전은 그대로. 꺼져 있으면 태블릿은 연락처 화면만 보여 준다.
+  staffCallEnabled: z.boolean(),
 });
 
 export type Contract = z.infer<typeof contractSchema>;

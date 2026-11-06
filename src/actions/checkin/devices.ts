@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 
 import { ENROLLMENT_CODE_PATTERN, checkinPropertyName, formatEnrollmentCode, isDeviceDisconnected } from "@/lib/checkin/model";
 import { UUID_PATTERN, checkinDb, checkinGate, runCheckinAction, throwOnCheckinError, writeCheckinAuditAfterChange } from "@/lib/checkin/server";
+import { closeDeviceStaffCalls } from "@/lib/checkin/staff-call-server";
 
 /**
  * 셀프 체크인 기기 관리(FR-S07) — 등록 코드 · 목록 · 이름 · 폐기. 권한 `checkin.manage`. 16 §4-1.
@@ -210,6 +211,7 @@ export async function revokeCheckinDevice(deviceId: string): Promise<RevokeCheck
       action: "device_revoked",
       meta: { device_id: deviceId },
     });
+    await closeDeviceStaffCalls({ organizationId: gate.organizationId, deviceId, userId: gate.userId });
     revalidatePath("/admin/checkin");
     return { ok: true as const, already: false };
   });

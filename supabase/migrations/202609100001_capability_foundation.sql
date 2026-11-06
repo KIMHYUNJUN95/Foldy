@@ -180,7 +180,9 @@ insert into public.capability_roles (capability, role) values
   ('checkin.documents', 'owner'::organization_role),
   ('checkin.documents', 'senior_managing_director'::organization_role),
   ('checkin.manage', 'owner'::organization_role),
-  ('checkin.manage', 'senior_managing_director'::organization_role);
+  ('checkin.manage', 'senior_managing_director'::organization_role),
+  ('checkin.call', 'owner'::organization_role),
+  ('checkin.call', 'senior_managing_director'::organization_role);
 
 delete from public.capability_policies;
 insert into public.capability_policies (capability, individual_grant, individual_deny, platform_bypass) values
@@ -226,7 +228,8 @@ insert into public.capability_policies (capability, individual_grant, individual
   ('staff_documents.view', true, true, true),
   ('checkin.view', true, false, true),
   ('checkin.documents', true, false, true),
-  ('checkin.manage', true, false, true);
+  ('checkin.manage', true, false, true),
+  ('checkin.call', true, false, true);
 -- <<< generated
 
 -- ---------------------------------------------------------------------------

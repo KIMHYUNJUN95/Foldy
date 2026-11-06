@@ -279,4 +279,14 @@
     <string name="proof_mismatch">パスポートのお名前が予約と合いません。予約された方のパスポートをかざすか、「コードで探す」を押すか、スタッフをお呼びください。</string>
     <string name="proof_no_passport">パスポートがありません</string>
     <string name="proof_retake">もう一度撮る</string>
+    <!-- 직원 통화(46 §6, E1~E3) -->
+    <string name="calling_title">スタッフを呼んでいます</string>
+    <string name="calling_note">つながると、スタッフがカメラ越しにお客様を見ながらお話しします。\n通話は保存されません。</string>
+    <string name="talking_title">スタッフと通話中</string>
+    <string name="talking_end">通話を終える</string>
+    <string name="call_nobody_title">スタッフが応答できません</string>
+    <string name="call_failed_title">接続できませんでした</string>
+    <string name="call_retry_hint">もう一度呼ぶか、下の連絡先までご連絡ください。</string>
+    <string name="call_retry_hint_none">もう一度呼ぶか、フロントのスタッフに直接お声がけください。</string>
+    <string name="call_again">もう一度呼ぶ</string>
 </resources>

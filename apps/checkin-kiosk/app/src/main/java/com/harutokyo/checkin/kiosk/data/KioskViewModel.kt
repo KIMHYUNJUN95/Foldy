@@ -7,6 +7,9 @@ import android.os.Build
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.harutokyo.checkin.kiosk.BuildConfig
+import com.harutokyo.checkin.kiosk.call.CallController
+import com.harutokyo.checkin.kiosk.call.HttpCallApi
+import com.harutokyo.checkin.kiosk.call.LiveKitRoom
 import com.harutokyo.checkin.kiosk.contract.CONTRACT_VERSION
 import com.harutokyo.checkin.kiosk.contract.Contract
 import com.harutokyo.checkin.kiosk.contract.DeviceInfo
@@ -77,6 +80,10 @@ class KioskViewModel(application: Application) : AndroidViewModel(application) {
 
     /** 직원 PIN 시도 횟수 — 화면이 다시 만들어져도(회전 등) 이어서 센다. */
     val pinGuard = PinGuard()
+
+    /** 직원 통화(46) — 화면이 다시 만들어져도 통화는 이어진다. */
+    val callRoom = LiveKitRoom(application, viewModelScope)
+    val call = CallController(viewModelScope, HttpCallApi { vault.get(KEY_TOKEN) }, callRoom, android.os.SystemClock::elapsedRealtime)
     private val _state = MutableStateFlow(KioskState())
     val state: StateFlow<KioskState> = _state.asStateFlow()
 
@@ -297,6 +304,8 @@ class KioskViewModel(application: Application) : AndroidViewModel(application) {
 
     /** 직원 메뉴 「기기 다시 등록」 · 서버가 폐기를 알렸을 때. 토큰 · 저장된 설정을 지운다. */
     fun forget(revoked: Boolean = false) {
+        // 통화 중이면 먼저 끝낸다(토큰이 지워지면 서버에 end 를 못 보낸다 — 직원 화면은 서버의 30분 · 확인 규칙이 닫는다).
+        call.cancel()
         vault.clear()
         _state.value = KioskState(phase = Phase.Enroll, revoked = revoked)
     }

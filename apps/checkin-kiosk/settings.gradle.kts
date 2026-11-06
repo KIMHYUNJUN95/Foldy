@@ -11,6 +11,10 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // LiveKit 이 쓰는 오디오 장치 선택 라이브러리(audioswitch)만 JitPack 에서 받는다 — 다른 것은 받지 않게 묶어 둔다.
+        maven("https://jitpack.io") {
+            content { includeGroup("com.github.davidliu") }
+        }
     }
 }
 rootProject.name = "checkin-kiosk"

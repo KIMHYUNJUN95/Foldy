@@ -1695,3 +1695,15 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 - 등록 코드: 화면 「새 코드」는 코드 값 + 조직 + 발급자 + 미사용 조건으로 그 코드 하나만 끝내고 기록한다(값 없음). 다른 사람 코드 값을 넘겨도 끝나지 않는다. 발급이나 패널 닫기로는 앞 코드가 끝나지 않아, 한 사람이 살아 있는 코드를 여러 개 가질 수 있다(각각 최대 10분, 연달아 등록하는 흐름). 태블릿 등록이 코드의 `created_by` 를 `devices.registered_by` 로 옮기고 `device_enrolled` 기록을 남긴다.
 - 민감 응답: 파일은 서명 URL 3분 · 볼 때마다 기록, `checkin.documents` 없으면 파일 줄 없음. 체크인 코드는 별도 액션 · 볼 때마다 기록(값 없음). `storage_path` · `mrz_raw` · `token_hash` · `staff_pin_hash` 는 화면으로 보내지 않는다.
 - 확인: 로컬 PGlite 에 마이그레이션을 돌려 표 13 · 정책 0 · RLS 전부 켜짐, authenticated · anon 의 SELECT · `audit_log` INSERT 거부(42501), service_role 쓰기 통과를 봤다(Supabase 역할 · `auth` · `storage` 는 흉내, 2026-11-04). 서버 액션 테스트는 가짜 DB 이고 Supabase 실제 프로젝트에서는 아직 안 돌려 봤다. 적용 전 할 일: 마이그레이션 2 + 1개 적용(사용자 컨펌) · API 노출 스키마에 `checkin` 추가.
+
+## 2026-11-06 셀프 체크인 직원 통화 — `checkin.call` · `checkin.notify_staff` (`202611060001`, 운영 미적용)
+
+- 권한 키 `checkin.call`(전화 받기): 기본 대표 · 전무, 개인 부여 가능, 기한 · 차단 없음. 명부 열람(`checkin.view`)과 나눈 키다.
+- 직원 액션의 문은 `checkinCallGate`(`src/lib/checkin/staff-call-server.ts`)다: 온보딩 상태 `ready`(정지 · 비활성 거부) + 세션 + 조직 + 그 키(`checkin.call`, `getStaffCallStay` 만 `checkin.view`). `checkinGate` 와 달리 `admin_web.access` 를 요구하지 않는다 — 관리자 웹 없는 야간 직원이 받는 키라서다. 끊기 · 상태 읽기는 그 위에서 받은 본인 또는 `checkin.manage` 만. 다른 체크인 액션은 `checkinGate` 그대로다.
+- `checkin.staff_calls`: RLS 켬 · 정책 없음 · service_role 만(다른 `checkin` 표와 같음). 직원은 이 표를 JWT 로 읽지 못하고, 신호는 `public.notifications` 실시간으로 받는다.
+- 태블릿 라우트(`/api/kiosk/call/**`)는 기기 토큰을 확인하고 모든 쿼리를 그 기기의 `organization_id` · `device_id` 로 거른다. 다른 기기 · 다른 조직의 통화는 404. `stay_id` 는 기기 입력이 아니라 `openProvenKioskStay` 를 통과한 세션의 stay 만 넣는다.
+- `checkin.member_can_receive` · `checkin.notify_staff` · `checkin.can_take_call`: `security definer`(`auth.users.banned_until` 을 읽으려고) · `search_path=''` · 실행 권한 service_role 만. 받는 사람은 앱의 `memberIdsWithCapability` 에 계정 정지 제외를 더한 것이다 — 활성 멤버 중 (활성 개인 부여 또는 역할 기본값, 전무는 owner 를 물려받음)에서 활성 개인 차단(대표 · 전무는 면역)과 Auth 정지 계정을 뺀다. 기한 지난 · 회수된 부여와 차단은 보지 않는다. 플랫폼 개발자 통과는 받는 사람에 넣지 않는다(`has_capability` 를 쓰지 않는 이유). `can_take_call` 만 활성 멤버십이 있는 활성 플랫폼 개발자도 통과시킨다 — `checkinGate` 를 지나 받을 수 있기 때문이다.
+- `public.notifications` INSERT 정책 「org members can create notifications for org recipients」: 본문은 그대로이고 `type::text not in ('checkin_staff_call','checkin_call_missed','checkin_staff_check')` 를 더했다. 조직 멤버가 가짜 전화 알림을 넣지 못한다. 이 세 종류는 service_role 함수로만 들어간다.
+- 통화 중 권한 회수 · 정지: `GET /api/kiosk/call/[id]` 가 `can_take_call` 이 거짓이면 `ended`(`system`) + 방 삭제 + 기록. 판정 실패(DB 오류)는 통화를 끊지 않는다. 태블릿이 30초마다 부르므로 최대 약 30초 안에 닫힌다.
+- LiveKit 태블릿 토큰: identity `kiosk-<deviceId>`, 방 하나, camera · microphone 만 올리기, 데이터 올리기 · 녹화 · 관리 권한 없음, 30분. 비밀값은 서버 환경 변수만.
+- 확인: 로컬 PGlite 에 실제 마이그레이션을 돌려 받는 사람 상황표(역할 · 기한 · 회수 · 차단 · 정지 · 다른 조직 · 다른 키 · 개발자), 중복 키, anon · authenticated 실행 · 표 읽기 거부, service_role 쓰기, 제약, 조건부 받기(한 명만), `can_take_call` 상황표, 계정 정지, 알림 위조 거부를 봤다(`auth` · `storage` · `memberships` 등은 흉내, 2026-11-06). Supabase 실제 프로젝트에서는 아직 안 돌려 봤다.

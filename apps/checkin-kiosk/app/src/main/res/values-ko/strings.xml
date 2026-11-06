@@ -278,4 +278,14 @@
     <string name="proof_mismatch">여권의 이름이 예약과 달라요. 예약하신 분의 여권을 비추거나, 「코드로 찾기」를 누르거나, 직원을 불러 주세요.</string>
     <string name="proof_no_passport">여권이 없어요</string>
     <string name="proof_retake">다시 찍기</string>
+    <!-- 직원 통화(46 §6, E1~E3) -->
+    <string name="calling_title">직원을 부르고 있어요</string>
+    <string name="calling_note">연결되면 직원이 카메라로 손님을 보며 이야기해요.\n통화는 저장하지 않아요.</string>
+    <string name="talking_title">직원과 통화 중</string>
+    <string name="talking_end">통화 끝내기</string>
+    <string name="call_nobody_title">지금 받는 직원이 없어요</string>
+    <string name="call_failed_title">연결하지 못했어요</string>
+    <string name="call_retry_hint">다시 불러 보거나 아래로 연락해 주세요.</string>
+    <string name="call_retry_hint_none">다시 불러 보거나 프런트 직원에게 직접 말씀해 주세요.</string>
+    <string name="call_again">다시 부르기</string>
 </resources>

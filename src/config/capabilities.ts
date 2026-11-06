@@ -649,6 +649,16 @@ export const CAPABILITIES = {
     systemOnly: false,
     developerOnly: false,
   },
+  /** 직원 통화 받기(docs/product/46 §4) — 야간 응대 직원에게 명부 열람 없이 전화만 주려고 `checkin.view` 와 나눈다. */
+  "checkin.call": {
+    roles: ["owner", "senior_managing_director"],
+    individualGrant: true,
+    individualDeny: false,
+    asksExpiry: false,
+    platformBypass: true,
+    systemOnly: false,
+    developerOnly: false,
+  },
 } as const satisfies Record<string, CapabilityPolicy>;
 
 export type Capability = keyof typeof CAPABILITIES;

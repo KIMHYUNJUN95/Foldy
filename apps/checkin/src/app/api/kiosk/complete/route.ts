@@ -13,6 +13,7 @@ import {
   sharedCodesOf,
   staffCheckCount,
 } from "@/lib/kiosk/complete";
+import { notifyStaff } from "@/lib/kiosk/staff-notify";
 import { openKioskStayForComplete } from "@/lib/kiosk/store";
 import { createCheckinServiceClient } from "@/lib/supabase/service";
 
@@ -156,6 +157,15 @@ export async function POST(request: Request) {
           meta: { staff_check_count: staffChecks },
         });
         if (auditError) console.error("[kiosk-complete] audit_log 쓰기 실패:", auditError.message);
+        if (staffChecks > 0) {
+          await notifyStaff(db, {
+            organizationId: stay.organizationId,
+            capability: "checkin.view",
+            type: "checkin_staff_check",
+            sourceId: stay.id,
+            payload: { stayId: stay.id, propertyKey: stay.propertyKey },
+          });
+        }
       }
     }
 

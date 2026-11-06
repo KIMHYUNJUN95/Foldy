@@ -37,6 +37,8 @@ data class Contract(
     val mrzAutofill: Boolean = true,
     val supportContacts: Map<String, String> = emptyMap(),
     val staffPin: StaffPin? = null,
+    /** 건물별 「직원 통화」 켜짐(46). 꺼짐이면 연락처 화면만. */
+    val staffCallEnabled: Boolean = false,
 )
 
 @Serializable

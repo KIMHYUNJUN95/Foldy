@@ -17,6 +17,7 @@ const row: PropertySettingsRow = {
   verification_method: "video",
   staff_pin_hash: null,
   mrz_autofill: true,
+  staff_call_enabled: false,
 };
 
 describe("contract build", () => {

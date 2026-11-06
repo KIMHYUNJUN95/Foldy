@@ -172,3 +172,72 @@ export async function saveCheckinPropertySettings(input: SaveCheckinSettingsInpu
     return { ok: true as const, settings: await toSettingsView(input.propertyKey, propertyName, saved) };
   });
 }
+
+export type CheckinStaffCallSettingResult = { ok: true; enabled: boolean } | CommonFailure;
+
+// 칼럼만 없을 때(마이그레이션 전)도 준비 전으로 본다. 다른 설정 읽기와 쿼리를 나눠서, 이 칼럼이 없어도 설정 화면 전체가 멈추지 않는다.
+function isStaffCallColumnMissing(error: { code?: string } | null): boolean {
+  return error?.code === "42703" || error?.code === "PGRST204";
+}
+
+/** 건물별 직원 통화 켜짐 여부(46 §4). 줄이 없으면 꺼짐. 권한 `checkin.manage`. */
+export async function getCheckinStaffCallSetting(propertyKey: string): Promise<CheckinStaffCallSettingResult> {
+  const gate = await checkinGate("checkin.manage");
+  if (!gate.ok) return gate;
+  if (!checkinPropertyName(propertyKey)) return { ok: false, errorKey: "invalid" };
+  return runCheckinAction("staff-call-setting-read", async (): Promise<CheckinStaffCallSettingResult> => {
+    const { data, error } = await checkinDb()
+      .from("property_settings")
+      .select("staff_call_enabled")
+      .eq("organization_id", gate.organizationId)
+      .eq("property_key", propertyKey)
+      .maybeSingle();
+    if (isStaffCallColumnMissing(error)) return { ok: false, errorKey: "not_ready" };
+    throwOnCheckinError(error, "property_settings");
+    return { ok: true, enabled: data?.staff_call_enabled === true };
+  });
+}
+
+/**
+ * 직원 통화 켜기 · 끄기 — 누르면 바로 저장. `updated_at` 은 건드리지 않는다: 설정 폼의 동시 저장 검사 값이라,
+ * 바꾸면 폼을 열어 둔 사람의 저장이 까닭 없이 충돌로 막힌다. 약관 버전과도 무관하다. 누가 바꿨는지는 audit 에 남는다.
+ */
+export async function setCheckinStaffCallEnabled(propertyKey: string, enabled: boolean): Promise<CheckinStaffCallSettingResult> {
+  const gate = await checkinGate("checkin.manage");
+  if (!gate.ok) return gate;
+  if (!checkinPropertyName(propertyKey) || typeof enabled !== "boolean") return { ok: false, errorKey: "invalid" };
+  return runCheckinAction("staff-call-setting-save", async (): Promise<CheckinStaffCallSettingResult> => {
+    const update = () =>
+      checkinDb()
+        .from("property_settings")
+        .update({ staff_call_enabled: enabled })
+        .eq("organization_id", gate.organizationId)
+        .eq("property_key", propertyKey)
+        .select("property_key")
+        .maybeSingle();
+
+    let { data, error } = await update();
+    if (isStaffCallColumnMissing(error)) return { ok: false, errorKey: "not_ready" };
+    throwOnCheckinError(error, "property_settings");
+    if (!data) {
+      const inserted = await checkinDb()
+        .from("property_settings")
+        .insert({ organization_id: gate.organizationId, property_key: propertyKey, staff_call_enabled: enabled });
+      if (inserted.error?.code === "23505") {
+        ({ data, error } = await update());
+        throwOnCheckinError(error, "property_settings");
+      } else {
+        throwOnCheckinError(inserted.error, "property_settings");
+      }
+    }
+
+    await writeCheckinAuditAfterChange({
+      organizationId: gate.organizationId,
+      userId: gate.userId,
+      action: "property_settings_updated",
+      meta: { property_key: propertyKey, changed: ["staff_call_enabled"], enabled },
+    });
+    revalidatePath("/admin/checkin/settings");
+    return { ok: true, enabled };
+  });
+}

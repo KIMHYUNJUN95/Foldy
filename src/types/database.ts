@@ -306,6 +306,7 @@ export type Database = {
           organization_id: string
           property_key: string
           required_fields: Json
+          staff_call_enabled: boolean
           staff_pin_hash: string | null
           support_contacts: Json
           terms_text: Json
@@ -324,6 +325,7 @@ export type Database = {
           organization_id: string
           property_key: string
           required_fields?: Json
+          staff_call_enabled?: boolean
           staff_pin_hash?: string | null
           support_contacts?: Json
           terms_text?: Json
@@ -342,6 +344,7 @@ export type Database = {
           organization_id?: string
           property_key?: string
           required_fields?: Json
+          staff_call_enabled?: boolean
           staff_pin_hash?: string | null
           support_contacts?: Json
           terms_text?: Json
@@ -390,6 +393,60 @@ export type Database = {
           started_at?: string
           stay_id?: string
           step_payload?: Json
+        }
+        Relationships: []
+      }
+      staff_calls: {
+        Row: {
+          accepted_at: string | null
+          accepted_by: string | null
+          created_at: string
+          device_id: string
+          ended_at: string | null
+          ended_by: string | null
+          id: string
+          language: string
+          organization_id: string
+          property_key: string
+          ring_deadline_at: string
+          room_name: string
+          status: string
+          stay_id: string | null
+          step: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          created_at?: string
+          device_id: string
+          ended_at?: string | null
+          ended_by?: string | null
+          id?: string
+          language: string
+          organization_id: string
+          property_key: string
+          ring_deadline_at: string
+          room_name: string
+          status?: string
+          stay_id?: string | null
+          step: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          created_at?: string
+          device_id?: string
+          ended_at?: string | null
+          ended_by?: string | null
+          id?: string
+          language?: string
+          organization_id?: string
+          property_key?: string
+          ring_deadline_at?: string
+          room_name?: string
+          status?: string
+          stay_id?: string | null
+          step?: string
         }
         Relationships: []
       }
@@ -491,7 +548,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      notify_staff: {
+        Args: {
+          p_capability: string
+          p_dedupe_key: string
+          p_href: string
+          p_organization_id: string
+          p_payload: Json
+          p_type: string
+        }
+        Returns: number
+      }
     }
     Enums: {
       [_ in never]: never
@@ -7494,6 +7561,9 @@ export type Database = {
         | "announcement_activity"
         | "bug_report_activity"
         | "id_document_expiring"
+        | "checkin_staff_call"
+        | "checkin_call_missed"
+        | "checkin_staff_check"
       order_request_status:
         | "requested"
         | "approved"
@@ -7708,6 +7778,9 @@ export const Constants = {
         "announcement_activity",
         "bug_report_activity",
         "id_document_expiring",
+        "checkin_staff_call",
+        "checkin_call_missed",
+        "checkin_staff_check",
       ],
       order_request_status: [
         "requested",

@@ -22,6 +22,7 @@ export type PropertySettingsRow = {
   verification_method: "video" | "staff_call" | "auto_match";
   staff_pin_hash: string | null;
   mrz_autofill: boolean;
+  staff_call_enabled: boolean;
 };
 
 type FieldKey = z.infer<typeof fieldKeySchema>;
@@ -88,6 +89,14 @@ function contacts(value: unknown): Contract["supportContacts"] {
   return out;
 }
 
+/**
+ * 태블릿이 「설정을 다시 받을까」를 판단하는 불투명한 값. ping 과 settings 가 이 함수 하나로 만든다.
+ * 직원 통화 켜기는 폼 동시 저장 검사 때문에 `updated_at` 을 바꾸지 않으므로 값에 함께 넣는다.
+ */
+export function settingsVersionOf(row: { updated_at?: string | null; staff_call_enabled?: boolean | null } | null): string {
+  return `${row?.updated_at ?? "default"}|call:${row?.staff_call_enabled ?? false}`;
+}
+
 export function buildContract(row: PropertySettingsRow | null): Contract {
   const languages = (row?.languages ?? []).filter((value): value is Locale => (LOCALES as readonly string[]).includes(value));
   return {
@@ -105,5 +114,6 @@ export function buildContract(row: PropertySettingsRow | null): Contract {
     addressRules: { maxLength: ADDRESS_MAX, minLengthForeign: ADDRESS_MIN_FOREIGN, minLengthJapan: ADDRESS_MIN_JAPAN, foreignScript: "latin" },
     supportContacts: contacts(row?.support_contacts),
     staffPin: parseStaffPin(row?.staff_pin_hash),
+    staffCallEnabled: row?.staff_call_enabled ?? false,
   };
 }

@@ -305,26 +305,34 @@ private fun SharedRow(item: CompleteShared) {
     }
 }
 
-/** 직원 부르기 — 계약의 연락처를 글자로만 보여 준다(전화를 직접 걸지 않는다, FR-K14). 비어 있는 종류는 숨긴다. */
+/** 계약 연락처 → (라벨 · 값) 줄. 비어 있는 종류는 숨긴다. */
+internal fun contactRows(contacts: Map<String, String>): List<Pair<Int, String>> = listOf(
+    "phone" to R.string.call_phone,
+    "line" to R.string.call_line,
+    "whatsapp" to R.string.call_whatsapp,
+).mapNotNull { (key, label) -> contacts[key]?.trim()?.takeIf { it.isNotEmpty() }?.let { label to it } }
+
+@Composable
+internal fun ContactRows(rows: List<Pair<Int, String>>) {
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        for ((label, value) in rows) {
+            InfoBox(str(label), Modifier.fillMaxWidth()) {
+                Text(value, color = G.Text, fontSize = 36.sp, fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace)
+            }
+        }
+    }
+}
+
+/** 직원 부르기(통화 꺼짐) — 계약의 연락처를 글자로만 보여 준다(전화를 직접 걸지 않는다, FR-K14). 비어 있는 종류는 숨긴다. */
 @Composable
 fun StaffCallScreen(contacts: Map<String, String>, onBack: () -> Unit) {
-    val rows = listOf(
-        "phone" to R.string.call_phone,
-        "line" to R.string.call_line,
-        "whatsapp" to R.string.call_whatsapp,
-    ).mapNotNull { (key, label) -> contacts[key]?.trim()?.takeIf { it.isNotEmpty() }?.let { label to it } }
+    val rows = contactRows(contacts)
     ScrollPage(bottom = null) {
         OutlineButton(str(R.string.back), onClick = onBack)
         Spacer(Modifier.height(48.dp))
         Heading(str(R.string.call_title), str(if (rows.isEmpty()) R.string.call_none else R.string.call_body))
         Spacer(Modifier.height(40.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            for ((label, value) in rows) {
-                InfoBox(str(label), Modifier.fillMaxWidth()) {
-                    Text(value, color = G.Text, fontSize = 36.sp, fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace)
-                }
-            }
-        }
+        ContactRows(rows)
     }
 }
 

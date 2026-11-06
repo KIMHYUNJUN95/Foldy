@@ -1,12 +1,14 @@
 import type { Locale } from "@/lib/i18n";
 import { getDictionary } from "@/lib/i18n";
 import { bugStatusLabel, type BugStatus } from "@/components/bugs/bug-types";
+import { checkinPropertyName } from "@/lib/checkin/model";
 import { localizeBuildingName } from "@/lib/room-label-normalization";
 import {
   isAnnouncementNotificationPayload,
   isAttendanceNotificationPayload,
   isBoardNotificationPayload,
   isBugReportNotificationPayload,
+  isCheckinNotificationPayload,
   isIdDocumentExpiryNotificationPayload,
   isOrderProcessedPayload,
   isProjectNotificationPayload,
@@ -18,6 +20,12 @@ import {
 
 const BUG_STATUSES: readonly string[] = ["submitted", "reviewing", "fixed", "closed"];
 const isBugStatus = (value: string): value is BugStatus => BUG_STATUSES.includes(value);
+
+/** 체크인 알림은 건물 키만 싣는다 — 보는 사람 언어의 건물 이름으로. */
+export function checkinBuildingLabel(propertyKey: string, locale: Locale): string {
+  const name = checkinPropertyName(propertyKey);
+  return name ? localizeBuildingName(name, getDictionary(locale).cleaning.buildingLabels) : propertyKey;
+}
 
 export type NotificationDisplay = {
   title: string;
@@ -330,6 +338,28 @@ export function getNotificationDisplay(
     };
   }
 
+  if (
+    (notification.type === "checkin_staff_call" ||
+      notification.type === "checkin_call_missed" ||
+      notification.type === "checkin_staff_check") &&
+    isCheckinNotificationPayload(notification.payload)
+  ) {
+    const building = checkinBuildingLabel(notification.payload.propertyKey, locale);
+    const [title, body] =
+      notification.type === "checkin_staff_call"
+        ? [copy.checkinCallTitle, copy.checkinCallBody]
+        : notification.type === "checkin_call_missed"
+          ? [copy.checkinMissedTitle, copy.checkinMissedBody]
+          : [copy.checkinCheckTitle, copy.checkinCheckBody];
+    return {
+      title,
+      body: body.replace("{building}", building),
+      statusLabel: copy.checkinKind,
+      kindLabel: copy.checkinKind,
+      locationLabel: building,
+    };
+  }
+
   return {
     title: copy.fallbackTitle,
     body: copy.fallbackBody,
@@ -364,6 +394,10 @@ export function notificationTypeLabel(type: NotificationType, locale: Locale) {
       return copy.bugReportKind;
     case "id_document_expiring":
       return copy.idDocKind;
+    case "checkin_staff_call":
+    case "checkin_call_missed":
+    case "checkin_staff_check":
+      return copy.checkinKind;
     default:
       return copy.fallbackKind;
   }

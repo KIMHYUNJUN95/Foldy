@@ -1,7 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Locale } from "@/lib/i18n";
 import { getDictionary } from "@/lib/i18n";
-import { getNotificationDisplay } from "@/lib/notifications/display";
+import { resolveCheckinNotificationLink, type CheckinNotificationAccess } from "@/lib/checkin/staff-call";
+import { checkinBuildingLabel, getNotificationDisplay } from "@/lib/notifications/display";
 import { localizeBuildingName, localizeRoomPlaceLabel } from "@/lib/room-label-normalization";
 import { categoryForType, type NotificationIconKey, type NotificationView } from "@/lib/notifications/grouping";
 import {
@@ -9,6 +10,7 @@ import {
   isAttendanceNotificationPayload,
   isBoardNotificationPayload,
   isBugReportNotificationPayload,
+  isCheckinNotificationPayload,
   isIdDocumentExpiryNotificationPayload,
   isOrderProcessedPayload,
   isProjectNotificationPayload,
@@ -247,6 +249,19 @@ function briefOf(row: NotificationRow, locale: Locale, actorNames: Map<string, s
     };
   }
 
+  if (
+    (row.type === "checkin_staff_call" || row.type === "checkin_call_missed" || row.type === "checkin_staff_check") &&
+    isCheckinNotificationPayload(payload)
+  ) {
+    return {
+      title: row.type === "checkin_staff_call" ? copy.tCheckinCall : row.type === "checkin_call_missed" ? copy.tCheckinMissed : copy.tCheckinCheck,
+      object: checkinBuildingLabel(payload.propertyKey, locale),
+      icon: row.type === "checkin_staff_check" ? "flag" : "bell",
+      source: copy.sCheckin,
+      event: row.type,
+    };
+  }
+
   // 모르는 종류 · 깨진 payload — 예전 긴 문장 그대로.
   const legacy = getNotificationDisplay(row, locale);
   return { title: legacy.title, object: legacy.body, icon: "bell", source: legacy.kindLabel, event: "legacy" };
@@ -255,16 +270,25 @@ function briefOf(row: NotificationRow, locale: Locale, actorNames: Map<string, s
 /** 알림 행들 → 화면 줄(최근 순 그대로). `now` 는 테스트 · 같은 요청 안 일관성용. */
 export function buildNotificationViews(
   rows: readonly NotificationRow[],
-  options: { locale: Locale; actorNames?: Map<string, string>; now?: Date },
+  // `checkin` 없으면 체크인 알림은 이동하지 않는다 — 막힌 화면으로 보내는 것보다 안전한 쪽.
+  options: { locale: Locale; actorNames?: Map<string, string>; now?: Date; checkin?: CheckinNotificationAccess },
 ): { views: NotificationView[]; todayKey: string } {
   const copy = getDictionary(options.locale).mobile.notifications.w;
   const todayKey = dayKeyOf((options.now ?? new Date()).toISOString());
   const actorNames = options.actorNames ?? new Map<string, string>();
   const views = rows.map((row): NotificationView => {
     const brief = briefOf(row, options.locale, actorNames);
+    const checkinPayload =
+      row.type === "checkin_staff_call" || row.type === "checkin_call_missed" || row.type === "checkin_staff_check"
+        ? ((row.payload ?? {}) as { callId?: unknown })
+        : null;
+    const checkinLink = checkinPayload
+      ? resolveCheckinNotificationLink({ type: row.type, callId: checkinPayload.callId, access: options.checkin })
+      : null;
     return {
       id: row.id,
-      href: row.href,
+      href: checkinLink ? checkinLink.href : row.href,
+      staffCallId: checkinLink?.staffCallId ?? null,
       unread: !row.read_at,
       category: categoryForType(row.type),
       icon: brief.icon,

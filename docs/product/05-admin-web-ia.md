@@ -249,6 +249,7 @@ Electron 은 쓰지 않는다(설치 파일이 크다).
   MRZ · 빠진 칸 · 동의 · 「확인함」). **기기**(`checkin.manage`): 목록 + 「기기 추가」(8자리 등록 코드, 한 번만 보임) + 이름 바꾸기 + 폐기(확인 창).
   **건물 설정**(`checkin.manage`): 건물 고르고 언어 · 환영 문구 · 약관 · 동영상 초 · 연락처 · 직원 PIN(「설정됨」만, 값은 안 보임) 저장, 서버 `invalid.field` 는 해당 구역 옆에 표시.
   탭은 링크(주소 이동), `checkin.manage` 가 없으면 「오늘」 탭만 보인다. 권한이 없으면 `AdminNoAccess`, 데이터가 아직 연결 전이면(`not_ready`) 「아직 준비 중」 빈 상태.
+  **직원 통화(2026-11-06, docs/product/46 §6)**: `checkin.call` 이 있으면 관리자 레이아웃에 `StaffCallHost` 가 붙어 어느 화면에서든 오른쪽 아래 카드(닫기 · 받기 + 소리)가 뜨고, 받으면 오른쪽 440px 패널(영상 · 시간 · 손님 언어 · 누른 단계 · 예약 + 마이크 끄기 · 예약 보기 · 끊기)이 콘솔을 그만큼 밀어 낸다. 예약 보기는 `/admin/checkin?date&property` 로 이동하고 패널은 유지된다. 건물 설정 맨 아래 「직원 통화」 켜기 · 끄기(`checkin.manage`, 기본 꺼짐)는 폼의 「저장」과 따로 누르면 바로 저장되고 폼의 동시 저장 검사 값(`updated_at`)을 바꾸지 않는다. 벨의 체크인 알림은 `checkin.view` 가 있을 때만 이동한다.
   새 공용 프리미티브는 만들지 않고 `AdminDatePicker` · `AdmDropdown` · `useAdminPanelA11y` · `AdminToast` · 공용 `.panel` / `.modal` 위에 화면 고유 스타일만
   `src/components/admin/checkin/checkin.css`(`.ck-*`)로 얹는다. 대신 입력(FR-S04) · 어제 이전 미체크인(S03) · 내보내기(S05)는 P1. docs/product/44 §4-4
 

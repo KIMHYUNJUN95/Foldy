@@ -613,6 +613,14 @@ Example subject:
 mailto:admin@example.com
 ```
 
+## LiveKit (셀프 체크인 직원 통화, 2026-11-06)
+
+`LIVEKIT_URL` · `LIVEKIT_API_KEY` · `LIVEKIT_API_SECRET`. 서버 전용이며 `NEXT_PUBLIC_` 을 붙이지 않는다. Foldy(직원 토큰)와 `apps/checkin`(태블릿 토큰) 두 Vercel 프로젝트에 같은 값을 넣는다.
+
+- **운영 `LIVEKIT_URL` 은 `wss://` 필수다.** 태블릿 앱이 평문 연결을 막는다.
+- 값이 하나라도 없으면 호출은 `unconfigured` 로 끝나고 행도 알림도 만들지 않는다. 태블릿은 연락처 화면을 보여 준다.
+- 동작 약속: `docs/product/46-self-checkin-staff-call.md`.
+
 ## Daily Report (Todo 완료/기록 tab)
 
 No environment variable required. The daily work-report generator
@@ -749,6 +757,10 @@ SLACK_OPS_ALERT_WEBHOOK_URL=
 NEXT_PUBLIC_VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
 VAPID_SUBJECT=
+
+LIVEKIT_URL=
+LIVEKIT_API_KEY=
+LIVEKIT_API_SECRET=
 ```
 
 ## Supabase Migration CLI

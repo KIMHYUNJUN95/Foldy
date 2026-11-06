@@ -36,6 +36,8 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
+            // 실제 태블릿 CPU 만 — LiveKit(WebRTC) 네이티브 라이브러리가 CPU 종류마다 들어가 크기가 크다. 디버그 빌드(에뮬레이터)는 그대로 둔다.
+            ndk { abiFilters += "arm64-v8a" }
         }
     }
 
@@ -65,5 +67,9 @@ dependencies {
     implementation("androidx.camera:camera-video:1.5.0")
     implementation("com.google.mlkit:text-recognition:16.0.1")
 
+    // 직원 통화(46) — 손님 카메라 + 마이크를 LiveKit 방에 올리고 직원 음성을 받는다.
+    implementation("io.livekit:livekit-android:2.30.0")
+
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
 }

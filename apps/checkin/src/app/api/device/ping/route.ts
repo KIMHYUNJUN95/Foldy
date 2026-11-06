@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { settingsVersionOf } from "@/lib/contract/build";
+import { readDeviceSettings } from "@/lib/contract/read-settings";
 import { authenticateDevice } from "@/lib/device/auth";
 import { json, readJson, serverError } from "@/lib/guest/request";
 import { createCheckinServiceClient } from "@/lib/supabase/service";
@@ -29,17 +31,12 @@ export async function POST(request: Request) {
     if (parsed.data.appVersion) patch.app_version = parsed.data.appVersion;
     if (parsed.data.osVersion) patch.os_version = parsed.data.osVersion;
 
-    const [{ error }, { data: settings }] = await Promise.all([
+    const [{ error }, settings] = await Promise.all([
       db.from("devices").update(patch).eq("id", device.id),
-      db
-        .from("property_settings")
-        .select("updated_at")
-        .eq("organization_id", device.organization_id)
-        .eq("property_key", device.property_key)
-        .maybeSingle(),
+      readDeviceSettings(db, device, "updated_at"),
     ]);
     if (error) throw new Error(error.message);
-    return json({ ok: true, settingsVersion: (settings?.updated_at as string | undefined) ?? "default" });
+    return json({ ok: true, settingsVersion: settingsVersionOf(settings as { updated_at?: string | null; staff_call_enabled: boolean } | null) });
   } catch (error) {
     return serverError("device-ping", error);
   }

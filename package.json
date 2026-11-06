@@ -39,6 +39,8 @@
     "exceljs": "^4.4.0",
     "jsqr": "^1.4.0",
     "libphonenumber-js": "^1.13.14",
+    "livekit-client": "^2.23.0",
+    "livekit-server-sdk": "^2.19.2",
     "lottie-react": "^2.4.1",
     "lucide-react": "^1.14.0",
     "next": "16.2.6",

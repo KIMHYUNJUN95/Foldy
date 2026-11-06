@@ -278,4 +278,14 @@
     <string name="proof_mismatch">护照上的姓名与预订不一致。请出示预订人的护照，或点击“用代码查找”，或呼叫工作人员。</string>
     <string name="proof_no_passport">我没有护照</string>
     <string name="proof_retake">重新扫描</string>
+    <!-- 직원 통화(46 §6, E1~E3) -->
+    <string name="calling_title">正在呼叫工作人员</string>
+    <string name="calling_note">接通后，工作人员会通过摄像头看到您并与您交谈。\n通话不会被保存。</string>
+    <string name="talking_title">正在与工作人员通话</string>
+    <string name="talking_end">结束通话</string>
+    <string name="call_nobody_title">暂无工作人员接听</string>
+    <string name="call_failed_title">无法连接</string>
+    <string name="call_retry_hint">请再次呼叫，或通过下方方式联系我们。</string>
+    <string name="call_retry_hint_none">请再次呼叫，或直接联系前台工作人员。</string>
+    <string name="call_again">再次呼叫</string>
 </resources>

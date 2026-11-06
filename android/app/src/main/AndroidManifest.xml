@@ -64,6 +64,8 @@
     <!-- 출퇴근 QR 스캔 · 사진 첨부(카메라), 출퇴근 인증 순간의 위치. 웹(getUserMedia · Geolocation)이 요청하면
          Capacitor 의 WebChromeClient 가 런타임 권한을 묻는다 (2026-10-06). -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />

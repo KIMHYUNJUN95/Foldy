@@ -41,7 +41,11 @@ export default async function MobileNotificationsPage() {
   ]);
   // 줄 글자(짧은 제목 · 대상 · 시각)는 여기서 만든다 — 클라이언트에 사전을 싣지 않는다(화이트 리디자인 2026-10-15).
   const actorNames = await loadNotificationActorNames(supabase, items);
-  const { views, todayKey } = buildNotificationViews(items, { locale, actorNames });
+  const { views, todayKey } = buildNotificationViews(items, {
+    locale,
+    actorNames,
+    checkin: { surface: "mobile", canViewCheckin: session.capabilities.includes("checkin.view") },
+  });
 
   return (
     // 넓은 화면(2026-10-05 · 화이트 리디자인 2026-10-15): 폴드는 가운데 540px 한 줄, 태블릿 가로는 왼쪽 알림 목록 · 오른쪽 그 알림의 상세 칸(`SplitList`).

@@ -42,6 +42,8 @@ export type NotificationView = {
   source: string;
   /** 도쿄 날짜(YYYY-MM-DD). 묶음 · 구간의 기준. */
   dayKey: string;
+  /** 직원 통화 호출 알림 — 아직 울리는 중이면 받기 화면을 다시 띄운다. `href` 가 빈 줄은 이동하지 않는다. */
+  staffCallId?: string | null;
   /** 같은 종류인가를 가르는 열쇠(종류 + 사건). 같은 날 · 같은 열쇠가 이어지면 한 줄로 묶는다. */
   groupKey: string;
 };

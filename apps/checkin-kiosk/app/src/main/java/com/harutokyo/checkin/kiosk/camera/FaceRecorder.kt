@@ -68,7 +68,10 @@ fun FaceRecorder(
     val failed by rememberUpdatedState(onFailed)
     val disposed = remember { AtomicBoolean(false) }
 
-    DisposableEffect(lifecycleOwner) {
+    // 직원 통화 중에는 카메라를 닫는다. 녹화 중이었다면 그 영상은 버려지고, 돌아오면 처음부터 다시 5초.
+    val hold = LocalCameraHold.current
+    DisposableEffect(lifecycleOwner, hold) {
+        if (hold) return@DisposableEffect onDispose { }
         disposed.set(false)
         val future = ProcessCameraProvider.getInstance(context)
         var provider: ProcessCameraProvider? = null

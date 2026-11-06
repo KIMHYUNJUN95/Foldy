@@ -30,6 +30,7 @@ async function scopeFromSession() {
   return {
     scope: { userId: session.user.id, organizationId: session.organization.id },
     locale: session.user.preferredLanguage,
+    canViewCheckin: session.capabilities.includes("checkin.view"),
   };
 }
 
@@ -53,7 +54,11 @@ export async function getAdminNotifications(): Promise<AdminNotifData> {
       countUnreadNotifications(supabase, ctx.scope),
     ]);
     const actorNames = await loadNotificationActorNames(supabase, list.items);
-    const { views } = buildNotificationViews(list.items, { locale: ctx.locale, actorNames });
+    const { views } = buildNotificationViews(list.items, {
+      locale: ctx.locale,
+      actorNames,
+      checkin: { surface: "admin", canViewCheckin: ctx.canViewCheckin },
+    });
     return { unread, items: views, copy, userId: ctx.scope.userId };
   } catch {
     return { unread: 0, items: [], copy, userId: ctx.scope.userId };

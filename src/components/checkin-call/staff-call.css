@@ -1,0 +1,36 @@
+/* 직원 통화 — Tailwind 로 못 쓰는 것만. 다른 화면으로 새지 않게 전부 staff-call 접두어. docs/product/46 §6 */
+
+@keyframes staff-call-pulse {
+  from { transform: scale(1); opacity: .45; }
+  to { transform: scale(1.7); opacity: 0; }
+}
+
+.staff-call-pulse { position: relative; }
+.staff-call-pulse::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1.5px solid #1f9d4d;
+  animation: staff-call-pulse 2s cubic-bezier(.23, 1, .32, 1) infinite;
+  pointer-events: none;
+}
+
+@keyframes staff-call-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+.staff-call-enter { animation: staff-call-enter 200ms cubic-bezier(.23, 1, .32, 1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .staff-call-pulse::before { animation: none; opacity: .25; transform: scale(1.25); }
+  .staff-call-enter { animation: none; }
+}
+
+/* 스크롤 잠금: BottomSheet 는 인라인 스타일을 저장 · 복원하는 참조 수 잠금이라, 겹쳐도 어긋나지 않게 속성으로 따로 건다. */
+html[data-staff-call-open] body { overflow: hidden; overscroll-behavior: none; }
+
+/* PC 통화 패널 자리만큼 콘솔을 밀어 내용이 가려지지 않게 한다. 콘솔의 오른쪽 상세 패널도 그 왼쪽으로. */
+html[data-staff-call-panel] main.adm { padding-right: min(440px, 100vw); }
+html[data-staff-call-panel] .adm .panel { right: min(440px, 100vw); }

@@ -278,4 +278,14 @@
     <string name="proof_mismatch">The name on the passport doesn\'t match the booking. Show the booker\'s passport, tap “Find by code”, or call our staff.</string>
     <string name="proof_no_passport">I don\'t have a passport</string>
     <string name="proof_retake">Scan again</string>
+    <!-- 직원 통화(46 §6, E1~E3) -->
+    <string name="calling_title">Calling our staff</string>
+    <string name="calling_note">Once connected, a staff member will see you on camera and talk with you.\nCalls are not recorded.</string>
+    <string name="talking_title">On a call with staff</string>
+    <string name="talking_end">End call</string>
+    <string name="call_nobody_title">No one is available right now</string>
+    <string name="call_failed_title">We couldn\'t connect</string>
+    <string name="call_retry_hint">Try again, or reach us using the details below.</string>
+    <string name="call_retry_hint_none">Try again, or speak to our front desk staff.</string>
+    <string name="call_again">Call again</string>
 </resources>

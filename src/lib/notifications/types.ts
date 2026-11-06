@@ -105,6 +105,13 @@ export type IdDocumentExpiryNotificationPayload = {
   audience: "holder" | "admin";
 };
 
+/** 셀프 체크인 직원 통화 · 직원 확인(docs/product/46 §4) — 손님 정보 없음. 호출 · 놓침은 `callId`, 직원 확인은 `stayId`. */
+export type CheckinNotificationPayload = {
+  callId?: string;
+  stayId?: string | null;
+  propertyKey: string;
+};
+
 export type NotificationPayloadByType = {
   order_processed: OrderProcessedNotificationPayload;
   task_shared: TaskNotificationPayload;
@@ -119,6 +126,9 @@ export type NotificationPayloadByType = {
   board_activity: BoardNotificationPayload;
   bug_report_activity: BugReportNotificationPayload;
   id_document_expiring: IdDocumentExpiryNotificationPayload;
+  checkin_staff_call: CheckinNotificationPayload;
+  checkin_call_missed: CheckinNotificationPayload;
+  checkin_staff_check: CheckinNotificationPayload;
 };
 
 export function isTaskNotificationPayload(
@@ -212,4 +222,9 @@ export function isIdDocumentExpiryNotificationPayload(
     typeof record.daysLeft === "number" &&
     (record.audience === "holder" || record.audience === "admin")
   );
+}
+
+export function isCheckinNotificationPayload(payload: unknown): payload is CheckinNotificationPayload {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return false;
+  return typeof (payload as Record<string, unknown>).propertyKey === "string";
 }

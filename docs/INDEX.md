@@ -77,6 +77,7 @@ Historical: Retained for decision history but superseded by a newer document or 
 | [Self Check-in Kiosk](./product/43-self-checkin-kiosk.md) | Draft | Building-tablet self check-in — decision record (23 decisions, Hotelsmart survey) |
 | [Self Check-in QA · Rollout Plan](./planning/20-self-checkin-qa-rollout-plan.md) | Draft | QA gates, device checklist, pilot → all buildings, staff ops guide, schedule |
 | [Self Check-in PRD](./product/44-self-checkin-prd.md) | Draft | Requirements (FR/NFR), personas, journeys, KPIs, risks, acceptance criteria |
+| [Self Check-in Staff Call](./product/46-self-checkin-staff-call.md) | Living | Tablet ↔ staff call on demand — decisions, states, API contract, LiveKit tokens, screens |
 
 ## Design Docs
 

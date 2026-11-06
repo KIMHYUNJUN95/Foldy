@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { AdminEntry } from "@/components/admin/admin-entry";
 import { AdminNavBadgesProvider } from "@/components/admin/admin-nav-badges";
+import { StaffCallHost } from "@/components/checkin-call/staff-call-host";
 import { BuildingNamesProvider } from "@/components/shared/building-names";
 import { getDictionary } from "@/lib/i18n";
-import { getCurrentAppSession } from "@/lib/session";
+import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { countPendingIdDocumentPeople } from "@/lib/staff-documents/server";
 
 // 관리자 콘솔은 모바일 앱과 완전히 분리된, 독립적으로 설치 가능한 PWA 다. Next.js 메타데이터는
@@ -36,7 +37,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <AdminEntry />
       {/* 건물 이름을 보는 사람 언어로(2026-10-23) — 모바일과 같은 공급자. 데이터는 한국어 정규 명칭이라 그릴 때 `useBuildingName()` 으로 바꾼다. */}
       <AdminNavBadgesProvider badges={pendingIdDocs > 0 ? { users: pendingIdDocs } : {}}>
-        <BuildingNamesProvider labels={dictionary.cleaning.buildingLabels}>{children}</BuildingNamesProvider>
+        <BuildingNamesProvider labels={dictionary.cleaning.buildingLabels}>
+          {children}
+          {/* 직원 통화 받기(docs/product/46 §6) — 레이아웃에 붙여 화면을 옮겨도 통화가 이어진다. */}
+          {session && hasOrganizationContext(session) && session.capabilities.includes("checkin.call") ? (
+            <StaffCallHost userId={session.user.id} surface="admin" copy={dictionary.checkinCall} />
+          ) : null}
+        </BuildingNamesProvider>
       </AdminNavBadgesProvider>
     </>
   );

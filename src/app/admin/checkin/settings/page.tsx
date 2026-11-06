@@ -1,7 +1,8 @@
-import { getCheckinPropertySettings } from "@/actions/checkin/settings";
+import { getCheckinPropertySettings, getCheckinStaffCallSetting } from "@/actions/checkin/settings";
 import { CheckinSettingsConsole } from "@/components/admin/checkin/checkin-settings-console";
 import { CheckinTabs } from "@/components/admin/checkin/checkin-ui";
 import { AdminNoAccess } from "@/components/admin/shared/admin-no-access";
+import { StaffCallSetting } from "@/components/checkin-call/staff-call-setting";
 import { AdminShell } from "@/components/shell/admin-shell";
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { CHECKIN_PROPERTIES, checkinPropertyName } from "@/lib/checkin/model";
@@ -28,13 +29,22 @@ export default async function AdminCheckinSettingsPage({ searchParams }: { searc
 
   const propertyKey =
     typeof params.property === "string" && checkinPropertyName(params.property) ? params.property : (CHECKIN_PROPERTIES[0]?.key ?? "");
-  const result = await getCheckinPropertySettings(propertyKey);
+  const [result, staffCall] = await Promise.all([getCheckinPropertySettings(propertyKey), getCheckinStaffCallSetting(propertyKey)]);
   return (
     <AdminShell activeItem="checkin" title={copy.title}>
       <div className="ck">
         <CheckinTabs active="settings" canManage copy={copy} />
       </div>
-      <CheckinSettingsConsole copy={copy} shared={shared} properties={[...CHECKIN_PROPERTIES]} propertyKey={propertyKey} result={result} />
+      {/* 저장한 적 없는 건물에서 통화를 켜면 줄이 생긴다 — 폼이 옛 기준값으로 저장하다 충돌하지 않게 그때 새로 그린다. */}
+      <CheckinSettingsConsole
+        key={result.ok && result.settings.saved ? "saved" : "new"}
+        copy={copy}
+        shared={shared}
+        properties={[...CHECKIN_PROPERTIES]}
+        propertyKey={propertyKey}
+        result={result}
+      />
+      {staffCall.ok ? <StaffCallSetting key={propertyKey} propertyKey={propertyKey} enabled={staffCall.enabled} copy={copy} /> : null}
     </AdminShell>
   );
 }

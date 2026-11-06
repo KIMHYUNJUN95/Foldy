@@ -123,6 +123,9 @@ class PassportScanner {
     }
 }
 
+/** true 이면 체크인 카메라(여권 · 얼굴)를 닫는다 — 직원 통화(46 §6). */
+val LocalCameraHold = androidx.compose.runtime.compositionLocalOf { false }
+
 /** 카메라 미리보기. 카메라를 못 열면 onUnavailable(→ T3n 「카메라가 켜지지 않아요」). */
 @Composable
 fun PassportPreview(
@@ -140,7 +143,10 @@ fun PassportPreview(
             scaleType = PreviewView.ScaleType.FILL_CENTER
         }
     }
-    DisposableEffect(lifecycleOwner) {
+    // 직원 통화 중에는 카메라를 닫는다(LiveKit 이 같은 카메라를 쓴다) — 끝나면 다시 열려 자동 찍기가 새로 시작된다.
+    val hold = LocalCameraHold.current
+    DisposableEffect(lifecycleOwner, hold) {
+        if (hold) return@DisposableEffect onDispose { }
         val future = ProcessCameraProvider.getInstance(context)
         var provider: ProcessCameraProvider? = null
         var bound: Array<UseCase> = emptyArray()

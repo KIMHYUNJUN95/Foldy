@@ -1,4 +1,5 @@
 import { AppSplash } from "@/components/mobile/app-splash";
+import { StaffCallHost } from "@/components/checkin-call/staff-call-host";
 import { IdentityFillPrompt } from "@/components/identity/identity-fill-prompt";
 import { ImageFadeIn } from "@/components/shell/image-fade-in";
 import { ResumeRefresh } from "@/components/shell/resume-refresh";
@@ -53,7 +54,13 @@ export default async function MobileLayout({ children }: { children: React.React
           할 일 · 요청을 여기서 구독하면 상관없는 화면까지 매번 다시 그린다. */}
       {session ? <LiveRefresh sources={notificationLiveSources(session.user.id)} /> : null}
       {/* 건물 이름을 보는 사람 언어로(2026-10-22) — 데이터는 한국어 정규 명칭이라 그릴 때 `useBuildingName()` 으로 바꾼다. */}
-      <BuildingNamesProvider labels={dictionary.cleaning.buildingLabels}>{children}</BuildingNamesProvider>
+      <BuildingNamesProvider labels={dictionary.cleaning.buildingLabels}>
+        {children}
+        {/* 직원 통화 받기(docs/product/46 §6) — 레이아웃에 붙여 화면을 옮겨도 통화가 이어진다. */}
+        {session && hasOrganizationContext(session) && session.capabilities.includes("checkin.call") ? (
+          <StaffCallHost userId={session.user.id} surface="mobile" copy={dictionary.checkinCall} />
+        ) : null}
+      </BuildingNamesProvider>
     </>
   );
 }

@@ -11,6 +11,7 @@ import { EnvelopeOpenGlyph, NotificationGlyph, TrashGlyph } from "@/components/n
 import { NotificationRowBody, rowLabelIds } from "@/components/notifications/notification-row";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { useIsTablet, useSplitPush } from "@/components/shell/split-list";
+import { requestStaffCallReopen } from "@/lib/checkin/staff-call-events";
 import { haptic } from "@/lib/haptics";
 import {
   filterByTab,
@@ -184,6 +185,8 @@ export function NotificationList({ items, todayKey, copy }: NotificationListProp
 
   function openNotification(view: NotificationView) {
     if (view.unread) markRead([view.id]);
+    if (view.staffCallId) requestStaffCallReopen(view.staffCallId);
+    if (!view.href) return;
     if (isTablet) setActiveId(view.id);
     // 태블릿 가로 2분할 안이면 오른쪽 칸에 연다(`useSplitPush` — 그 밖에서는 그대로 이동).
     splitPush(view.href);

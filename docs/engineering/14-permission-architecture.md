@@ -191,6 +191,7 @@ automation.manage           자동화 설정 · 발송       ← 2026-10-06 추�
 checkin.view                셀프 체크인 현황 · 명부 · 코드 보기  ← 2026-11-04 추가
 checkin.documents           여권 사진 · 얼굴 영상 · 「확인함」   ← 2026-11-04 추가
 checkin.manage              체크인 기기 · 건물 설정             ← 2026-11-04 추가
+checkin.call                셀프 체크인 직원 통화 받기           ← 2026-11-06 추가
 ```
 
 **`board.moderate`**(2026-10-06) — 게시판 신고 처리(모바일 `/mobile/board/reports` · 관리 `/admin/board-reports`). 역할 owner · office_admin

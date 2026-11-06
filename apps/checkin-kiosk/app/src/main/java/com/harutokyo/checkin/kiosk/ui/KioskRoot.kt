@@ -1,7 +1,18 @@
 package com.harutokyo.checkin.kiosk.ui
 
 import androidx.activity.compose.BackHandler
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.activity.compose.LocalActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.Lifecycle
+import com.harutokyo.checkin.kiosk.call.CallState
+import com.harutokyo.checkin.kiosk.call.callStepOf
+import com.harutokyo.checkin.kiosk.call.callUiActive
+import com.harutokyo.checkin.kiosk.camera.LocalCameraHold
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -82,7 +93,18 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
     // 직원 부르기 — 흐름 위에 덮어 보여 준다(진행 중인 체크인 · 올리기 줄을 잃지 않게). G1 의 호출만 별도 화면이다.
     var callOpen by remember { mutableStateOf(false) }
     val callOpenNow by rememberUpdatedState(callOpen)
+    // 직원 통화(46): 계약이 켜져 있으면 연락처 화면 대신 통화 흐름. 컨트롤러는 ViewModel 이 들고 있다.
+    val callEnabled = state.contract?.staffCallEnabled == true
+    val callState by model.call.state.collectAsStateWithLifecycle()
+    // 빠른 체크인 안의 지금 단계(StepTimer 이름) — 호출이 서버에 「누른 단계」로 가려면 필요.
+    var fastStep by remember { mutableStateOf<String?>(null) }
+    // 통화 시작을 기다리는 중(권한 묻는 동안) · 통화를 시작했나.
+    var callPending by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var callLive by remember { mutableStateOf(false) }
     val reset = {
+        model.call.cancel()
+        callPending = null
+        callLive = false
         callOpen = false
         screen = Screen.Language
         language = "ja"
@@ -138,14 +160,84 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
     val scope = rememberCoroutineScope()
     val activity = LocalActivity.current!!
 
+    // 통화는 카메라 · 마이크 권한이 모두 있어야 한다. 하나라도 거부되면 서버를 부르지 않고 바로 안내 화면(E3)으로 — 체크인은 그대로.
+    fun callPermitted() = listOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)
+        .all { ContextCompat.checkSelfPermission(activity, it) == PackageManager.PERMISSION_GRANTED }
+    val askCallPermissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        val go = callPending
+        callPending = null
+        go?.invoke()
+    }
+    // 어느 화면에서 눌렀든 같은 입구. 통화가 꺼져 있으면 연락처 화면만 연다(지금까지와 같다).
+    val openCall = {
+        callOpen = true
+        if (callEnabled && !callLive && callState is CallState.Idle) {
+            val step = callStepOf(screen.name.lowercase(), fastStep)
+            val lang = language
+            val sid = session
+            val begin = {
+                callLive = true
+                model.call.start(step, lang, sid, permitted = callPermitted())
+            }
+            if (callPermitted()) {
+                begin()
+            } else {
+                callPending = begin
+                askCallPermissions.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO))
+            }
+        }
+    }
+    // 통화가 끝나 Idle 로 돌아오면(취소 · 끝내기 · 상대 끊김 · 뒤로) 누른 자리로 — 입력 값 · 진행 단계는 그대로다.
+    LaunchedEffect(callState) {
+        if (callState is CallState.Idle && callLive) {
+            callLive = false
+            callOpen = false
+        }
+    }
+    // 앱이 백그라운드로 가면 통화를 정리한다(직원 화면에서 울림이 남지 않게).
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
+        if (callLive || callPending != null) {
+            // 권한을 묻는 중이었다면 아직 통화가 없어 Idle 전이가 일어나지 않는다 — 호출 없는 E1 이 남지 않게 직접 닫는다.
+            callPending = null
+            callLive = false
+            callOpen = false
+            model.call.cancel()
+        }
+    }
+    // 통화 도중 이 건물의 통화 설정이 꺼지거나 기기가 폐기돼 계약이 사라지면 통화를 끝낸다(끝내기 단추가 사라진 채 LiveKit 이 계속 나가지 않게).
+    LaunchedEffect(callEnabled) {
+        if (!callEnabled) {
+            if (callPending != null && !callLive) {
+                callPending = null
+                callOpen = false
+            }
+            if (callLive) model.call.cancel()
+        }
+    }
+
     // 뒤로 가기로 앱을 나가지 못하게 — 화면 안 뒤로 버튼만 쓴다.
     BackHandler { reset() }
     // 직원 부르기 창이 열려 있으면 뒤로 가기는 그 창만 닫는다(위 핸들러보다 나중에 등록 = 우선).
-    BackHandler(enabled = callOpen) { callOpen = false }
+    BackHandler(enabled = callOpen) {
+        when {
+            !callEnabled -> callOpen = false
+            callState is CallState.Failed -> model.call.dismiss()
+            callState is CallState.Idle -> {
+                // 권한을 묻는 중 · 막 시작하는 중 — 시작을 취소하고 닫는다.
+                callPending = null
+                callLive = false
+                callOpen = false
+            }
+            else -> model.call.cancel()
+        }
+    }
 
     // 손님 화면이든 직원 PIN · 메뉴든 손을 떼고 idleSecondsInput 지나면 G1 로(직원 창이 열린 채 남지 않게).
     val idleSeconds = state.contract?.idleSecondsInput ?: 240
-    LaunchedEffect(screen, staff, lastTouch, idleSeconds) {
+    // 통화 중(부르는 중 · 연결 중 · 통화 중)에는 세지 않는다 — 통화 도중 처음 화면으로 돌아가지 않게. 끝나면 새로 센다.
+    val callBusy = callLive && callState !is CallState.Idle && callState !is CallState.Failed
+    LaunchedEffect(screen, staff, lastTouch, idleSeconds, callBusy) {
+        if (callBusy) return@LaunchedEffect
         if (screen == Screen.Language && staff == StaffStep.Closed) return@LaunchedEffect
         delay(idleSeconds * 1000L)
         reset()
@@ -176,6 +268,7 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
                     }
                 },
         ) {
+            CompositionLocalProvider(LocalCameraHold provides (callOpen && callUiActive(callLive, callPending != null))) {
             Localized(if (state.phase == Phase.Ready) language else "ja") {
                 when (state.phase) {
                     Phase.Loading -> Centered(stringResource(R.string.loading))
@@ -185,9 +278,9 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
                         Screen.Language -> LanguageScreen(
                             languages = state.contract?.languages ?: listOf("ja", "en", "zh-Hans", "ko"),
                             online = state.online,
-                            hasContacts = !state.contract?.supportContacts.isNullOrEmpty(),
+                            hasContacts = callEnabled || !state.contract?.supportContacts.isNullOrEmpty(),
                             onStaff = { staff = StaffStep.Pin },
-                            onCall = { callOpen = true },
+                            onCall = openCall,
                             onPick = { code ->
                                 language = code
                                 screen = Screen.Scan
@@ -202,7 +295,7 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
                                 error = scanError,
                                 onBack = reset,
                                 onLanguage = { screen = Screen.Language },
-                                onCall = { callOpen = true },
+                                onCall = openCall,
                                 onByCode = {
                                     form = form.copy(byCode = true)
                                     screen = Screen.Find
@@ -270,13 +363,13 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
                                     screen = Screen.Scan
                                 },
                                 onLanguage = { screen = Screen.Language },
-                                onCall = { callOpen = true },
+                                onCall = openCall,
                                 onByCode = {
                                     form = form.copy(byCode = true)
                                     screen = Screen.Find
                                 },
                                 onByName = {},
-                                onNoPassport = { callOpen = true },
+                                onNoPassport = openCall,
                                 onPassport = { shot ->
                                     // 검사 숫자가 맞는 읽기만 보낸다. 직원 호출 창이 열려 있으면 버린다.
                                     val mrz = shot.mrz?.takeIf { it.valid } ?: return@ScanScreen false
@@ -343,7 +436,7 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
                                 },
                                 onBack = { screen = Screen.Scan },
                                 onLanguage = { screen = Screen.Language },
-                                onCall = { callOpen = true },
+                                onCall = openCall,
                                 onSubmit = {
                                     when (val result = model.find(form.query())) {
                                         is FindResult.Found -> foundStay(result, state.contract?.languages.orEmpty(), null)
@@ -367,26 +460,26 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
                             remaining = (notFound as? FindResult.NotFound)?.remaining ?: 0,
                             lockedUntil = (notFound as? FindResult.Locked)?.untilMillis,
                             onBack = { screen = if (proofSession != null) Screen.Proof else Screen.Scan },
-                            onCall = { callOpen = true },
+                            onCall = openCall,
                             onRetry = { screen = if (proofSession != null) Screen.Proof else Screen.Scan },
                         )
                         Screen.Blocked -> BlockedScreen(
                             reason = blocked?.reason ?: BlockReason.Expired,
                             checkInDate = blocked?.checkInDate,
                             onBack = { screen = Screen.Scan },
-                            onCall = { callOpen = true },
+                            onCall = openCall,
                             onHome = reset,
                         )
                         Screen.CheckedIn -> stay?.let { current ->
                             CheckedInScreen(
                                 stay = current,
                                 onBack = { screen = Screen.Scan },
-                                onCall = { callOpen = true },
+                                onCall = openCall,
                                 onRoom = {
                                     doneFromFast = false
                                     screen = Screen.Done
                                 },
-                                onMore = { callOpen = true },
+                                onMore = openCall,
                                 onHome = reset,
                             )
                         }
@@ -421,8 +514,11 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
                                         stay = null
                                         screen = Screen.Scan
                                     },
-                                    onCall = { callOpen = true },
-                                    onStep = timer::enter,
+                                    onCall = openCall,
+                                    onStep = {
+                                        fastStep = it
+                                        timer.enter(it)
+                                    },
                                     onDone = {
                                         timer.enter("done")
                                         timer.finish()
@@ -452,16 +548,50 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
                                         false
                                     }
                                 },
-                                onCall = { callOpen = true },
+                                onCall = openCall,
                                 onHome = reset,
                             )
                         }
                     }
                 }
             }
+            }
             if (callOpen) {
                 Box(Modifier.fillMaxSize().background(G.Bg).pointerInput(Unit) { detectTapGestures { } }) {
-                    Localized(language) { StaffCallScreen(contacts = state.contract?.supportContacts.orEmpty(), onBack = { callOpen = false }) }
+                    Localized(language) {
+                        // 창을 열 때 통화를 시작했거나 권한을 기다리는 중이면 통화 화면, 아니면 연락처 화면(설정이 그 뒤에 켜져도 연락처 그대로).
+                        // 통화 중 설정이 꺼져도 통화 화면을 지킨다 — 통화를 끝내면 Idle 로 돌아와 창이 닫힌다.
+                        if (callUiActive(callLive, callPending != null)) {
+                            StaffCallFlow(
+                                state = callState,
+                                contacts = state.contract?.supportContacts.orEmpty(),
+                                video = { modifier ->
+                                    GuestCameraView(modifier, attach = model.callRoom::attach, detach = model.callRoom::detach)
+                                },
+                                onCancel = {
+                                    // 권한을 묻는 중이면 시작 자체를 접는다.
+                                    if (callState is CallState.Idle) {
+                                        callPending = null
+                                        callLive = false
+                                        callOpen = false
+                                    } else {
+                                        model.call.cancel()
+                                    }
+                                },
+                                onHangUp = model.call::cancel,
+                                onBack = model.call::dismiss,
+                                onRetry = {
+                                    if (callPermitted()) model.call.retry() else {
+                                        // 권한이 아직 없다 — 다시 한 번 묻는다. 거부되면 서버를 부르지 않고 같은 안내 화면(직원 앱이 울리면 안 된다).
+                                        callPending = { model.call.retry(permitted = callPermitted()) }
+                                        askCallPermissions.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO))
+                                    }
+                                },
+                            )
+                        } else {
+                            StaffCallScreen(contacts = state.contract?.supportContacts.orEmpty(), onBack = { callOpen = false })
+                        }
+                    }
                 }
             }
             // 직원 화면은 손님이 고른 언어가 아니라 기기 언어로.

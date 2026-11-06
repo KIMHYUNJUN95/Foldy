@@ -2394,3 +2394,16 @@ INSERT · UPDATE 신호만, DELETE 는 오지 않는다. 대신 `task_occurrence
 - 접근: service_role 만. authenticated · anon 에는 스키마 usage · 표 권한 · RLS 정책이 없다(직원 JWT 로 직접 읽는 길 없음).
 - check 제약: `property_settings.idle_seconds_input` 30~900 · `idle_seconds_done` 5~120(계약 스키마와 같음).
 - 평문 칼럼: `enrollment_codes.code`(8자리) · `stays.checkin_code`(6자리). 해시: `devices.token_hash`(sha256) · `property_settings.staff_pin_hash`(pbkdf2).
+
+## 2026-11-06 `checkin.staff_calls` — 셀프 체크인 직원 통화 (`202611060001`, 운영 미적용)
+
+기준 문서: `docs/product/46-self-checkin-staff-call.md` §3 · §4. 통화 내용은 저장하지 않는다.
+
+- 표 `checkin.staff_calls`: 칼럼은 `docs/engineering/16-self-checkin-technical-design.md` §3. `device_id` → `devices`(지우면 같이 지움), `stay_id` → `stays`(지우면 null), `accepted_by` 는 다른 `checkin` 표처럼 `public` 외래 키 없이 id 값만.
+- check: status · step(`welcome` · `find` · `passport` · `face` · `address` · `done` · `other`) · language(`ja` · `en` · `zh-Hans` · `ko`) · ended_by 값 목록, `room_name` 모양, `accepted` 면 `accepted_at` · `accepted_by` 필수, 끝난 상태면 `ended_at` 필수.
+- 인덱스: 기기당 진행 중 하나(`status in ('ringing','accepted')` 부분 고유) · 조직별 울리는 중 · 조직별 최근 · 기기별 최근 · stay.
+- `checkin.property_settings.staff_call_enabled boolean not null default false`.
+- `public.notification_type` 추가: `checkin_staff_call` · `checkin_call_missed` · `checkin_staff_check`. 알림 행의 `source_type` 은 `checkin_staff_call`(source_id = 통화) · `checkin_stay`(source_id = stay). payload: 호출 · 놓침은 `callId` · `propertyKey`, 직원 확인은 `stayId` · `propertyKey`.
+- 함수 `checkin.notify_staff(p_organization_id, p_capability, p_type, p_dedupe_key, p_href, p_payload) returns integer`: 받는 사람을 계산해 알림을 넣고 받는 사람 수를 돌려준다. `callId` · `stayId` 가 둘 다 없으면 오류(`22023`).
+- 함수 `checkin.member_can_receive(org, user, capability)`(받는 사람 규칙) · `checkin.can_take_call(org, user)`(통화를 이어 가도 되는가).
+- `audit_log.action` 추가: `staff_call_started` · `staff_call_accepted` · `staff_call_no_answer` · `staff_call_canceled` · `staff_call_ended`. `meta` 는 `call_id` · `property_key` 만.

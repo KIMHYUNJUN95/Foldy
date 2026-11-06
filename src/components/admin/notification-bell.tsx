@@ -10,6 +10,7 @@ import {
 } from "@/app/admin/notification-actions";
 import { NotificationRowBody, rowLabelIds } from "@/components/notifications/notification-row";
 import { useLiveRefresh } from "@/components/shared/live-refresh";
+import { requestStaffCallReopen } from "@/lib/checkin/staff-call-events";
 import { notificationLiveSources } from "@/lib/live-sources";
 import { groupNotificationViews, type NotificationGroup } from "@/lib/notifications/grouping";
 import "@/components/notifications/notification-white.css";
@@ -247,12 +248,27 @@ function PopRow({
             baseId={baseId}
             dotIndex={dotIndex}
             hit={
-              <Link
-                aria-labelledby={rowLabelIds(baseId, unread)}
-                className="nfw-hit"
-                href={view.href || "/notifications"}
-                onClick={onNavigate}
-              />
+              view.href ? (
+                <Link
+                  aria-labelledby={rowLabelIds(baseId, unread)}
+                  className="nfw-hit"
+                  href={view.href}
+                  onClick={() => {
+                    if (view.staffCallId) requestStaffCallReopen(view.staffCallId);
+                    onNavigate();
+                  }}
+                />
+              ) : (
+                <button
+                  aria-labelledby={rowLabelIds(baseId, unread)}
+                  className="nfw-hit"
+                  onClick={() => {
+                    if (view.staffCallId) requestStaffCallReopen(view.staffCallId);
+                    onNavigate();
+                  }}
+                  type="button"
+                />
+              )
             }
             more={more}
             object={object}

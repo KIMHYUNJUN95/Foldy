@@ -23,6 +23,8 @@
 	<false/>
 	<key>NSCameraUsageDescription</key>
 	<string>Foldy uses the camera to scan the attendance QR code, to take photos you attach to work records such as maintenance and lost &amp; found reports, and to photograph your residence card (front and back) or the front of your My Number card for your staff records.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Foldy uses the microphone so staff can talk with a guest who calls from a self check-in tablet. Calls are not recorded.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Foldy checks your location only at the moment you clock in or out, to confirm you are at the work site. Location is never tracked in the background.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>

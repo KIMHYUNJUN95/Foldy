@@ -537,6 +537,7 @@ const FALLBACK_DICTIONARY = {
     stay: "Stay",
     party: "Guests",
     partyN: "Guests {n}",
+    roomUnknown: "Room unconfirmed",
     loadFailed: "Couldn't load the booking.",
     steps: {
       welcome: "welcome",
@@ -612,6 +613,7 @@ const FALLBACK_DICTIONARY = {
     channelBooking: "Booking",
     channelManual: "Direct",
     partyN: "Guests {n}",
+    roomUnknown: "Room unconfirmed",
     rosterAria: "Roster {filled} of {total}",
     nightsN: "Nights {n}",
     channelsHint: "Channel colors: Airbnb coral, Booking navy, Direct gray",
@@ -9485,6 +9487,7 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
     stay: "숙박",
     party: "인원",
     partyN: "{n}명",
+    roomUnknown: "방 미확인",
     loadFailed: "예약을 불러오지 못했어요.",
     steps: {
       welcome: "첫 화면",
@@ -9560,6 +9563,7 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
     channelBooking: "Booking",
     channelManual: "직접",
     partyN: "{n}명",
+    roomUnknown: "방 미확인",
     rosterAria: "명부 {filled}/{total}",
     nightsN: "{n}박",
     channelsHint: "채널 색 · Airbnb 코랄 · Booking 남색 · 직접 회색",
@@ -18253,6 +18257,7 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
     stay: "宿泊",
     party: "人数",
     partyN: "{n}名",
+    roomUnknown: "部屋未確認",
     loadFailed: "予約を読み込めませんでした。",
     steps: {
       welcome: "最初の画面",
@@ -18328,6 +18333,7 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
     channelBooking: "Booking",
     channelManual: "直接",
     partyN: "{n}名",
+    roomUnknown: "部屋未確認",
     rosterAria: "名簿 {filled}/{total}",
     nightsN: "{n}泊",
     channelsHint: "チャネル色 ・ Airbnb コーラル ・ Booking 紺 ・ 直接 グレー",

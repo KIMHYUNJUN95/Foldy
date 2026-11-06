@@ -183,7 +183,7 @@ function ArrivalRow({ row, copy, selected, onSelect }: { row: CheckinArrivalRow;
           </span>
         </span>
       </span>
-      <span className="ck-c">{roomsText({ propertyName: row.propertyName, roomLabels: row.roomLabels, localizedProperty: buildingName(row.propertyName) })}</span>
+      <span className="ck-c">{roomsText({ propertyName: row.propertyName, roomLabels: row.roomLabels, localizedProperty: buildingName(row.propertyName), unknownRoomLabel: copy.roomUnknown })}</span>
       <span className="ck-c num">{fill(copy.partyN, { n: row.partySize })}</span>
       <span className="ck-c is-soft num" aria-label={fill(copy.rosterAria, { filled: row.rosterFilled, total: row.partySize })}>
         <span className="ck-pd" aria-hidden="true">

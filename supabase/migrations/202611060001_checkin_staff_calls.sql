@@ -85,6 +85,12 @@ with check (
   and type::text not in ('checkin_staff_call', 'checkin_call_missed', 'checkin_staff_check')
 );
 
+-- 위 제한은 만들기만 막는다. UPDATE 정책 「recipients can mark own notifications read」는 누구의 행인지만 봐서, 수신자가 자기
+-- 알림의 type · payload · href · recipient_user_id 등을 바꿔 전화 알림으로 둔갑시킬 수 있었다. 앱이 쓰는 칸은 읽음 시각뿐이므로
+-- (src/lib/notifications/queries.ts) 칸 권한으로 좁힌다. service_role 은 그대로이고, 모든 알림 종류에 적용된다. 이 두 줄은 다시 돌려도 안전하다.
+revoke update on public.notifications from public, anon, authenticated;
+grant update (read_at) on public.notifications to authenticated;
+
 -- ── 받는 사람 규칙 ─────────────────────────────────────────────────────────
 -- apps/checkin 은 Foldy 코드를 가져올 수 없어 앱의 `memberIdsWithCapability`(src/lib/capabilities-server.ts)와 같은 규칙을 여기 둔다:
 --   이 조직의 활성 멤버 + (활성 개인 부여 또는 역할 기본값, 전무는 owner 를 물려받음) − 활성 개인 차단(대표 · 전무는 면역) − Auth 정지 계정.

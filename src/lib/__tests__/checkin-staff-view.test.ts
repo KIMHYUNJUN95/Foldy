@@ -165,10 +165,10 @@ describe("목록 판정", () => {
   });
 
   it("방 줄 — 방 이름에 건물 이름이 붙어 있으면 한 번만", () => {
-    expect(roomsText({ propertyName: "아라키초A", roomLabels: ["201", "202"], localizedProperty: "Arakicho A" })).toBe("Arakicho A · 201, 202");
-    expect(roomsText({ propertyName: "아라키초A", roomLabels: ["아라키초A 201"], localizedProperty: "Arakicho A" })).toBe("Arakicho A · 201");
-    expect(roomsText({ propertyName: "오쿠보A", roomLabels: ["오쿠보A"], localizedProperty: "Okubo A" })).toBe("Okubo A");
-    expect(roomsText({ propertyName: "오쿠보A", roomLabels: [], localizedProperty: "Okubo A" })).toBe("Okubo A");
+    expect(roomsText({ propertyName: "아라키초A", roomLabels: ["201", "202"], localizedProperty: "Arakicho A", unknownRoomLabel: "?" })).toBe("Arakicho A · 201, 202");
+    expect(roomsText({ propertyName: "아라키초A", roomLabels: ["아라키초A 201"], localizedProperty: "Arakicho A", unknownRoomLabel: "?" })).toBe("Arakicho A · 201");
+    expect(roomsText({ propertyName: "오쿠보A", roomLabels: ["오쿠보A"], localizedProperty: "Okubo A", unknownRoomLabel: "?" })).toBe("Okubo A");
+    expect(roomsText({ propertyName: "오쿠보A", roomLabels: [], localizedProperty: "Okubo A", unknownRoomLabel: "?" })).toBe("Okubo A");
   });
 
   it("명부 점과 밤 수", () => {

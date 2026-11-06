@@ -1,7 +1,9 @@
 // 셀프 체크인 직원 PC 화면의 판정 · 표시 규칙(DB · 서버 없음). 클라이언트 컴포넌트가 그대로 import 한다.
 // 화면 코드에서 로직을 뽑아 둔 파일이라 vitest 로 바로 돌린다. docs/product/44 §4-4 · docs/engineering/16 §4-1.
 
-import type { CheckinArrivalGroup, CheckinArrivalRow, CheckinStayStatus, MissingField } from "./model";
+import { getCanonicalRoomLabel, getDisplayRoomLabel, getUnsuffixedRoomKey } from "@/lib/room-label-normalization";
+
+import { checkinPropertyName, type CheckinArrivalGroup, type CheckinArrivalRow, type CheckinStayStatus, type MissingField } from "./model";
 import type {
   CheckinContactKey,
   CheckinLanguage,
@@ -125,16 +127,34 @@ export function rowStatus(row: Pick<CheckinArrivalRow, "status" | "group" | "par
   return { key: "notArrived", tone: "soft" };
 }
 
-/** 방 이름 줄 — 방 이름이 건물 이름으로 시작하면 건물 이름을 떼고 한 번만 보여 준다. 현지화된 건물 이름은 부르는 쪽이 넘긴다. */
-export function roomsText(input: { propertyName: string; roomLabels: readonly string[]; localizedProperty: string }): string {
-  const rooms = input.roomLabels
-    .map((label) => {
-      const trimmed = label.trim();
-      if (trimmed.startsWith(`${input.propertyName} `)) return trimmed.slice(input.propertyName.length + 1).trim();
-      return trimmed === input.propertyName ? "" : trimmed;
-    })
-    .filter(Boolean);
-  return rooms.length ? `${input.localizedProperty} · ${rooms.join(", ")}` : input.localizedProperty;
+/**
+ * 방 이름 줄 — 건물 이름은 한 번, 방은 현장에서 부르는 이름으로. 현지화된 건물 이름과 방 미확인 문구는 부르는 쪽이 넘긴다.
+ * 저장된 라벨은 Beds24 방 이름 그대로다(`K202` · `Ab101` · `401_2_2`, 건물 이름 없음). 독채는 건물 이름만 남는다.
+ * 앞에 건물 이름이 붙어 들어와도 뗀다. 같은 방의 Beds24 유닛(`401` · `401_2_2`)은 `_N` 만 뗀 내부 키로 한 번만 보여 주고,
+ * 내부 키가 다른데 표시 이름이 같으면(`A301` · `301`, 다른 방이다 — 문서 01 · 15) 구분이 사라지지 않게 내부 키로 보여 준다.
+ * `(unknown)` 은 방을 못 찾은 예약의 저장값이라 원문 대신 문구를 붙인다.
+ */
+export function roomsText(input: { propertyName: string; roomLabels: readonly string[]; localizedProperty: string; unknownRoomLabel: string }): string {
+  const { propertyName } = input;
+  const keys = new Set<string>();
+  let hasUnknown = false;
+  for (const label of input.roomLabels) {
+    const trimmed = label.trim();
+    const bare = trimmed.startsWith(`${propertyName} `) ? trimmed.slice(propertyName.length + 1).trim() : trimmed;
+    if (bare === "(unknown)") hasUnknown = true;
+    else if (bare) keys.add(getUnsuffixedRoomKey(propertyName, getCanonicalRoomLabel(propertyName, bare)));
+  }
+  keys.delete(propertyName); // 독채
+  const displayOf = (key: string) => getDisplayRoomLabel(propertyName, key);
+  const rooms = [...keys].map((key) => ([...keys].filter((other) => displayOf(other) === displayOf(key)).length > 1 ? key : displayOf(key)));
+  const parts = hasUnknown ? [...rooms, input.unknownRoomLabel] : rooms;
+  return parts.length ? `${input.localizedProperty} · ${parts.join(", ")}` : input.localizedProperty;
+}
+
+/** 통화 중 예약 요약의 방 줄 — 건물 키에서 정규 이름을 찾아 `roomsText` 로 그린다. `buildingName` 은 `useBuildingName()`. */
+export function stayRoomsText(stay: { propertyKey: string; roomLabels: readonly string[] }, buildingName: (name: string) => string, unknownRoomLabel: string): string {
+  const propertyName = checkinPropertyName(stay.propertyKey) ?? stay.propertyKey;
+  return roomsText({ propertyName, roomLabels: stay.roomLabels, localizedProperty: buildingName(propertyName), unknownRoomLabel });
 }
 
 // ── 명부 ────────────────────────────────────────────────────────────────────

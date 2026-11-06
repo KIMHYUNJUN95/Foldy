@@ -8,6 +8,7 @@ import { useBuildingName } from "@/components/shared/building-names";
 import { checkinPropertyName } from "@/lib/checkin/model";
 import { formatCallElapsed, type StaffCallNotice } from "@/lib/checkin/staff-call-flow";
 import type { RingingStaffCall, StaffCallStay } from "@/lib/checkin/staff-call";
+import { stayRoomsText } from "@/lib/checkin/staff-view";
 import type { Dictionary } from "@/lib/i18n";
 import "./staff-call.css";
 
@@ -266,6 +267,7 @@ export function PhoneCall(props: CallViewProps) {
 export function PcCall(props: CallViewProps & { stay: StaffCallStay | null }) {
   const { call, copy, connected, startedAtMs, canHangUp, muted, micDenied, onToggleMute, onHangUp, onViewStay, stay } = props;
   const labels = useCallLabels(call, copy);
+  const buildingName = useBuildingName();
   const elapsed = useElapsed(startedAtMs);
   useFocusReturn();
   useEffect(() => {
@@ -277,7 +279,7 @@ export function PcCall(props: CallViewProps & { stay: StaffCallStay | null }) {
     [copy.guestLanguage, labels.language],
     [copy.pressedStep, labels.stepRow],
   ];
-  if (stay) rows.push([copy.bookingRow, [...stay.roomLabels, fill(copy.partyN, { n: String(stay.partySize) })].join(" · ")]);
+  if (stay) rows.push([copy.bookingRow, `${stayRoomsText(stay, buildingName, copy.roomUnknown)} · ${fill(copy.partyN, { n: String(stay.partySize) })}`]);
   const pcButton = `min-h-11 flex-1 rounded-[10px] border-0 px-2 text-[15px] leading-tight ${PRESS} disabled:opacity-45`;
   return createPortal(
     <aside
@@ -353,7 +355,7 @@ export function StaySummary({ stay, copy }: { stay: StaffCallStay; copy: StaffCa
   const rows: [string, string][] = [
     [copy.leadName, stay.leadName ?? "—"],
     [copy.reservationNo, stay.reservationNumber],
-    [copy.room, [buildingName(checkinPropertyName(stay.propertyKey) ?? stay.propertyKey), ...stay.roomLabels].join(" ")],
+    [copy.room, stayRoomsText(stay, buildingName, copy.roomUnknown)],
     [copy.stay, `${stay.checkInDate} – ${stay.checkOutDate}`],
     [copy.party, String(stay.partySize)],
   ];

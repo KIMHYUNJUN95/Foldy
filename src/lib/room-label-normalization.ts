@@ -253,12 +253,16 @@ function stripBuildingCodePrefix(label: string): string {
  * (`AB101` → `101`, `O102` → `102`). `stripBuildingCodePrefix` 참고.
  */
 export function getDisplayRoomLabel(propertyName: string, internalRoomKey: string): string {
-  const canonical = getCanonicalPropertyName(propertyName);
-  const withoutSuffix = isArakichoProperty(canonical)
-    ? stripArakichoDisplaySuffix(internalRoomKey)
-    : internalRoomKey;
   // 접미사를 먼저 떼야 `AB101_2` 가 `AB101` → `101` 로 이어진다.
-  return stripBuildingCodePrefix(withoutSuffix);
+  return stripBuildingCodePrefix(getUnsuffixedRoomKey(propertyName, internalRoomKey));
+}
+
+/**
+ * 표시용 접미사(`_N`)만 뗀 내부 키 — 알파벳 접두어는 남는다(`401_2_2` → `401`, `A301_2` → `A301`).
+ * 같은 방의 Beds24 유닛은 하나로 모으고 `A301` · `301` 은 다른 방으로 두어야 하는 자리에 쓴다.
+ */
+export function getUnsuffixedRoomKey(propertyName: string, internalRoomKey: string): string {
+  return isArakichoProperty(getCanonicalPropertyName(propertyName)) ? stripArakichoDisplaySuffix(internalRoomKey) : internalRoomKey;
 }
 
 /**

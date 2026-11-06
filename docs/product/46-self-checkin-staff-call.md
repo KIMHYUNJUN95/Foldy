@@ -56,7 +56,7 @@
 
 권한 키 `checkin.call` (전화 받기) 추가 — 기본 대표 · 전무, 개인 부여 가능, 기한 · 차단 없음. 야간 응대 직원에게 명부 열람(`checkin.view`) 없이, 관리자 웹 권한 없이도 전화만 받게 하려고 키를 나눈다. 받은 사람이 `checkin.view` 가 있을 때만 「예약 보기」가 열린다. 관리자 웹 권한 없이 받기와, 플랫폼 개발자가 멤버십이 있는 조직의 호출을 받아 손님 영상을 볼 수 있는 점은 사용자가 2026-11-06 확정했다.
 
-알림 종류 `public.notification_type` 에 추가: `checkin_staff_call`(호출) · `checkin_call_missed`(아무도 안 받음) · `checkin_staff_check`(직원 확인 필요 체크인 완료). payload 에 손님 정보 없음 — 호출 · 놓침은 `callId` · `propertyKey` 만(`checkin.call` 만 가진 직원에게도 가므로 `stayId` 를 싣지 않는다), 직원 확인은 `stayId` · `propertyKey` 만. 이 세 종류는 서버만 만든다 — `notifications` INSERT 정책이 로그인 사용자의 직접 삽입을 막는다.
+알림 종류 `public.notification_type` 에 추가: `checkin_staff_call`(호출) · `checkin_call_missed`(아무도 안 받음) · `checkin_staff_check`(직원 확인 필요 체크인 완료). payload 에 손님 정보 없음 — 호출 · 놓침은 `callId` · `propertyKey` 만(`checkin.call` 만 가진 직원에게도 가므로 `stayId` 를 싣지 않는다), 직원 확인은 `stayId` · `propertyKey` 만. 이 세 종류는 서버만 만든다 — `notifications` INSERT 정책이 로그인 사용자의 직접 삽입을 막고, 같은 마이그레이션의 칸 권한(`revoke update` + `grant update (read_at)`)이 이미 받은 알림을 이 종류로 바꾸는 것을 막는다. 로그인 사용자는 모든 알림에서 `read_at` 만 바꿀 수 있고, `type` · `payload` · `href` · `recipient_user_id` 등은 `service_role` 만 바꾼다.
 
 수신자 계산과 알림 넣기는 SQL 함수 `checkin.notify_staff(p_organization_id, p_capability, p_type, p_dedupe_key, p_href, p_payload)` 한 곳에서 한다. 역할은 `capability_roles`, 개인 부여는 기존 개인 권한 표 + 기한 규칙을 그대로 따른다. `apps/checkin` 이 Foldy 코드를 import 할 수 없어서 DB 함수로 둔다. `service_role` 만 실행 가능. 규칙은 앱의 `memberIdsWithCapability` 와 같다 — 플랫폼 개발자 통과는 받는 사람에 넣지 않는다. 돌려주는 값은 받는 사람 수(중복 키로 건너뛴 사람 포함). `source_id` 는 payload 의 `callId`, 없으면 `stayId` 이고 둘 다 없으면 받는 사람 수와 상관없이 오류(`22023`)를 낸다. Auth 정지(`banned_until`) 계정은 받는 사람에서 뺀다.
 
@@ -124,7 +124,7 @@
 
 **수신 동작**: 신호 · 첫 mount · 앱 복귀 · 재접속 때, 그리고 호출을 닫거나 통화 · 안내가 끝나 비었을 때 `getRingingStaffCalls()` 를 읽고(함께 온 호출 · 통화 중 온 호출), 받기 응답이 10초 안에 안 오면 실패로 끝낸다. 울리는 동안 2초마다 다시 읽어 누가 받았거나 끝나면 조용히 닫는다. 서버 소식이 끊겨도 처음 본 때부터 50초면 스스로 닫는다(기기 시계를 믿지 않으려고 마감 시각과 비교하지 않는다). 숨은 탭은 다시 보일 때 울린다(`useLiveRefresh` 규칙). 통화 중 3초마다 상태를 읽고, 손님이 30초 넘게 방에 없으면 끊는다. 페이지를 떠날 때 끊기는 `pagehide` 에서 시도하지만 전송이 보장되지는 않는다.
 
-**문구**: 태블릿 ja · en · ko · zh-Hans, 직원 ko · ja · en. 한국어에 한자 용어 없음. 건물 이름은 `useBuildingName()`.
+**문구**: 태블릿 ja · en · ko · zh-Hans, 직원 ko · ja · en. 한국어에 한자 용어 없음. 건물 이름은 `useBuildingName()`. 예약 요약의 방은 관리자 오늘 도착 목록과 같은 `roomsText`(`src/lib/checkin/staff-view.ts`)로 그린다 — 「건물 · 방」 모양이고, 저장된 Beds24 방 이름(`K202` · `401_2_2`)은 현장에서 부르는 이름(`202` · `401`)으로 접으며, 독채는 건물 이름 하나다. 합치는 기준은 `_N` 만 뗀 내부 키다 — `401` + `401_2_2` 는 한 방이고, 내부 키가 다른데 표시 이름이 같은 `A301` · `301` 은 다른 방이라 `A301, 301` 로 보여 준다. 방을 못 찾은 예약의 저장값 `(unknown)` 은 원문 대신 「방 미확인」 문구로 알린다(`건물 · 방 미확인`, `건물 · 101, 방 미확인`, 사전 `checkinCall.roomUnknown` · `checkinStaff.roomUnknown`). 서버 액션이 돌려주는 값은 원래 라벨 그대로다.
 
 ## 7. 앱에 필요한 것
 

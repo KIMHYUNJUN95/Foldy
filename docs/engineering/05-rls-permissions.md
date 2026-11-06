@@ -548,6 +548,7 @@ Read:
 Update:
 
 - User can mark own notifications as read.
+- 칸 권한으로 `read_at` 만 바꿀 수 있다(`202611060001`, 운영 미적용). `type` · `payload` · `href` · `recipient_user_id` 등은 `service_role` 만.
 
 Create:
 
@@ -1704,6 +1705,8 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 - 태블릿 라우트(`/api/kiosk/call/**`)는 기기 토큰을 확인하고 모든 쿼리를 그 기기의 `organization_id` · `device_id` 로 거른다. 다른 기기 · 다른 조직의 통화는 404. `stay_id` 는 기기 입력이 아니라 `openProvenKioskStay` 를 통과한 세션의 stay 만 넣는다.
 - `checkin.member_can_receive` · `checkin.notify_staff` · `checkin.can_take_call`: `security definer`(`auth.users.banned_until` 을 읽으려고) · `search_path=''` · 실행 권한 service_role 만. 받는 사람은 앱의 `memberIdsWithCapability` 에 계정 정지 제외를 더한 것이다 — 활성 멤버 중 (활성 개인 부여 또는 역할 기본값, 전무는 owner 를 물려받음)에서 활성 개인 차단(대표 · 전무는 면역)과 Auth 정지 계정을 뺀다. 기한 지난 · 회수된 부여와 차단은 보지 않는다. 플랫폼 개발자 통과는 받는 사람에 넣지 않는다(`has_capability` 를 쓰지 않는 이유). `can_take_call` 만 활성 멤버십이 있는 활성 플랫폼 개발자도 통과시킨다 — `checkinGate` 를 지나 받을 수 있기 때문이다.
 - `public.notifications` INSERT 정책 「org members can create notifications for org recipients」: 본문은 그대로이고 `type::text not in ('checkin_staff_call','checkin_call_missed','checkin_staff_check')` 를 더했다. 조직 멤버가 가짜 전화 알림을 넣지 못한다. 이 세 종류는 service_role 함수로만 들어간다.
+- `public.notifications` UPDATE 칸 권한: `revoke update ... from public, anon, authenticated` + `grant update (read_at) ... to authenticated`. 정책은 수신자만 보기 때문에, 칸 권한이 없으면 수신자가 자기 알림의 `type` 을 전화 알림으로 바꿀 수 있었다. 모든 알림 종류에 적용되고, `service_role` 은 그대로다.
+- 확인(칸 권한): 2026-11-06 로컬 Postgres 17 + PostgREST 로 전체 마이그레이션 213개를 새 DB 에 적용한 뒤 실제 JWT 로 확인했다. authenticated 는 `read_at` 만 update 가능(204), `type` · `payload` · `href` · `recipient_user_id` · `organization_id` · `source_type` · `source_id` · `dedupe_key` · `created_at` · `id` 와 묶음은 403 42501, 남의 알림은 0행, anon 은 401, service_role 은 모든 칸 200. 운영은 미확인.
 - 통화 중 권한 회수 · 정지: `GET /api/kiosk/call/[id]` 가 `can_take_call` 이 거짓이면 `ended`(`system`) + 방 삭제 + 기록. 판정 실패(DB 오류)는 통화를 끊지 않는다. 태블릿이 30초마다 부르므로 최대 약 30초 안에 닫힌다.
 - LiveKit 태블릿 토큰: identity `kiosk-<deviceId>`, 방 하나, camera · microphone 만 올리기, 데이터 올리기 · 녹화 · 관리 권한 없음, 30분. 비밀값은 서버 환경 변수만.
 - 확인: 로컬 PGlite 에 실제 마이그레이션을 돌려 받는 사람 상황표(역할 · 기한 · 회수 · 차단 · 정지 · 다른 조직 · 다른 키 · 개발자), 중복 키, anon · authenticated 실행 · 표 읽기 거부, service_role 쓰기, 제약, 조건부 받기(한 명만), `can_take_call` 상황표, 계정 정지, 알림 위조 거부를 봤다(`auth` · `storage` · `memberships` 등은 흉내, 2026-11-06). Supabase 실제 프로젝트에서는 아직 안 돌려 봤다.

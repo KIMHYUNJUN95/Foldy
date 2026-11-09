@@ -18,9 +18,14 @@ import { activeDeferUntil,
   countOpenRooms,
   ghostAssignRoom,
   canAddRoom,
+  isGhostAssignment,
   isOpenRoom,
+  liveAssignments,
+  suggestCandidates,
   personHasRoomRecord,
-  personLoad,
+  needOf,
+  needsMonthWorkDays,
+  personDayWork,
   suggestInputsForDay,
   type AssignRoom,
   type SessionRow,
@@ -402,17 +407,55 @@ export async function loadDayBoard(supabase: Client, organizationId: string, dat
   return (await buildDay(supabase, organizationId, date, viewerId)).board;
 }
 
-/** 제안 대상 사람 — 하루 · 월이 같은 값(출근 시각 · 견습 등). */
-function suggestPersonOf(app: ApplicationRow, member: { role: string } | undefined, profile: StaffProfile, monthWorkDays: number) {
-  const known = member ?? { role: "part_time_staff" };
+/**
+ * 제안 대상 사람 — 하루 · 월이 같은 값(출근 시각 · 견습 등). 대상은 `suggestCandidates` 로 먼저 거른 **현장 멤버만**(문서 45 A11) —
+ * 예전엔 멤버가 아니면 알바 역할로 대신해, 비활성 · 조직에서 빠진 사람의 신청 줄에도 제안이 들어갔다(2026-11-09 점검).
+ */
+function suggestPersonOf(app: ApplicationRow, member: { role: string }, profile: StaffProfile, monthWorkDays: number) {
   return {
     monthDays: monthWorkDays,
     priority: profile.priority,
-    startMinutes: app.startMinutes ?? profile.defaultStartMinutes ?? defaultStartMinutes(known.role),
+    startMinutes: app.startMinutes ?? profile.defaultStartMinutes ?? defaultStartMinutes(member.role),
     trainee: profile.trainee,
-    trainer: isTrainer(known, profile),
+    trainer: isTrainer(member, profile),
     userId: app.userId,
   };
+}
+
+/**
+ * 이번 달 근무 일수(날 수) — 월 제안(`computeMonthSuggestions`)과 같은 셈(`liveAssignments` — 유령 배정 빼고, 기록 있는 배정은 산다, C14).
+ * 하루 보기는 비교가 일어날 때만 부르고(`needsMonthWorkDays`), 제안 대상 사람의 배정만 센다. 유령 판단에 쓰는 방 목록 · 기록은
+ * 오늘은 이미 읽은 값(`rooms` · `daySessions`)을 쓰고, 다른 날은 그 사람들 배정이 있는 날의 처음~끝 범위만 읽는다(2026-11-09 재리뷰).
+ */
+async function loadMonthWorkDays(
+  supabase: Client,
+  organizationId: string,
+  date: string,
+  userIds: ReadonlySet<string>,
+  todayRooms: readonly AssignRoom[],
+  todayRecords: readonly SessionRow[],
+): Promise<Map<string, Set<string>>> {
+  const ym = monthOf(date);
+  const monthRows = (await loadAssignments(supabase, organizationId, `${ym}-01`, monthDays(ym).at(-1)!)).filter((row) => userIds.has(row.userId));
+  const otherDays = [...new Set(monthRows.map((row) => row.workDate).filter((day) => day !== date))].sort();
+  const monthPlans = new Map<string, readonly AssignRoom[]>();
+  let monthRecords: readonly SessionRow[] = todayRecords;
+  if (otherDays.length > 0) {
+    const from = otherDays[0];
+    const to = otherDays.at(-1)!;
+    const shared = createSharedRoomReads(supabase, organizationId, from, to);
+    const [plans, records] = await Promise.all([loadRangeDayRooms(supabase, organizationId, from, to, null, shared), shared.sessions(from, to)]);
+    for (const [day, list] of plans) monthPlans.set(day, list);
+    monthRecords = [...records.filter((row) => row.cleaning_date !== date), ...todayRecords];
+  }
+  monthPlans.set(date, todayRooms);
+  const out = new Map<string, Set<string>>();
+  for (const row of liveAssignments(monthRows, monthPlans, monthRecords)) {
+    let set = out.get(row.userId);
+    if (!set) out.set(row.userId, (set = new Set()));
+    set.add(row.workDate);
+  }
+  return out;
 }
 
 async function buildDay(supabase: Client, organizationId: string, date: string, viewerId: string): Promise<DayBuild> {
@@ -438,19 +481,17 @@ async function buildDay(supabase: Client, organizationId: string, date: string, 
   }
   const nameOf = (id: string | null) => (id ? (names.get(id) ?? "—") : null);
 
-  const ym = monthOf(date);
   const allIds = [...new Set([...members.map((m) => m.userId), ...applications.map((a) => a.userId)])];
-  const [traineeCounts, activity, monthAssignments] = await Promise.all([
+  // 제안 대상 — 신청했고 그날 일정이 살아 있는 현장 멤버만(A11).
+  const candidates = suggestCandidates(applications, new Set(memberById.keys()));
+  const assignedCountOf = (roomKey: string) => assignments.filter((row) => row.roomKey === roomKey).length;
+  // 이번 달 근무 일수는 「근무 일수 적은 사람」 비교에만 쓴다 — 비교가 일어날 때만 읽는다(2026-11-09 재리뷰).
+  const needMonth = needsMonthWorkDays(settings.rules, rooms.some((room) => needOf(room, assignedCountOf(room.roomKey)) > 0), candidates.length);
+  const [traineeCounts, activity, monthDaysBy] = await Promise.all([
     loadTraineeCounts(supabase, organizationId, allIds, date),
     loadAttendanceActivity(supabase, organizationId, allIds, date),
-    loadAssignments(supabase, organizationId, `${ym}-01`, monthDays(ym).at(-1)!),
+    needMonth ? loadMonthWorkDays(supabase, organizationId, date, new Set(candidates.map((app) => app.userId)), rooms, daySessions) : new Map<string, Set<string>>(),
   ]);
-  const monthDaysBy = new Map<string, Set<string>>();
-  for (const row of monthAssignments) {
-    let set = monthDaysBy.get(row.userId);
-    if (!set) monthDaysBy.set(row.userId, (set = new Set()));
-    set.add(row.workDate);
-  }
 
   const appByUser = new Map(applications.map((a) => [a.userId, a]));
   const byRoom = new Map<string, AssignmentRow[]>();
@@ -468,10 +509,10 @@ async function buildDay(supabase: Client, organizationId: string, date: string, 
     cancelledRooms.push(ghostAssignRoom(rows[0]));
   }
 
-  // 제안 — 신청했고 그날 일정이 살아 있는 사람만.
   const { suggestPeople, suggestRooms } = suggestInputsForDay({
     assignments,
-    people: applications.filter((app) => !app.cancelledAt).map((app) => suggestPersonOf(app, memberById.get(app.userId), profileOf(profiles, app.userId), monthDaysBy.get(app.userId)?.size ?? 0)),
+    people: candidates.map((app) => suggestPersonOf(app, memberById.get(app.userId)!, profileOf(profiles, app.userId), monthDaysBy.get(app.userId)?.size ?? 0)),
+    records: daySessions,
     rooms,
   });
   const suggestions = suggestAssignments({ fixedTiers, people: suggestPeople, rooms: suggestRooms, rules: settings.rules });
@@ -505,7 +546,11 @@ async function buildDay(supabase: Client, organizationId: string, date: string, 
     const profile = profileOf(profiles, userId);
     const counts = traineeByUser(userId);
     const base = profile.defaultStartMinutes ?? defaultStartMinutes(member.role);
-    const mine = byUser.get(userId) ?? [];
+    // 그 사람 방 — 유령 배정(예약 취소로 목록에 없는 방, C14)은 빼서, 그 방만 있던 사람은 「배정 전」으로 위에 뜬다(문서 37 4-2-d).
+    // 그 방 자체는 「취소됨」 묶음에 이름과 함께 남아 빼기로 정리한다.
+    // 몫 · 방은 제안 입력과 같은 함수(`personDayWork`) — 기록 있는 배정은 목록에 없어도 든다.
+    const work = personDayWork(byUser.get(userId) ?? [], rooms, daySessions);
+    const mine = work.rows;
     return {
       applied: Boolean(app),
       cancelRequestNote: app?.cancelRequestNote ?? null,
@@ -513,7 +558,7 @@ async function buildDay(supabase: Client, organizationId: string, date: string, 
       cancelled: Boolean(app?.cancelledAt),
       fixed: (fixedByUser.get(userId) ?? []).sort((a, b) => a.tier - b.tier),
       lastWorked: activity.get(userId)?.last ?? null,
-      load: personLoad(mine, roomByKey),
+      load: work.load,
       memo: profile.memo,
       monthDays: activity.get(userId)?.monthDays ?? 0,
       name: member.name,
@@ -622,17 +667,20 @@ export async function loadMonthBoard(supabase: Client, organizationId: string, y
   const days = monthDays(ym);
   const from = days[0];
   const to = days.at(-1)!;
-  const [plans, members, profiles, fixedTiers, assignments, applications] = await Promise.all([
-    loadRangeDayRooms(supabase, organizationId, from, to, ownerId),
+  const shared = createSharedRoomReads(supabase, organizationId, from, to);
+  const [plans, members, profiles, fixedTiers, assignments, applications, monthRecords] = await Promise.all([
+    loadRangeDayRooms(supabase, organizationId, from, to, ownerId, shared),
     loadFieldMembers(supabase, organizationId),
     loadStaffProfiles(supabase, organizationId, ownerId),
     loadFixedTiers(supabase, organizationId, ownerId),
     loadAssignments(supabase, organizationId, from, to),
     loadApplications(supabase, organizationId, from, to),
+    shared.sessions(from, to),
   ]);
   const assignedRooms = assignedKeysByDate(assignments);
+  // 칸 숫자는 살아 있는 배정만(유령 배정 C14 — 그날 목록에 없는 방은 하루 보기 「취소됨」에서 정리한다).
   const cellRooms = new Map<string, number>();
-  for (const row of assignments) {
+  for (const row of liveAssignments(assignments, plans, monthRecords)) {
     cellRooms.set(`${row.userId}|${row.workDate}`, (cellRooms.get(`${row.userId}|${row.workDate}`) ?? 0) + 1);
   }
   const appKey = new Map(applications.map((a) => [`${a.userId}|${a.workDate}`, a]));
@@ -688,24 +736,27 @@ export async function computeMonthSuggestions(
 ): Promise<{ suggestions: Array<Suggestion & { workDate: string; propertyName: string; roomLabel: string }>; openTotal: number; shortDays: string[]; leftTotal: number }> {
   const days = monthDays(ym).filter((date) => date >= fromDate);
   if (days.length === 0) return { leftTotal: 0, openTotal: 0, shortDays: [], suggestions: [] };
-  const [plans, members, profiles, fixedTiers, settings, assignments, applications] = await Promise.all([
-    loadRangeDayRooms(supabase, organizationId, days[0], days.at(-1)!, ownerId),
+  const shared = createSharedRoomReads(supabase, organizationId, days[0], days.at(-1)!);
+  const [plans, members, profiles, fixedTiers, settings, assignments, applications, rangeRecords] = await Promise.all([
+    loadRangeDayRooms(supabase, organizationId, days[0], days.at(-1)!, ownerId, shared),
     loadFieldMembers(supabase, organizationId),
     loadStaffProfiles(supabase, organizationId, ownerId),
     loadFixedTiers(supabase, organizationId, ownerId),
     loadAssignSettings(supabase, organizationId, ownerId),
     loadAssignments(supabase, organizationId, days[0], days.at(-1)!),
     loadApplications(supabase, organizationId, days[0], days.at(-1)!),
+    shared.sessions(days[0], days.at(-1)!),
   ]);
   const memberById = new Map(members.map((m) => [m.userId, m]));
-  // 이번 달 근무 일수(방 수가 아니라 날 수) — 앞날에 제안한 날도 더해 가며 센다(「근무 일수 적은 사람 먼저」).
+  const memberIds = new Set(memberById.keys());
+  // 이번 달 근무 일수(방 수가 아니라 날 수) — 앞날에 제안한 날도 더해 가며 센다(「근무 일수 적은 사람 먼저」). 유령 배정은 근무가 아니다(C14).
   const monthDaysOf = new Map<string, Set<string>>();
   const addWorkDay = (userId: string, date: string) => {
     let set = monthDaysOf.get(userId);
     if (!set) monthDaysOf.set(userId, (set = new Set()));
     set.add(date);
   };
-  for (const row of assignments) addWorkDay(row.userId, row.workDate);
+  for (const row of liveAssignments(assignments, plans, rangeRecords)) addWorkDay(row.userId, row.workDate);
   const out: Array<Suggestion & { workDate: string; propertyName: string; roomLabel: string }> = [];
   let openTotal = 0;
   let leftTotal = 0;
@@ -716,9 +767,11 @@ export async function computeMonthSuggestions(
     const dayAssign = assignments.filter((a) => a.workDate === date);
     const { suggestPeople: people, suggestRooms: rooms } = suggestInputsForDay({
       assignments: dayAssign,
-      people: applications
-        .filter((a) => a.workDate === date && !a.cancelledAt)
-        .map((a) => suggestPersonOf(a, memberById.get(a.userId), profileOf(profiles, a.userId), monthDaysOf.get(a.userId)?.size ?? 0)),
+      records: rangeRecords.filter((row) => row.cleaning_date === date),
+      people: suggestCandidates(
+        applications.filter((a) => a.workDate === date),
+        memberIds,
+      ).map((a) => suggestPersonOf(a, memberById.get(a.userId)!, profileOf(profiles, a.userId), monthDaysOf.get(a.userId)?.size ?? 0)),
       rooms: dayRooms,
     });
     openTotal += rooms.filter((room) => room.assigned.length === 0).length;
@@ -767,11 +820,17 @@ export async function loadMyShift(
   const from = days[0] < today ? days[0] : today;
   const to = addDays(today, 7) > days.at(-1)! ? addDays(today, 7) : days.at(-1)!;
   // 달력 「배정 없음」은 오늘부터만 미배정 수를 본다(`shiftDayState` — 지난 날은 보지 않는다).
-  const [plans, myApps, allAssign] = await Promise.all([
-    loadRangeDayRooms(supabase, organizationId, from > today ? from : today, to, null),
+  const planFrom = from > today ? from : today;
+  const shared = createSharedRoomReads(supabase, organizationId, planFrom, to);
+  const [plans, myApps, readAssign, shiftRecords] = await Promise.all([
+    loadRangeDayRooms(supabase, organizationId, planFrom, to, null, shared),
     loadApplications(supabase, organizationId, from, to, userId),
     loadAssignments(supabase, organizationId, from, to),
+    shared.sessions(planFrom, to),
   ]);
+  // 유령 배정(그날 청소할 방 목록에 없는 배정 — 예약 취소 · 날짜 변경, C14)은 방 수 · 상태에서 뺀다. 목록을 읽은 날(오늘부터)만 판단한다.
+  // 오늘 화면(`loadTodayRooms`)은 그 방을 「예약이 바뀌었어요」로 따로 보여 준다.
+  const allAssign = liveAssignments(readAssign, plans, shiftRecords);
   const appBy = new Map(myApps.map((a) => [a.workDate, a]));
   const assignedKeys = new Map<string, Set<string>>();
   const mineBy = new Map<string, AssignmentRow[]>();
@@ -884,13 +943,15 @@ export async function loadTodayRooms(
 }> {
   const tomorrow = addDays(date, 1);
   const shared = createSharedRoomReads(supabase, organizationId, date, tomorrow);
-  const [dayRooms, assign, apps, tomorrowPlans, stayKeys] = await Promise.all([
+  const [dayRooms, assign, apps, tomorrowPlans, stayKeys, todayRecords, tomorrowRecords] = await Promise.all([
     loadAssignDayRooms(supabase, organizationId, date, null, shared),
     loadAssignments(supabase, organizationId, date, tomorrow),
     loadApplications(supabase, organizationId, date, tomorrow, userId),
     loadRangeDayRooms(supabase, organizationId, tomorrow, tomorrow, null, shared),
     // 청소 종류(표시용)만 쓰는 값 — 못 읽어도 화면 전체를 깨지 않고 체크아웃으로 보인다(시작은 서버가 다시 계산).
     loadStayKeysOrEmpty(supabase, organizationId, date),
+    shared.sessions(date, date),
+    shared.sessions(tomorrow, tomorrow),
   ]);
   const todayRows = assign.filter((row) => row.workDate === date);
   const mine = todayRows.filter((row) => row.userId === userId);
@@ -962,8 +1023,11 @@ export async function loadTodayRooms(
   const todayTotal = dayRooms.length;
   // 미룸 · 처리 끝 방은 미배정으로 세지 않는다(문서 45 C10).
   const todayOpen = countOpenRooms(dayRooms, new Set(todayRows.map((row) => row.roomKey)));
+  // 상태 · 내일 방 수는 살아 있는 배정만(C14) — 예약이 바뀐 방은 위 목록에 흐리게 남지만 「배정됨」으로 세지 않는다.
+  const myLive = mine.filter((row) => !isGhostAssignment(row, dayRooms, todayRecords)).length;
   const tApp = apps.find((a) => a.workDate === tomorrow);
-  const tRows = assign.filter((row) => row.workDate === tomorrow);
+  const tomorrowRows = assign.filter((row) => row.workDate === tomorrow);
+  const tRows = liveAssignments(tomorrowRows, tomorrowPlans, tomorrowRecords);
   const tAssigned = new Set(tRows.map((row) => row.roomKey));
   const tPlan = tomorrowPlans.get(tomorrow) ?? [];
   const tMine = tRows.filter((row) => row.userId === userId).length;
@@ -973,8 +1037,8 @@ export async function loadTodayRooms(
     mates: [...matesMap.entries()].map(([id, list]) => ({ name: names.get(id) ?? "—", rooms: list })),
     rooms,
     startMinutes: app?.startMinutes ?? base,
-    state: shiftDayState({ applied: Boolean(app), cancelled: Boolean(app?.cancelledAt), isPast: false, myRooms: mine.length, openRooms: todayOpen, totalRooms: todayTotal }),
-    cancelled: Boolean(app?.cancelledAt) && mine.length === 0,
+    state: shiftDayState({ applied: Boolean(app), cancelled: Boolean(app?.cancelledAt), isPast: false, myRooms: myLive, openRooms: todayOpen, totalRooms: todayTotal }),
+    cancelled: Boolean(app?.cancelledAt) && myLive === 0,
     tomorrow: {
       date: tomorrow,
       rooms: tMine,
@@ -1100,11 +1164,14 @@ export async function loadCompareRows(
   const days = monthDays(ym);
   const from = days[0];
   const to = days.at(-1)!;
-  const [members, profiles, fixedTiers, assignments, sessions] = await Promise.all([
+  const shared = createSharedRoomReads(supabase, organizationId, from, to);
+  const [members, profiles, fixedTiers, readAssign, plans, compareRecords, sessions] = await Promise.all([
     loadFieldMembers(supabase, organizationId),
     loadStaffProfiles(supabase, organizationId, ownerId),
     loadFixedTiers(supabase, organizationId, ownerId),
     loadAssignments(supabase, organizationId, from, to),
+    loadRangeDayRooms(supabase, organizationId, from, to, null, shared),
+    shared.sessions(from, to),
     readAllPages<SessionRow>((start, end) =>
       supabase
         .from("cleaning_sessions")
@@ -1120,6 +1187,9 @@ export async function loadCompareRows(
     ),
   ]);
   if (sessions.error) throw new Error(sessions.error.message);
+  // 배정 방 · 날은 살아 있는 배정만(유령 배정 C14 — 예약이 취소돼 그날 목록에 없는 방은 일이 아니다).
+  // 그 사람이 그 방을 실제로 청소한 기록(진행 중 · 완료)이 있으면 목록에 없어도 산다 — 청소한 방이 비교에서 빠지지 않게(2026-11-09 리뷰).
+  const assignments = liveAssignments(readAssign, plans, compareRecords);
   const userIds = [...new Set(assignments.map((row) => row.userId))];
   const memberById = new Map(members.map((m) => [m.userId, m]));
   const missing = userIds.filter((id) => !memberById.has(id));

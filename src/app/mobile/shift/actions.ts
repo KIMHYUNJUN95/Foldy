@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { signalCleaningAssignChange } from "@/lib/cleaning-assign/live";
 import { getCleaningOperatingDateKey } from "@/lib/cleaning";
 import { addDays, isDateKey } from "@/lib/cleaning-assign/day-state";
+import { loadLiveAssignmentsOfDay } from "@/lib/cleaning-assign/live-day";
 import { getCurrentAppSession, hasOrganizationContext, type AppSession } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -30,6 +31,12 @@ async function worker(): Promise<AppSession | null> {
   return session;
 }
 
+/** 읽기 실패는 로그만 남기고 `null` — 부르는 쪽이 error 로 돌려준다. */
+function readFailed(error: unknown): null {
+  console.error("[shift] live assignment read failed", error instanceof Error ? error.message : error);
+  return null;
+}
+
 /** 신청할 수 있는 날 — 오늘부터 다다음 달 말까지(약 90일). */
 function isOpenDate(date: string): boolean {
   const today = getCleaningOperatingDateKey();
@@ -45,11 +52,14 @@ export async function toggleMyShift(input: { date: string; apply?: boolean }): P
   const supabase = getSupabaseServiceClient();
   const organizationId = session.organization.id;
   const userId = session.user.id;
-  const [existing, rooms] = await Promise.all([
+  const [existing, assigned] = await Promise.all([
     supabase.from("cleaning_shift_applications").select("cancelled_at").eq("organization_id", organizationId).eq("user_id", userId).eq("work_date", input.date).maybeSingle(),
-    supabase.from("cleaning_assignments").select("id").eq("organization_id", organizationId).eq("user_id", userId).eq("work_date", input.date).limit(1),
+    // 그날 살아 있는 배정 — 서버 공용 판단(문서 45 C14, 「내 시프트」 달력과 같은 기준). 유령 배정만 있으면 배정된 날이 아니다.
+    loadLiveAssignmentsOfDay(supabase, organizationId, input.date, userId).then((rows) => rows.length > 0, readFailed),
   ]);
-  if ((rooms.data ?? []).length > 0) return { ok: false, reason: "assigned" };
+  if (existing.error || assigned === null) return { ok: false, reason: "error" };
+  // 유령 배정만 남은 날은 배정된 날이 아니다 — 신청을 뺄 수 있다. 남은 유령 배정 줄은 지우지 않는다(관리자가 「취소됨」 방에서 정리).
+  if (assigned) return { ok: false, reason: "assigned" };
   // 관리자가 취소한 날 — 지우면 다시 눌러 신청할 수 있게 되므로 막는다(다시 넣는 것은 관리자가).
   if (existing.data?.cancelled_at) return { ok: false, reason: "cancelled" };
   // 이미 바라는 상태면 그대로.
@@ -80,16 +90,11 @@ export async function requestShiftCancel(input: { date: string; note?: string; w
   const supabase = getSupabaseServiceClient();
   // 취소 요청은 **실제로 배정된 날**에만(2026-10-26). 예전에는 신청 행만 있으면(배정 전 · 관리자가 이미 취소한 날도)
   // 요청이 들어가 관리자 큐에 배정 없는 「취소 요청」이 떴다. 거두기(withdraw)는 배정이 빠진 뒤에도 할 수 있게 둔다.
+  // 유령 배정(예약 취소 · 날짜 변경으로 그날 목록에 없는 방)만 남은 날은 배정된 날이 아니다(C14) — 그날은 신청 빼기로 정리된다.
   if (!input.withdraw) {
-    const rooms = await supabase
-      .from("cleaning_assignments")
-      .select("id")
-      .eq("organization_id", session.organization.id)
-      .eq("user_id", session.user.id)
-      .eq("work_date", input.date)
-      .limit(1);
-    if (rooms.error) return { ok: false, reason: "error" };
-    if ((rooms.data ?? []).length === 0) return { ok: false, reason: "invalid" };
+    const assigned = await loadLiveAssignmentsOfDay(supabase, session.organization.id, input.date, session.user.id).then((rows) => rows.length > 0, readFailed);
+    if (assigned === null) return { ok: false, reason: "error" };
+    if (!assigned) return { ok: false, reason: "invalid" };
   }
   let query = supabase
     .from("cleaning_shift_applications")

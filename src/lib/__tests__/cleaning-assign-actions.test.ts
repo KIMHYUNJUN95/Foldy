@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * 청소 배정 서버 액션 — 조용히 사라지는 오류 · 조직 확인(문서 45 A7 · A10). 조회 · 쓰기 결과를 표(handler)로 정해 돌린다.
  */
 
-type Call = { table: string; op: string; payload?: unknown };
+type Call = { table: string; op: string; payload?: unknown; filters: string[] };
 type Result = { data?: unknown; error?: { code?: string; message?: string } | null };
 let calls: Call[] = [];
 let handler: (call: Call) => Result = () => ({ data: null, error: null });
@@ -12,10 +12,16 @@ let handler: (call: Call) => Result = () => ({ data: null, error: null });
 function fakeClient() {
   return {
     from(table: string) {
-      const call: Call = { op: "select", table };
+      const call: Call = { filters: [], op: "select", table };
       const chain: Record<string, unknown> = {};
-      const passthrough = ["eq", "in", "not", "is", "limit", "order", "gt", "gte", "lt", "lte", "range", "maybeSingle", "single", "select"];
+      const passthrough = ["eq", "in", "limit", "order", "gt", "gte", "lt", "lte", "range", "maybeSingle", "single", "select"];
       for (const name of passthrough) chain[name] = () => chain;
+      for (const name of ["not", "is"]) {
+        chain[name] = (column: string, ...rest: unknown[]) => {
+          call.filters.push(`${name}:${column}:${rest.map(String).join(":")}`);
+          return chain;
+        };
+      }
       for (const op of ["insert", "update", "upsert", "delete"]) {
         chain[op] = (payload: unknown) => {
           call.op = op;
@@ -24,7 +30,7 @@ function fakeClient() {
         };
       }
       chain.then = (resolve: (value: Result) => unknown) => {
-        calls.push({ ...call });
+        calls.push({ ...call, filters: [...call.filters] });
         const result = handler(call);
         return Promise.resolve({ data: result.data ?? null, error: result.error ?? null }).then(resolve);
       };
@@ -40,26 +46,30 @@ const STRANGER = "22222222-2222-4222-8222-222222222222";
 const DATE = "2026-11-10";
 let roomsRead: (() => unknown[]) | null = null;
 let sessionsRead: (() => unknown[]) | null = null;
+let daySuggestions: { propertyName: string; roomKey: string; roomLabel: string; userId: string }[] = [];
 const OPTION = { label: "401", propertyName: "아라키초A", roomKey: "k401", roomLabel: "401" };
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 vi.mock("@/lib/supabase/service", () => ({ getSupabaseServiceClient: () => fakeClient() }));
 vi.mock("@/lib/session", () => ({
-  getCurrentAppSession: async () => ({ capabilities: ["cleaning.assign", "cleaning.assign_swap"], organization: { id: "org" }, user: { id: "admin" } }),
+  getCurrentAppSession: async () => ({ capabilities: ["cleaning.assign", "cleaning.assign_swap", "cleaning.work"], organization: { id: "org" }, user: { id: USER } }),
   hasOrganizationContext: () => true,
 }));
 vi.mock("@/lib/cleaning", () => ({ getCleaningOperatingDateKey: () => DATE }));
 vi.mock("@/lib/cleaning-assign/live", () => ({ signalCleaningAssignChange: async () => {} }));
 vi.mock("@/lib/cleaning-assign/data", () => ({
-  computeDaySuggestions: async () => [],
+  computeDaySuggestions: async () => daySuggestions,
   computeMonthSuggestions: async () => ({ leftTotal: 0, openTotal: 0, shortDays: [], suggestions: [] }),
   loadFieldMembers: async () => [...memberIds].map((userId) => ({ userId })),
   loadMonthBoard: async () => ({}),
   loadMonthOpenCounts: async () => ({}),
 }));
+let blockedKeys = new Set<string>();
 vi.mock("@/lib/cleaning-assign/rooms", () => ({
-  loadAddBlockedRoomKeys: async () => new Set<string>(),
+  createSharedRoomReads: () => ({ holds: async () => [], sessions: async () => (sessionsRead ? sessionsRead() : []) }),
+  loadRangeDayRooms: async (_s: unknown, _o: unknown, from: string) => new Map([[from, roomsRead ? roomsRead() : []]]),
+  loadAddBlockedRoomKeys: async () => blockedKeys,
   loadAssignDayRooms: async () => (roomsRead ? roomsRead() : []),
   loadDaySessionRows: async () => (sessionsRead ? sessionsRead() : []),
   MAX_DEFER_DAYS: 60,
@@ -68,8 +78,10 @@ vi.mock("@/lib/automation/data", () => ({ loadCleaningRoomOptions: async () => [
 vi.mock("@/lib/cleaning-assign/person-shift", () => ({ loadPersonShift: async () => ({}) }));
 
 const { ensureApplication } = await import("@/actions/cleaning-assign-guards");
-const { cancelPersonDay, toggleApplicationForUser } = await import("@/actions/cleaning-assign-shift");
-const { addApplicantForDay, addRoomForDay, holdRoom, reassignRooms } = await import("@/app/admin/cleaning-assign/actions");
+const { cancelPersonDay, resolveCancelRequest, toggleApplicationForUser } = await import("@/actions/cleaning-assign-shift");
+const { addApplicantForDay, addRoomForDay, applyDaySuggestions, holdRoom, reassignRooms, setDayStartTime } = await import("@/app/admin/cleaning-assign/actions");
+const { checkAddExtraRoom, removeExtraRoom } = await import("@/lib/cleaning-assign/extra-room");
+const { requestShiftCancel, toggleMyShift } = await import("@/app/mobile/shift/actions");
 const { assignToRoom, unassignFromRoom } = await import("@/actions/cleaning-assign-room");
 
 beforeEach(() => {
@@ -77,6 +89,8 @@ beforeEach(() => {
   handler = () => ({ data: null, error: null });
   roomsRead = null;
   sessionsRead = null;
+  daySuggestions = [];
+  blockedKeys = new Set();
 });
 
 const opsOn = (table: string, op: string) => calls.filter((call) => call.table === table && call.op === op);
@@ -224,5 +238,136 @@ describe("읽기가 throw 해도 오류 화면 대신 error", () => {
     await expect(cancelPersonDay({ date: DATE, userId: USER })).resolves.toEqual(error);
     expect(log).toHaveBeenCalled();
     log.mockRestore();
+  });
+});
+
+describe("점검 D (2026-11-09) — 서버가 다시 본다", () => {
+  it("A12 제안대로 넣기 — 보낸 건물 범위만 넣는다(보이는 수 = 넣는 수)", async () => {
+    daySuggestions = [
+      { propertyName: "아라키초A", roomKey: "k401", roomLabel: "401", userId: USER },
+      { propertyName: "가부키초", roomKey: "k501", roomLabel: "501", userId: USER },
+    ];
+    handler = (call) => (call.op === "upsert" ? { data: (call.payload as unknown[]).map((_, i) => ({ id: `a${i}` })) } : {});
+    await expect(applyDaySuggestions({ date: DATE, properties: ["아라키초A"] })).resolves.toEqual({ added: 1, ok: true });
+    expect((opsOn("cleaning_assignments", "upsert")[0].payload as { room_key: string }[]).map((row) => row.room_key)).toEqual(["k401"]);
+  });
+
+  it("A12 건물 범위가 이상하면 invalid, 아무것도 넣지 않는다", async () => {
+    daySuggestions = [{ propertyName: "아라키초A", roomKey: "k401", roomLabel: "401", userId: USER }];
+    await expect(applyDaySuggestions({ date: DATE, properties: [1 as unknown as string] })).resolves.toEqual({ ok: false, reason: "invalid" });
+    expect(opsOn("cleaning_assignments", "upsert")).toHaveLength(0);
+  });
+
+  it("A15 취소 요청 수락 — 쓰는 순간 요청이 없으면(거둠 · 경쟁) stale, 새 취소 줄도 배정 지우기도 없다", async () => {
+    handler = (call) => (call.table === "cleaning_assignments" && call.op === "select" ? { data: [{ id: "a1", property_name: "아라키초A", room_key: "k401", room_label: "401" }] } : call.op === "update" ? { data: [] } : {});
+    await expect(resolveCancelRequest({ accept: true, date: DATE, userId: USER })).resolves.toEqual({ ok: false, reason: "stale" });
+    const update = opsOn("cleaning_shift_applications", "update");
+    expect(update).toHaveLength(1);
+    // 조건 붙은 쓰기 — 요청이 살아 있고 아직 취소 안 된 줄만 바꾼다.
+    expect(update[0].filters).toEqual(expect.arrayContaining(["not:cancel_requested_at:is:null", "is:cancelled_at:null"]));
+    expect(opsOn("cleaning_shift_applications", "insert")).toHaveLength(0);
+    expect(opsOn("cleaning_assignments", "delete")).toHaveLength(0);
+  });
+
+  it("A15 요청이 살아 있으면 일정 취소 뒤 시작 안 한 방 배정을 지운다", async () => {
+    handler = (call) =>
+      call.table === "cleaning_assignments" && call.op === "select"
+        ? { data: [{ id: "a1", property_name: "아라키초A", room_key: "k401", room_label: "401" }] }
+        : call.op === "update"
+          ? { data: [{ user_id: USER }] }
+          : {};
+    await expect(resolveCancelRequest({ accept: true, date: DATE, userId: USER })).resolves.toEqual({ ok: true });
+    expect(opsOn("cleaning_assignments", "delete")).toHaveLength(1);
+  });
+
+  it("A15 수락은 멤버 확인 없이 — 비활성이 된 알바의 살아 있는 요청도 받고, 새 줄은 만들지 않는다", async () => {
+    handler = (call) =>
+      call.table === "cleaning_assignments" && call.op === "select"
+        ? { data: [{ id: "a1", property_name: "아라키초A", room_key: "k401", room_label: "401" }] }
+        : call.op === "update"
+          ? { data: [{ user_id: STRANGER }] }
+          : {};
+    await expect(resolveCancelRequest({ accept: true, date: DATE, userId: STRANGER })).resolves.toEqual({ ok: true });
+    expect(opsOn("cleaning_shift_applications", "insert")).toHaveLength(0);
+    expect(opsOn("cleaning_assignments", "delete")).toHaveLength(1);
+  });
+
+  it("A15 수락 — 요청 줄이 없으면(비활성 · 다른 조직 사람 포함) stale, 아무것도 만들지 않는다", async () => {
+    handler = (call) => (call.op === "update" ? { data: [] } : {});
+    await expect(resolveCancelRequest({ accept: true, date: DATE, userId: STRANGER })).resolves.toEqual({ ok: false, reason: "stale" });
+    expect(opsOn("cleaning_shift_applications", "insert")).toHaveLength(0);
+    expect(opsOn("cleaning_assignments", "delete")).toHaveLength(0);
+  });
+
+  it("A17 그날 출근 시각 넣기 — 현장 인원이 아니면 invalid, 아무것도 쓰지 않는다", async () => {
+    await expect(setDayStartTime({ date: DATE, time: "10:00", userId: STRANGER })).resolves.toEqual({ ok: false, reason: "invalid" });
+    expect(calls.filter((call) => call.op !== "select")).toHaveLength(0);
+  });
+
+  it("A17 시각 지우기 — 비활성 · 탈퇴한 사람도 있는 줄의 시각은 지운다(새 줄은 만들지 않음)", async () => {
+    await expect(setDayStartTime({ date: DATE, time: null, userId: STRANGER })).resolves.toEqual({ ok: true });
+    expect(opsOn("cleaning_shift_applications", "update")).toHaveLength(1);
+    expect(opsOn("cleaning_shift_applications", "insert")).toHaveLength(0);
+  });
+
+  it("A17 시각 지우기 — 신청 줄이 없으면 새로 만들지 않는다", async () => {
+    await expect(setDayStartTime({ date: DATE, time: null, userId: USER })).resolves.toEqual({ ok: true });
+    expect(opsOn("cleaning_shift_applications", "insert")).toHaveLength(0);
+  });
+
+  it("A16 방 추가 판단 — 없는 방 invalid, 청소 중인 방 stale, 대기 · 목록에 없는 방은 됨", async () => {
+    await expect(checkAddExtraRoom(fakeClient() as never, "org", DATE, "nope", null)).resolves.toEqual({ ok: false, reason: "invalid" });
+    roomsRead = () => [{ ...ROOM, status: "progress" }];
+    await expect(checkAddExtraRoom(fakeClient() as never, "org", DATE, "k401", null)).resolves.toEqual({ ok: false, reason: "stale" });
+    roomsRead = () => [];
+    await expect(checkAddExtraRoom(fakeClient() as never, "org", DATE, "k401", null)).resolves.toMatchObject({ ok: true, option: { roomKey: "k401" } });
+  });
+
+  it("A16 방 빼기 — 미룬 기간이라 목록에 없는 방은 in_use", async () => {
+    roomsRead = () => [];
+    blockedKeys = new Set(["k401"]);
+    handler = (call) => (call.table === "cleaning_assignments" ? { data: [] } : {});
+    await expect(removeExtraRoom(fakeClient() as never, "org", DATE, "k401")).resolves.toEqual({ ok: false, reason: "in_use" });
+    expect(opsOn("cleaning_list_extra_rooms", "delete")).toHaveLength(0);
+  });
+
+  it("A16 방 빼기 — 배정된 사람이 있으면 in_use, 지우지 않는다", async () => {
+    roomsRead = () => [{ ...ROOM, source: "extra" }];
+    handler = (call) => (call.table === "cleaning_assignments" ? { data: [{ id: "a1" }] } : {});
+    await expect(removeExtraRoom(fakeClient() as never, "org", DATE, "k401")).resolves.toEqual({ ok: false, reason: "in_use" });
+    expect(opsOn("cleaning_list_extra_rooms", "delete")).toHaveLength(0);
+    handler = (call) => (call.table === "cleaning_assignments" ? { data: [] } : {});
+    await expect(removeExtraRoom(fakeClient() as never, "org", DATE, "k401")).resolves.toEqual({ ok: true });
+    expect(opsOn("cleaning_list_extra_rooms", "delete")).toHaveLength(1);
+  });
+
+  it("C14 내 시프트 — 남은 배정이 모두 유령(예약 취소)이면 신청을 뺄 수 있고 취소 요청은 걸지 않는다", async () => {
+    roomsRead = () => [];
+    handler = (call) => (call.table === "cleaning_assignments" ? { data: [{ created_at: "", created_by: null, id: "a1", property_name: "아라키초A", room_key: "k401", room_label: "401", user_id: USER, work_date: DATE }] } : call.table === "cleaning_shift_applications" && call.op === "select" ? { data: { cancelled_at: null } } : {});
+    await expect(toggleMyShift({ apply: false, date: DATE })).resolves.toEqual({ applied: false, ok: true });
+    expect(opsOn("cleaning_shift_applications", "delete")).toHaveLength(1);
+    await expect(requestShiftCancel({ date: DATE })).resolves.toEqual({ ok: false, reason: "invalid" });
+  });
+
+  it("C14 내 시프트 — 살아 있는 배정이 있으면 그대로 assigned", async () => {
+    roomsRead = () => [ROOM];
+    handler = (call) => (call.table === "cleaning_assignments" ? { data: [{ created_at: "", created_by: null, id: "a1", property_name: "아라키초A", room_key: "k401", room_label: "401", user_id: USER, work_date: DATE }] } : call.table === "cleaning_shift_applications" && call.op === "select" ? { data: { cancelled_at: null } } : {});
+    await expect(toggleMyShift({ apply: false, date: DATE })).resolves.toEqual({ ok: false, reason: "assigned" });
+  });
+
+  it("C14 기록이 있는 유령 배정은 살아 있다 — 신청을 빼지 않는다", async () => {
+    roomsRead = () => [];
+    sessionsRead = () => [{ ...RECORD, staff_user_id: USER, status: "completed" }];
+    handler = (call) => (call.table === "cleaning_assignments" ? { data: [{ created_at: "", created_by: null, id: "a1", property_name: "아라키초A", room_key: "k401", room_label: "401", user_id: USER, work_date: DATE }] } : call.table === "cleaning_shift_applications" && call.op === "select" ? { data: { cancelled_at: null } } : {});
+    await expect(toggleMyShift({ apply: false, date: DATE })).resolves.toEqual({ ok: false, reason: "assigned" });
+  });
+
+  it("C14 관리자 월 칸 신청 빼기도 같은 판단 — 유령 배정만 있으면 빼고, 살아 있으면 conflict", async () => {
+    const assignment = { created_at: "", created_by: null, id: "a1", property_name: "아라키초A", room_key: "k401", room_label: "401", user_id: USER, work_date: DATE };
+    handler = (call) => (call.table === "cleaning_assignments" ? { data: [assignment] } : call.table === "cleaning_shift_applications" && call.op === "select" ? { data: { cancelled_at: null, user_id: USER } } : {});
+    roomsRead = () => [];
+    await expect(toggleApplicationForUser({ date: DATE, userId: USER })).resolves.toEqual({ applied: false, ok: true });
+    roomsRead = () => [ROOM];
+    await expect(toggleApplicationForUser({ date: DATE, userId: USER })).resolves.toEqual({ ok: false, reason: "conflict" });
   });
 });

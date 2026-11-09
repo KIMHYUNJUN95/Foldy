@@ -26,7 +26,7 @@ import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
 import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
 import { AdminUndoToast } from "@/components/admin/shared/admin-undo-toast";
 import type { Dictionary } from "@/lib/i18n";
-import { addWarningText, assignFailText, fill, type CleaningAssignCopy } from "@/lib/cleaning-assign-i18n";
+import { addWarningText, assignFailText, cancelRequestFailText, fill, type CleaningAssignCopy } from "@/lib/cleaning-assign-i18n";
 import type { BoardPerson, BoardRoom, DayBoard } from "@/lib/cleaning-assign/data";
 import { canAddPerson, canHoldRoom, canRemovePerson, canSwapPerson, carryBadgeDays, directAddWarning, directAddWarnings, isOpenSectionRoom, needMoreCount, sortOpenSection } from "@/lib/cleaning-assign/room-rules";
 import { DAILY_CAP, roomWeight } from "@/lib/cleaning-assign/suggest";
@@ -109,14 +109,15 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
   const [swapMode, setSwapMode] = useState(false);
   const [swapPair, setSwapPair] = useState<{ aId: string; bId: string; only?: string[] } | null>(null);
   const [roomSwap, setRoomSwap] = useState<{ roomKey: string; fromId: string } | null>(null);
-  const [swapUndo, setSwapUndo] = useState<{ stamp: number; message: string; moves: RoomMove[] } | null>(null);
+  // 되돌리기 정보는 원래 날짜를 같이 기억한다 — 토스트가 떠 있는 사이 날짜를 바꿔도 그 날을 고친다(문서 45 A14).
+  const [swapUndo, setSwapUndo] = useState<{ stamp: number; message: string; date: string; moves: RoomMove[] } | null>(null);
   const [changedKeys, setChangedKeys] = useState<Set<string>>(new Set());
   // 빈 방 「+ 사람」 작은 창 · 뺀 뒤 5초 「되돌리기」.
   const [seatFor, setSeatFor] = useState<string | null>(null);
   const seatMenu = useRef<HTMLDivElement>(null);
   // 보통 인원(객실 설정, 기본 1명)이 이미 찬 방에 더 넣을 때 — 확인 창.
   const [overfill, setOverfill] = useState<{ room: BoardRoom; userId: string } | null>(null);
-  const [seatUndo, setSeatUndo] = useState<{ stamp: number; message: string; roomKey: string; userId: string } | null>(null);
+  const [seatUndo, setSeatUndo] = useState<{ stamp: number; message: string; date: string; roomKey: string; userId: string } | null>(null);
   useEffect(() => {
     if (!seatFor) return;
     const onDown = (event: PointerEvent) => {
@@ -159,7 +160,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
     return () => window.removeEventListener("keydown", onKey);
   }, [overlayOpen]);
 
-  function run(task: () => Promise<{ ok: true } | AssignFail>, success?: string) {
+  function run(task: () => Promise<{ ok: true } | AssignFail>, success?: string, failText: (reason: string, copy: CleaningAssignCopy) => string = assignFailText) {
     startTransition(async () => {
       const result = await task();
       if (result.ok) {
@@ -167,21 +168,23 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
         if (success) showToast(success);
       } else {
         haptic("error");
-        showToast(assignFailText(result.reason, copy));
+        showToast(failText(result.reason, copy));
       }
       router.refresh();
     });
   }
 
   // 미루기 · 처리 끝 — 5초 「실행 취소」. 지난 뒤에는 방 줄의 「되돌리기」(둘 다 뺀 배정까지 다시 넣는다).
-  const [undo, setUndo] = useState<{ stamp: number; message: string; roomKey: string; originDate: string } | null>(null);
+  const [undo, setUndo] = useState<{ stamp: number; message: string; date: string; roomKey: string; originDate: string } | null>(null);
   function hold(room: { roomKey: string; propertyName: string; roomLabel: string }, input: { originDate: string; kind: "defer" | "resolved"; untilDate?: string; reason?: string }) {
     const name = room.roomLabel === room.propertyName ? label(room.propertyName) : `${label(room.propertyName)} ${room.roomLabel}`;
+    const date = board.date;
     startTransition(async () => {
-      const result = await holdRoom({ date: board.date, roomKey: room.roomKey, ...input });
+      const result = await holdRoom({ date, roomKey: room.roomKey, ...input });
       if (result.ok) {
         haptic("success");
         setUndo({
+          date,
           message: input.kind === "resolved" ? fill(copy.heldResolved, { room: name }) : fill(copy.heldDeferred, { date: shortDate(input.untilDate ?? nextDay(board.date)), room: name }),
           originDate: input.originDate,
           roomKey: room.roomKey,
@@ -197,11 +200,12 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
 
   // 담당 바꾸기 실행 — 바뀐 줄을 잠깐 옅은 보라로 표시 + 5초 「되돌리기」(거꾸로 옮기기).
   function reassign(moves: RoomMove[], message: string) {
+    const date = board.date;
     startTransition(async () => {
-      const result = await reassignRooms({ date: board.date, moves });
+      const result = await reassignRooms({ date, moves });
       if (result.ok) {
         haptic("success");
-        setSwapUndo({ message, moves, stamp: Date.now() });
+        setSwapUndo({ date, message, moves, stamp: Date.now() });
         setChangedKeys(new Set(moves.map((m) => m.roomKey)));
         window.setTimeout(() => setChangedKeys(new Set()), 4000);
       } else {
@@ -211,10 +215,10 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
       router.refresh();
     });
   }
-  function undoReassign(moves: RoomMove[]) {
+  function undoReassign(date: string, moves: RoomMove[]) {
     const back = moves.map((m) => ({ fromUserId: m.toUserId, roomKey: m.roomKey, toUserId: m.fromUserId }));
     startTransition(async () => {
-      const result = await reassignRooms({ date: board.date, moves: back });
+      const result = await reassignRooms({ date, moves: back });
       if (result.ok) {
         haptic("success");
         showToast(copy.heldUndone);
@@ -234,6 +238,8 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
   };
 
   const visibleProperty = (name: string) => !onlyMine || board.mainProperties.length === 0 || board.mainProperties.includes(name);
+  // 제안 넣기 서버 액션에 보내는 범위 — 위 거르기와 같은 값(null = 전 건물). 버튼의 「N개」 = 서버가 넣는 수(문서 45 A12).
+  const visibleProperties = onlyMine && board.mainProperties.length > 0 ? board.mainProperties : null;
 
   const rooms = board.rooms.filter((room) => visibleProperty(room.propertyName));
   const cancelledRooms = rooms.filter((room) => room.cancelled && room.people.length > 0);
@@ -256,13 +262,14 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
   // 빼기 — 바로 저장하고 5초 「되돌리기」(다시 넣기). 이름표 × · 고른 상태의 체크 해제가 같이 쓴다.
   function removeSeat(room: BoardRoom, userId: string) {
     const name = personById.get(userId)?.name ?? room.people.find((p) => p.userId === userId)?.name ?? "";
+    const date = board.date;
     startTransition(async () => {
-      const result = await unassignFromRoom({ date: board.date, roomKey: room.roomKey, userId });
+      const result = await unassignFromRoom({ date, roomKey: room.roomKey, userId });
       if (result.ok) {
         haptic("light");
         // 청소 중 · 끝난 방은 뺄 수만 있고 다시 넣을 수 없다(문서 45 A2~A4) — 그때는 되돌리기를 내밀지 않는다.
         const message = fill(copy.seatRemoved, { name, room: roomTitle(room) });
-        if (canAddPerson(room)) setSeatUndo({ message, roomKey: room.roomKey, stamp: Date.now(), userId });
+        if (canAddPerson(room)) setSeatUndo({ date, message, roomKey: room.roomKey, stamp: Date.now(), userId });
         else showToast(message);
       } else {
         haptic("error");
@@ -664,7 +671,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
           disabled={pending}
           onClick={() =>
             startTransition(async () => {
-              const result = await applyDaySuggestions({ date: board.date, onlyFixed: true });
+              const result = await applyDaySuggestions({ date: board.date, onlyFixed: true, properties: visibleProperties });
               showToast(result.ok ? (result.added > 0 ? fill(copy.added, { n: result.added }) : copy.nothingToAdd) : copy.failed);
               router.refresh();
             })
@@ -738,7 +745,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
                 disabled={pending}
                 onClick={() =>
                   startTransition(async () => {
-                    const result = await applyDaySuggestions({ date: board.date });
+                    const result = await applyDaySuggestions({ date: board.date, properties: visibleProperties });
                     showToast(result.ok ? (result.added > 0 ? fill(copy.added, { n: result.added }) : copy.nothingToAdd) : copy.failed);
                     router.refresh();
                   })
@@ -907,10 +914,10 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
                         {p.cancelRequestNote ? <span>{p.cancelRequestNote}</span> : null}
                       </span>
                       <span className="cas-person__reqacts">
-                        <button type="button" className="cas-reqbtn is-red" disabled={pending} onClick={() => run(() => resolveCancelRequest({ accept: true, date: board.date, userId: p.userId }))}>
+                        <button type="button" className="cas-reqbtn is-red" disabled={pending} onClick={() => run(() => resolveCancelRequest({ accept: true, date: board.date, userId: p.userId }), undefined, cancelRequestFailText)}>
                           {copy.cancelRequestAccept}
                         </button>
-                        <button type="button" className="cas-reqbtn" disabled={pending} onClick={() => run(() => resolveCancelRequest({ accept: false, date: board.date, userId: p.userId }))}>
+                        <button type="button" className="cas-reqbtn" disabled={pending} onClick={() => run(() => resolveCancelRequest({ accept: false, date: board.date, userId: p.userId }), undefined, cancelRequestFailText)}>
                           {copy.cancelRequestReject}
                         </button>
                       </span>
@@ -1081,7 +1088,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
           onUndo={() => {
             const target = seatUndo;
             setSeatUndo(null);
-            run(() => assignToRoom({ date: board.date, roomKey: target.roomKey, userId: target.userId }), copy.heldUndone);
+            run(() => assignToRoom({ date: target.date, roomKey: target.roomKey, userId: target.userId }), copy.heldUndone);
           }}
         />
       ) : null}
@@ -1095,7 +1102,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
           onUndo={() => {
             const target = swapUndo;
             setSwapUndo(null);
-            undoReassign(target.moves);
+            undoReassign(target.date, target.moves);
           }}
         />
       ) : null}
@@ -1109,7 +1116,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
           onUndo={() => {
             const target = undo;
             setUndo(null);
-            run(() => releaseHold({ date: board.date, originDate: target.originDate, roomKey: target.roomKey }), copy.heldUndone);
+            run(() => releaseHold({ date: target.date, originDate: target.originDate, roomKey: target.roomKey }), copy.heldUndone);
           }}
         />
       ) : null}

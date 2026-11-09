@@ -10,6 +10,7 @@ import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast
 import type { Dictionary } from "@/lib/i18n";
 import { assignFailText, fill, type CleaningAssignCopy } from "@/lib/cleaning-assign-i18n";
 import type { MonthBoard } from "@/lib/cleaning-assign/data";
+import { stateForMonth } from "@/lib/cleaning-assign/day-state";
 import { haptic } from "@/lib/haptics";
 import { AssignPersonPanel } from "./assign-person-panel";
 import { monthName, shortDate, weekdayShort } from "./format";
@@ -25,7 +26,8 @@ import "./cleaning-assign.css";
 
 type Shared = Dictionary["admin"]["shared"];
 
-type Preview = { proposals: Map<string, number>; fill: number; open: number; shortDays: string[]; left: number };
+/** `ym` — 미리 본 달. 다른 달로 넘기면 보이지 않고, 반영도 이 달로 보낸다(문서 45 A13). */
+type Preview = { ym: string; proposals: Map<string, number>; fill: number; open: number; shortDays: string[]; left: number };
 
 export function AssignMonthBoard({
   board,
@@ -51,10 +53,18 @@ export function AssignMonthBoard({
   const router = useRouter();
   const { toast, showToast, dismiss } = useAdminToast();
   const [pending, startTransition] = useTransition();
-  const [preview, setPreview] = useState<Preview | null>(null);
+  const [previewState, setPreview] = useState<Preview | null>(null);
   const [limit, setLimit] = useState(30);
   const [personId, setPersonId] = useState<string | null>(null);
   const [panelDate, setPanelDate] = useState<string | null>(null);
+  // 미리 보기는 미리 본 달에서만 — 월 이동은 같은 화면을 다시 쓰므로(새로 그리지 않음) 달이 바뀌면 여기서 걸러 낸다.
+  // 다른 달로 넘기면 미리 보기 자체를 비운다 — 돌아와도 다시 보이지 않는다(문서 45 A13, 2026-11-09 리뷰). 렌더 중 이전 값 비교(effect 없음).
+  const [previewYm, setPreviewYm] = useState(board.ym);
+  if (previewYm !== board.ym) {
+    setPreviewYm(board.ym);
+    setPreview(null);
+  }
+  const preview = stateForMonth(previewState, board.ym);
   const mon = monthName(board.ym, locale);
   const people = board.people;
 
@@ -76,21 +86,24 @@ export function AssignMonthBoard({
   const columns = useMemo(() => `168px repeat(${board.days.length}, minmax(0, 1fr))`, [board.days.length]);
 
   function runPreview() {
+    const ym = board.ym;
     startTransition(async () => {
-      const result = await previewMonthSuggestions({ ym: board.ym });
+      const result = await previewMonthSuggestions({ ym });
       if (!result.ok) {
         showToast(copy.failed);
         return;
       }
       const proposals = new Map<string, number>();
       for (const p of result.proposals) proposals.set(`${p.userId}|${p.workDate}`, (proposals.get(`${p.userId}|${p.workDate}`) ?? 0) + 1);
-      setPreview({ fill: result.proposals.length, left: result.leftTotal, open: result.openTotal, proposals, shortDays: result.shortDays });
+      setPreview({ fill: result.proposals.length, left: result.leftTotal, open: result.openTotal, proposals, shortDays: result.shortDays, ym });
     });
   }
 
   function apply() {
+    const target = preview;
+    if (!target) return;
     startTransition(async () => {
-      const result = await applyMonthSuggestions({ ym: board.ym });
+      const result = await applyMonthSuggestions({ ym: target.ym });
       if (result.ok) {
         haptic("success");
         showToast(fill(copy.added, { n: result.added }));

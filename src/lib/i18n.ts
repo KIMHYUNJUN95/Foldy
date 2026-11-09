@@ -1063,6 +1063,8 @@ const FALLBACK_DICTIONARY = {
       save_failed: "Something went wrong. Please try again.",
       no_destination: "No recipients yet — add them in Settings.",
       no_sample: "No booking to use as a sample yet.",
+      room_locked: "This room is being cleaned, done, or postponed, so it can't be added now.",
+      room_in_use: "Someone is assigned to this room or has a cleaning record. Take them off in Cleaning assignment first.",
     },
     // 화이트 리디자인(2026-10-15) — docs/product/36-automation-control.md 「화이트 리디자인」
     white: {
@@ -9927,6 +9929,8 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
       save_failed: "처리하지 못했어요. 다시 시도해 주세요.",
       no_destination: "받는 곳이 없어요 — 설정에서 넣어 주세요.",
       no_sample: "미리 볼 예약이 아직 없어요.",
+      room_locked: "청소 중이거나 끝났거나 미룬 방이라 지금은 더할 수 없어요.",
+      room_in_use: "배정된 사람이나 청소 기록이 있는 방이라 뺄 수 없어요. 청소 배정에서 먼저 빼 주세요.",
     },
     white: {
       dataOk: "예약 데이터 정상 · {n}분 전",
@@ -18612,6 +18616,8 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
       save_failed: "処理できませんでした。もう一度お試しください。",
       no_destination: "送信先がありません — 設定で追加してください。",
       no_sample: "プレビューできる予約がまだありません。",
+      room_locked: "清掃中・完了・延期の部屋のため、今は追加できません。",
+      room_in_use: "担当者または清掃記録がある部屋のため外せません。先に清掃割り当てで外してください。",
     },
     white: {
       dataOk: "予約データ正常 · {n}分前",

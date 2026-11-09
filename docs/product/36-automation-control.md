@@ -668,6 +668,10 @@ JI HYEUN CHANG · Booking                     매출 *¥4,786,364*
 - 그날 이미 퇴실 청소가 있는 물리 객실이면 한 번만 나온다. 제외 건물이면 안 나온다.
 - 표 `cleaning_list_extra_rooms`(날짜 × 물리 객실 키 · 건물 · 객실 · 메모, 마이그레이션 `202610070001`, 운영 적용 2026-10-07). 읽기 `ops_admin.access`,
   쓰기는 서버 액션(`addCleaningExtraRoom` · `removeCleaningExtraRoom`) — `automation.manage`, 고른 방은 서버가 카탈로그에서 다시 찾는다.
+- **청소 상황표를 따른다(2026-11-09, 문서 45 A16):** 더하기 · 빼기 판단은 청소 배정 「+ 방 추가」와 같은 함수(`src/lib/cleaning-assign/extra-room.ts`
+  `checkAddExtraRoom` · `removeExtraRoom`). 청소 중 · 끝난 방 · 미룸 · 처리 끝 방은 더하지 않고 `room_locked`, 배정된 사람 · 청소 기록 · 미룸이 있는
+  수기 방은 빼지 않고 `room_in_use`(「청소 배정에서 먼저 빼 주세요」 — 빼면 배정이 「취소됨」으로 남는다). 미뤄서 그날 목록에 안 보이는 방도 막는다. 그날 체크아웃 방이기도 한 방은 줄을 빼도 목록 · 배정이 그대로라 배정이 있어도 뺄 수 있다(2026-11-09 리뷰). 문구 `errors.room_locked` · `errors.room_in_use`(ko · ja · en).
+  저장하면 열려 있는 청소 배정 · 내 시프트 화면에 신호(`cleaning_assign`)를 보낸다. 예전엔 이 판단을 건너뛰어 청소 중 · 끝난 방에도 줄이 생겼다.
 - 보낸 뒤 더하거나 빼면 정정본 대상이다(아래).
 
 ### 정정본 — 우리 조건 + 두 군데 보완

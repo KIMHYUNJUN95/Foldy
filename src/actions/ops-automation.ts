@@ -34,6 +34,8 @@ import { computeNextWake } from "@/lib/automation/schedule";
 import { canAccessOpsAdmin } from "@/lib/ops-admin";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { isYmd } from "@/lib/tokyo-date";
+import { changed } from "@/actions/cleaning-assign-guards";
+import { checkAddExtraRoom, removeExtraRoom } from "@/lib/cleaning-assign/extra-room";
 import type { Json } from "@/types/database";
 
 /**
@@ -48,7 +50,8 @@ import type { Json } from "@/types/database";
  * 실패 사유는 코드로만 돌려준다 — 문구는 화면이 사전에서 고른다(ko/ja/en).
  */
 
-type Fail = { ok: false; error: "forbidden" | "invalid" | "not_found" | "save_failed" | "no_destination" | "no_sample" };
+/** `room_locked` — 청소 중 · 끝남 · 미룸 · 처리 끝 방이라 더할 수 없음. `room_in_use` — 배정 · 기록이 있는 방이라 뺄 수 없음(문서 45 A16). */
+type Fail = { ok: false; error: "forbidden" | "invalid" | "not_found" | "save_failed" | "no_destination" | "no_sample" | "room_locked" | "room_in_use" };
 
 async function viewer() {
   // 화면을 옮기지 않고 「권한 없음」만 돌려준다 — 모바일 판매 캘린더 · 자동화도 같은 액션을 부른다.
@@ -461,7 +464,8 @@ export async function sendAutomationNow(input: {
 
 /**
  * 청소 명단에 방을 직접 더한다(연박 청소 등 — Hotelsmart 대신). 고를 수 있는 방은 활성 객실 카탈로그에 있는 것만 —
- * 화면이 보낸 키를 그대로 믿지 않고 서버가 다시 찾는다.
+ * 화면이 보낸 키를 그대로 믿지 않고 서버가 다시 찾는다. 더해도 되는지는 청소 배정 「+ 방 추가」와 같은 함수(`checkAddExtraRoom`, 문서 45 A16) —
+ * 청소 중 · 끝난 방 · 미룬 방은 `room_locked`. 저장하면 열려 있는 청소 배정 화면에 신호를 보낸다(`changed`).
  */
 export async function addCleaningExtraRoom(input: { date: string; roomKey: string; note?: string }): Promise<{ ok: true } | Fail> {
   const session = await manager();
@@ -470,8 +474,13 @@ export async function addCleaningExtraRoom(input: { date: string; roomKey: strin
   if (!isYmd(input.date)) return { error: "invalid", ok: false };
   const supabase = getSupabaseServiceClient();
   const organizationId = session.organization.id;
-  const option = (await loadCleaningRoomOptions(supabase, organizationId)).find((item) => item.roomKey === input.roomKey);
-  if (!option) return { error: "invalid", ok: false };
+  const checked = await checkAddExtraRoom(supabase, organizationId, input.date, String(input.roomKey ?? ""), null).catch((error: unknown) => {
+    console.error("[automation] extra room check failed", error instanceof Error ? error.message : error);
+    return null;
+  });
+  if (!checked) return { error: "save_failed", ok: false };
+  if (!checked.ok) return { error: checked.reason === "stale" ? "room_locked" : "invalid", ok: false };
+  const option = checked.option;
   const result = await supabase.from("cleaning_list_extra_rooms").upsert(
     {
       created_by: session.user.id,
@@ -489,6 +498,7 @@ export async function addCleaningExtraRoom(input: { date: string; roomKey: strin
     return { error: "save_failed", ok: false };
   }
   await writeLog(organizationId, "cleaning_list", session.user.id, { [`extra:${input.date}:${option.roomKey}`]: { after: note || "+", before: null } });
+  await changed(organizationId);
   return { ok: true };
 }
 
@@ -498,17 +508,14 @@ export async function removeCleaningExtraRoom(input: { date: string; roomKey: st
   const roomKey = String(input.roomKey ?? "").trim();
   if (!isYmd(input.date) || roomKey.length === 0 || roomKey.length > 80) return { error: "invalid", ok: false };
   const organizationId = session.organization.id;
-  const result = await getSupabaseServiceClient()
-    .from("cleaning_list_extra_rooms")
-    .delete()
-    .eq("organization_id", organizationId)
-    .eq("target_date", input.date)
-    .eq("room_key", roomKey);
-  if (result.error) {
-    console.error("[automation] extra room remove failed", { code: result.error.code });
-    return { error: "save_failed", ok: false };
-  }
+  // 배정 · 기록 · 미룸이 있는 방은 빼지 않는다 — 빼면 배정이 「취소됨」 유령으로 남는다. 청소 배정에서 먼저 정리(문서 45 A16).
+  const result = await removeExtraRoom(getSupabaseServiceClient(), organizationId, input.date, roomKey).catch((error: unknown) => {
+    console.error("[automation] extra room remove failed", error instanceof Error ? error.message : error);
+    return { ok: false as const, reason: "error" as const };
+  });
+  if (!result.ok) return { error: result.reason === "in_use" ? "room_in_use" : "save_failed", ok: false };
   await writeLog(organizationId, "cleaning_list", session.user.id, { [`extra:${input.date}:${roomKey}`]: { after: null, before: "+" } });
+  await changed(organizationId);
   return { ok: true };
 }
 

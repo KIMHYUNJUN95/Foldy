@@ -3,6 +3,7 @@ import { roomShareState, sameRoomRecords, storedSessionRoomKey } from "@/lib/cle
 import { DAILY_CAP, overDailyCap, roomWeight, type SuggestPerson, type SuggestRoom } from "@/lib/cleaning-assign/suggest";
 import { holdSkipReason } from "@/lib/cleaning-assign/task-kind";
 import { isCleanedRecord } from "@/lib/cleaning-record-rules";
+import { isUnmeasuredSession } from "@/lib/cleaning-unmeasured";
 import { buildSessionRoomLabel, CALENDAR_BUILDING_ORDER, compareRoomLabel, physicalRoomKeyOfSessionLabel } from "@/lib/room-label-normalization";
 import { tokyoDateOf, tokyoDayStart } from "@/lib/tokyo-date";
 
@@ -712,8 +713,10 @@ export function needOf(room: Pick<AssignRoom, "status" | "deferredUntil" | "reso
  */
 export function suggestInputsForDay(input: {
   rooms: readonly AssignRoom[];
-  assignments: readonly { roomKey: string; propertyName: string; userId: string }[];
+  assignments: readonly (GhostCheckRow & { propertyName: string; userId: string })[];
   people: readonly Omit<SuggestPerson, "loadToday" | "propertiesToday">[];
+  /** 그날 청소 기록 — 기록 있는 배정은 목록에 없어도 몫 · 건물에 든다(C14). 빠뜨리지 않게 필수. */
+  records: readonly SessionRow[];
 }): { suggestRooms: SuggestRoom[]; suggestPeople: SuggestPerson[] } {
   const byKey = new Map(input.rooms.map((room) => [room.roomKey, room]));
   const byRoom = new Map<string, string[]>();
@@ -729,18 +732,34 @@ export function suggestInputsForDay(input: {
     .filter((room) => room.need > 0)
     .sort((a, b) => Number(Boolean(byKey.get(b.roomKey)!.carriedFrom)) - Number(Boolean(byKey.get(a.roomKey)!.carriedFrom)));
   const suggestPeople = input.people.map((person) => {
-    const mine = input.assignments.filter((row) => row.userId === person.userId);
-    return { ...person, loadToday: personLoad(mine, byKey), propertiesToday: [...new Set(mine.map((row) => row.propertyName))] };
+    // 보드 몫과 같은 함수(`personDayWork`) — 유령 배정은 빼고, 기록 있는 배정은 목록에 없어도 넣는다(C14).
+    const work = personDayWork(input.assignments.filter((row) => row.userId === person.userId), input.rooms, input.records);
+    return { ...person, loadToday: work.load, propertiesToday: work.properties };
   });
   return { suggestPeople, suggestRooms };
 }
 
-/** 한 사람의 그날 몫 — 목록에 있는 방의 무게 합. 취소된 방(목록 밖)은 뺀다. */
-export function personLoad(rows: readonly { roomKey: string }[], roomByKey: ReadonlyMap<string, Pick<AssignRoom, "usualHeadcount">>): number {
-  return rows.reduce((sum, row) => {
-    const room = roomByKey.get(row.roomKey);
-    return room ? sum + roomWeight(room.usualHeadcount) : sum;
-  }, 0);
+/**
+ * 한 사람의 그날 일(C14 · L4) — 하루 보기 보드 몫(`BoardPerson.load`)과 제안 입력(`suggestInputsForDay`)이 같은 값.
+ * 유령 배정(목록에 없고 그 사람 기록도 없음)은 뺀다. 기록 있는 배정은 목록에 없어도 실제 일이라 몫(보통 인원을 모르니 1인 방 무게) · 건물에 든다.
+ */
+export function personDayWork<T extends GhostCheckRow & { propertyName: string }>(
+  rows: readonly T[],
+  rooms: readonly AssignRoom[],
+  records: readonly SessionRow[],
+): { rows: T[]; load: number; properties: string[] } {
+  const byKey = new Map(rooms.map((room) => [room.roomKey, room]));
+  const live = rows.filter((row) => !isGhostAssignment(row, rooms, records));
+  const load = live.reduce((sum, row) => sum + roomWeight(byKey.get(row.roomKey)?.usualHeadcount ?? 1), 0);
+  return { load, properties: [...new Set(live.map((row) => row.propertyName))], rows: live };
+}
+
+/**
+ * 이번 달 근무 일수(`SuggestPerson.monthDays`)를 읽어야 하나 — 그 값은 「근무 일수 적은 사람 먼저」 규칙의 비교에만 쓴다.
+ * 규칙이 꺼져 있거나, 제안할 방이 없거나, 고를 사람이 한 명 이하면 비교가 일어나지 않아 읽지 않는다(하루 보기 읽기 줄이기, 2026-11-09 재리뷰).
+ */
+export function needsMonthWorkDays(rules: readonly { key: string; enabled: boolean }[], hasOpenRooms: boolean, candidateCount: number): boolean {
+  return hasOpenRooms && candidateCount > 1 && rules.some((rule) => rule.enabled && rule.key === "fewest_month_days");
 }
 
 /** 관리자 직접 넣기 확인 창을 띄우나(L6) — 보통 인원 초과 또는 하루 몫 초과. 막지는 않는다. */
@@ -773,4 +792,102 @@ export function swapOverCapNames(
     ...(fromB.length > 0 && a.load - weight(fromA) + weight(fromB) > DAILY_CAP ? [a.name] : []),
     ...(fromA.length > 0 && b.load - weight(fromB) + weight(fromA) > DAILY_CAP ? [b.name] : []),
   ];
+}
+
+// ── 점검 D(2026-11-09) — 같은 판단을 한 곳으로 ─────────────────────────────────────────────────────
+
+/**
+ * 제안 대상(A11) — 그날 일정이 살아 있고 **지금 현장 멤버**(`loadFieldMembers` — 활성 · `cleaning.work` 역할)인 사람만.
+ * 비활성 · 조직에서 빠진 사람의 신청 줄이 남아 있어도 제안하지 않는다(직접 넣기 `isFieldMember` 와 같은 기준). 하루 · 월 · 「고정 인력 먼저」 공용.
+ */
+export function suggestCandidates<T extends { userId: string; cancelledAt: string | null }>(apps: readonly T[], memberIds: ReadonlySet<string>): T[] {
+  return apps.filter((app) => !app.cancelledAt && memberIds.has(app.userId));
+}
+
+/** 제안 넣기 범위(A12) — 화면에 보이는 건물(「내 건물」 거르기)만. 거르기가 없으면(null · 빈 목록) 전 건물. */
+export function suggestionsInProperties<T extends { propertyName: string }>(list: readonly T[], properties: readonly string[] | null | undefined): T[] {
+  if (!properties || properties.length === 0) return [...list];
+  const allowed = new Set(properties);
+  return list.filter((item) => allowed.has(item.propertyName));
+}
+
+/**
+ * 자동화 화면 「청소 명단」의 수기 방 빼기(A16).
+ * - 체크아웃 · 밀려 온 방이기도 하면(`source` 가 extra 가 아님) 줄을 지워도 방은 그날 목록에 남는다 — 배정 · 청소 중이어도 뺀다.
+ * - 그 밖에는 대기 방이고 아무도 배정되지 않았을 때만. 청소 중 · 끝남 · 미룸 · 처리 끝이거나 배정된 사람이 있으면 막는다
+ *   (배정은 청소 배정에서 먼저 뺀다 — 빼면 배정이 「취소됨」 유령으로 남는다).
+ * - 목록에 없는 방은 미룬 기간 · 처리 끝(`heldByHold`, 「방 추가」를 막는 것과 같은 판단)이면 막고, 아니면 뺀다.
+ */
+export function canRemoveExtraRoom(room: (CapRoom & { source?: AssignRoomSource }) | undefined, assignedCount: number, heldByHold: boolean): boolean {
+  if (room && room.source && room.source !== "extra") return true;
+  if (heldByHold || assignedCount > 0) return false;
+  if (!room) return true;
+  return canAddPerson(room);
+}
+
+/** 유령 판단에 쓰는 배정 한 줄 — 기록 확인(그 사람 · 그 날 · 그 방)에는 `userId` · `workDate` · 건물 · 방이 있어야 한다. */
+export type GhostCheckRow = { roomKey: string; userId?: string; workDate?: string; propertyName?: string; roomLabel?: string };
+
+/**
+ * 유령 배정(C14) — 그날 청소할 방 목록(`loadAssignDayRooms` · `loadRangeDayRooms`)에 없는 배정(배정 뒤 예약 취소 · 날짜 변경).
+ * 하루 보기에서는 「취소됨」 방으로 남고(R13 · A6) 사람은 「배정 전」으로 위에 뜬다(문서 37 4-2-d). 배정 수 · 상태 · 비교표 · 달력은 세지 않는다.
+ * - 그날 목록을 모르면(`dayRooms` 없음 — 읽지 않은 날) 판단하지 않고 정상 배정으로 본다.
+ * - **기록이 있는 배정은 유령이 아니다**(「기록이 있는 사람은 빠지지 않는다」와 같은 뜻, 2026-11-09 리뷰) — 그 사람이 그날 그 방에 진행 중 · 완료 기록
+ *   (`personHasRoomRecord` — 취소 · 처리 끝 제외)이 있으면 목록에서 빠져도(체크아웃 뒤 예약 취소 · 날짜 변경) 실제로 일한 배정이다.
+ *   `records` 는 그날(또는 여러 날) 청소 기록.
+ */
+export function isGhostAssignment(row: GhostCheckRow, dayRooms: readonly { roomKey: string }[] | undefined, records: readonly SessionRow[]): boolean {
+  if (dayRooms === undefined || dayRooms.some((room) => room.roomKey === row.roomKey)) return false;
+  if (records.length === 0 || !row.userId) return true;
+  const sameDay = row.workDate ? records.filter((record) => record.cleaning_date === row.workDate) : records;
+  const sessionRoomLabel = row.propertyName && row.roomLabel ? buildSessionRoomLabel(row.propertyName, row.roomLabel) : row.roomKey;
+  return !personHasRoomRecord(sameDay, { roomKey: row.roomKey, sessionRoomLabel }, row.userId);
+}
+
+/** 유령 배정을 뺀 배정 — `plans` 는 날짜 → 그날 방 목록(`loadRangeDayRooms`), `records` 는 그 범위의 청소 기록. 목록에 없는 날짜는 그대로 둔다. */
+export function liveAssignments<T extends GhostCheckRow & { workDate: string }>(
+  rows: readonly T[],
+  plans: ReadonlyMap<string, readonly { roomKey: string }[]>,
+  records: readonly SessionRow[],
+): T[] {
+  const byDate = new Map<string, SessionRow[]>();
+  for (const record of records) byDate.set(record.cleaning_date, [...(byDate.get(record.cleaning_date) ?? []), record]);
+  return rows.filter((row) => !isGhostAssignment(row, plans.get(row.workDate), byDate.get(row.workDate) ?? []));
+}
+
+export type PersonRecordRow = {
+  room_label: string;
+  cleaning_date: string;
+  started_at: string;
+  completed_at: string | null;
+  duration_seconds: number | null;
+  status: string;
+  closed_without_cleaning: boolean;
+};
+
+export type PersonRecordSession = { startedAt: string; completedAt: string | null; minutes: number | null; endUnknown: boolean };
+
+/**
+ * 사람별 시프트 달력의 기록(C15) — 「일한 날」은 **청소한 기록**(`isCleanedRecord` — 완료 · 처리 끝 아님)이 있는 날만.
+ * 방마다 보여 줄 기록은 끝난 것 먼저, 없으면 시작만 한 것(진행 중). 취소 · 처리 끝은 보이지 않는다(「미시작」).
+ * 키는 `날짜|물리 방 키`(아는 건물이 아니면 저장된 라벨).
+ */
+export function indexPersonRecords(rows: readonly PersonRecordRow[]): { cleanedDates: Set<string>; sessionBy: Map<string, PersonRecordSession> } {
+  const cleanedDates = new Set<string>();
+  const sessionBy = new Map<string, PersonRecordSession>();
+  for (const row of rows) {
+    if (row.closed_without_cleaning || (row.status !== "completed" && row.status !== "in_progress")) continue;
+    const done = isCleanedRecord(row) && Boolean(row.completed_at);
+    if (done) cleanedDates.add(row.cleaning_date);
+    const key = `${row.cleaning_date}|${physicalRoomKeyOfSessionLabel(row.room_label) ?? row.room_label}`;
+    if (sessionBy.get(key)?.completedAt && !done) continue;
+    sessionBy.set(key, {
+      completedAt: done ? row.completed_at : null,
+      // 다음 날 「청소했어요」로 닫은 기록은 끝낸 시각을 모른다 — 「09:00–09:00」처럼 보이지 않게 따로 표시한다.
+      endUnknown: done && isUnmeasuredSession(row),
+      minutes: done && row.duration_seconds ? Math.round(row.duration_seconds / 60) : null,
+      startedAt: row.started_at,
+    });
+  }
+  return { cleanedDates, sessionBy };
 }

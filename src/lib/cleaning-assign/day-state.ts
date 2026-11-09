@@ -97,3 +97,8 @@ export function minutesToLabel(minutes: number | null): string {
 export function defaultStartMinutes(role: string): number {
   return isHourlyRole(role) ? 9 * 60 + 45 : 9 * 60;
 }
+
+/** 그 달 것만 남긴다 — 월 자동 제안 미리 보기는 미리 본 달에서만 보인다(달을 넘기면 사라짐, 문서 45 A13). */
+export function stateForMonth<T extends { ym: string }>(value: T | null, ym: string): T | null {
+  return value && value.ym === ym ? value : null;
+}

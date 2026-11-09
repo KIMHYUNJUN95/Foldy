@@ -13,8 +13,9 @@ import {
   type MonthBoard,
 } from "@/lib/cleaning-assign/data";
 import { loadPersonShift, type PersonShift } from "@/lib/cleaning-assign/person-shift";
-import { canAddRoom, canHoldRoom, canSwapPerson, applyHoldSteps, holdRemovedUserIds, holdUpsertRow, personHasRoomRecord, releaseHoldSteps, restoreIdsAfterRelease } from "@/lib/cleaning-assign/room-rules";
-import { loadAddBlockedRoomKeys, loadAssignDayRooms, loadDaySessionRows, MAX_DEFER_DAYS } from "@/lib/cleaning-assign/rooms";
+import { checkAddExtraRoom } from "@/lib/cleaning-assign/extra-room";
+import { canHoldRoom, canSwapPerson, applyHoldSteps, holdRemovedUserIds, holdUpsertRow, personHasRoomRecord, releaseHoldSteps, restoreIdsAfterRelease, suggestionsInProperties } from "@/lib/cleaning-assign/room-rules";
+import { loadAssignDayRooms, loadDaySessionRows, MAX_DEFER_DAYS } from "@/lib/cleaning-assign/rooms";
 import { FLAG_THRESHOLD_OPTIONS, isAssignRuleKey, normalizeAssignRules, TRAINEE_CHECK_STEP, type AssignRule } from "@/lib/cleaning-assign/rules";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import {
@@ -110,18 +111,26 @@ async function reassignRoomsBody(input: { date: string; moves: RoomMove[] }): Pr
   return { moved: Number(result.data ?? moves.length), ok: true };
 }
 
-/** 제안대로 넣기 · 고정 인력 먼저 넣기 — 제안은 서버가 다시 계산한다. 이미 들어간 줄은 건너뛴다(동시에 눌러도 겹치지 않음). */
-export async function applyDaySuggestions(input: { date: string; onlyFixed?: boolean }): Promise<AssignOk<{ added: number }> | AssignFail> {
+/**
+ * 제안대로 넣기 · 고정 인력 먼저 넣기 — 제안은 서버가 다시 계산한다. 이미 들어간 줄은 건너뛴다(동시에 눌러도 겹치지 않음).
+ * `properties` = 화면에 보이는 건물(「내 건물」 거르기). 서버도 그 건물 방만 넣는다 — 버튼의 「N개」와 실제로 넣는 수가 같다(문서 45 A12).
+ * 없으면(전 건물 보기) 전 건물.
+ */
+export async function applyDaySuggestions(input: { date: string; onlyFixed?: boolean; properties?: string[] | null }): Promise<AssignOk<{ added: number }> | AssignFail> {
   return guardAssignAction("applyDaySuggestions", () => applyDaySuggestionsBody(input));
 }
 
-async function applyDaySuggestionsBody(input: { date: string; onlyFixed?: boolean }): Promise<AssignOk<{ added: number }> | AssignFail> {
+async function applyDaySuggestionsBody(input: { date: string; onlyFixed?: boolean; properties?: string[] | null }): Promise<AssignOk<{ added: number }> | AssignFail> {
   const session = await assigner();
   if (!session) return { ok: false, reason: "forbidden" };
   if (!isEditableDate(input.date)) return { ok: false, reason: "invalid" };
+  const properties = input.properties ?? null;
+  if (properties !== null && (!Array.isArray(properties) || properties.length > 40 || properties.some((name) => typeof name !== "string" || name.length === 0 || name.length > 80))) {
+    return { ok: false, reason: "invalid" };
+  }
   const organizationId = session.organization.id;
   const supabase = getSupabaseServiceClient();
-  const suggestions = await computeDaySuggestions(supabase, organizationId, input.date, Boolean(input.onlyFixed), session.user.id);
+  const suggestions = suggestionsInProperties(await computeDaySuggestions(supabase, organizationId, input.date, Boolean(input.onlyFixed), session.user.id), properties);
   if (suggestions.length === 0) return { added: 0, ok: true };
   const result = await supabase
     .from("cleaning_assignments")
@@ -174,13 +183,17 @@ async function setDayStartTimeBody(input: { date: string; userId: string; time: 
   if (!session) return { ok: false, reason: "forbidden" };
   const minutes = input.time === null ? null : timeToMinutes(input.time);
   if (!isEditableDate(input.date) || !isUuid(input.userId) || (input.time !== null && minutes === null)) return { ok: false, reason: "invalid" };
+  // 시각을 넣을 때만 현장 멤버인지 본다 — 다른 넣기 액션과 같은 기준(문서 45 A17, 2026-11-09). 지우기(null)는 비활성 · 탈퇴한 사람의
+  // 남은 신청 줄도 지울 수 있다(아래 조건이 조직 · 사람 · 날짜 줄만 고치고 새 줄은 만들지 않는다).
   // 취소된 날에 시각을 넣으면 되살린 것처럼 보인다 — 넣기만 막고 지우기(null)는 그대로 둔다(2026-11-02).
   if (minutes !== null) {
+    if (!(await isFieldMember(session.organization.id, input.userId))) return { ok: false, reason: "invalid" };
     const cancelledDay = await cancelledUserIds(session.organization.id, input.date, [input.userId]);
     if (cancelledDay === null) return { ok: false, reason: "error" };
     if (cancelledDay.has(input.userId)) return { ok: false, reason: "cancelled" };
+    if (!(await ensureApplication(session.organization.id, input.userId, input.date, session.user.id))) return { ok: false, reason: "error" };
   }
-  if (!(await ensureApplication(session.organization.id, input.userId, input.date, session.user.id))) return { ok: false, reason: "error" };
+  // 지우기(null)는 있는 신청 줄만 고친다 — 없는 줄을 새로 만들면 신청하지 않은 사람이 「관리자가 넣음」 신청자로 생긴다(A17).
   const result = await getSupabaseServiceClient()
     .from("cleaning_shift_applications")
     .update({ start_time: minutes === null ? null : `${minutesToLabel(minutes).padStart(5, "0")}:00`, updated_at: new Date().toISOString() })
@@ -204,15 +217,11 @@ async function addRoomForDayBody(input: { date: string; roomKey: string; note?: 
   if (!isEditableDate(input.date) || typeof input.roomKey !== "string") return { ok: false, reason: "invalid" };
   const organizationId = session.organization.id;
   const supabase = getSupabaseServiceClient();
-  const [options, rooms, addBlocked] = await Promise.all([
-    loadCleaningRoomOptions(supabase, organizationId),
-    loadAssignDayRooms(supabase, organizationId, input.date, session.user.id),
-    loadAddBlockedRoomKeys(supabase, organizationId, input.date),
-  ]);
-  const option = options.find((item) => item.roomKey === input.roomKey);
-  if (!option) return { ok: false, reason: "invalid" };
   // 청소 중 · 끝난 방, 미룸 · 처리 끝 방에는 수기 줄을 더하지 않는다. 예약이 취소된 방은 목록에 없어 수기 방으로 추가된다(문서 45 A1~A6).
-  if (!canAddRoom(rooms.find((item) => item.roomKey === input.roomKey), addBlocked.has(input.roomKey))) return { ok: false, reason: "stale" };
+  // 자동화 화면 「청소 명단」도 같은 판단을 부른다(A16).
+  const checked = await checkAddExtraRoom(supabase, organizationId, input.date, input.roomKey, session.user.id);
+  if (!checked.ok) return { ok: false, reason: checked.reason };
+  const option = checked.option;
   const note = String(input.note ?? "").trim().slice(0, 60);
   // 함께 넣을 사람 중 그날 일정이 취소된 사람이 있으면 아무것도 쓰지 않고 알린다 — 조용히 빼면 방이 채워진 것처럼 보인다(2026-11-02).
   const members = new Set((await loadFieldMembers(supabase, organizationId)).map((member) => member.userId));

@@ -12,7 +12,7 @@ import type { PsAction } from "@/components/admin/cleaning-assign/person-shift-t
 import { useBuildingName } from "@/components/shared/building-names";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { useIsTablet } from "@/components/shell/split-list";
-import { assignFailText, type CleaningAssignCopy } from "@/lib/cleaning-assign-i18n";
+import { assignFailText, cancelRequestFailText, type CleaningAssignCopy } from "@/lib/cleaning-assign-i18n";
 import type { PersonShift } from "@/lib/cleaning-assign/person-shift";
 import { haptic } from "@/lib/haptics";
 import { phoneHref } from "@/lib/phone-format";
@@ -88,7 +88,7 @@ export function PersonShiftView({
         setSheet(false);
       } else {
         haptic("error");
-        setMessage(result.reason === "conflict" ? copy.errAssigned : assignFailText(result.reason, copy));
+        setMessage(result.reason === "conflict" ? copy.errAssigned : action === "accept" || action === "reject" ? cancelRequestFailText(result.reason, copy) : assignFailText(result.reason, copy));
       }
       router.refresh();
     });

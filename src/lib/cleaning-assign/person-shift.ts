@@ -3,10 +3,9 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { addDays, defaultStartMinutes, monthDays, shiftDayState, type ShiftDayState } from "@/lib/cleaning-assign/day-state";
 import { loadApplications, loadAssignments, loadFieldMembers, loadProfilesByOwners, loadStaffProfiles, profileOf } from "@/lib/cleaning-assign/data";
-import { compareAssignRooms, countOpenRooms } from "@/lib/cleaning-assign/room-rules";
-import { loadRangeDayRooms } from "@/lib/cleaning-assign/rooms";
-import { isUnmeasuredSession } from "@/lib/cleaning-unmeasured";
-import { buildSessionRoomLabel, physicalRoomKeyOfSessionLabel } from "@/lib/room-label-normalization";
+import { compareAssignRooms, countOpenRooms, indexPersonRecords, liveAssignments, type PersonRecordRow } from "@/lib/cleaning-assign/room-rules";
+import { createSharedRoomReads, loadRangeDayRooms } from "@/lib/cleaning-assign/rooms";
+import { buildSessionRoomLabel } from "@/lib/room-label-normalization";
 import { readAllPages } from "@/lib/supabase/read-all-pages";
 import type { Database } from "@/types/database";
 
@@ -78,11 +77,12 @@ export async function loadPersonShift(
   const days = monthDays(ym);
   const from = days[0];
   const to = days.at(-1)!;
-  const [plans, apps, allAssign, sessions, viewerProfiles] = await Promise.all([
-    loadRangeDayRooms(supabase, organizationId, from, to, null),
+  const shared = createSharedRoomReads(supabase, organizationId, from, to);
+  const [plans, apps, readAssign, sessions, viewerProfiles, records] = await Promise.all([
+    loadRangeDayRooms(supabase, organizationId, from, to, null, shared),
     loadApplications(supabase, organizationId, from, to, userId),
     loadAssignments(supabase, organizationId, from, to),
-    readAllPages<{ room_label: string; cleaning_date: string; started_at: string; completed_at: string | null; duration_seconds: number | null; status: string; closed_without_cleaning: boolean }>((start, end) =>
+    readAllPages<PersonRecordRow>((start, end) =>
       supabase
         .from("cleaning_sessions")
         .select("room_label, cleaning_date, started_at, completed_at, duration_seconds, status, closed_without_cleaning")
@@ -94,8 +94,12 @@ export async function loadPersonShift(
         .range(start, end),
     ),
     loadStaffProfiles(supabase, organizationId, viewerId),
+    shared.sessions(from, to),
   ]);
   if (sessions.error) throw new Error(sessions.error.message);
+  // 유령 배정(그날 청소할 방 목록에 없는 배정 — 예약 취소 · 날짜 변경, 문서 45 C14)은 배정으로 세지 않는다. 그 달 전체 목록을 읽었다.
+  // 그 사람이 그 방을 실제로 청소한 기록이 있으면 유령이 아니다 — 지난 날 실제 청소한 방이 달력에서 빠지지 않게(2026-11-09 리뷰).
+  const allAssign = liveAssignments(readAssign, plans, records);
 
   const appBy = new Map(apps.map((a) => [a.workDate, a]));
   const assignedKeys = new Map<string, Set<string>>();
@@ -106,26 +110,8 @@ export async function loadPersonShift(
     set.add(row.roomKey);
     if (row.userId === userId) mineBy.set(row.workDate, [...(mineBy.get(row.workDate) ?? []), row]);
   }
-  // 그 사람 청소 기록 — 날짜 × 방. 「처리 끝」 기록은 청소가 아니다.
-  const recordDates = new Set<string>();
-  const sessionBy = new Map<string, PersonShiftRoom["session"]>();
-  for (const row of sessions.data ?? []) {
-    if (row.closed_without_cleaning) continue;
-    recordDates.add(row.cleaning_date);
-    // 아는 건물이 아니면 저장된 라벨 그대로(아래에서 방의 세션 라벨로 다시 찾는다) — 새 건물 방 기록이 빠지지 않게.
-    const key = physicalRoomKeyOfSessionLabel(row.room_label) ?? row.room_label;
-    const id = `${row.cleaning_date}|${key}`;
-    const prev = sessionBy.get(id);
-    const done = row.status === "completed" && row.completed_at;
-    if (prev?.completedAt && !done) continue;
-    sessionBy.set(id, {
-      completedAt: done ? row.completed_at : null,
-      // 다음 날 「청소했어요」로 닫은 기록은 끝낸 시각을 모른다 — 「09:00–09:00」처럼 보이지 않게 따로 표시한다.
-      endUnknown: Boolean(done) && isUnmeasuredSession(row),
-      minutes: done && row.duration_seconds ? Math.round(row.duration_seconds / 60) : null,
-      startedAt: row.started_at,
-    });
-  }
+  // 그 사람 청소 기록 — 날짜 × 방. 「일한 날」은 청소한 기록(완료 · 처리 끝 아님)만, 취소 · 처리 끝은 기록이 아니다(C15 · `indexPersonRecords`).
+  const { cleanedDates: recordDates, sessionBy } = indexPersonRecords(sessions.data ?? []);
 
   // 출근 시각 — 그날 신청에 적힌 값 → 그 방을 넣은 담당의 설정 → 보는 사람의 설정 → 역할 기본값(내 시프트와 같은 순서 + 보는 사람).
   const owners = [...new Set([...mineBy.values()].flat().map((row) => row.createdBy).filter((id): id is string => Boolean(id)))];

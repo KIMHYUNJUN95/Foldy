@@ -4,7 +4,8 @@ import type { BoardPerson, BoardRoom } from "@/lib/cleaning-assign/data";
 import { shiftDayState } from "@/lib/cleaning-assign/day-state";
 import { physicalKeyOf, sessionRoomKeyLookup } from "@/lib/cleaning-assign/room-key";
 import { shortRoomKeys } from "@/lib/cleaning-assign/suggest";
-import { activeDeferUntil } from "@/lib/cleaning-assign/room-rules";
+import { activeDeferUntil, canRemoveExtraRoom, indexPersonRecords, isGhostAssignment, liveAssignments, suggestCandidates, suggestionsInProperties } from "@/lib/cleaning-assign/room-rules";
+import { stateForMonth } from "@/lib/cleaning-assign/day-state";
 import { consoleWhoIds, forceCompleteDefaultStaff, needMoreCount } from "@/lib/cleaning-assign/room-rules";
 import { recordListChip } from "@/lib/cleaning-record-rules";
 import { addWarningText, assignFailText, fill, getCleaningAssignCopy } from "@/lib/cleaning-assign-i18n";
@@ -38,6 +39,8 @@ import {
   sortOpenSection,
   startableListTargets,
   suggestInputsForDay,
+  personDayWork,
+  needsMonthWorkDays,
   swapOverCapNames,
   type AssignRoom,
   type DayRoomSeed,
@@ -438,7 +441,7 @@ describe("표 3 — 어떤 기록을 어떻게 세나", () => {
 
   it("C9 월 제안 — 하루 보기와 같은 계산으로 끝난 방 · 미룸을 제안하지 않는다", () => {
     const rooms = day({ holds: [hold(TODAY, "defer", TOMORROW)], seeds: [seed(key401), seed(key402)], sessions: [session(TODAY, "a", "completed", { room_key: key402.roomKey, room_label: key402.sessionRoomLabel })] });
-    const { suggestRooms } = suggestInputsForDay({ assignments: [], people: [], rooms });
+    const { suggestRooms } = suggestInputsForDay({ assignments: [], people: [], records: [], rooms });
     expect(suggestRooms).toEqual([]);
   });
 
@@ -607,6 +610,7 @@ describe("표 4 — 하루 몫 상한", () => {
         { propertyName: "취소", roomKey: "ghost", userId: "a" },
       ],
       people: [{ monthDays: 0, priority: false, startMinutes: null, trainee: false, trainer: false, userId: "a" }],
+      records: [],
       rooms,
     });
     expect(suggestPeople[0].loadToday).toBe(1.5);
@@ -1023,5 +1027,188 @@ describe("콘솔 대기 카드 담당 (2026-11-04)", () => {
       const copy = getCleaningAssignCopy(locale);
       for (const text of [copy.stateHeldRoom, copy.stateResolvedRoom, copy.stateChangedRoom]) expect(text).toContain(word);
     }
+  });
+});
+
+describe("점검 D (2026-11-09) — 같은 판단을 한 곳으로", () => {
+  const app = (userId: string, cancelledAt: string | null = null) => ({ cancelledAt, userId });
+
+  it("A11 제안 대상은 그날 일정이 살아 있는 현장 멤버만 — 비활성 · 조직에서 빠진 사람은 빼고 다른 역할로 대신하지 않는다", () => {
+    const members = new Set(["u1", "u3"]);
+    expect(suggestCandidates([app("u1"), app("u2"), app("u3", "2026-11-09T00:00:00Z")], members).map((a) => a.userId)).toEqual(["u1"]);
+  });
+
+  it("A12 제안대로 넣기 · 고정 인력 먼저 — 보이는 건물만 넣는다, 거르기가 없으면 전 건물", () => {
+    const list = [
+      { propertyName: "아라키초A", roomKey: "r1" },
+      { propertyName: "가부키초", roomKey: "r2" },
+    ];
+    expect(suggestionsInProperties(list, ["아라키초A"]).map((s) => s.roomKey)).toEqual(["r1"]);
+    expect(suggestionsInProperties(list, null)).toHaveLength(2);
+    expect(suggestionsInProperties(list, [])).toHaveLength(2);
+  });
+
+  it("A12 하루 보기 숫자와 서버가 같은 범위 — 화면이 보이는 건물을 보내고 서버가 거른다", () => {
+    const board = readFileSync("src/components/admin/cleaning-assign/assign-day-board.tsx", "utf8");
+    expect(board.match(/applyDaySuggestions\(\{[^}]*properties: visibleProperties/g)?.length).toBe(2);
+    expect(readFileSync("src/app/admin/cleaning-assign/actions.ts", "utf8")).toMatch(/suggestionsInProperties\(/);
+  });
+
+  it("A13 월 자동 제안 미리 보기는 그 달에만 — 달을 바꾸면 사라지고, 반영은 미리 본 달로 보낸다", () => {
+    const preview = { fill: 3, ym: "2026-11" };
+    expect(stateForMonth(preview, "2026-11")).toBe(preview);
+    expect(stateForMonth(preview, "2026-12")).toBeNull();
+    expect(stateForMonth(null, "2026-12")).toBeNull();
+    const month = readFileSync("src/components/admin/cleaning-assign/assign-month-board.tsx", "utf8");
+    expect(month).toMatch(/stateForMonth\(previewState, board\.ym\)/);
+    // 달이 바뀌면 미리 보기 상태 자체를 비운다 — 돌아와도 예전 미리 보기가 다시 보이지 않게.
+    expect(month).toMatch(/if \(previewYm !== board\.ym\) \{\s*setPreviewYm\(board\.ym\);\s*setPreview\(null\);/);
+    expect(month).toMatch(/applyMonthSuggestions\(\{ ym: target\.ym \}\)/);
+  });
+
+  it("A14 되돌리기는 원래 날짜로 보낸다 — 토스트가 떠 있는 사이 날짜를 바꿔도 그 날을 고친다", () => {
+    const board = readFileSync("src/components/admin/cleaning-assign/assign-day-board.tsx", "utf8");
+    expect(board).toMatch(/assignToRoom\(\{ date: target\.date, roomKey: target\.roomKey/);
+    expect(board).toMatch(/releaseHold\(\{ date: target\.date, originDate: target\.originDate/);
+    expect(board).toMatch(/undoReassign\(target\.date, target\.moves\)/);
+    expect(board).toMatch(/reassignRooms\(\{ date, moves: back \}\)/);
+  });
+
+  it("A16 자동화 화면 방 빼기 — 대기 방이고 아무도 배정되지 않았을 때만, 목록에 없는 방은 미룸이 아니면 뺀다", () => {
+    const pending = only(day({ seeds: [seed(key401, { source: "extra" })] }));
+    expect(canRemoveExtraRoom(pending, 0, false)).toBe(true);
+    expect(canRemoveExtraRoom(pending, 1, false)).toBe(false);
+    expect(canRemoveExtraRoom(only(day({ seeds: [seed(key401, { source: "extra" })], sessions: [session(TODAY, "u1", "in_progress")] })), 0, false)).toBe(false);
+    expect(canRemoveExtraRoom(only(day({ holds: [hold(TODAY, "defer", TOMORROW)], seeds: [seed(key401, { source: "extra" })] })), 0, true)).toBe(false);
+    expect(canRemoveExtraRoom(undefined, 0, false)).toBe(true);
+  });
+
+  it("A16 미룬 기간이라 목록에 없는 수기 방은 빼지 않는다", () => {
+    expect(canRemoveExtraRoom(undefined, 0, true)).toBe(false);
+  });
+
+  it("A16 체크아웃 방이기도 한 수기 방은 줄을 지워도 방이 남으므로 배정 · 청소 중이어도 뺀다", () => {
+    const both = only(day({ seeds: [seed(), seed(key401, { source: "extra" })], sessions: [session(TODAY, "u1", "in_progress")] }));
+    expect(both.source).toBe("checkout");
+    expect(canRemoveExtraRoom(both, 2, false)).toBe(true);
+  });
+
+  it("A16 자동화 화면 방 추가 · 빼기는 청소 배정과 같은 공용 함수를 부르고 배정 화면에 신호를 보낸다", () => {
+    const ops = readFileSync("src/actions/ops-automation.ts", "utf8");
+    expect(ops).toMatch(/checkAddExtraRoom\(/);
+    expect(ops).toMatch(/removeExtraRoom\(/);
+    expect(ops.match(/await changed\(organizationId\)/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(readFileSync("src/app/admin/cleaning-assign/actions.ts", "utf8")).toMatch(/checkAddExtraRoom\(/);
+  });
+
+  it("C14 유령 배정 = 그날 청소할 방 목록에 없는 배정 — 목록을 모르는 날은 판단하지 않는다", () => {
+    const plans = new Map([[TODAY, [{ roomKey: "k1" }]], [TOMORROW, []]]);
+    const rows = [
+      { roomKey: "k1", workDate: TODAY },
+      { roomKey: "k2", workDate: TODAY },
+      { roomKey: "k1", workDate: TOMORROW },
+      { roomKey: "k9", workDate: YESTERDAY },
+    ];
+    expect(isGhostAssignment(rows[1], plans.get(TODAY), [])).toBe(true);
+    expect(isGhostAssignment(rows[3], plans.get(YESTERDAY), [])).toBe(false);
+    expect(liveAssignments(rows, plans, [])).toEqual([rows[0], rows[3]]);
+  });
+
+  it("C14 그 사람이 그날 그 방에 기록(진행 중 · 완료)이 있으면 목록에 없어도 유령이 아니다 — 남의 기록 · 처리 끝 · 다른 날 기록은 아니다", () => {
+    const plans = new Map([[YESTERDAY, [] as { roomKey: string }[]]]);
+    const row = { propertyName: key401.propertyName, roomKey: key401.roomKey, roomLabel: key401.roomLabel, userId: "u1", workDate: YESTERDAY };
+    expect(liveAssignments([row], plans, [session(YESTERDAY, "u1")])).toEqual([row]);
+    expect(liveAssignments([row], plans, [session(YESTERDAY, "u1", "in_progress")])).toEqual([row]);
+    expect(liveAssignments([row], plans, [session(YESTERDAY, "u2")])).toEqual([]);
+    expect(liveAssignments([row], plans, [session(YESTERDAY, "u1", "completed", { closed_without_cleaning: true })])).toEqual([]);
+    expect(liveAssignments([row], plans, [session(TWO_AGO, "u1")])).toEqual([]);
+    expect(isGhostAssignment(row, [], [session(YESTERDAY, "u1")])).toBe(false);
+  });
+
+  it("C14 하루 제안 입력 — 유령 배정 건물은 그 사람의 오늘 건물로 세지 않는다", () => {
+    const rooms = day({ seeds: [seed()] });
+    const { suggestPeople } = suggestInputsForDay({
+      assignments: [{ propertyName: "가부키초", roomKey: "gone", userId: "u1" }],
+      people: [{ monthDays: 0, priority: false, startMinutes: 585, trainee: false, trainer: false, userId: "u1" }],
+      records: [],
+      rooms,
+    });
+    expect(suggestPeople[0].propertiesToday).toEqual([]);
+  });
+
+  it("C14 기록 있는 방은 목록에 없어도 그 사람의 오늘 몫 · 오늘 건물 — 보드 몫과 제안이 같은 함수(personDayWork)", () => {
+    const rooms = day({ seeds: [seed(key402)] });
+    const row = { propertyName: key401.propertyName, roomKey: key401.roomKey, roomLabel: key401.roomLabel, userId: "u1", workDate: TODAY };
+    const records = [session(TODAY, "u1", "completed")];
+    const work = personDayWork([row], rooms, records);
+    expect(work.rows).toEqual([row]);
+    expect(work.load).toBe(1);
+    expect(work.properties).toEqual([key401.propertyName]);
+    expect(personDayWork([row], rooms, []).load).toBe(0);
+    const { suggestPeople } = suggestInputsForDay({
+      assignments: [row],
+      people: [{ monthDays: 0, priority: false, startMinutes: 585, trainee: false, trainer: false, userId: "u1" }],
+      records,
+      rooms,
+    });
+    expect(suggestPeople[0].loadToday).toBe(1);
+    expect(suggestPeople[0].propertiesToday).toEqual([key401.propertyName]);
+    const data = readFileSync("src/lib/cleaning-assign/data.ts", "utf8");
+    expect(data).toMatch(/personDayWork\(byUser\.get\(userId\) \?\? \[\], rooms, daySessions\)/);
+    expect(data.match(/suggestInputsForDay\(\{[^}]*records:/g)?.length).toBe(2);
+  });
+
+  it("C14 이번 달 근무 일수는 쓸 때만 읽는다 — 「근무 일수 적은 사람」 규칙이 켜져 있고, 제안할 방이 있고, 고를 사람이 둘 이상일 때", () => {
+    const on = [{ enabled: true, key: "fewest_month_days" as const }];
+    const off = [{ enabled: false, key: "fewest_month_days" as const }];
+    expect(needsMonthWorkDays(on, true, 2)).toBe(true);
+    expect(needsMonthWorkDays(off, true, 2)).toBe(false);
+    expect(needsMonthWorkDays(on, false, 2)).toBe(false);
+    expect(needsMonthWorkDays(on, true, 1)).toBe(false);
+    const data = readFileSync("src/lib/cleaning-assign/data.ts", "utf8");
+    const body = data.slice(data.indexOf("function buildDay("), data.indexOf("\n}\n", data.indexOf("function buildDay(")));
+    expect(body).toMatch(/needsMonthWorkDays\(/);
+    expect(body).toMatch(/loadMonthWorkDays\(/);
+    // 하루 보기가 한 달치 방 목록을 늘 읽지 않는다.
+    expect(body).not.toMatch(/loadRangeDayRooms\(supabase, organizationId, monthFrom, monthTo/);
+  });
+
+  it("C14 배정 수를 세는 모든 곳이 같은 함수를 쓴다", () => {
+    const data = readFileSync("src/lib/cleaning-assign/data.ts", "utf8");
+    for (const fn of ["buildDay", "loadMonthBoard", "computeMonthSuggestions", "loadMyShift", "loadTodayRooms", "loadCompareRows"]) {
+      const body = data.slice(data.indexOf(`function ${fn}(`), data.indexOf("\n}\n", data.indexOf(`function ${fn}(`)));
+      expect(body, fn).toMatch(/liveAssignments\(|isGhostAssignment\(|personDayWork\(/);
+    }
+    expect(readFileSync("src/lib/cleaning-assign/person-shift.ts", "utf8")).toMatch(/liveAssignments\(readAssign, plans, records\)/);
+    // 기록 있는 배정은 살아 있다 — 범위 셈은 모두 기록을 같이 넘긴다.
+    expect(data.match(/liveAssignments\([^)]*, [a-zA-Z]*[Rr]ecords\)/g)?.length).toBeGreaterThanOrEqual(5);
+    // 이번 달 근무 일수도 월 제안과 같은 기준(필요한 날만 읽어 같은 함수로 센다).
+    expect(data).toMatch(/liveAssignments\(monthRows, monthPlans, monthRecords\)/);
+    // 오늘 화면 — 상태와 「취소됨」 빈 화면이 같은 값.
+    expect(data).toMatch(/cancelled: Boolean\(app\?\.cancelledAt\) && myLive === 0/);
+  });
+
+  it("C14 「그날 살아 있는 배정」 한 날 판단은 서버 공용 함수 하나 — 알바 신청 빼기 · 취소 요청 · 관리자 월 칸 신청 빼기", () => {
+    const mobile = readFileSync("src/app/mobile/shift/actions.ts", "utf8");
+    expect(mobile).not.toMatch(/function hasLiveAssignment/);
+    expect(mobile.match(/loadLiveAssignmentsOfDay\(/g)?.length).toBe(2);
+    expect(readFileSync("src/actions/cleaning-assign-shift.ts", "utf8")).toMatch(/loadLiveAssignmentsOfDay\(/);
+    // 체크인 정보까지 읽는 하루 보기 읽기(`loadAssignDayRooms`)를 쓰지 않는다.
+    expect(readFileSync("src/lib/cleaning-assign/live-day.ts", "utf8")).not.toMatch(/loadAssignDayRooms/);
+  });
+
+  it("C15 사람 달력 「일한 날」 = 청소한 기록만 — 취소 · 처리 끝은 아니고, 시작만 한 기록은 시각만 보인다", () => {
+    const base = { completed_at: null, duration_seconds: null, room_label: key401.sessionRoomLabel, started_at: `${TODAY}T01:00:00Z` };
+    const index = indexPersonRecords([
+      { ...base, cleaning_date: TODAY, closed_without_cleaning: false, status: "cancelled" },
+      { ...base, cleaning_date: YESTERDAY, closed_without_cleaning: true, completed_at: `${YESTERDAY}T02:00:00Z`, duration_seconds: 0, status: "completed" },
+      { ...base, cleaning_date: TWO_AGO, closed_without_cleaning: false, status: "in_progress" },
+      { ...base, cleaning_date: TOMORROW, closed_without_cleaning: false, completed_at: `${TOMORROW}T02:00:00Z`, duration_seconds: 1800, status: "completed" },
+    ]);
+    expect([...index.cleanedDates]).toEqual([TOMORROW]);
+    expect(index.sessionBy.has(`${TODAY}|${key401.roomKey}`)).toBe(false);
+    expect(index.sessionBy.has(`${YESTERDAY}|${key401.roomKey}`)).toBe(false);
+    expect(index.sessionBy.get(`${TWO_AGO}|${key401.roomKey}`)?.completedAt).toBeNull();
+    expect(index.sessionBy.get(`${TOMORROW}|${key401.roomKey}`)?.minutes).toBe(30);
   });
 });

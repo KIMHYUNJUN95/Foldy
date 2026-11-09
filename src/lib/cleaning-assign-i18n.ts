@@ -156,6 +156,8 @@ export type CleaningAssignCopy = {
   errDayCancelled: string;
   errHasRecord: string;
   errRoomChanged: string;
+  /** 취소 요청 수락 · 돌려보내기 — 그 사이 알바가 거뒀거나 이미 처리됨(문서 45 A15). */
+  errRequestGone: string;
   errBusyDay: string;
   suggestShort: string; // "사람 모자람 · {n}개 남음"
   capTitle: string;
@@ -687,6 +689,7 @@ const ko: CleaningAssignCopy = {
   conflict: "방금 다른 담당자가 바꿔서 새로 불러왔어요",
   errHasRecord: "청소 기록이 있는 사람은 이 방에서 뺄 수 없어요",
   errRoomChanged: "방 상태가 바뀌었어요. 새로 불러왔어요",
+  errRequestGone: "취소 요청이 이미 거둬졌거나 처리됐어요. 새로 불러왔어요",
   errBusyDay: "청소 중인 방이 있어요",
   suggestShort: "사람 모자람 · {n}개 남음",
   capTitle: "{name} 님은 오늘 몫 {cap}을 넘어요",
@@ -1200,6 +1203,7 @@ const ja: CleaningAssignCopy = {
   conflict: "ほかの担当者が変更したため再読み込みしました",
   errHasRecord: "清掃記録がある人はこの部屋から外せません",
   errRoomChanged: "部屋の状態が変わりました。読み込み直しました",
+  errRequestGone: "取消依頼はすでに取り下げ・処理済みです。読み込み直しました",
   errBusyDay: "清掃中の部屋があります",
   suggestShort: "人手不足 · 残り{n}室",
   capTitle: "{name}さんは今日の担当量 {cap} を超えます",
@@ -1713,6 +1717,7 @@ const en: CleaningAssignCopy = {
   conflict: "Another manager just changed this — reloaded",
   errHasRecord: "Someone with a cleaning record can’t be taken off this room.",
   errRoomChanged: "This room has changed. We’ve reloaded the list",
+  errRequestGone: "That cancel request was already withdrawn or handled — reloaded",
   errBusyDay: "They have a room in progress.",
   suggestShort: "Short-staffed · {n} left",
   capTitle: "{name} would go over today’s limit of {cap}",
@@ -2113,6 +2118,11 @@ export function addWarningText(
     };
   }
   return { body: cap ?? "", confirm: copy.capConfirm, hint: null, title: copy.capManyTitle };
+}
+
+/** 취소 요청 받아 주기 · 돌려보내기 실패 — `stale` 은 방이 아니라 요청이 바뀐 것이다(A15). */
+export function cancelRequestFailText(reason: string, copy: CleaningAssignCopy): string {
+  return reason === "stale" ? copy.errRequestGone : assignFailText(reason, copy);
 }
 
 export function assignFailText(reason: string, copy: CleaningAssignCopy): string {

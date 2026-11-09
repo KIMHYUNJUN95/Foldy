@@ -153,7 +153,7 @@ export async function loadAssigneeBoard(
     // 청소 배정이 있는 방은 배정한 이름(Slack 명단과 같은 값 — docs/product/37).
     const names = await loadAssigneesForModel(supabase, organizationId, date, model);
     const label = (name: string) => labeler(name, locale);
-    // 건물 제목 · 순서는 Slack 청소 명단과 같게(「오쿠보A (B동)」, 다카다노바바 → 오쿠보 → 스테이아리).
+    // 건물 제목 · 순서는 Slack 청소 명단과 같게(「오쿠보A」, 다카다노바바 → 오쿠보 → 스테이아리).
     const messageCopy = getDictionary(locale).automationMessages;
     const headerLabel = (name: string) => automationBuildingLabel(messageCopy, "cleaning", name, label);
     const orderOf = (name: string) => {

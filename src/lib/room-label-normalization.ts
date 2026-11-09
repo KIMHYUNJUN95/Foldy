@@ -38,19 +38,25 @@ function isSano(propertyName: string) {
   return hasAny(key, ["사노", "sano", "佐野"]);
 }
 
+// okubo / 오쿠보 / 大久保 바로 뒤 글자로만 가른다(2026-11-09 — Beds24 에서 A · B 이름이 맞바뀌어 뒤에 붙은 棟 글자는 보지 않는다).
+// 그 글자 뒤에 또 다른 알파벳이 붙으면(`Okubo Apartment`) 다른 이름이라 건물로 보지 않는다.
+const OKUBO_PREFIX = "(?:okubo|오쿠보|大久保)[\\s_()\\-]*";
+
+function matchesOkubo(propertyName: string, pattern: string) {
+  return new RegExp(`${OKUBO_PREFIX}${pattern}`, "i").test(propertyName);
+}
+
 function isOkuboA(propertyName: string) {
-  const key = normalizeKey(propertyName);
-  return hasAny(key, ["오쿠보a", "okuboa", "okuboab棟", "okuboab동", "大久保a"]);
+  return matchesOkubo(propertyName, "a(?![a-z])");
 }
 
 function isOkuboB(propertyName: string) {
-  const key = normalizeKey(propertyName);
-  return hasAny(key, ["오쿠보b", "okubob", "okuboba棟", "okuboba동", "大久保b"]);
+  return matchesOkubo(propertyName, "b(?![a-z])");
 }
 
 function isOkuboC(propertyName: string) {
-  const key = normalizeKey(propertyName);
-  return hasAny(key, ["오쿠보c", "okuboc", "okubockr", "大久保c"]);
+  // `OkuboCC` · `Okubo_C (kr)` 처럼 C 뒤에 붙는 꼬리를 받아 준다.
+  return matchesOkubo(propertyName, "c(?:c|kr|(?![a-z]))");
 }
 
 /** 정규 한국어 숙소 이름을 안정적인 i18n 건물 키로 매핑한다. */

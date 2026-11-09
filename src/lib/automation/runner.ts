@@ -469,7 +469,7 @@ async function buildCleaning(
       buildingOrder: AUTOMATION_BUILDING_ORDER,
       copy,
       correction,
-      // 오쿠보 줄의 방 자리는 건물 이름 그대로(`*오쿠보A*`), 제목만 저쪽 이름(「오쿠보A (B동)」).
+      // 오쿠보 줄의 방 자리는 건물 이름 그대로(`*오쿠보A*`), 제목도 같은 이름(2026-11-09 동 표시 뺌).
       model: withLocalizedCodes(model, plainLabel),
       names,
       propertyLabel: (name) => automationBuildingLabel(copy, "cleaning", name, plainLabel),

@@ -38,7 +38,7 @@ export type OpsRevenueProperty = {
   name: string;
   /** 객실 목록(카탈로그)의 방 수. */
   roomCount: number;
-  /** 합계에서 기본으로 빼는 건물(오쿠보A · 사노 — 판매 캘린더 매출 요약과 같다). */
+  /** 합계에서 기본으로 빼는 건물(오쿠보B · 사노 — 판매 캘린더 매출 요약과 같다). */
   defaultExcluded: boolean;
   rooms: OpsRevenueRoom[];
 };
@@ -283,7 +283,7 @@ async function readRoomFirstSale(
 export type DashboardOpsSummary = {
   month: string;
   today: string;
-  /** 고른 달 매출 합계(지난 날 실적 + 남은 날 예약 확정). 기본 제외 건물(오쿠보A · 사노)은 매출 화면처럼 뺀다. */
+  /** 고른 달 매출 합계(지난 날 실적 + 남은 날 예약 확정). 기본 제외 건물(오쿠보B · 사노)은 매출 화면처럼 뺀다. */
   revenue: number;
   /** 오늘(이번 달일 때)까지 실적 · 그 날짜. 지난 달이면 달 전체, 앞날이면 0 · null. */
   actualToDate: number;

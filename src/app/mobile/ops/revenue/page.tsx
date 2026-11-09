@@ -21,7 +21,7 @@ import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
  * 도메인 계약: `docs/product/34-metrics-and-automation.md` → 「모바일 매출」
  *
  * **숫자는 데스크톱과 같은 읽기**(`getOpsRevenueData`, 월 모드)다. 모바일은 **월 하나만**(`?ym=YYYY-MM`, 없으면 도쿄 이번 달) ·
- * 합계 건물은 기본값(오쿠보A · 사노 제외)으로 고정. 서버가 요약(`buildRevenueSummary`)까지 내고 결과만 넘긴다.
+ * 합계 건물은 기본값(오쿠보B · 사노 제외)으로 고정. 서버가 요약(`buildRevenueSummary`)까지 내고 결과만 넘긴다.
  *
  * 권한은 모바일 가동률과 같은 두 조건 — `ops_admin.access` + 관리자 웹 역할. 없으면 모바일 홈으로.
  */

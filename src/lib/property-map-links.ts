@@ -129,6 +129,21 @@ export const PROPERTY_MAP_META: PropertyMapMeta[] = [
     canonicalName: "오쿠보A",
     kind: "house",
     address: {
+      ko: "오쿠보B와 동일한 위치 (3개 건물 중 가장 왼쪽 집)",
+      ja: "オクボBと同じ場所（3棟のうち一番左の家）",
+      en: "Same location as Okubo B (leftmost house among the three buildings).",
+    },
+    googleMapsUrl:
+      "https://www.google.com/maps/place/Hotel+STAY+ARI+Highashi+Shinjuku/@35.6993611,139.7035311,16.64z/data=!4m9!3m8!1s0x60188d4a4ba67c23:0xe32142309aa2de59!5m2!4m1!1i2!8m2!3d35.7002401!4d139.706157!16s%2Fg%2F11vkft6rpq?entry=tts&g_ep=EgoyMDI2MDMyNC4wIPu8ASoASAFQAw%3D%3D&skid=e50d31ca-42e2-4891-b634-6737921a0629",
+    sharedAccess: [
+      { labelKey: "keyBoxPassword", code: "5757" },
+      { labelKey: "storagePassword", code: "519" },
+    ],
+  },
+  {
+    canonicalName: "오쿠보B",
+    kind: "house",
+    address: {
       ko: "1 Chome-5-19 Okubo, Shinjuku City, Tokyo 169-0072",
       ja: "1 Chome-5-19 Okubo, Shinjuku City, Tokyo 169-0072",
       en: "1 Chome-5-19 Okubo, Shinjuku City, Tokyo 169-0072",
@@ -137,21 +152,6 @@ export const PROPERTY_MAP_META: PropertyMapMeta[] = [
       "https://www.google.com/maps/place/Hotel+STAY+ARI+Highashi+Shinjuku/@35.6993611,139.7035311,16.64z/data=!4m9!3m8!1s0x60188d4a4ba67c23:0xe32142309aa2de59!5m2!4m1!1i2!8m2!3d35.7002401!4d139.706157!16s%2Fg%2F11vkft6rpq?entry=tts&g_ep=EgoyMDI2MDMyNC4wIPu8ASoASAFQAw%3D%3D&skid=e50d31ca-42e2-4891-b634-6737921a0629",
     sharedAccess: [
       { labelKey: "keyBoxPassword", code: "0072" },
-      { labelKey: "storagePassword", code: "519" },
-    ],
-  },
-  {
-    canonicalName: "오쿠보B",
-    kind: "house",
-    address: {
-      ko: "오쿠보A와 동일한 위치 (3개 건물 중 가장 왼쪽 집)",
-      ja: "オクボAと同じ場所（3棟のうち一番左の家）",
-      en: "Same location as OkuboA (leftmost house among the three buildings).",
-    },
-    googleMapsUrl:
-      "https://www.google.com/maps/place/Hotel+STAY+ARI+Highashi+Shinjuku/@35.6993611,139.7035311,16.64z/data=!4m9!3m8!1s0x60188d4a4ba67c23:0xe32142309aa2de59!5m2!4m1!1i2!8m2!3d35.7002401!4d139.706157!16s%2Fg%2F11vkft6rpq?entry=tts&g_ep=EgoyMDI2MDMyNC4wIPu8ASoASAFQAw%3D%3D&skid=e50d31ca-42e2-4891-b634-6737921a0629",
-    sharedAccess: [
-      { labelKey: "keyBoxPassword", code: "5757" },
       { labelKey: "storagePassword", code: "519" },
     ],
   },

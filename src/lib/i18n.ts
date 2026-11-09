@@ -1164,7 +1164,7 @@ const FALLBACK_DICTIONARY = {
     listSeparator: ", ",
     // 저쪽 메시지 이름을 살리는 건물만(나머지는 건물 정보 · 공용 이름). 청소 명단 제목 / 일일 리포트가 서로 다르다.
     buildings: {
-      cleaning: { okubo_a: "Okubo A (Bldg B)", okubo_b: "Okubo B (Bldg A)", okubo_c: "Okubo C" },
+      cleaning: { okubo_a: "Okubo A", okubo_b: "Okubo B", okubo_c: "Okubo C" },
       daily: { okubo_a: "Okubo A", okubo_b: "Okubo B", okubo_c: "Okubo C", sano: "Sano City" },
     },
     daily: {
@@ -10025,7 +10025,7 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
     listSeparator: ", ",
     // 저쪽 메시지 이름을 살리는 건물만(나머지는 건물 정보 · 공용 이름). 청소 명단 제목 / 일일 리포트가 서로 다르다.
     buildings: {
-      cleaning: { okubo_a: "오쿠보A (B동)", okubo_b: "오쿠보B (A동)", okubo_c: "오쿠보C동" },
+      cleaning: { okubo_a: "오쿠보A", okubo_b: "오쿠보B", okubo_c: "오쿠보C" },
       daily: { okubo_a: "오쿠보A동", okubo_b: "오쿠보B동", okubo_c: "오쿠보C동", sano: "사노시" },
     },
     daily: {
@@ -18710,7 +18710,7 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
     listSeparator: "、",
     // 저쪽 메시지 이름을 살리는 건물만(나머지는 건물 정보 · 공용 이름). 청소 명단 제목 / 일일 리포트가 서로 다르다.
     buildings: {
-      cleaning: { okubo_a: "大久保A（B棟）", okubo_b: "大久保B（A棟）", okubo_c: "大久保C棟" },
+      cleaning: { okubo_a: "大久保A", okubo_b: "大久保B", okubo_c: "大久保C" },
       daily: { okubo_a: "大久保A棟", okubo_b: "大久保B棟", okubo_c: "大久保C棟", sano: "佐野市" },
     },
     daily: {

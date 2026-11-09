@@ -26,7 +26,7 @@ export type OccupancySummary = {
   today: string;
   /** 고른 달 `YYYY-MM`. */
   month: string;
-  /** 합계에 넣은 건물 수 · 뺀 건물 이름(기본 제외 — 오쿠보A · 사노). */
+  /** 합계에 넣은 건물 수 · 뺀 건물 이름(기본 제외 — 오쿠보B · 사노). */
   includedCount: number;
   excluded: string[];
   hasProperties: boolean;

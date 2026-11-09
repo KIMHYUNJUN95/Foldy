@@ -571,9 +571,9 @@ describe("per-room / per-building consistency", () => {
 });
 
 describe("defaultSalesExcluded", () => {
-  it("drops 오쿠보A · 사노 from totals only when other buildings are in view", () => {
-    expect(defaultSalesExcluded(["아라키초A", "오쿠보A", "Sano", "오쿠보B"])).toEqual(["오쿠보A", "Sano"]);
-    expect(defaultSalesExcluded(["오쿠보A"])).toEqual([]);
+  it("drops 오쿠보B · 사노 from totals only when other buildings are in view", () => {
+    expect(defaultSalesExcluded(["아라키초A", "오쿠보A", "Sano", "오쿠보B"])).toEqual(["Sano", "오쿠보B"]);
+    expect(defaultSalesExcluded(["오쿠보B"])).toEqual([]);
     expect(defaultSalesExcluded(["아라키초A"])).toEqual([]);
   });
 });

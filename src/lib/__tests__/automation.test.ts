@@ -416,16 +416,16 @@ describe("취소된 예약의 원래 금액", () => {
 describe("메시지 표시 형식 — 저쪽 이름 · 순서 (2026-10-07)", () => {
   const plain = (name: string) => `plain:${name}`;
 
-  it("청소 명단 제목은 「오쿠보A (B동)」, 일일 리포트는 「오쿠보A동」 · 「사노시」, 나머지는 건물 정보 이름", () => {
+  it("청소 명단 제목은 동 표시 없이 「오쿠보A」, 일일 리포트는 「오쿠보A동」 · 「사노시」, 나머지는 건물 정보 이름", () => {
     const ko = dictionaries.ko.automationMessages;
-    expect(automationBuildingLabel(ko, "cleaning", "오쿠보A", plain)).toBe("오쿠보A (B동)");
-    expect(automationBuildingLabel(ko, "cleaning", "오쿠보B", plain)).toBe("오쿠보B (A동)");
-    expect(automationBuildingLabel(ko, "cleaning", "오쿠보C", plain)).toBe("오쿠보C동");
+    expect(automationBuildingLabel(ko, "cleaning", "오쿠보A", plain)).toBe("오쿠보A");
+    expect(automationBuildingLabel(ko, "cleaning", "오쿠보B", plain)).toBe("오쿠보B");
+    expect(automationBuildingLabel(ko, "cleaning", "오쿠보C", plain)).toBe("오쿠보C");
     expect(automationBuildingLabel(ko, "daily", "오쿠보A", plain)).toBe("오쿠보A동");
     expect(automationBuildingLabel(ko, "daily", "사노", plain)).toBe("사노시");
     expect(automationBuildingLabel(ko, "cleaning", "사노", plain)).toBe("plain:사노");
     expect(automationBuildingLabel(ko, "daily", "아라키초A", plain)).toBe("plain:아라키초A");
-    expect(automationBuildingLabel(dictionaries.ja.automationMessages, "cleaning", "오쿠보A", plain)).toBe("大久保A（B棟）");
+    expect(automationBuildingLabel(dictionaries.ja.automationMessages, "cleaning", "오쿠보A", plain)).toBe("大久保A");
   });
 
   it("건물 순서 = 저쪽 청소 명단 순서(다카다노바바 → 오쿠보 → 스테이아리), 사노 맨 끝", () => {

@@ -530,12 +530,12 @@ export function buildOpsSalesSummary(input: {
 // ── 합계에 넣을 건물 고르기 (2026-10-05) ────────────────────────────────
 
 /**
- * 매출 요약의 **합계에서 기본으로 빼는 건물** — 오쿠보A · 사노(2026-10-05 사용자 결정). 두 건물은 따로 보이고
+ * 매출 요약의 **합계에서 기본으로 빼는 건물** — 오쿠보B · 사노(2026-10-05 사용자 결정). 두 건물은 따로 보이고
  * 총매출 · 가동률 · 채널 합계에 섞지 않는다. 사용자가 요약 안에서 다시 넣을 수 있다. 이 건물들**만** 보고 있으면
  * 빼지 않는다(볼 게 그것뿐이다).
  */
 export const SALES_SUMMARY_DEFAULT_EXCLUDED: ReadonlySet<string> = new Set(
-  ["오쿠보A", "Sano"].map((name) => getCanonicalPropertyName(name)),
+  ["오쿠보B", "Sano"].map((name) => getCanonicalPropertyName(name)),
 );
 
 export function defaultSalesExcluded(propertyNames: readonly string[]): string[] {

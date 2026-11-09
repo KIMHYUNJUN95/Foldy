@@ -163,9 +163,10 @@ const CLOSE_MS = 150;
 
 /**
  * 합계에서 뺀 건물 — 기기(브라우저)에 기억한다(편의). 지금 요약에 없는 건물의 기억은 건드리지 않는다. 처음이면
- * 기본값(오쿠보A · 사노 — `defaultSalesExcluded`). 저장소가 막혀 있으면 기본값으로 그냥 연다.
+ * 기본값(오쿠보B · 사노 — `defaultSalesExcluded`). 저장소가 막혀 있으면 기본값으로 그냥 연다.
  */
-const EXCLUDED_KEY = "stayops.ops-sales-excluded";
+// v2 (2026-11-09): 오쿠보A · B 이름 맞바꿈 — 예전 기억(오쿠보A 제외)이 다른 집을 가리키지 않게 새 키로 시작한다.
+const EXCLUDED_KEY = "stayops.ops-sales-excluded.v2";
 
 function readExcluded(present: readonly string[]): Set<string> {
   let stored: string[] | null = null;
@@ -501,7 +502,7 @@ export function SummaryContent({
 }) {
   const bName = useBuildingName();
   /*
-   * **합계에 넣을 건물**(2026-10-05 사용자 지시) — 오쿠보A · 사노는 기본으로 합계(총매출 · 가동률 · 채널)에서 빼고 아래에
+   * **합계에 넣을 건물**(2026-10-05 사용자 지시) — 오쿠보B · 사노는 기본으로 합계(총매출 · 가동률 · 채널)에서 빼고 아래에
    * 따로 보인다. 건물 표의 체크로 넣고 뺄 수 있다(2026-10-16 화이트 — 칩 줄 대신 표 안 체크). 숫자는 건물별 몫을 다시
    * 더해 낸다(`combineSalesSummary` — 서버 재요청 없음).
    */

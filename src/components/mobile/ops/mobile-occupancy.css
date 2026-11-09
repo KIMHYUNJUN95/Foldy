@@ -200,7 +200,7 @@
 @media (min-width: 1000px) and (min-height: 600px) { .moc-bld { padding-top: 0; } }
 
 /* 영어 · 일본어 폭 맞춤(2026-10-23). 한국어는 지금 모양 그대로 — 넘칠 때만 움직인다.
-   - 머리: 부제(「Total · excluding Okubo A · Sano」)가 달 고르기 옆에 안 들어가면 달 고르기를 다음 줄 오른쪽으로 내린다
+   - 머리: 부제(「Total · excluding Okubo B · Sano」)가 달 고르기 옆에 안 들어가면 달 고르기를 다음 줄 오른쪽으로 내린다
      (전엔 부제가 두 줄로 접혀 달 고르기와 부딪혔다).
    - 고리 안 전년 비교: 고리 안쪽 폭(≈108px)보다 길면 두 줄(「vs last year」/「+1.7pp」) — 전엔 고리 밖으로 넘쳤다.
    - 앞으로 3달: 달 이름(「October · In progress」)이 길면 두 줄로, 세 칸의 숫자 줄은 subgrid 로 같은 높이에 맞춘다.

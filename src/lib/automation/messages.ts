@@ -39,7 +39,7 @@ export const fill = (template: string, values: Record<string, string | number>) 
 
 /**
  * 자동화 메시지의 건물 이름 — 저쪽 메시지 이름을 살리는 건물만 사전(`automationMessages.buildings`)에서 덮고,
- * 나머지는 `fallback`(우리 건물 정보 · 공용 건물 이름). 청소 명단 제목은 「오쿠보A (B동)」, 일일 리포트는 「오쿠보A동」 ·
+ * 나머지는 `fallback`(우리 건물 정보 · 공용 건물 이름). 청소 명단 제목은 「오쿠보A」(2026-11-09 동 표시 뺌), 일일 리포트는 「오쿠보A동」 ·
  * 「사노시」 — 저쪽이 두 메시지에서 다르게 썼고 현장이 그 이름에 익숙하다(2026-10-07 사용자 결정).
  */
 const AUTOMATION_BUILDING_KEY: Record<string, "okubo_a" | "okubo_b" | "okubo_c" | "sano"> = {

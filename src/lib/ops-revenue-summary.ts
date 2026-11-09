@@ -35,7 +35,7 @@ export type RevenueSummary = {
   /** 고른 달 `YYYY-MM`. */
   month: string;
   includedCount: number;
-  /** 합계에서 뺀 건물 이름(기본 제외 — 오쿠보A · 사노). */
+  /** 합계에서 뺀 건물 이름(기본 제외 — 오쿠보B · 사노). */
   excluded: string[];
   hasProperties: boolean;
   revenue: number;

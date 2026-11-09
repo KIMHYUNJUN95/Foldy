@@ -15,7 +15,7 @@ import { requireOpsAdminPage } from "../../ops-page-session";
  *
  * 도메인 계약: docs/product/34-metrics-and-automation.md 「매출 비교」
  *
- * 주소: `?am=month&af=2026-09-01&at=2026-09-30&bm=…&bf=…&bt=…&ex=오쿠보A&ex=사노`. 값은 믿지 않고 모드마다 바로잡는다.
+ * 주소: `?am=month&af=2026-09-01&at=2026-09-30&bm=…&bf=…&bt=…&ex=오쿠보B&ex=사노`. 값은 믿지 않고 모드마다 바로잡는다.
  * 없으면 A = 지난달, B = 그 전년 같은 달. `ex` = 합계에서 뺄 건물(없으면 매출 화면 기본값).
  */
 export const dynamic = "force-dynamic";

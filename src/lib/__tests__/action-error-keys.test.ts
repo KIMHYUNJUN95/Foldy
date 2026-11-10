@@ -32,7 +32,7 @@ const ACTION_NAMESPACES: { file: string; namespace: string }[] = [
   { file: "src/app/mobile/tasks/new/actions.ts", namespace: "tasks.errors" },
   { file: "src/app/mobile/tasks/[id]/actions.ts", namespace: "tasks.errors" },
   { file: "src/app/mobile/tasks/projects/actions.ts", namespace: "tasks.errors" },
-  { file: "src/app/admin/maintenance/actions.ts", namespace: "maintenance.errors" },
+  // src/app/admin/maintenance/actions.ts 는 2026-11-10 에 redirect 로 실패를 넘기던 `updateMaintenanceStatus` 를 지워 빠졌다(결과 객체만 돌려준다).
   { file: "src/app/admin/settings/actions.ts", namespace: "admin.settings.errors" },
   { file: "src/app/admin/settings/attendance/actions.ts", namespace: "admin.settings.errors" },
   { file: "src/app/auth/actions.ts", namespace: "auth.errors" },

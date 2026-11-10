@@ -19,7 +19,14 @@ export default async function AdminLostFoundPage() {
   return (
     <AdminShell activeItem="lost-found" title={dictionary.lostFound.adminTitle}>
       <LiveRefresh sources={requestLiveSources(session.organization.id)} />
-      <LostFoundConsole locale={locale} items={items} loadError={loadError} />
+      {/* 처리 단추는 모바일과 같은 키(`lost_found.handle`)가 있을 때만 — 서버 액션이 다시 본다(2026-11-10). */}
+      <LostFoundConsole
+        canHandle={session.capabilities.includes("lost_found.handle")}
+        deleteAccess={{ canDeleteAny: session.capabilities.includes("request.delete_any"), userId: session.user.id }}
+        locale={locale}
+        items={items}
+        loadError={loadError}
+      />
     </AdminShell>
   );
 }

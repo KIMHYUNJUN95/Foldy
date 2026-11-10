@@ -6,10 +6,11 @@
 // 액션은 전부 제거됐다. See docs/product/09-lost-found-workflow.md.
 //
 // 일반 처리는 콘솔의 능동 처리 존(반환/폐기/보관연장)에서 하고, 상태 정정은 잘못된 자동/수동 상태를
-// 관리자가 되돌리는 예외 경로다. 청소 강제완료와 같은 역할 게이트(canForceCompleteCleaning)를 쓴다.
+// 관리자가 되돌리는 예외 경로다. 권한은 모바일 처리와 같은 키 `lost_found.handle` 하나다(2026-11-10 — 그 전엔 청소 강제완료
+// 게이트를 잘못 써서 키를 꺼 둔 사람도 콘솔에서는 처리할 수 있었다).
 import { revalidatePath } from "next/cache";
+import { deleteLostItem } from "@/actions/request-delete";
 import { requireAdminSession } from "@/lib/admin-session";
-import { canForceCompleteCleaning } from "@/lib/cleaning";
 import {
   isLostReturnMethod,
   LOST_FOUND_STORAGE_DAYS,
@@ -17,32 +18,22 @@ import {
 } from "@/lib/lost-found-constants";
 import { appendAdminRestoreMemo } from "@/lib/lost-found-memo";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
-import { tokyoToday } from "@/lib/tokyo-date";
+import { isCalendarYmd, tokyoToday, ymdShift } from "@/lib/tokyo-date";
 import type { Database } from "@/types/database";
 
 type LostActionResult =
   | { ok: true }
-  | { ok: false; reason: "forbidden" | "invalid" | "not_found" | "failed" };
+  // stale = 읽은 뒤 다른 사람이 상태를 바꿨다(새로 보고 다시 해야 한다).
+  | { ok: false; reason: "forbidden" | "invalid" | "not_found" | "failed" | "stale" };
 
 function isValidUUID(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
 
-function isValidDateKey(value: string) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(new Date(`${value}T00:00:00Z`).getTime());
-}
-
-// 도쿄 기준 오늘 + days 만큼 더한 "YYYY-MM-DD". 복원 시 보관 시계 재설정에 쓴다 — 자동 폐기 배치가
+// 도쿄 기준 오늘 + days 만큼 더한 "YYYY-MM-DD". 복원 · 보관 상태로 정정할 때 보관 시계 재설정에 쓴다 — 자동 폐기 배치가
 // 발견일+14 기준으로 다시 즉시 걸리지 않도록 새 만료일을 준다.
 function tokyoDateKeyPlusDays(days: number): string {
-  const todayKey = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Tokyo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-  const [y, m, d] = todayKey.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+  return ymdShift(tokyoToday(), days);
 }
 
 // 진행 중(반환/폐기/연장/정정 대상) 상태. 종결 건은 복원 경로(restoreLostItem)만 건드린다.
@@ -68,7 +59,7 @@ function revalidateItem(itemId: string) {
 // 관리자 예외 개입(반환/폐기/연장/정정)의 공통 진입 가드: 세션 · 역할 게이트 · UUID.
 async function requireLostFoundAction(itemId: string) {
   const session = await requireAdminSession();
-  if (!canForceCompleteCleaning(session)) {
+  if (!session.capabilities.includes("lost_found.handle")) {
     return { ok: false as const, result: { ok: false, reason: "forbidden" } as LostActionResult };
   }
   if (!isValidUUID(itemId)) {
@@ -103,7 +94,8 @@ export async function returnLostItem(input: {
     .maybeSingle();
   if (!existing) return { ok: false, reason: "not_found" };
   const current = existing as { status: string; handling_memo: string | null };
-  if (!isInProgressStatus(current.status)) return { ok: false, reason: "invalid" };
+  // 화면이 본 뒤 이미 종결됐다 — 새로 보고 다시.
+  if (!isInProgressStatus(current.status)) return { ok: false, reason: "stale" };
 
   const { data: updated, error } = await supabase
     .from("lost_items")
@@ -123,7 +115,7 @@ export async function returnLostItem(input: {
 
   if (error) return { ok: false, reason: "failed" };
   // 0행 = 읽은 뒤 다른 사람이 상태를 바꿨다.
-  if (!updated || updated.length === 0) return { ok: false, reason: "invalid" };
+  if (!updated || updated.length === 0) return { ok: false, reason: "stale" };
 
   revalidateItem(input.itemId);
   return { ok: true };
@@ -148,7 +140,8 @@ export async function disposeLostItem(input: {
     .maybeSingle();
   if (!existing) return { ok: false, reason: "not_found" };
   const current = existing as { status: string; handling_memo: string | null };
-  if (!isInProgressStatus(current.status)) return { ok: false, reason: "invalid" };
+  // 화면이 본 뒤 이미 종결됐다 — 새로 보고 다시.
+  if (!isInProgressStatus(current.status)) return { ok: false, reason: "stale" };
 
   const { data: updated, error } = await supabase
     .from("lost_items")
@@ -165,7 +158,7 @@ export async function disposeLostItem(input: {
     .select("id");
 
   if (error) return { ok: false, reason: "failed" };
-  if (!updated || updated.length === 0) return { ok: false, reason: "invalid" };
+  if (!updated || updated.length === 0) return { ok: false, reason: "stale" };
 
   revalidateItem(input.itemId);
   return { ok: true };
@@ -181,7 +174,7 @@ export async function extendLostItemStorage(input: {
   const { session } = gate;
 
   // 연장일은 도쿄 오늘 이후여야 한다 — 과거 날짜면 곧바로 자동 폐기 배치에 걸린다.
-  if (!isValidDateKey(input.dueDate) || input.dueDate <= tokyoToday()) {
+  if (!isCalendarYmd(input.dueDate) || input.dueDate <= tokyoToday()) {
     return { ok: false, reason: "invalid" };
   }
   const reason = input.reason.trim();
@@ -196,7 +189,7 @@ export async function extendLostItemStorage(input: {
   if (!existing) return { ok: false, reason: "not_found" };
   // 진행 중인 건만 연장한다 — 종결 건을 연장하면 상태가 어긋난다(복원 경로 사용).
   if (!isInProgressStatus((existing as { status: string }).status)) {
-    return { ok: false, reason: "invalid" };
+    return { ok: false, reason: "stale" };
   }
 
   // 폐기예정 건을 연장하면 다시 보관중으로 되돌린다(종결 아님). 그 외 상태는 유지.
@@ -218,7 +211,7 @@ export async function extendLostItemStorage(input: {
     .select("id");
 
   if (error) return { ok: false, reason: "failed" };
-  if (!updated || updated.length === 0) return { ok: false, reason: "not_found" };
+  if (!updated || updated.length === 0) return { ok: false, reason: "stale" };
 
   revalidateItem(input.itemId);
   return { ok: true };
@@ -248,6 +241,8 @@ export async function correctLostItemStatus(input: {
   if (!existing) return { ok: false, reason: "not_found" };
 
   const currentRow = existing as { status: Database["public"]["Tables"]["lost_items"]["Row"]["status"]; handling_memo: string | null };
+  // 같은 상태로의 「정정」은 아무것도 바꾸지 않는다 — 기록만 남기는 저장을 막는다.
+  if (currentRow.status === input.status) return { ok: false, reason: "invalid" };
   const previousMemo = currentRow.handling_memo ?? "";
   const addition = input.memo.trim();
   // 정정 사유는 기존 처리 메모를 덮어쓰지 않고 덧붙인다 — 감사 흔적을 남긴다.
@@ -255,6 +250,12 @@ export async function correctLostItemStatus(input: {
 
   // 종결(반환/폐기) 건을 진행 상태로 되돌리면 restoreLostItem 과 똑같이 처리 정보를 비우고 보관 시계를 새로 준다.
   const wasTerminal = currentRow.status === "returned" || currentRow.status === "disposed";
+  // 보관 중 · 접수로 되돌리면 보관 시계를 새로 준다 — 지난 기한을 그대로 두면 밤 자동 폐기 배치(202607180001)가
+  // 곧바로 폐기 예정 · 폐기로 다시 넘긴다(2026-11-10).
+  const backToHolding = input.status === "registered" || input.status === "stored";
+  const holdFields = backToHolding
+    ? { hold_until: tokyoDateKeyPlusDays(LOST_FOUND_STORAGE_DAYS), hold_reason: null }
+    : {};
   const resetFields = wasTerminal
     ? {
         hold_until: tokyoDateKeyPlusDays(LOST_FOUND_STORAGE_DAYS),
@@ -272,6 +273,7 @@ export async function correctLostItemStatus(input: {
     .update({
       status: input.status,
       handling_memo: memo || null,
+      ...holdFields,
       ...resetFields,
     })
     .eq("id", input.itemId)
@@ -280,7 +282,7 @@ export async function correctLostItemStatus(input: {
     .select("id");
 
   if (error) return { ok: false, reason: "failed" };
-  if (!updated || updated.length === 0) return { ok: false, reason: "not_found" };
+  if (!updated || updated.length === 0) return { ok: false, reason: "stale" };
 
   revalidateItem(input.itemId);
   return { ok: true };
@@ -306,9 +308,9 @@ export async function restoreLostItem(input: {
   if (!existing) return { ok: false, reason: "not_found" };
 
   // 완료(폐기/반환) 건만 복원 대상 — 진행 중인 건은 정정/연장 경로가 담당한다.
-  const current = existing as { status: string; handling_memo: string | null };
+  const current = existing as { status: "disposed" | "returned" | InProgressStatus; handling_memo: string | null };
   if (current.status !== "disposed" && current.status !== "returned") {
-    return { ok: false, reason: "invalid" };
+    return { ok: false, reason: "stale" };
   }
 
   // 복원 사유는 locale-neutral marker로 저장하고 각 뷰어의 언어로 렌더링한다.
@@ -331,62 +333,22 @@ export async function restoreLostItem(input: {
     })
     .eq("id", input.itemId)
     .eq("organization_id", session.organization.id)
+    // 읽은 상태 그대로일 때만 — 그 사이 다른 사람이 복원 · 정정했으면 그 기록을 덮지 않는다(2026-11-10).
+    .eq("status", current.status)
     .select("id");
 
   if (error) return { ok: false, reason: "failed" };
-  if (!updated || updated.length === 0) return { ok: false, reason: "not_found" };
+  if (!updated || updated.length === 0) return { ok: false, reason: "stale" };
 
   revalidateItem(input.itemId);
   return { ok: true };
 }
 
-function canDeleteAnyLostItem(who: { capabilities: readonly string[] }): boolean {
-  return who.capabilities.includes("request.delete_any");
-}
-
+// 삭제는 모바일 요청 목록과 같은 공용 액션(`src/actions/request-delete.ts`)으로 — 판정(`canDeleteRequestRecord`) · 읽은 상태 조건 ·
+// 지운 행 수 확인이 한 곳이다(2026-11-10). 여기서는 콘솔 세션만 먼저 확인한다.
 export async function deleteLostItemById(
   id: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  const session = await requireAdminSession();
-
-  if (!isValidUUID(id)) {
-    return { ok: false, error: "not_found" };
-  }
-
-  const supabase = await getSupabaseServerClient();
-  const { data: existing } = await supabase
-    .from("lost_items")
-    .select("id, reported_by_user_id")
-    .eq("id", id)
-    .eq("organization_id", session.organization.id)
-    .maybeSingle();
-  if (!existing) {
-    return { ok: false, error: "not_found" };
-  }
-  const owner = (existing as { reported_by_user_id: string }).reported_by_user_id;
-  if (owner !== session.user.id && !canDeleteAnyLostItem(session)) {
-    return { ok: false, error: "unauthorized" };
-  }
-
-  const { data, error } = await supabase
-    .from("lost_items")
-    .delete()
-    .eq("id", id)
-    .eq("organization_id", session.organization.id)
-    .select("id");
-
-  if (error) {
-    const msg = error.message.toLowerCase();
-    if (msg.includes("permission") || msg.includes("policy") || msg.includes("denied")) {
-      return { ok: false, error: "unauthorized" };
-    }
-    return { ok: false, error: "delete_failed" };
-  }
-
-  if (!data || data.length === 0) {
-    return { ok: false, error: "not_found" };
-  }
-
-  revalidatePath("/admin/lost-found");
-  return { ok: true };
+  await requireAdminSession();
+  return deleteLostItem(id);
 }

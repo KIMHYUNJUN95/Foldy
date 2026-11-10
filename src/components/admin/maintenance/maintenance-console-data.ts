@@ -114,12 +114,16 @@ export function fmtElapsed(ts: string, locale: Locale): string {
   return formatter.format(-d, "day");
 }
 
-export function fmtDate(d: string, locale: Locale): string {
+/** 비었거나 잘못된 날짜면 「—」 — 던지면(RangeError) 콘솔 전체가 오류 화면이 된다(2026-11-10, 분실물과 같은 규칙). */
+export function fmtDate(d: string | null | undefined, locale: Locale): string {
+  if (!d) return "—";
+  const date = new Date(`${d}T00:00:00+09:00`);
+  if (Number.isNaN(date.getTime())) return "—";
   return new Intl.DateTimeFormat(locale, {
     month: "short",
     day: "numeric",
     timeZone: "Asia/Tokyo",
-  }).format(new Date(`${d}T00:00:00+09:00`));
+  }).format(date);
 }
 
 export function fmtDateTime(ts: string | null, locale: Locale): string {

@@ -5,7 +5,7 @@ import { LightboxThumbs } from "@/components/shell/lightbox-thumbs";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { getMobileNavBadges } from "@/lib/nav-badges";
 import { getDictionary, type Locale } from "@/lib/i18n";
-import { getDisplayRoomLabel, localizePropertyName } from "@/lib/room-label-normalization";
+import { getDisplayRoomLabel, localizePropertyName, localizeRoomPlaceLabel } from "@/lib/room-label-normalization";
 import {
   getOrderRequestById,
   type OrderRequestItem,
@@ -221,7 +221,10 @@ export default async function MobileOrderRequestDetailPage({
             ? copy.wInDays.replace("{n}", String(daysLeft))
             : copy.wDaysPast.replace("{n}", String(-daysLeft));
   const building = localizePropertyName(order.building_name ?? "", dictionary.cleaning.buildingLabels);
-  const room = getDisplayRoomLabel(order.building_name ?? "", order.room_label);
+  const room = localizeRoomPlaceLabel(
+    getDisplayRoomLabel(order.building_name ?? "", order.room_label),
+    dictionary.cleaning.buildingLabels,
+  );
   const where = room && room !== "-" && room !== building ? `${room} · ${building}` : building;
   const stamp = tokyoStamp(order.created_at);
 

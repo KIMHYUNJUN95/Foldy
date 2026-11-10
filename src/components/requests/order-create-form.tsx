@@ -19,6 +19,7 @@ import type { Dictionary } from "@/lib/i18n";
 import { localizePropertyName } from "@/lib/room-label-normalization";
 import { cn } from "@/lib/utils";
 import { haptic } from "@/lib/haptics";
+import { ORDER_ITEM_LIMITS } from "@/lib/order-item-rules";
 import "@/components/requests/order-form.css";
 
 type OrderCreateFormProps = {
@@ -288,7 +289,7 @@ export function OrderCreateForm({
         <section className="ofw-sec ofw-items">
           <div className="ofw-sec__h">
             <b>{copy.itemsTitle}</b>
-            <span className="num">{copy.wItemsCount.replace("{n}", String(items.length))}</span>
+            <span className="num">{copy.wItemsCount.replace("{n}", String(items.length)).replace("{max}", String(ORDER_ITEM_LIMITS.maxItems))}</span>
           </div>
           <p className="ofw-hint">{copy.wTitleHint}</p>
           {items.map((item, index) => (
@@ -308,7 +309,7 @@ export function OrderCreateForm({
               photos={itemPhotos[item.id] ?? []}
             />
           ))}
-          {items.length < 40 ? (
+          {items.length < ORDER_ITEM_LIMITS.maxItems ? (
             <button className="ofw-add" onClick={addItem} type="button">
               <Plus aria-hidden="true" />
               {copy.addItem}

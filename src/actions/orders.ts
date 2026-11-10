@@ -208,6 +208,11 @@ export async function updateOrderRequestStatus(
     revalidatePath("/mobile/notifications");
   }
 
+  // 승인 · 주문 · 거절 모두 두 화면을 다시 그린다(2026-11-10 — 예전엔 주문 처리 때만 알림 화면을 재검증하고, 승인 · 거절 뒤엔
+  // 부른 화면이 `router.refresh()` 로 때웠다. 다른 쪽 화면은 낡은 채로 남았다).
+  revalidatePath("/mobile/requests");
+  revalidatePath(`/mobile/requests/orders/${input.orderId}`);
+  revalidatePath("/admin/orders");
   return { ok: true, status: input.targetStatus };
 }
 
@@ -268,8 +273,11 @@ export async function updateOrderDeliveryDate(
 
   if (fetchError) return { ok: false, error: "save_failed" };
   if (!current) return { ok: false, error: "not_found" };
-  // 배송일은 주문 처리가 끝난 뒤에만 의미가 있다.
-  if (current.status !== "ordered") return { ok: false, error: "invalid_transition" };
+  // 배송일은 주문 처리가 끝난 뒤에만 의미가 있다. `received`(DB 에만 있는 비활성 단계 — 화면은 `ordered` 로 보여 준다)도 같이
+  // 받는다 — 화면에 「배송일 수정」 단추가 보이는데 저장이 막혔다(2026-11-10, 문서 10 「received」).
+  if (current.status !== "ordered" && current.status !== "received") {
+    return { ok: false, error: "invalid_transition" };
+  }
 
   const updatePayload: Database["public"]["Tables"]["order_requests"]["Update"] =
     mode === "range" && input.deliveryStartDate && input.deliveryEndDate
@@ -285,7 +293,7 @@ export async function updateOrderDeliveryDate(
     .update(updatePayload)
     .eq("id", input.orderId)
     .eq("organization_id", session.organization.id)
-    // 검증한 상태(ordered)일 때만 수정한다. 0행이면 그 사이에 바뀐 것이다.
+    // 검증한 상태(ordered · received)일 때만 수정한다. 0행이면 그 사이에 바뀐 것이다.
     .eq("status", current.status)
     .select("id");
 
@@ -318,6 +326,8 @@ export async function updateOrderDeliveryDate(
   });
 
   revalidatePath("/mobile/requests");
+  revalidatePath(`/mobile/requests/orders/${input.orderId}`);
   revalidatePath("/mobile/notifications");
-  return { ok: true, status: "ordered" };
+  revalidatePath("/admin/orders");
+  return { ok: true, status: current.status };
 }

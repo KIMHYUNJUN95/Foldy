@@ -9,7 +9,7 @@ import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { tokyoToday } from "@/lib/tokyo-date";
 import { haptic } from "@/lib/haptics";
 import "@/components/requests/order-detail.css";
-import { localizeBuildingName } from "@/lib/room-label-normalization";
+import { localizeBuildingName, localizeRoomPlaceLabel } from "@/lib/room-label-normalization";
 
 /**
  * 주문 배송 캘린더 — 소모품 주문 배송을 큰 월 그리드로 보여주는 바텀시트.
@@ -217,7 +217,8 @@ export function OrderDeliveryCalendar({
                 selectedList.map((o) => {
                   // 사전은 건물 키(`kabukicho`)로 찾는다 — 저장된 한국어 이름으로 바로 찾으면 늘 비어 한국어가 남았다(2026-10-22).
                   const building = localizeBuildingName(o.buildingName, buildingLabels);
-                  const place = o.roomLabel && o.roomLabel !== "-" ? `${building} · ${o.roomLabel}` : building;
+                  const roomText = o.roomLabel && o.roomLabel !== "-" ? localizeRoomPlaceLabel(o.roomLabel, buildingLabels) : "";
+                  const place = roomText && roomText !== building ? `${building} · ${roomText}` : building;
                   const isRange = Boolean(o.deliveryStartDate && o.deliveryEndDate && o.deliveryStartDate !== o.deliveryEndDate);
                   return (
                     <button className="odc-row" key={o.id} onClick={() => onOpenOrder(o.id)} type="button">

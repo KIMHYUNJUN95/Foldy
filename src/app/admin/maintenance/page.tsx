@@ -12,7 +12,7 @@ import { requestLiveSources } from "@/lib/live-sources";
 export default async function AdminMaintenancePage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string | string[] }>;
+  searchParams: Promise<{ error?: string | string[]; report?: string | string[] }>;
 }) {
   const session = await requireAdminPageSession({ nextPath: "/admin/maintenance" });
   const locale = session.user.preferredLanguage;
@@ -20,14 +20,19 @@ export default async function AdminMaintenancePage({
 
   const { reports, loadError } = await getAdminMaintenance(session, dictionary.cleaning.buildingLabels);
 
-  // `updateMaintenanceStatus` 는 실패하면 `?error=not_found` 로 이 목록에 되돌려 보낸다. 예전에는
-  // 이 화면이 그 파라미터를 읽지 않아, 상태 변경이 막혀도 목록만 다시 그려지고 안내가 없었다
-  // (2026-08-04). 상세 화면(`[id]/page.tsx`)은 이미 같은 사유를 배너로 띄우고 있었다.
-  const errorRaw = (await searchParams)?.error;
+  // `?error=키` 배너 — 예전 상세 화면의 상태 폼이 쓰던 길(그 폼은 2026-11-10 에 지웠다). 옛 주소로 들어와도 안내는 뜬다.
+  const query = await searchParams;
+  const errorRaw = query?.error;
   const errorKey = Array.isArray(errorRaw) ? errorRaw[0] : errorRaw;
   const errorMessage = errorKey
     ? (dictionary.maintenance.errors[errorKey] ?? dictionary.maintenance.errors.save_failed)
     : null;
+
+  // `?report=<id>` — 옛 상세 주소(`/admin/maintenance/[id]`)가 넘겨 준다. 그 건의 오른쪽 패널을 열고 시작한다.
+  const reportRaw = Array.isArray(query?.report) ? query.report[0] : query?.report;
+  const initialReportId = reportRaw && reports.some((r) => r.id === reportRaw) ? reportRaw : null;
+  // 강제 완료 · 무효 = 모바일 상태 바꾸기와 같은 키(서버 액션이 다시 본다 — 여기는 단추를 숨기기만).
+  const canHandle = session.capabilities.includes("maintenance_status_change");
 
   return (
     <AdminShell activeItem="maintenance" title={dictionary.maintenance.adminTitle}>
@@ -37,7 +42,14 @@ export default async function AdminMaintenancePage({
           {errorMessage}
         </div>
       ) : null}
-      <MaintenanceConsole locale={locale} loadError={loadError} reports={reports} />
+      <MaintenanceConsole
+        canHandle={canHandle}
+        deleteAccess={{ canDeleteAny: session.capabilities.includes("request.delete_any"), userId: session.user.id }}
+        initialReportId={initialReportId}
+        locale={locale}
+        loadError={loadError}
+        reports={reports}
+      />
     </AdminShell>
   );
 }

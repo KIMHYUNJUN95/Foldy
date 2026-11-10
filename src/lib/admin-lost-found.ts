@@ -43,7 +43,8 @@ export type AdminLostItemVM = {
   photos: readonly string[];
   /** 등록 메모(memo). */
   description: string;
-  guest: { name: string; checkIn: string; checkOut: string } | null;
+  /** 손님. 예약이 연결 안 되고 이름만 있으면 날짜는 null(2026-11-10 — 예전엔 ""를 넣어 패널이 날짜 표시에서 크래시). */
+  guest: LostItemGuest | null;
   // 보관 시계(도쿄, 파생 — 저장 안 함)
   /** "YYYY-MM-DD" = hold_until ?? 발견일+14. */
   dueDate: string;
@@ -140,6 +141,23 @@ type LostRow = LostItemWithReporter & {
  * 링크된 예약을 배치로 한 번씩만 조회한다(행마다 조회하면 N+1). 실패해도 목록 자체는 살아야 하므로
  * 빈 Map으로 degrade한다. (admin-maintenance collectLinks 축약판 — 분실물은 청소 링크를 쓰지 않는다.)
  */
+export type LostItemGuest = { name: string; checkIn: string | null; checkOut: string | null };
+
+/** 분실물의 손님 정보 — 연결된 예약이 있으면 예약 이름 · 날짜, 없으면 등록 때 적은 이름만(날짜 null). */
+export function lostItemGuest(
+  reservation: { guest_name: string; check_in_date: string | null; check_out_date: string | null } | null,
+  guestName: string | null,
+): LostItemGuest | null {
+  if (reservation) {
+    return {
+      checkIn: reservation.check_in_date || null,
+      checkOut: reservation.check_out_date || null,
+      name: reservation.guest_name,
+    };
+  }
+  return guestName ? { checkIn: null, checkOut: null, name: guestName } : null;
+}
+
 async function collectReservations(
   items: LostRow[],
 ): Promise<Map<string, ReservationRow>> {
@@ -199,15 +217,7 @@ export async function getAdminLostFound(
       deleteDaysLeft <= LOST_FOUND_PURGE_SOON_DAYS;
 
     const reservation = row.reservation_id ? (reservations.get(row.reservation_id) ?? null) : null;
-    const guest = reservation
-      ? {
-          name: reservation.guest_name,
-          checkIn: reservation.check_in_date,
-          checkOut: reservation.check_out_date,
-        }
-      : row.guest_name
-        ? { name: row.guest_name, checkIn: "", checkOut: "" }
-        : null;
+    const guest = lostItemGuest(reservation, row.guest_name);
 
     return {
       id: row.id,

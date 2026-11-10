@@ -21,7 +21,8 @@ const EXPECTED: Partial<Record<Capability, readonly string[]>> = {
   "complaint.write": ["developer_super_admin", "owner", "senior_managing_director", "cs_staff"],
   "complaint.manage": ["developer_super_admin", "owner", "senior_managing_director", "cs_staff"],
   "complaint.comment": ["developer_super_admin", "owner", "senior_managing_director", "cs_staff"],
-  "request.delete_any": ["developer_super_admin", "owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager"],
+  // 2026-11-10 — 현장 관리자는 남이 쓴 요청을 못 지운다(문서 08 · 09 · 10, 마이그레이션 202611100001).
+  "request.delete_any": ["developer_super_admin", "owner", "senior_managing_director", "office_admin", "cs_staff"],
   "bug.review": ["developer_super_admin", "owner", "senior_managing_director", "office_admin"],
   "board.manage": ["developer_super_admin", "owner", "senior_managing_director", "office_admin"],
   // 판매 캘린더 바꾸기(5-1) — 보기(`ops_admin.access`)와 같은 기본 역할.

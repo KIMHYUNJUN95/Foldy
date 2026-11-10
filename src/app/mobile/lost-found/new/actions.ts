@@ -8,6 +8,7 @@ import {
 } from "@/lib/room-label-normalization";
 import { isLostItemCategory, type LostItemCategory } from "@/lib/lost-found-constants";
 import { getActiveRoomCatalogServer } from "@/lib/rooms";
+import { isOwnResentRequest } from "@/lib/request-resend";
 import { getCurrentAppSession } from "@/lib/session";
 import { isOwnStoragePublicUrl } from "@/lib/storage-url-guard";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
@@ -181,9 +182,21 @@ export async function createLostItem(formData: FormData) {
     .insert(insert)
     .select("id")
     .single();
-  const createdId = (created as { id: string } | null)?.id ?? null;
+  let createdId = (created as { id: string } | null)?.id ?? null;
+  // 같은 id 로 다시 보냄(첫 번째가 이미 저장됨) — 내 행이면 성공으로 넘긴다(2026-11-10).
+  if (
+    !createdId &&
+    (await isOwnResentRequest(supabase, "lost_items", {
+      error,
+      id: requestId,
+      organizationId: session.organization.id,
+      userId: session.user.id,
+    }))
+  ) {
+    createdId = requestId;
+  }
 
-  if (error || !createdId) {
+  if (!createdId) {
     // 올라간 사진은 지우지 않는다(2026-10-26) — 사진의 주인은 클라이언트(`usePhotoUpload`)다. 폼은 같은 요청 id 와
     // 같은 주소로 다시 보내므로 여기서 지우면 다시 보낸 등록이 지워진 사진을 가리켰다. 그만두면 클라이언트가 지운다.
     redirect(`/mobile/lost-found/new?error=save_failed${sessionParam}`);

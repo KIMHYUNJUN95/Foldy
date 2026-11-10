@@ -8,6 +8,7 @@
 import Image from "next/image";
 import { ExternalLink, ImageIcon, Pencil, RotateCcw, Trash2, X } from "lucide-react";
 import { useAdminPanelA11y } from "@/components/admin/shared/use-admin-panel-a11y";
+import { canDeleteRequestRecord, type RequestDeleteAccess } from "@/lib/request-delete-rule";
 import type { Locale } from "@/lib/i18n";
 import type { AdminOrderVM, OrderItemVM } from "@/lib/admin-orders";
 import { STATUS, dateToNum, fmtDateTime, tpl } from "./orders-console-data";
@@ -22,6 +23,8 @@ type PanelProps = {
   todayKey: string;
   onClose: () => void;
   onAction: (kind: OrdActionKind, id: string) => void;
+  /** 휴지통을 보일지 — 모바일과 같은 규칙 `canDeleteRequestRecord`(주문은 상태도 본다). 서버가 다시 본다. */
+  deleteAccess: RequestDeleteAccess;
   disabled?: boolean;
 };
 
@@ -83,7 +86,7 @@ function ItemRow({ it }: { it: OrderItemVM }) {
   );
 }
 
-export function OrdersDetailPanel({ order, t, locale, onClose, onAction, disabled }: PanelProps) {
+export function OrdersDetailPanel({ order, t, locale, onClose, onAction, deleteAccess, disabled }: PanelProps) {
   const panelRef = useAdminPanelA11y<HTMLElement>(onClose, { disabled });
   if (!order) return null;
 
@@ -105,9 +108,15 @@ export function OrdersDetailPanel({ order, t, locale, onClose, onAction, disable
               <span>{statusText}</span>
             </span>
             <span className="lfp__acts">
-              <button type="button" className="lfp__del" title={t.del} aria-label={t.del} onClick={() => onAction("delete", order.id)}>
-                <Trash2 aria-hidden="true" />
-              </button>
+              {canDeleteRequestRecord({
+                canDeleteAny: deleteAccess.canDeleteAny,
+                isOwner: order.reporterId === deleteAccess.userId,
+                orderStatus: order.status,
+              }) ? (
+                <button type="button" className="lfp__del" title={t.del} aria-label={t.del} onClick={() => onAction("delete", order.id)}>
+                  <Trash2 aria-hidden="true" />
+                </button>
+              ) : null}
               <button type="button" className="panel__x" onClick={onClose} aria-label={t.close}>
                 <X />
               </button>
@@ -184,10 +193,13 @@ export function OrdersDetailPanel({ order, t, locale, onClose, onAction, disable
             </>
           ) : null}
           <div className="ow-links">
-            <button type="button" className="lfp__link" onClick={() => onAction("edit", order.id)}>
-              <Pencil aria-hidden="true" />
-              {t.actEdit}
-            </button>
+            {/* 종결 건은 내용을 못 고친다(서버 editOrder 도 거절) — 다시 열기 뒤에 고친다(2026-11-10). */}
+            {order.status !== "closed" ? (
+              <button type="button" className="lfp__link" onClick={() => onAction("edit", order.id)}>
+                <Pencil aria-hidden="true" />
+                {t.actEdit}
+              </button>
+            ) : null}
             <button type="button" className="lfp__link" onClick={() => onAction("correct", order.id)}>
               <RotateCcw aria-hidden="true" />
               {t.actCorrect}

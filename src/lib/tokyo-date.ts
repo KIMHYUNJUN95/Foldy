@@ -55,6 +55,14 @@ export function isYmd(value: string | null | undefined): value is string {
 }
 
 /**
+ * YYYY-MM-DD 형식이면서 **달력에 있는 날짜**인가(2026-02-31 · 2026-13-01 은 아니다). `new Date("2026-02-31")` 는 3월 3일로
+ * 굴러가서 형식 검사만으로는 못 거른다(2026-11-10 분실물 보관 연장에서 발견).
+ */
+export function isCalendarYmd(value: string | null | undefined): value is string {
+  return isYmd(value) && ymdShift(value, 0) === value;
+}
+
+/**
  * 도쿄 달력 날짜를 **`timestamptz` 조회 경계**로 바꾼다 (2026-09-11).
  *
  * 화면의 기간 선택기는 도쿄 날짜(`YYYY-MM-DD`)를 준다. 그런데 DB 의 `reviewed_at` ·

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { tokyoToday, ymdShift } from "@/lib/tokyo-date";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 
 export type DateRangeValue = {
@@ -91,7 +92,7 @@ function CalendarPanel({
   summaryLabel,
 }: Omit<DateRangeCalendarProps, "open">) {
   const [viewMonth, setViewMonth] = useState<Date>(() =>
-    value.startDate ? startOfMonth(isoToDate(value.startDate)) : startOfMonth(new Date()),
+    value.startDate ? startOfMonth(isoToDate(value.startDate)) : startOfMonth(isoToDate(tokyoToday())),
   );
   const [draftStart, setDraftStart] = useState<string | undefined>(value.startDate);
   const [draftEnd, setDraftEnd] = useState<string | undefined>(value.endDate);
@@ -126,7 +127,7 @@ function CalendarPanel({
     return result;
   }, [viewMonth]);
 
-  const todayIso = toIsoDate(new Date());
+  const todayIso = tokyoToday();
 
   function handleDayClick(iso: string) {
     // 시작일이 없거나 이미 완성된 범위가 있으면 → 새 범위를 시작한다.
@@ -160,14 +161,13 @@ function CalendarPanel({
 
   /**
    * 프리셋은 «오늘 포함 최근 N일»이다 — 90일을 고르면 오늘이 종료일이고 시작일은 89일 전이다.
-   * 로컬 `Date` 산술이지만 이 컴포넌트의 나머지 셀 계산과 같은 기준이라 하루가 어긋나지 않는다.
+   * 「오늘」은 기기 시간이 아니라 도쿄 날짜(`tokyoToday`)다.
    */
   function applyPreset(days: number) {
-    const end = new Date();
-    const start = new Date(end.getFullYear(), end.getMonth(), end.getDate() - (days - 1));
-    setDraftStart(toIsoDate(start));
-    setDraftEnd(toIsoDate(end));
-    setViewMonth(startOfMonth(end));
+    const endIso = tokyoToday();
+    setDraftStart(ymdShift(endIso, -(days - 1)));
+    setDraftEnd(endIso);
+    setViewMonth(startOfMonth(isoToDate(endIso)));
   }
 
   const rangeStart = draftStart;
@@ -213,13 +213,8 @@ function CalendarPanel({
             <div className="mt-4 flex gap-1.5">
               {presets.map((preset) => {
                 // 현재 초안이 정확히 그 프리셋 구간이면 선택 상태로 칠한다.
-                const end = new Date();
-                const start = new Date(
-                  end.getFullYear(),
-                  end.getMonth(),
-                  end.getDate() - (preset.days - 1),
-                );
-                const on = draftStart === toIsoDate(start) && (draftEnd ?? draftStart) === toIsoDate(end);
+                const endIso = tokyoToday();
+                const on = draftStart === ymdShift(endIso, -(preset.days - 1)) && (draftEnd ?? draftStart) === endIso;
                 return (
                   <button
                     className={cn(

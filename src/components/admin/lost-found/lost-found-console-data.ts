@@ -68,12 +68,25 @@ export function parseTs(ts: string | null): number | null {
   return toAbsMinutes(d, h * 60 + mm);
 }
 
-export function fmtDate(d: string, locale: Locale): string {
+/** "YYYY-MM-DD" → 「11월 10일」. 비었거나 잘못된 값이면 「—」 — 던지면(RangeError) 콘솔 전체가 오류 화면이 된다(2026-11-10). */
+export function fmtDate(d: string | null | undefined, locale: Locale): string {
+  if (!d) return "—";
+  const date = new Date(`${d}T00:00:00+09:00`);
+  if (Number.isNaN(date.getTime())) return "—";
   return new Intl.DateTimeFormat(locale, {
     month: "short",
     day: "numeric",
     timeZone: "Asia/Tokyo",
-  }).format(new Date(`${d}T00:00:00+09:00`));
+  }).format(date);
+}
+
+/** 패널의 손님 줄 — 날짜가 있으면 「이름 · 체크인 – 체크아웃」, 예약 없이 이름만이면 이름만. */
+export function lostGuestLine(guest: NonNullable<AdminLostItemVM["guest"]>, template: string, locale: Locale): string {
+  if (!guest.checkIn || !guest.checkOut) return guest.name;
+  return template
+    .replace("{name}", guest.name)
+    .replace("{in}", fmtDate(guest.checkIn, locale))
+    .replace("{out}", fmtDate(guest.checkOut, locale));
 }
 
 export function fmtDateTime(ts: string | null, locale: Locale): string {

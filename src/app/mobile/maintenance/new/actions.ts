@@ -12,6 +12,8 @@ import {
   type MaintenanceCategory,
   type MaintenancePriority,
 } from "@/lib/maintenance-constants";
+import { isOwnResentRequest } from "@/lib/request-resend";
+import { getActiveRoomCatalogServer } from "@/lib/rooms";
 import { getCurrentAppSession } from "@/lib/session";
 import { isOwnStoragePublicUrl } from "@/lib/storage-url-guard";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
@@ -88,6 +90,22 @@ export async function createMaintenanceReport(formData: FormData) {
   }
   if (imageUrls.length > 5) {
     redirect(`/mobile/maintenance/new?error=save_failed${sessionParam}`);
+  }
+
+  // 건물 · 방을 활성 방 카탈로그와 대조한다(분실물 · 주문 등록과 같은 방식, 2026-11-10). 예전엔 폼이 보낸 글자를 그대로 저장해서
+  // 없는 건물 · 방이 들어갈 수 있었다. 「건물 전체」는 건물이 카탈로그에 있을 때만. 카탈로그를 못 읽으면 저장하지 않는다(fail closed).
+  if (!propertyName) {
+    redirect(`/mobile/maintenance/new?error=missing_building${sessionParam}`);
+  }
+  const catalog = await getActiveRoomCatalogServer(session.organization.id).catch(() => null);
+  if (!catalog || catalog.length === 0) {
+    redirect(`/mobile/maintenance/new?error=save_failed${sessionParam}`);
+  }
+  const placeKnown = isBuildingOnly
+    ? catalog.some((item) => item.propertyName === propertyName)
+    : catalog.some((item) => item.propertyName === propertyName && item.displayRoomLabel === roomLabel);
+  if (!placeKnown) {
+    redirect(`/mobile/maintenance/new?error=invalid_room${sessionParam}`);
   }
 
   const requestId = requestedId || crypto.randomUUID();
@@ -174,9 +192,21 @@ export async function createMaintenanceReport(formData: FormData) {
     .insert(insert)
     .select("id")
     .single();
-  const createdId = (created as { id: string } | null)?.id ?? null;
+  let createdId = (created as { id: string } | null)?.id ?? null;
+  // 같은 id 로 다시 보냄(첫 번째가 이미 저장됨) — 내 행이면 성공으로 넘긴다.
+  if (
+    !createdId &&
+    (await isOwnResentRequest(supabase, "maintenance_reports", {
+      error,
+      id: requestId,
+      organizationId: session.organization.id,
+      userId: session.user.id,
+    }))
+  ) {
+    createdId = requestId;
+  }
 
-  if (error || !createdId) {
+  if (!createdId) {
     // 올라간 사진은 지우지 않는다(2026-10-26) — 사진의 주인은 클라이언트(`usePhotoUpload`)다. 폼은 같은 요청 id 와
     // 같은 주소로 다시 보내므로 여기서 지우면 다시 보낸 신고가 지워진 사진을 가리켰다. 그만두면 클라이언트가 지운다.
     redirect(`/mobile/maintenance/new?error=save_failed${sessionParam}`);

@@ -5,9 +5,11 @@
 // 바꿀 경로가 없었다. 수리·점검(202607160001)과 동일한 매커니즘을 분실물에 이식한다.
 //
 // 핵심 요구사항: "반환은 등록자와 무관하게 누구나 처리할 수 있고, 누가·언제 처리했는지 기록으로 남는다."
-//   → 권한 = part_time_staff 제외 전원. 앱에서 먼저 끊고, DB의 RLS UPDATE 정책이 최종 게이트다
-//     (마이그레이션 202607170001에서 staff 추가). RLS가 행을 걸러내면 Supabase는 "0행 + 에러 없음"을
-//     돌려주므로, 영향 행 수를 확인하지 않으면 권한 없는 사용자에게도 "처리됨"이라고 응답하게 된다.
+//   → 권한 = 권한 키 `lost_found.handle` 하나(역할 기본: 대표 · 전무 · 오피스 · CS · 현장 관리자. 아르바이트 · 아르바이트 리더는
+//     역할로 못 받고 사람마다 켠다, 2026-10-21). 신고자 본인이라고 상태를 바꿀 수 있는 건 아니다 — DB 트리거
+//     `enforce_lost_item_processing`(202611100001)이 키 없는 사람의 처리 칸 변경을 막는다. 앱에서 먼저 끊고 RLS · 트리거가 최종
+//     게이트다. RLS가 행을 걸러내면 Supabase는 "0행 + 에러 없음"을 돌려주므로 영향 행 수를 반드시 확인한다.
+//   현장이 넘길 수 있는 상태는 `isValidLostItemTransition`(`@/lib/lost-found-handling`) 하나가 정한다 — 보관 중 → 폐기 예정은 못 한다.
 
 import { revalidatePath } from "next/cache";
 import {
@@ -93,7 +95,7 @@ export async function updateLostItemHandling(
   const supabase = await getSupabaseServerClient();
   const { data: existingRow } = await supabase
     .from("lost_items")
-    .select("id, status, handling_memo, handling_image_urls")
+    .select("id, status, handling_memo, handling_image_urls, updated_at")
     .eq("id", itemId)
     .eq("organization_id", session.organization.id)
     .maybeSingle();
@@ -103,6 +105,7 @@ export async function updateLostItemHandling(
     status: LostItemStatus;
     handling_memo: string | null;
     handling_image_urls: string[] | null;
+    updated_at: string;
   };
 
   const currentStatus = existing.status;
@@ -128,16 +131,19 @@ export async function updateLostItemHandling(
   const { systemLines } = splitLostFoundHandlingMemo(existing.handling_memo);
   const nextMemo = [memo.trim(), ...systemLines].filter(Boolean).join("\n");
 
-  // 어떤 상태 변경이든 "누가·언제 처리했는지"를 기록으로 남긴다(요구사항). 현장 처리이므로
-  // handled_by_admin = false — 관리자 예외 개입(대시보드)이 아니다.
+  // 상태가 바뀔 때 "누가·언제 처리했는지"를 기록으로 남긴다(요구사항). 현장 처리이므로
+  // handled_by_admin = false — 관리자 예외 개입(대시보드)이 아니다. 상태 그대로 메모 · 사진만 저장할 때는 처리자 · 처리 시각을
+  // 덮지 않는다(2026-11-10 — 예전엔 메모만 고쳐도 마지막 처리자가 바뀌었다).
   const update: Database["public"]["Tables"]["lost_items"]["Update"] = {
     status: input.status,
     handling_memo: nextMemo || null,
     handling_image_urls: mergedImages,
-    handled_at: new Date().toISOString(),
-    handled_by: session.user.id,
-    handled_by_admin: false,
   };
+  if (input.status !== currentStatus) {
+    update.handled_at = new Date().toISOString();
+    update.handled_by = session.user.id;
+    update.handled_by_admin = false;
+  }
 
   // 반환 처리는 반환 방식·송장번호까지 남겨야 손님 클레임 시 증빙이 된다 — 어드민 `returnLostItem`과
   // 같은 컬럼·같은 규칙(송장번호는 배송 반환일 때만).
@@ -147,26 +153,30 @@ export async function updateLostItemHandling(
       returnMethod === "delivery" ? (input.returnTrackingNo ?? "").trim().slice(0, 100) : "";
   }
 
-  // 읽은 뒤 다른 사람이 상태를 바꿨으면 덮어쓰지 않는다 — 읽은 상태 그대로일 때만 쓴다.
+  // 읽은 뒤 다른 사람이 바꿨으면 덮어쓰지 않는다 — 읽은 상태 · 수정 시각 그대로일 때만 쓴다. 상태만 보면 두 사람이 같은 상태에서
+  // 사진을 동시에 올릴 때 나중 사람이 먼저 사람 사진을 지운다(합친 목록을 통째로 쓰므로). 수리 처리와 같은 규칙(2026-11-10).
   const { data: updated, error } = await supabase
     .from("lost_items")
     .update(update)
     .eq("id", itemId)
     .eq("organization_id", session.organization.id)
     .eq("status", currentStatus)
+    .eq("updated_at", existing.updated_at)
     .select("id");
 
   if (error) return { ok: false, error: "save_failed" };
   if (!updated || updated.length === 0) {
-    // 0행 = RLS 가 걸렀거나(권한), 그 사이 상태가 바뀌었다(동시 변경). 다시 읽어 구분한다.
+    // 0행 = RLS 가 걸렀거나(권한), 그 사이 누가 바꿨다(동시 변경). 다시 읽어 구분한다.
     const { data: recheck } = await supabase
       .from("lost_items")
-      .select("status")
+      .select("status, updated_at")
       .eq("id", itemId)
       .eq("organization_id", session.organization.id)
       .maybeSingle();
-    const nowStatus = (recheck as { status: LostItemStatus } | null)?.status;
-    if (nowStatus && nowStatus !== currentStatus) return { ok: false, error: "conflict" };
+    const now = recheck as { status: LostItemStatus; updated_at: string } | null;
+    if (now && (now.status !== currentStatus || now.updated_at !== existing.updated_at)) {
+      return { ok: false, error: "conflict" };
+    }
     return { ok: false, error: "forbidden" };
   }
 

@@ -254,10 +254,6 @@
 .adm .ow-urg::after { content: "·"; margin-left: 6px; color: #c9c6d3; font-weight: 400; }
 .adm .ow-link { height: 32px; padding: 0 6px; border: 0; border-radius: 8px; background: none; font: inherit; font-size: 13px; font-weight: 500; color: #7a52e6; cursor: pointer; }
 .adm .ow-link:hover { background: #f4f1fd; }
-.adm .ow-navb { display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 9px; background: none; color: #6b6878; cursor: pointer; transition: background 150ms ease, transform 140ms ease; }
-.adm .ow-navb:hover { background: #f4f4f7; }
-.adm .ow-navb:active { transform: scale(.94); }
-.adm .ow-navb svg { width: 16px; height: 16px; }
 
 /* 처리 중 — 이번 주 배송 7칸 + 묶음 줄 */
 .adm .ow-queue { display: flex; flex-direction: column; gap: 26px; }
@@ -292,7 +288,6 @@
 
 /* 배송 캘린더 */
 .adm .ow-mnav { display: inline-flex; align-items: center; gap: 2px; margin-left: 6px; }
-.adm .ow-mnav b { min-width: 104px; text-align: center; font-size: 15px; font-weight: 700; color: #16141f; }
 .adm .ow-cal { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 32px; align-items: start; }
 .adm .ow-cal__head { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
 .adm .ow-cal__head b { min-width: 120px; text-align: center; font-size: 16px; font-weight: 700; color: #16141f; }
@@ -349,26 +344,25 @@
 .adm .owp .ow-note { text-align: center; color: #6b6878; }
 
 /* 처리 창 */
-.adm .modal.lfm.owm { width: 480px; max-height: calc(100vh - 48px); overflow-y: auto; }
-.adm .modal.lfm.owm--edit { width: 600px; }
+/* 주문 처리 창은 transform 가운데 정렬 · 바깥 스크롤을 쓰지 않는다(2026-11-10) — 공용 날짜 피커가 창 안에 그대로 뜨게.
+   transform 이 있으면 기간 피커(`.calpop`, position: fixed)가 화면이 아니라 창 기준이 되어 엉뚱한 자리에 뜨고, overflow 가 있으면
+   하루 피커(`.adp__pop`, absolute)가 창 끝에서 잘렸다. 분실물 처리 창(`overflow: visible`, 하루 피커만)이 되는 것과 같은 이유로
+   여기도 overflow 를 열고, 가운데 정렬은 inset + margin auto 로, 들어오는 움직임은 opacity 만(transform 을 남기지 않게). */
+.adm .modal.lfm.owm, .adm .modal.lfm.owm.on { inset: 0; margin: auto; height: fit-content; width: 480px; max-height: calc(100vh - 48px); transform: none; overflow: visible; animation: owm-in 200ms ease both; }
+@keyframes owm-in { from { opacity: 0; } }
+/* 요청 수정 창은 품목이 길어 창 안 스크롤이 필요하다 — 날짜 피커가 없는 창이라 잘릴 것이 없다. */
+.adm .modal.lfm.owm--edit, .adm .modal.lfm.owm--edit.on { width: 600px; overflow-y: auto; }
+/* 하루 달력은 이 창 안에서만 위로 연다 — 날짜 칸이 창 아래쪽이라 노트북 높이(1280×700)에서 아래로 열면 화면 밖으로 잘렸다.
+   공용 `.adp__pop`(top: calc(100% + 6px))을 이 창에서만 뒤집는다. */
+.adm .modal.lfm.owm .adp__pop { top: auto; bottom: calc(100% + 6px); }
+/* 배송일 단추 — 분실물 처리 창(`.lfm__nf--date .adp > button`)과 같은 모양. 기간 단추도 같게. */
+.adm .lfm .lfm__nf--date .dpick { display: block; }
+.adm .lfm .lfm__nf--date .dpick > .datepick { width: 100%; height: 48px; border-radius: 12px; }
 .adm .owm .owm-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .adm .owm .owm-lbl { margin: 0; }
 .adm .owm .owm-seg { width: 160px; flex: none; }
 .adm .owm .owm-seg4 { grid-template-columns: repeat(4, 1fr); }
 .adm .owm .owm-grow { flex: 1; min-width: 0; }
-.adm .owm .lfm__nf input[readonly] { cursor: default; }
-.adm .owm-cal { display: flex; flex-direction: column; gap: 6px; }
-.adm .owm-cal__h { display: flex; align-items: center; justify-content: space-between; }
-.adm .owm-cal__h b { font-size: 15px; font-weight: 700; color: #16141f; }
-.adm .owm-cal__g { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); row-gap: 2px; }
-.adm .owm-cal__wd span { padding-bottom: 4px; text-align: center; font-size: 12px; color: var(--text-3); }
-.adm .owm-day { position: relative; height: 38px; border: 0; border-radius: 10px; background: transparent; font: inherit; font-size: 14px; color: #16141f; font-variant-numeric: tabular-nums; cursor: pointer; transition: background 150ms ease, color 150ms ease, transform 120ms ease; }
-.adm .owm-day:hover { background: #f4f4f7; }
-.adm .owm-day:active { transform: scale(.97); }
-.adm .owm-day.is-in { background: #f1ecfd; border-radius: 0; }
-.adm .owm-day.is-sel { background: #7a52e6; color: #fff; font-weight: 600; }
-.adm .owm-day.is-today { font-weight: 600; }
-.adm .owm-day.is-today::after { content: ""; position: absolute; bottom: 5px; left: 50%; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: currentColor; }
 .adm .owm-items { display: flex; flex-direction: column; }
 .adm .owm-items__h { display: flex; align-items: baseline; justify-content: space-between; padding-bottom: 4px; }
 .adm .owm-items__h b { font-size: 14px; font-weight: 700; color: #16141f; }
@@ -388,6 +382,6 @@
 }
 
 /* 키보드 포커스(web-design-guidelines 점검) */
-.adm .ow-act:focus-visible, .adm .ow-link:focus-visible, .adm .ow-navb:focus-visible, .adm .ow-day:focus-visible,
-.adm .ow-wd__it:focus-visible, .adm .ow-cal__row:focus-visible, .adm .owm-day:focus-visible, .adm .owm-rm:focus-visible, .adm .owm-add:focus-visible,
+.adm .ow-act:focus-visible, .adm .ow-link:focus-visible, .adm .ow-day:focus-visible,
+.adm .ow-wd__it:focus-visible, .adm .ow-cal__row:focus-visible, .adm .owm-rm:focus-visible, .adm .owm-add:focus-visible,
 .adm .lfw-tr.ow-qr:focus-visible { outline: 2px solid #7a52e6; outline-offset: 2px; }

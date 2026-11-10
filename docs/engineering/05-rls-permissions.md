@@ -1516,7 +1516,7 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
   | `cleaning_sessions` 시작 · 완료 / 남의 기록 읽기 | `cleaning.work` / `cleaning.read_all` |
   | `linen_items` · `linen_return_records` · `linen_return_record_items` | `linen.manage` |
   | `lost_items` · `maintenance_reports` · `order_requests` 남의 것 삭제 | `request.delete_any` |
-  | `maintenance_reports` 수정 | `maintenance_status_change`(예전 역할 + 부여 표시) |
+  | `maintenance_reports` 수정 | `maintenance_status_change`(예전 역할 + 부여 표시) — 처리 칸 보호 트리거는 2026-11-10 (`202611100001`) |
   | `order_requests` 수정 / 처리 칸 트리거 `enforce_order_request_processing` | `order_processor` ∨ `request.delete_any` / `order_processor` |
   | `property_operation_infos` | `property_info.edit` |
 
@@ -1710,3 +1710,22 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 - 통화 중 권한 회수 · 정지: `GET /api/kiosk/call/[id]` 가 `can_take_call` 이 거짓이면 `ended`(`system`) + 방 삭제 + 기록. 판정 실패(DB 오류)는 통화를 끊지 않는다. 태블릿이 30초마다 부르므로 최대 약 30초 안에 닫힌다.
 - LiveKit 태블릿 토큰: identity `kiosk-<deviceId>`, 방 하나, camera · microphone 만 올리기, 데이터 올리기 · 녹화 · 관리 권한 없음, 30분. 비밀값은 서버 환경 변수만.
 - 확인: 로컬 PGlite 에 실제 마이그레이션을 돌려 받는 사람 상황표(역할 · 기한 · 회수 · 차단 · 정지 · 다른 조직 · 다른 키 · 개발자), 중복 키, anon · authenticated 실행 · 표 읽기 거부, service_role 쓰기, 제약, 조건부 받기(한 명만), `can_take_call` 상황표, 계정 정지, 알림 위조 거부를 봤다(`auth` · `storage` · `memberships` 등은 흉내, 2026-11-06). Supabase 실제 프로젝트에서는 아직 안 돌려 봤다.
+
+## 2026-11-10 요청(수리 · 분실물 · 주문) 처리 칸 보호 · 남의 것 삭제 (`202611100001`, 운영 미적용)
+
+- **`request.delete_any` 에서 `field_manager` 를 뺐다** — `capability_roles` 행 삭제 + `src/config/capabilities.ts`. 세 표 DELETE 정책
+  (202610210007)과 요청 사진 Storage 삭제 정책(202610220001)이 모두 `has_capability(..., 'request.delete_any')` 로 읽어 같이 닫힌다. 본인 것 삭제는 그대로.
+  문서 08 · 09 · 10 의 삭제 표(현장 관리자 = 남의 것 ❌)가 맞았고 코드 · DB 가 틀렸다.
+- **INSERT 보호**: 세 표 INSERT 정책은 「신고자 본인 + 멤버」만 본다. 이제 BEFORE INSERT 트리거가 처리 권한 없는 사람의 등록을 시작 상태 ·
+  빈 처리 칸으로만 받는다 — 주문 `enforce_order_request_insert`(`order_processor`; `requested`, 배송일 · `admin_memo` 비움),
+  수리 `enforce_maintenance_report_processing`(`maintenance_status_change`; `open`, 완료 칸 · 처리 메모 · 완료 사진 비움),
+  분실물 `enforce_lost_item_processing`(`lost_found.handle`; `registered`, 처리 칸 · 반환 방식 · 보관 기한 비움).
+- **UPDATE 보호(수리 · 분실물)**: UPDATE 정책이 신고자 본인에게 행 전체를 열어 두므로, 같은 두 함수가 BEFORE UPDATE 에서 처리 권한이 없으면
+  `updated_at` 말고 아무 칸도 못 바꾸게 한다(앱에 신고자 수정 화면은 없다). 소속(`organization_id` · `reported_by_user_id`)은 누구도 못 바꾼다.
+  외래 키 `on delete set null`(`cleaning_session_id` · `reservation_id` · `completed_by` / `handled_by` 가 null 로)은 지운 사람의 권한으로
+  돌기 때문에 비교에서 뺀다. 주문 UPDATE 는 기존 `enforce_order_request_processing` 그대로.
+- 공통: `security definer`, `search_path = ''`, public · anon · authenticated 실행 권한 회수, `auth.uid()` 가 없으면(service_role · cron — 밤 자동
+  폐기 포함) 통과, 판정은 `is_platform_admin()` ∨ `has_capability`(앱 세션 권한과 같은 결론). 실패는 42501.
+- 확인: SQL 정적 검사(`src/lib/__tests__/requests-processing-guard-sql.test.ts` — 트리거 부착 · 키 · 시작 상태 · 쓰는 열 · set null 예외)와
+  로컬 PGlite 에 이 마이그레이션을 그대로 적용해 `SET ROLE` 로 21가지(권한 없는 등록 거절 · 시작 상태 통과 · 신고자 수정 거절 · 처리자 ·
+  service_role 통과 · 청소 기록 삭제 set null 통과)를 봤다(2026-11-10, `has_capability` · `auth` 는 흉내). 운영 미적용 — 적용은 사용자 컨펌.

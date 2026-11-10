@@ -123,6 +123,9 @@ Implementation note (2026-07-09):
   `/mobile/lost-found/new?reservationId=...`.
 - In that path, the form opens with reservation-linked building / room / guest context already
   filled and stores optional `property_name`, `reservation_id`, and `guest_name` snapshots.
+- 관리자 콘솔 손님 줄(2026-11-10): 예약이 연결돼 있으면 「이름 · 체크인 – 체크아웃」, 예약 없이 `guest_name` 만 있으면 이름만
+  (`lostItemGuest()` 가 날짜를 null 로 둔다). 예전엔 날짜에 ""를 넣어 패널을 열면 날짜 표시가 던져 화면 전체가 오류 화면이 됐다.
+  분실물 · 수리 · 주문 콘솔의 `fmtDate` 는 빈 값 · 잘못된 값이면 「—」.
 - The standalone direct lost-found form does **not yet** auto-suggest the latest checkout after
   room selection; that broader suggestion flow remains future work.
 
@@ -296,7 +299,7 @@ Default mobile behavior:
   테두리 이름표 메모 칸 → [취소][확인] 두 개. **× 없음 — 닫기는 「취소」 하나**(Esc · 바깥 누르기도 취소). 살짝 커지며 나타남. 처리 창에서 증빙 사진은 받지 않는다(서버 액션이 받지 않음 — 시안의 사진 줄은 뺐다).
 - **모바일 상세**(`/mobile/requests/lost-found/[id]` · `lost-found-handling-form.tsx` · `lost-found-detail.css`, 수리 상세의 `.mdw` 위에): 카드 대신 위 한 줄(폐기 임박/만료 · 상태 · 분류 · 청소에서 등록) → 제목 → 「호실 · 건물 · 신고자 · M/D HH:mm」 → 사진 →
   진행 중이면 **「자동 폐기까지 D-n」 막대**(새 공용 계산 `lostItemClock()` — `src/lib/lost-found-constants.ts`, 어드민과 같은 규칙: `hold_until` ?? 발견일 + 14) + 「n일째 보관 · M/D 자동 폐기 예정 · 연장은 오피스에서 해요」 → 메모 → 손님 →
-  **현장 처리**: 5칸 상태 토글(누르면 가벼운 진동) · 반환완료로 바꾸면 경고 한 줄 · 테두리 이름표 메모 · 증빙 사진 · 저장(저장되면 초록 체크 + 성공 진동). 반환완료 확인 시트는 그대로(상자 없는 정보 줄로).
+  **현장 처리**: 상태 토글 — **갈 수 있는 상태만 보인다**(2026-11-10, 아래 「현장 상태 규칙」. 예: 보관 중이면 [보관 중 | 반환완료], 폐기 예정이면 [폐기 예정 | 폐기완료 | 반환완료]; 누르면 가벼운 진동) · 반환완료로 바꾸면 경고 한 줄 · 테두리 이름표 메모 · 증빙 사진 · 저장(저장되면 초록 체크 + 성공 진동). 반환완료 확인 시트는 그대로(상자 없는 정보 줄로).
   완료 건은 **처리 기록**(체크가 그려지는 초록 원 · 처리자 · 시각 · 반환 방식 · 송장 · 메모 · 증빙 사진 · 「상태 정정 · 무효는 어드민에서만」). 파트타임은 잠금 한 줄. 예전 읽기 전용 진행바 · 상자 · 배지 제거.
   휴지통은 넣지 않는다(삭제는 목록에서 — 수리 상세와 같음). 손님은 이름만(모바일엔 숙박 날짜가 없다).
 - **모바일 요청 목록 · 분실물 탭**(`requests-filter-view.tsx`): 날짜 묶음 대신 **「보관 중 · 자동 폐기 가까운 순」 → 「완료 · 최근 순」** 묶음(사용자 승인 2026-10-14). 보관 중 줄은 시각 대신 **D-n**(만료면 D+n), 3일 이내 · 만료는 상태 글자가 빨강. 다른 탭(전체 등)은 날짜 묶음 그대로이고 분실물 줄의 D-n · 빨강만 같이 쓴다.
@@ -309,7 +312,7 @@ Default mobile behavior:
 분실물은 수리·점검과 **동일한 매커니즘**을 쓴다. 습득물은 결국 현장이 손에 쥐고 있으므로,
 **현장이 모바일에서 직접 처리**한다(상태 변경 · 처리 메모 · 증빙 사진 전부 모바일).
 
-- **배정 개념이 없다.** 등록자와 무관하게 **누구나(파트타임 제외) 처리 가능** — 특히 반환은 손님에게
+- **배정 개념이 없다.** 등록자와 무관하게 **처리 권한(`lost_found.handle`)이 있는 사람이면 누구나 처리 가능** — 특히 반환은 손님에게
   물건을 넘긴 사람이 그대로 저장한다.
 - 대시보드의 역할 = **감시(oversight) + 이력(record) + 예외 개입**. (예외 개입 = 상태 정정 · 복원 ·
   삭제 — **2026-07-16 어드민 콘솔에 구현 완료**. 무효(void)는 두지 않는다. 아래 "구현 요약" 참고.)
@@ -323,7 +326,7 @@ Default mobile behavior:
 - 화면: 분실물 상세 `/mobile/requests/lost-found/[id]`. 기존 카드1(품목·위치·사진)은 그대로.
   읽기 전용이던 상태 스테퍼(카드2)를 **처리 블록**으로 승격.
 - 컴포넌트: `src/components/requests/lost-found-handling-form.tsx` (수리·점검의
-  `MaintenanceHandlingForm`과 동일 구조). 상태 칩 5개 + 처리 메모 + 증빙 사진(≤5) + 저장.
+  `MaintenanceHandlingForm`과 동일 구조). 상태 칩(갈 수 있는 상태만, 2026-11-10) + 처리 메모 + 증빙 사진(≤5) + 저장.
 - 서버 액션: `updateLostItemHandling`
   (`src/app/mobile/requests/lost-found/actions.ts`). part_time 차단 → 이미지 경로 검증
   (`{org}/lost-found-handling/{itemId}/`) → 영향 행 수 확인(RLS backstop) → `handled_*` 기록.
@@ -337,15 +340,16 @@ Default mobile behavior:
     `mrTracking` · `mrTrackingPh` 재사용). 확인 시트에도 「반환 방식 · 송장」 줄. 서버는 반환완료로 새로 넘어갈 때
     `returnMethod` 가 없으면 `return_method_required` 로 거절한다(예전 모바일은 방식을 안 물어 `return_method` 가 비고
     송장은 `""` 로 저장됐다). 송장번호는 어드민과 같이 선택 — 배송일 때만 저장(100자까지).
-  - **갈 수 있는 상태만**: 상태 5칸 중 지금 상태에서 갈 수 없는 칸은 흐리게 · 누를 수 없다. 규칙은 서버와 같은
-    `isValidLostItemTransition()`(`src/lib/lost-found-handling.ts` — 클라이언트 · 서버 공용으로 옮김): 한 단계 전진 ·
-    진행 중 어디서든 반환 · 종결에서 나가기 금지.
+  - **갈 수 있는 상태만**: 규칙은 서버와 같은 `isValidLostItemTransition()`(`src/lib/lost-found-handling.ts` — 클라이언트 · 서버 공용).
+    2026-11-10 부터 막힌 칸은 흐리게가 아니라 **아예 안 보인다**(`lostItemFieldTargets`), 규칙도 아래 「현장 상태 규칙」으로 바뀌었다
+    (보관 중 → 폐기 예정 금지 · 종결 상태 같은 상태 저장 금지).
   - **증빙 사진 이어 붙이기**: 새로 고른 사진만 보내고 서버가 저장된 사진 뒤에 붙인다(예전엔 통째로 바꿔 이전 사진이
     사라졌다). 합쳐 5장 — 넘으면 `too_many_photos`. 업로더는 남은 장수만, 진행 중 상세에도 이미 남긴 증빙 사진을 보여 준다.
     주소 검사는 공용 `isOwnStoragePublicUrl()`(`src/lib/storage-url-guard.ts`).
   - **두 번 저장 막기**: 사진 올리기부터 저장까지 버튼이 잠기고, 성공하면 고른 사진을 비우며, 실패하면 방금 올린 사진을 지운다.
   - **동시 변경**: 화면을 열 때 본 상태(`expectedStatus`)와 지금 상태가 다르면 `conflict`(「방금 다른 사람이 이 분실물을
-    바꿨어요」) — 업데이트에도 `.eq("status", 읽은 상태)` 가드.
+    바꿨어요」) — 업데이트에도 `.eq("status", 읽은 상태)` · `.eq("updated_at", 읽은 시각)` 가드(2026-11-10 — 상태가 같아도 그 사이
+    다른 사람이 사진 · 메모를 저장했으면 덮어쓰지 않고 `conflict`. 수리 처리와 같은 규칙).
   - **처리 메모의 시스템 줄**: 고치는 칸에는 사람이 쓴 줄만 넣는다(`splitLostFoundHandlingMemo()`). 관리자 복원 표시
     (`[stayops:admin_restore] …`)는 보는 사람 언어로 바꾼 글로 칸에 들어가 그 언어로 굳어 저장되던 문제 — 이제 서버가
     저장할 때 시스템 줄을 원래대로 뒤에 다시 붙인다.
@@ -373,7 +377,7 @@ Default mobile behavior:
 
 대시보드에 **폐기 내역** 뷰가 생기면서, 모바일에도 대칭되는 폐기 전용 목록을 추가해 정합을 맞췄다.
 반환완료 목록을 **1:1 미러링**하고 톤만 슬레이트(폐기)로 바꾼 것이다. **읽기 전용** — 복원/삭제는
-관리자 전용(`canForceCompleteCleaning`)이라 모바일엔 없다.
+PC 콘솔 전용이라 모바일엔 없다(복원 = `lost_found.handle`, 삭제 = 본인 또는 `request.delete_any`).
 
 - **진입점**: 요청 → 분실물 탭 필터 행, **반환완료 pill 옆**에 슬레이트 아웃라인 "폐기 내역" pill
   (`requests-filter-view.tsx`, 분실물 탭에서만 렌더, `Trash2` 아이콘 + `dictionary.lostFound.disposed.entry`).
@@ -392,18 +396,20 @@ Default mobile behavior:
 
 ## Status Change Permission
 
-Can change status (모바일 현장 처리 + 어드민 모두 동일 게이트):
+**처리 권한 = 권한 키 `lost_found.handle` 하나 — 모바일 현장 처리 · PC 콘솔(반환 · 폐기 · 연장 · 정정 · 복원) · DB 가 같은 키**(2026-11-10 정리).
 
-- Developer / Super Admin
-- Owner
-- Office Admin
-- CS Staff if permitted
-- Field Manager
-- Staff
+- 역할 기본으로 받음: 개발자 · 대표 · 전무 · 오피스 관리자 · CS 관리자 · 현장 관리자
+- 역할로는 못 받음: 아르바이트 리더(staff) · 아르바이트(part_time_staff) — 필요한 사람에게 개인 부여(차단도 사람마다). 키가 없으면 모바일은
+  처리 블록 대신 읽기 전용 안내, PC 콘솔은 패널의 처리 단추가 안 보인다.
+- **신고자 본인이라고 바꿀 수 있는 것은 아니다.** DB 트리거 `enforce_lost_item_processing`(202611100001)이 키 없는 사람의 수정과 처음부터
+  처리된 상태로 넣는 등록(`registered` 가 아니거나 처리 칸 · 반환 방식 · 보관 기한이 채워진 INSERT)을 막는다. 외래 키 `on delete set null` 과
+  service_role · cron(밤 자동 폐기)은 통과.
+- PC 콘솔은 2026-11-10 까지 청소 강제완료 게이트(`canForceCompleteCleaning`)를 잘못 써서, 키를 꺼 둔 사람도 콘솔에서는 처리할 수 있었다.
 
-Cannot change status:
-
-- Part-time Staff (모바일에서 처리 블록 대신 읽기 전용 안내를 본다. 서버 액션·RLS가 최종 게이트.)
+**현장(모바일) 상태 규칙 — 하나**(사용자 결정 2026-11-10, `isValidLostItemTransition` · `lostItemFieldTargets` — `src/lib/lost-found-handling.ts`,
+모바일 서버 액션과 상태 칩이 같은 함수): 접수 → 보관 중 · **폐기 예정 → 폐기 완료**만 폐기 쪽으로 넘긴다. **보관 중 → 폐기 예정은 현장이 못
+한다** — 폐기 예정은 밤 자동 처리(보관 기한 3일 전)와 PC 관리자만. 반환은 진행 중 어디서든. 기한 전 「바로 폐기」 예외는 없다. 상태 그대로
+메모 · 사진만 저장은 진행 중일 때만(종결 상태에서는 같은 상태 저장도 거절) — 이때 처리자 · 처리 시각은 덮지 않는다.
 
 > RLS 보강 (2026-07-15): 기존 lost_items UPDATE 정책은 `owner/office_admin/cs_staff/field_manager`만
 > 허용해 **`staff`가 빠져 있었다**(수리·점검에서 고친 것과 같은 누락). "반환은 누구나"가 요구사항이라
@@ -422,6 +428,9 @@ Cannot change status:
 | field_manager | ✅ | ❌ |
 | staff | ✅ | ❌ |
 | part_time_staff | ✅ | ❌ |
+
+남의 것 삭제 = `request.delete_any`(역할 기본에서 현장 관리자는 2026-11-10 에 뺐다 — 202611100001). 삭제는 공용 `src/actions/request-delete.ts`
+(읽은 상태 그대로인 행만 · 지운 행 수 확인).
 
 ### Entry point
 
@@ -590,8 +599,12 @@ Potential alerts:
 - **서버/데이터**: `src/lib/admin-lost-found.ts`(`getAdminLostFound` + `AdminLostItemVM` — 보관 시계·
   삭제 시계 파생 계산 포함), `src/app/admin/lost-found/actions.ts`(`returnLostItem` /
   `disposeLostItem` / `extendLostItemStorage` / `correctLostItemStatus` / `restoreLostItem` /
-  `deleteLostItemById` — 전부 `requireAdminSession()` + `canForceCompleteCleaning()` + 조직 스코프 +
-  영향 행수 확인).
+  `deleteLostItemById` — 전부 `requireAdminSession()` + 조직 스코프 + 영향 행수 확인. 처리 다섯은 `lost_found.handle`(2026-11-10, 예전
+  `canForceCompleteCleaning()`), 삭제는 공용 `src/actions/request-delete.ts`(본인 또는 `request.delete_any`)).
+- **2026-11-10 점검**: 정정이 보관 중 · 접수로 되돌리면 보관 기한을 오늘 + 14일로 새로 준다(지난 기한이면 밤 배치가 곧바로 다시 넘겼다).
+  같은 상태로의 정정은 `invalid`. 복원도 읽은 상태 그대로일 때만 쓴다. 읽은 뒤 바뀌었으면 처리 다섯 모두 `stale` — 콘솔은 「그 사이 다른
+  사람이 바꿨어요」 토스트(공용 `adminActionErrorMessage`). 보관 연장 날짜는 달력에 있는 날만(`isCalendarYmd` — 2월 31일 거절).
+  모바일 등록은 같은 요청 id 로 다시 보내면 내 행일 때 성공으로 넘긴다(`isOwnResentRequest`).
 - **복원(restore) 추가(2026-07-16)**: `restoreLostItem`이 완료(폐기/반환) 건을 보관중으로 되돌린다 —
   `status=stored`, `hold_until`=복원일+14일, 반환·처리 정보 초기화, 처리 메모에 복원 사유 append. 상세
   패널의 예외 개입 존(완료 상태에서만) + `restore` 모달(`lost-found-action-modal.tsx`). 스키마 변경 없음
@@ -684,8 +697,8 @@ hold_reason          -- text, nullable. 연장 사유(고가·중요 등은 여�
 ### 권한
 
 - 능동 처리(반환/폐기/연장) · 예외 개입은 **어드민 콘솔 세션**(`requireAdminSession()`) + 조직 스코프.
-  역할 게이트는 수리·점검 예외 개입과 동일 계열(owner/office_admin/개발자 + 허용된 cs_staff/field_manager).
-- **반환은 현장에서도 누구나(파트타임 제외)** 그대로 가능하다 — 사무실 능동 처리와 병존한다.
+  권한 키는 모바일과 같은 `lost_found.handle`(2026-11-10 — 위 「Status Change Permission」).
+- **반환은 현장에서도** 같은 키로 가능하다 — 사무실 능동 처리와 병존한다.
 - 모든 쓰기는 RLS + 영향 행 수 확인을 최종 게이트로 둔다(조용한 0행 성공 방지 — 수리·점검에서 고친 것과 동일).
 
 ### 알림 (후속)

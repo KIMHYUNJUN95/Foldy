@@ -280,20 +280,15 @@ Default mobile behavior:
 
 ## Status Change Permission
 
-Can change status:
+**상태를 바꾸는 권한 = 권한 키 `maintenance_status_change` 하나** (2026-11-10 정리 — 예전 목록은 실제와 달랐다).
 
-- Developer / Super Admin
-- Owner (+ Senior Managing Director, owner-equivalent)
-- Office Admin
-- CS Staff if permitted
-- Field Manager
-- Staff
-- 신고자 본인 (own record)
-- `maintenance_status_change` 권한 예외(override) 보유자
-
-Cannot change status:
-
-- Part-time Staff
+- 역할 기본으로 받음: 개발자 · 대표 · 전무 · 오피스 관리자 · CS 관리자 · 현장 관리자
+- 역할로는 못 받음: 아르바이트 리더(staff) · 아르바이트(part_time_staff) — 필요한 사람에게 개인 부여로 켠다(차단도 사람마다)
+- **신고자 본인이라고 바꿀 수 있는 것은 아니다.** 키가 없으면 자기 신고도 상태 · 처리 칸 · 본문 · 사진을 못 바꾼다.
+- 같은 키가 모바일 「현장 처리」(`updateMaintenanceHandling`) · PC 콘솔 강제 완료 / 무효(`applyMaintenanceException`) · DB 를 함께
+  지킨다 — DB 트리거 `enforce_maintenance_report_processing`(202611100001)이 키 없는 사람의 수정과, 처음부터 처리된 상태로
+  넣는 등록(`open` 이 아니거나 완료 칸 · 처리 메모 · 완료 사진이 채워진 INSERT)을 막는다. 외래 키 `on delete set null`(청소 기록 ·
+  예약 · 처리자 프로필 삭제)은 막지 않는다. service_role · cron 은 통과.
 
 **어디서 바꾸는가 (2026-07-14):** 현장이 **모바일 상세 화면의 "현장 처리" 블록**에서 바꾼다
 (상태 + 처리 메모 + 완료 사진을 한 번에 저장). 어드민 콘솔의 예외 개입은 아래 별도 절 참고.
@@ -315,6 +310,10 @@ Cannot change status:
 | field_manager | ✅ | ❌ |
 | staff | ✅ | ❌ |
 | part_time_staff | ✅ | ❌ |
+
+남의 것 삭제 = 권한 키 `request.delete_any`(역할 기본: 개발자 · 대표 · 전무 · 오피스 · CS). 2026-11-10 까지 앱 · DB 표에 현장 관리자가
+들어 있어 이 표와 반대로 열려 있었다 — 202611100001 이 뺐다. 삭제는 모바일 · PC 모두 공용 `src/actions/request-delete.ts` 하나로
+(판정 `canDeleteRequestRecord`, 읽은 상태 그대로인 행만 지우고 지운 행 수 확인 — 0행이면 「그 사이 바뀜」).
 
 ### Entry point
 
@@ -381,7 +380,9 @@ When created from an active cleaning timer, the request should automatically lin
 
 - **배정 개념이 없다.** `assignee` 컬럼도, 배정 UI도 만들지 않는다.
 - 대시보드의 역할 = **감시(oversight) + 이력(record) + 예외 개입**.
-- **예외 개입 = 강제 완료 / 무효 처리 / 삭제** 3종. 청소의 강제완료와 같은 철학이고 같은 역할 게이트를 쓴다.
+- **예외 개입 = 강제 완료 / 무효 처리 / 삭제** 3종. 청소의 강제완료와 같은 철학이다. 권한은 2026-11-10 부터 모바일 상태 바꾸기와
+  **같은 키 `maintenance_status_change`** — 그 전엔 청소 강제완료 게이트(`cleaning.force_complete`)를 잘못 써서 모바일에서 못 바꾸는
+  사람이 콘솔에서는 닫을 수 있었다. 키가 없으면 패널의 강제 완료 · 무효 단추가 안 보인다(서버가 다시 본다).
 - 무효(`cancelled`)는 **삭제의 대안**이다. 잘못된·중복 신고를 하드 삭제하는 대신 감사 흔적을 남긴다.
   삭제는 정말 불필요할 때만.
 
@@ -526,8 +527,21 @@ When created from an active cleaning timer, the request should automatically lin
 
 ## 2026-10-26 어드민 상태 변경 정합성
 
-- `updateMaintenanceStatus`(어드민 상세): 진행 → 종료(closed/cancelled)로 갈 때만 `completed_at`/`completed_by`/`completed_by_admin=true` 를 찍고, 다시 열면 지운다(모바일 `updateMaintenanceHandling` 과 같은 규칙). 읽은 상태 그대로일 때만 쓰는 조건부 업데이트(`.eq("status", 읽은 값)`).
-- `applyMaintenanceException`(강제 완료 / 무효): `open`/`in_progress` 건에만 적용(`.in("status", …)`). 이미 종결된 건은 `invalid` — 완료시각·처리자를 덮어쓰지 않는다.
+- ~~`updateMaintenanceStatus`(어드민 상세)~~ — **2026-11-10 삭제.** 권한 키 검사도 감사 흔적(처리 메모 덧붙이기)도 없이 아무 상태로나
+  바꿀 수 있었다. 옛 주소 `/admin/maintenance/[id]` 는 콘솔로 넘긴다(`/admin/maintenance?report=<id>` → 그 건의 오른쪽 패널이 열린다).
+- `applyMaintenanceException`(강제 완료 / 무효): `open`/`in_progress` 건에만 적용(`.in("status", …)`). 이미 종결된 건은 `stale`(2026-11-10, 예전 `invalid`) — 완료시각·처리자를 덮어쓰지 않는다.
+
+## 2026-11-10 점검 정리
+
+- **권한 한 키로**: 위 「Status Change Permission」. 콘솔 단추도 키를 따른다.
+- **실패 토스트**: 저장 실패에 「불러오지 못했어요」(errS)가 뜨던 것을 공용 `adminActionErrorMessage`(`src/components/admin/shared/admin-action-error.ts`)
+  로 — 권한 없음 · 그 사이 바뀜 · 저장 못 함 세 가지(`admin.shared.actionForbidden / actionStale / actionFailed`, ko/ja/en).
+- **연동된 청소 · 예약**: 토스트만 뜨던 것을 진짜 링크로 — 청소 `/admin/cleaning?date=<그날>`, 예약 `/admin/calendar?month=<체크인 달>&property=<건물>`.
+  안 쓰게 된 `tLink` 문구는 지웠다.
+- **등록 검사**: 모바일 등록이 건물 · 방을 활성 방 카탈로그와 대조한다(분실물 · 주문과 같은 방식). 「건물 전체」는 건물이 카탈로그에 있을 때만.
+  같은 요청 id 로 다시 보내면(첫 번째가 이미 저장됨) 내 행일 때 성공으로 넘긴다(`isOwnResentRequest`, `src/lib/request-resend.ts`).
+- **완료 사진 경합**: 모바일 처리 저장이 읽은 상태 + 읽은 `updated_at` 그대로일 때만 쓴다 — 두 사람이 동시에 사진을 올리면 늦은 쪽이 먼저 쓴
+  사진을 지우던 것을 「그 사이 바뀜(conflict)」으로 막는다.
 
 ## 실시간 갱신 (2026-10-29)
 

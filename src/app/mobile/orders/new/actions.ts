@@ -1,9 +1,11 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { isOwnResentRequest } from "@/lib/request-resend";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { getActiveRoomCatalogServer } from "@/lib/rooms";
+import { isOrderItemTextWithinLimits, normalizeOrderQuantity, ORDER_ITEM_LIMITS } from "@/lib/order-item-rules";
 import { isOwnStoragePublicUrl } from "@/lib/storage-url-guard";
 import type { Database, Json } from "@/types/database";
 
@@ -103,10 +105,23 @@ export async function createOrderRequest(formData: FormData) {
         quantity: String(item.quantity ?? "").trim(),
       };
     })
-    .filter((item) => item.name.length > 0 && Number(item.quantity) > 0);
+    .filter((item) => item.name.length > 0);
 
   if (invalidImages) {
     redirect("/mobile/orders/new?error=save_failed");
+  }
+
+  // 수량은 양의 정수(1~9999), 품목 수 · 글자 길이 상한 — PC 콘솔 내용 수정(editOrder)과 같은 규칙(2026-11-10). 예전엔
+  // `Number(quantity) > 0` 만 봐서 1.5 · 1e3 이 들어갔고, 수량이 틀린 품목은 말없이 빠졌다.
+  if (parsedItems.length > ORDER_ITEM_LIMITS.maxItems) {
+    redirect("/mobile/orders/new?error=invalid_item");
+  }
+  for (const item of parsedItems) {
+    const quantity = normalizeOrderQuantity(item.quantity);
+    if (quantity === null || !isOrderItemTextWithinLimits(item)) {
+      redirect("/mobile/orders/new?error=invalid_item");
+    }
+    item.quantity = quantity;
   }
 
   if (parsedItems.length === 0) {
@@ -136,9 +151,21 @@ export async function createOrderRequest(formData: FormData) {
     .insert(insert)
     .select("id")
     .single();
-  const createdId = (created as { id: string } | null)?.id ?? null;
+  let createdId = (created as { id: string } | null)?.id ?? null;
+  // 같은 id 로 다시 보냄(첫 번째가 이미 저장됨) — 내 행이면 성공으로 넘긴다(2026-11-10).
+  if (
+    !createdId &&
+    (await isOwnResentRequest(supabase, "order_requests", {
+      error,
+      id: requestId,
+      organizationId: session.organization.id,
+      userId: session.user.id,
+    }))
+  ) {
+    createdId = requestId;
+  }
 
-  if (error || !createdId) {
+  if (!createdId) {
     redirect("/mobile/orders/new?error=save_failed");
   }
 

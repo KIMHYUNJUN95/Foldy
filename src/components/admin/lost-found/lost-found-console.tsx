@@ -9,8 +9,10 @@ import { useRouter } from "next/navigation";
 import { Search, TriangleAlert, X } from "lucide-react";
 import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
 import { AdminDateRangePicker } from "@/components/admin/shared/admin-date-range-picker";
+import { adminActionErrorMessage } from "@/components/admin/shared/admin-action-error";
 import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import type { RequestDeleteAccess } from "@/lib/request-delete-rule";
 import type { AdminLostItemVM } from "@/lib/admin-lost-found";
 import type { LostReturnMethod } from "@/lib/lost-found-constants";
 import {
@@ -43,6 +45,10 @@ import {
 } from "./lost-found-action-modal";
 
 type LostFoundConsoleProps = {
+  /** 패널 휴지통 규칙(본인 id · `request.delete_any`). */
+  deleteAccess: RequestDeleteAccess;
+  /** 처리 권한(`lost_found.handle`) — 모바일 처리와 같은 키. 없으면 패널의 처리 단추를 숨긴다. */
+  canHandle: boolean;
   locale: Locale;
   items: AdminLostItemVM[];
   loadError: boolean;
@@ -55,7 +61,7 @@ function isThisMonthTokyo(dateOrDateTime: string | null, monthKey: string): bool
   return dateOrDateTime.slice(0, 7) === monthKey;
 }
 
-export function LostFoundConsole({ locale, items, loadError }: LostFoundConsoleProps) {
+export function LostFoundConsole({ canHandle, deleteAccess, locale, items, loadError }: LostFoundConsoleProps) {
   const router = useRouter();
   const dictionary = getDictionary(locale);
   const t = dictionary.lostFound.console;
@@ -137,7 +143,7 @@ export function LostFoundConsole({ locale, items, loadError }: LostFoundConsoleP
       if (kind === "delete") {
         const result = await deleteLostItemById(id);
         if (!result.ok) {
-          showToast(t.errS);
+          showToast(adminActionErrorMessage(result.error, dictionary.admin.shared));
           return;
         }
         setConfirm(null);
@@ -154,7 +160,7 @@ export function LostFoundConsole({ locale, items, loadError }: LostFoundConsoleP
           memo: payload.memo ?? "",
         });
         if (!result.ok) {
-          showToast(t.errS);
+          showToast(adminActionErrorMessage(result.reason, dictionary.admin.shared));
           return;
         }
         setConfirm(null);
@@ -166,7 +172,7 @@ export function LostFoundConsole({ locale, items, loadError }: LostFoundConsoleP
       if (kind === "dispose") {
         const result = await disposeLostItem({ itemId: id, memo: payload.memo ?? "" });
         if (!result.ok) {
-          showToast(t.errS);
+          showToast(adminActionErrorMessage(result.reason, dictionary.admin.shared));
           return;
         }
         setConfirm(null);
@@ -182,7 +188,7 @@ export function LostFoundConsole({ locale, items, loadError }: LostFoundConsoleP
           reason: payload.memo ?? "",
         });
         if (!result.ok) {
-          showToast(t.errS);
+          showToast(adminActionErrorMessage(result.reason, dictionary.admin.shared));
           return;
         }
         setConfirm(null);
@@ -193,7 +199,7 @@ export function LostFoundConsole({ locale, items, loadError }: LostFoundConsoleP
       if (kind === "restore") {
         const result = await restoreLostItem({ itemId: id, reason: payload.memo ?? "" });
         if (!result.ok) {
-          showToast(t.errS);
+          showToast(adminActionErrorMessage(result.reason, dictionary.admin.shared));
           return;
         }
         setConfirm(null);
@@ -209,7 +215,7 @@ export function LostFoundConsole({ locale, items, loadError }: LostFoundConsoleP
         memo: payload.memo ?? "",
       });
       if (!result.ok) {
-        showToast(t.errS);
+        showToast(adminActionErrorMessage(result.reason, dictionary.admin.shared));
         return;
       }
       setConfirm(null);
@@ -459,6 +465,8 @@ export function LostFoundConsole({ locale, items, loadError }: LostFoundConsoleP
         locale={locale}
         onClose={() => setSelectedId(null)}
         onAction={(kind, id) => setConfirm({ kind, id })}
+        canHandle={canHandle}
+        deleteAccess={deleteAccess}
         disabled={confirm !== null}
       />
 

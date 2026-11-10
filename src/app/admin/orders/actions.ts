@@ -13,14 +13,14 @@ import {
 } from "@/lib/admin-table-workbook";
 import { getDictionary } from "@/lib/i18n";
 import { canProcessOrders } from "@/lib/order-permissions";
+import { isOrderItemTextWithinLimits, normalizeOrderQuantity, ORDER_ITEM_LIMITS } from "@/lib/order-item-rules";
+import { getOrgOrderRequests, parseOrderItems, type OrderRequestItem } from "@/lib/order-requests";
 import {
-  getOrgOrderRequests,
-  orderRequestStatuses,
-  parseOrderItems,
-  type OrderRequestItem,
-  type OrderRequestStatus,
-} from "@/lib/order-requests";
-import { parseRequestDateRange } from "@/lib/request-filters";
+  filterOrdersForExport,
+  isOpenScope,
+  ordersExportQuery,
+  type OrdersExportFilters,
+} from "@/lib/orders-export-filter";
 import { resolveRequestLocation } from "@/lib/request-location";
 import { getActiveRoomCatalogServer } from "@/lib/rooms";
 import type { AppSession } from "@/lib/session";
@@ -33,25 +33,8 @@ import type { Database, Json } from "@/types/database";
 // 내보내기 도구(src/lib/admin-table-workbook.ts / admin-table-report.ts)를 거친다.
 // 참고: docs/product/10-order-request-workflow.md.
 
-export type OrdersExportFilters = {
-  startDate?: string;
-  endDate?: string;
-  status?: string;
-  /** "high" | "normal" — 그 외 값은 무시. */
-  urgency?: string;
-  /** 건물 한국어 원본 이름(= order_requests.building_name). */
-  building?: string;
-  /** 제목 · 요청자 · 품목명 검색어(콘솔 전체 기록 보기와 같은 규칙). */
-  query?: string;
-};
-
-function parseStatus(value: string | undefined): OrderRequestStatus | undefined {
-  return (orderRequestStatuses as readonly string[]).includes(value ?? "")
-    ? (value as OrderRequestStatus)
-    : undefined;
-}
-
 function rangeSuffix(filters: OrdersExportFilters): string {
+  if (isOpenScope(filters)) return "_open";
   const parts = [filters.startDate, filters.endDate]
     .filter((v): v is string => Boolean(v))
     .map(compactRangePart);
@@ -66,33 +49,18 @@ async function buildOrdersSheet(
   const dictionary = getDictionary(meta.locale);
   const form = dictionary.mobile.orderForm;
   const detail = dictionary.mobile.orderDetail;
-  const dateRange = parseRequestDateRange(filters);
-  const status = parseStatus(filters.status);
+  const { dateRange, status } = ordersExportQuery(filters);
 
   const [allOrders, roomCatalog] = await Promise.all([
     getOrgOrderRequests(session, { ...dateRange, status }),
     getActiveRoomCatalogServer(session.organization.id).catch(() => undefined),
   ]);
 
-  // 화면에 보이는 것과 같은 결과가 나가도록 긴급도 · 건물 · 검색어도 서버에서 거른다.
-  const urgency = filters.urgency === "high" || filters.urgency === "normal" ? filters.urgency : undefined;
-  const building = filters.building?.trim() || undefined;
-  const q = filters.query?.trim().toLowerCase().slice(0, 100) || undefined;
-  const orders = allOrders.filter((order) => {
-    if (urgency && order.urgency !== urgency) return false;
-    if (building && order.building_name !== building) return false;
-    if (
-      q &&
-      !(
-        order.title.toLowerCase().includes(q) ||
-        order.reporter_name.toLowerCase().includes(q) ||
-        parseOrderItems(order.items).some((item) => item.name.toLowerCase().includes(q))
-      )
-    ) {
-      return false;
-    }
-    return true;
-  });
+  // 화면에 보이는 것과 같은 결과가 나가도록 긴급도 · 건물 · 검색어(처리 중 보기는 종결 빼기 · 건물만)도 서버에서 거른다.
+  const orders = filterOrdersForExport(
+    allOrders.map((order) => ({ ...order, itemNames: parseOrderItems(order.items).map((item) => item.name) })),
+    filters,
+  );
 
   const columns: AdminTableColumn[] = [
     { key: "building", label: dictionary.cleaning.manualBuildingLabel, width: 15, printWidth: 12 },
@@ -211,7 +179,9 @@ export async function exportOrdersReport(
 
 type OrderActionResult =
   | { ok: true }
-  | { ok: false; reason: "forbidden" | "invalid" | "not_found" | "failed" };
+  // stale = 읽은 뒤 다른 사람이 바꿨다(새로 보고 다시). invalid_item = 내용 수정의 품목이 수량(0 초과 9999 이하 숫자) ·
+  // 글자 길이 규칙에 안 맞다, too_many_items = 품목이 40개를 넘는다(editOrder 만).
+  | { ok: false; reason: "forbidden" | "invalid" | "invalid_item" | "too_many_items" | "not_found" | "failed" | "stale" };
 
 function isValidUUID(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
@@ -253,7 +223,7 @@ export async function rejectOrder(input: {
   if (!existing) return { ok: false, reason: "not_found" };
   const current = existing as { status: Database["public"]["Tables"]["order_requests"]["Row"]["status"]; admin_memo: string | null };
   if (current.status === "closed") {
-    return { ok: false, reason: "invalid" };
+    return { ok: false, reason: "stale" };
   }
 
   const { data: updated, error } = await supabase
@@ -273,7 +243,7 @@ export async function rejectOrder(input: {
 
   if (error) return { ok: false, reason: "failed" };
   // 0행 = 읽은 뒤 다른 사람이 상태를 바꿨다.
-  if (!updated || updated.length === 0) return { ok: false, reason: "invalid" };
+  if (!updated || updated.length === 0) return { ok: false, reason: "stale" };
 
   revalidateOrders();
   return { ok: true };
@@ -296,7 +266,7 @@ export async function reopenOrder(input: {
     .maybeSingle();
   if (!existing) return { ok: false, reason: "not_found" };
   if ((existing as { status: string }).status !== "closed") {
-    return { ok: false, reason: "invalid" };
+    return { ok: false, reason: "stale" };
   }
 
   const { data: updated, error } = await supabase
@@ -314,7 +284,7 @@ export async function reopenOrder(input: {
     .select("id");
 
   if (error) return { ok: false, reason: "failed" };
-  if (!updated || updated.length === 0) return { ok: false, reason: "invalid" };
+  if (!updated || updated.length === 0) return { ok: false, reason: "stale" };
 
   revalidateOrders();
   return { ok: true };
@@ -362,6 +332,10 @@ export async function correctOrderStatus(input: {
   }
   const memo = input.memo.trim();
   if (input.status === "closed") {
+    // 종결은 거절(rejectOrder)과 같은 규칙 — 배송일을 비운다. 남겨 두면 종결 건이 배송 캘린더 · 이번 주 배송에 계속 뜬다(2026-11-10).
+    updatePayload.delivery_date = null;
+    updatePayload.delivery_start_date = null;
+    updatePayload.delivery_end_date = null;
     if (memo) updatePayload.admin_memo = memo;
   } else if (current.status === "closed") {
     // 종결(거절) 건을 되돌릴 때만 거절 사유를 지운다. 그 외 상태 사이 정정은 메모를 건드리지 않는다.
@@ -377,16 +351,25 @@ export async function correctOrderStatus(input: {
     .select("id");
 
   if (error) return { ok: false, reason: "failed" };
-  if (!updated || updated.length === 0) return { ok: false, reason: "invalid" };
+  if (!updated || updated.length === 0) return { ok: false, reason: "stale" };
 
   revalidateOrders();
   return { ok: true };
 }
 
-// 주문 내용(제목/긴급도/사유/품목)을 관리자가 직접 수정한다. 품목 사진(imageUrls)은 기존 항목에서
-// 보존한다 — 이름이 같거나 같은 인덱스의 기존 항목을 찾아 imageUrls와 id를 물려준다.
+// 주문 내용(제목/긴급도/사유/품목)을 관리자가 직접 수정한다. 화면이 보낸 품목 목록을 그대로 저장하고, 품목 사진(imageUrls)과 id 는
+// 기존 항목에서 물려준다 — 이름이 같거나 같은 자리의 기존 항목을 찾는다. 이름 · 수량이 빈 예전 품목은 원래부터 화면에 안 보여
+// 저장 때 빠진다(예전 동작 그대로).
+// 2026-11-10: 종결(closed) 건은 고치지 않는다(다시 열기 뒤에). 품목은 모바일 등록과 같은 규칙(`@/lib/order-item-rules` —
+// 이름 필수 · 수량 0 초과 9999 이하 숫자(소수 허용) · 글자 길이 · 보낸 품목 40개까지). 동시 편집은 행 전체로 본다 — 창을 연 때의
+// `updated_at` 이 그대로일 때만 쓰고, 다르면 `stale`(다른 처리 액션의 「읽은 상태」 조건과 같은 방식).
+const EDITABLE_ORDER_STATUSES = ["requested", "approved", "ordered", "received"] as const;
+type EditableOrderStatus = (typeof EDITABLE_ORDER_STATUSES)[number];
+
 export async function editOrder(input: {
   orderId: string;
+  /** 창을 열 때 본 행의 `updated_at`. */
+  expectedUpdatedAt: string;
   title: string;
   urgency: "high" | "normal";
   reason: string;
@@ -399,29 +382,43 @@ export async function editOrder(input: {
   if (input.urgency !== "high" && input.urgency !== "normal") {
     return { ok: false, reason: "invalid" };
   }
+  if (!Array.isArray(input.items) || typeof input.expectedUpdatedAt !== "string" || !input.expectedUpdatedAt) {
+    return { ok: false, reason: "invalid" };
+  }
+
+  const cleaned: { link: string; memo: string; name: string; qty: string }[] = [];
+  for (const item of input.items) {
+    const name = String(item?.name ?? "").trim();
+    if (!name) continue;
+    const text = { link: String(item?.link ?? "").trim(), memo: String(item?.memo ?? "").trim(), name };
+    const qty = normalizeOrderQuantity(item?.qty);
+    if (qty === null || !isOrderItemTextWithinLimits(text)) return { ok: false, reason: "invalid_item" };
+    cleaned.push({ ...text, qty });
+  }
+  if (cleaned.length === 0) return { ok: false, reason: "invalid" };
+  if (cleaned.length > ORDER_ITEM_LIMITS.maxItems) return { ok: false, reason: "too_many_items" };
 
   const supabase = await getSupabaseServerClient();
   const { data: existing } = await supabase
     .from("order_requests")
-    .select("id, title, items")
+    .select("id, status, title, items, updated_at")
     .eq("id", input.orderId)
     .eq("organization_id", session.organization.id)
     .maybeSingle();
   if (!existing) return { ok: false, reason: "not_found" };
 
-  const existingRow = existing as { id: string; title: string; items: Json };
+  const existingRow = existing as { id: string; status: string; title: string; items: Json; updated_at: string };
+  if (!(EDITABLE_ORDER_STATUSES as readonly string[]).includes(existingRow.status)) {
+    return { ok: false, reason: "invalid" };
+  }
+  // 창을 연 뒤 누가 이 주문을 바꿨다 — 덮어쓰지 않는다.
+  if (existingRow.updated_at !== input.expectedUpdatedAt) return { ok: false, reason: "stale" };
   const previousItems = parseOrderItems(existingRow.items);
-
-  const cleaned = input.items.filter((item) => item.name.trim().length > 0);
-  if (cleaned.length === 0) return { ok: false, reason: "invalid" };
 
   const used = new Set<number>();
   const nextItems: OrderRequestItem[] = cleaned.map((item, index) => {
-    const name = item.name.trim();
     // 사진 보존: 같은 이름의 미사용 기존 항목을 먼저, 없으면 같은 인덱스를 매칭한다.
-    let matchIndex = previousItems.findIndex(
-      (prev, i) => !used.has(i) && prev.name === name,
-    );
+    let matchIndex = previousItems.findIndex((prev, i) => !used.has(i) && prev.name === item.name);
     if (matchIndex === -1 && index < previousItems.length && !used.has(index)) {
       matchIndex = index;
     }
@@ -431,10 +428,10 @@ export async function editOrder(input: {
     const imageUrls = match?.imageUrls;
     return {
       id: match?.id || crypto.randomUUID(),
-      name,
-      quantity: item.qty.trim() || "1",
-      link: item.link.trim(),
-      memo: item.memo.trim(),
+      name: item.name,
+      quantity: item.qty,
+      link: item.link,
+      memo: item.memo,
       ...(imageUrls && imageUrls.length > 0 ? { imageUrls } : {}),
     };
   });
@@ -449,10 +446,13 @@ export async function editOrder(input: {
     })
     .eq("id", input.orderId)
     .eq("organization_id", session.organization.id)
+    // 읽은 상태 · 수정 시각 그대로일 때만 — 그 사이 종결 · 정정 · 다른 수정이 있었으면 덮어쓰지 않는다.
+    .eq("status", existingRow.status as EditableOrderStatus)
+    .eq("updated_at", existingRow.updated_at)
     .select("id");
 
   if (error) return { ok: false, reason: "failed" };
-  if (!updated || updated.length === 0) return { ok: false, reason: "not_found" };
+  if (!updated || updated.length === 0) return { ok: false, reason: "stale" };
 
   revalidateOrders();
   return { ok: true };

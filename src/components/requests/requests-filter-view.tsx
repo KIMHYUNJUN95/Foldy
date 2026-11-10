@@ -30,6 +30,8 @@ import {
   type DateRangeValue,
 } from "@/components/requests/date-range-calendar";
 import type { Locale } from "@/lib/i18n";
+import { haptic } from "@/lib/haptics";
+import { canDeleteRequestRecord } from "@/lib/request-delete-rule";
 import type { LostItemWithReporter } from "@/lib/lost-found";
 import { lostItemClock } from "@/lib/lost-found-constants";
 import type { MaintenanceReportWithReporter } from "@/lib/maintenance-reports";
@@ -43,7 +45,7 @@ import {
   OrderDeliveryCalendar,
   type DeliveryCalendarOrder,
 } from "@/components/requests/order-delivery-calendar";
-import { getCanonicalPropertyName, localizePropertyName } from "@/lib/room-label-normalization";
+import { getCanonicalPropertyName, localizePropertyName, localizeRoomPlaceLabel } from "@/lib/room-label-normalization";
 import { resolveRequestCatalogLocation, resolveRequestLocation, type RequestLocationDisplay } from "@/lib/request-location";
 import type { ActiveRoomCatalogItem } from "@/lib/rooms";
 import type { Database } from "@/types/database";
@@ -324,6 +326,7 @@ const RequestListCard = memo(function RequestListCard({
   onDelete,
   deleteLabel,
   live,
+  leaving = false,
 }: {
   kind: ListKind;
   href: string;
@@ -336,9 +339,12 @@ const RequestListCard = memo(function RequestListCard({
   deleteLabel: string;
   /** 새 줄이 위에서 내려오는 움직임의 열쇠(`LiveWash move`). */
   live: string;
+  /** 지우는 중 — 서버를 기다리지 않고 줄을 바로 접는다(공용 `.row-collapse`). */
+  leaving?: boolean;
 }) {
   return (
-    <Link className="rqw-row" href={href} data-live={live}>
+    <div className="row-collapse" data-leaving={leaving ? "" : undefined}>
+    <Link className="rqw-row" href={href} data-live={live} tabIndex={leaving ? -1 : undefined}>
       <span className="rqw-row__ic">{KIND_ICON[kind]}</span>
       <span className="rqw-row__b">
         <span className="rqw-row__t">
@@ -363,6 +369,7 @@ const RequestListCard = memo(function RequestListCard({
         </button>
       ) : null}
     </Link>
+    </div>
   );
 });
 
@@ -432,12 +439,37 @@ export function RequestsFilterView({
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, startDeleteTransition] = useTransition();
+  const [leavingKey, setLeavingKey] = useState<string | null>(null);
 
 
-  const openDelete = useCallback((target: DeleteTarget) => {
-    setDeleteTarget(target);
-    setDeleteError(null);
-  }, []);
+  const openDelete = useCallback(
+    (target: DeleteTarget) => {
+      // 다른 줄 삭제가 진행 중이면 새 삭제 시트를 열지 않는다(롤백이 새 시트를 덮지 않게).
+      if (isDeleting) {
+        haptic("light");
+        return;
+      }
+      setDeleteTarget(target);
+      setDeleteError(null);
+    },
+    [isDeleting],
+  );
+
+  // 접히는 줄이 목록에서 실제로 빠진 그 갱신(= 접힘으로 이미 아래 줄이 올라온 뒤)에서만 LiveWash 의 FLIP 을 건너뛴다.
+  const leavingGone =
+    leavingKey !== null &&
+    !(
+      lostItems.some((x) => `lost-found-${x.id}` === leavingKey) ||
+      maintenanceReports.some((x) => `maintenance-${x.id}` === leavingKey) ||
+      orderRequests.some((x) => `order-${x.id}` === leavingKey)
+    );
+
+  // 지운 줄이 서버 갱신으로 실제로 사라지면 접힘 표시를 거둔다(그 갱신의 FLIP 은 LiveWash 가 건너뛴다).
+  useEffect(() => {
+    if (!leavingGone) return;
+    const t = window.setTimeout(() => setLeavingKey(null), 0);
+    return () => window.clearTimeout(t);
+  }, [leavingGone]);
 
   const closeDelete = useCallback(() => {
     if (isDeleting) return;
@@ -447,18 +479,35 @@ export function RequestsFilterView({
 
   function handleConfirmDelete() {
     if (!deleteTarget || isDeleting) return;
+    const target = deleteTarget;
+    // 상태는 transition 밖에서 먼저(동기) 바꾼다 — 안에서 바꾸면 React 가 서버 응답까지 미룬다.
+    setLeavingKey(`${target.type}-${target.id}`);
+    setDeleteTarget(null);
+    setDeleteError(null);
     startDeleteTransition(async () => {
-      const action =
-        deleteTarget.type === "lost-found" ? deleteLostItem :
-        deleteTarget.type === "maintenance" ? deleteMaintenanceReport :
-        deleteOrderRequest;
-      const result = await action(deleteTarget.id);
-      if (!result.ok) {
-        setDeleteError(deleteCopy.deleteFailed);
+      let ok = false;
+      try {
+        const action =
+          target.type === "lost-found" ? deleteLostItem :
+          target.type === "maintenance" ? deleteMaintenanceReport :
+          deleteOrderRequest;
+        const result = await action(target.id);
+        ok = result.ok;
+      } catch {
+        ok = false;
+      }
+      if (ok) {
+        haptic("light");
+        // 줄이 서버 갱신으로 곧 빠진다. 혹시 그대로 남아 있으면 숨긴 채 두지 말고 다시 보이게 한다.
+        const mine = `${target.type}-${target.id}`;
+        window.setTimeout(() => setLeavingKey((cur) => (cur === mine ? null : cur)), 1500);
         return;
       }
-      setDeleteTarget(null);
-      setDeleteError(null);
+      haptic("error");
+      const mine = `${target.type}-${target.id}`;
+      setLeavingKey((cur) => (cur === mine ? null : cur));
+      setDeleteTarget((cur) => cur ?? target);
+      setDeleteError(deleteCopy.deleteFailed);
     });
   }
   // ─────────────────────────────────────────────────────────────────────────
@@ -799,6 +848,7 @@ export function RequestsFilterView({
         <RequestListCard
           key={item.id}
           live={`l-${item.id}`}
+          leaving={leavingKey === `lost-found-${item.id}`}
           kind="lost-found"
           href={`/mobile/requests/lost-found/${item.id}${listQueryString ? `?${listQueryString}` : ""}`}
           title={item.item_name}
@@ -811,7 +861,7 @@ export function RequestsFilterView({
           statusLabel={lostFoundCopy.statusLabels[item.status]}
           statusTone={clock && (clock.isDueSoon || clock.isExpired) ? "soon" : activeLostStatuses.has(item.status) ? "open" : "done"}
           onDelete={
-            canDeleteAny || item.reported_by_user_id === currentUserId
+            canDeleteRequestRecord({ canDeleteAny, isOwner: item.reported_by_user_id === currentUserId })
               ? () => openDelete({ type: "lost-found", id: item.id, title: item.item_name })
               : undefined
           }
@@ -827,6 +877,7 @@ export function RequestsFilterView({
         <RequestListCard
           key={report.id}
           live={`m-${report.id}`}
+          leaving={leavingKey === `maintenance-${report.id}`}
           kind="maintenance"
           href={`/mobile/requests/maintenance/${report.id}${listQueryString ? `?${listQueryString}` : ""}`}
           title={report.issue_title}
@@ -840,7 +891,7 @@ export function RequestsFilterView({
           statusLabel={maintenanceCopy.statusLabels[report.status]}
           statusTone={report.status === "in_progress" ? "prog" : activeMaintenanceStatuses.has(report.status) ? "open" : "done"}
           onDelete={
-            canDeleteAny || report.reported_by_user_id === currentUserId
+            canDeleteRequestRecord({ canDeleteAny, isOwner: report.reported_by_user_id === currentUserId })
               ? () => openDelete({ type: "maintenance", id: report.id, title: report.issue_title })
               : undefined
           }
@@ -876,11 +927,12 @@ export function RequestsFilterView({
           <RequestListCard
             key={order.id}
             live={`o-${order.id}`}
+            leaving={leavingKey === `order-${order.id}`}
             kind="order"
             href={`/mobile/requests/orders/${order.id}${listQueryString ? `?${listQueryString}` : ""}`}
             title={order.title || order.parsedItems[0]?.name || "-"}
             meta={[
-              order.room_label,
+              localizeRoomPlaceLabel(order.room_label ?? "", buildingLabels),
               localizePropertyName(order.building_name, buildingLabels),
               order.reporter_name,
               typeFilter === "order"
@@ -892,7 +944,11 @@ export function RequestsFilterView({
             statusLabel={orderCopy.statusLabels[order.status]}
             statusTone={activeOrderStatuses.has(order.status) ? "open" : "done"}
             onDelete={
-              canDeleteAny || order.reported_by_user_id === currentUserId
+              canDeleteRequestRecord({
+                canDeleteAny,
+                isOwner: order.reported_by_user_id === currentUserId,
+                orderStatus: order.status,
+              })
                 ? () => openDelete({ type: "order", id: order.id, title: order.title || order.parsedItems[0]?.name || order.id })
                 : undefined
             }
@@ -1212,7 +1268,7 @@ export function RequestsFilterView({
       {!hasAnyResults ? <FoldyEmpty title={filterLabels.noFilterResults} /> : null}
 
       {/* 새 요청이 들어오면(실시간 · 당겨서 새로고침) 맨 위에서 내려와 끼어든다 — 탭 · 필터로 통째로 바뀔 땐 그대로. */}
-      <LiveWash move sig={rows.map((r) => r.key).join(",")}>
+      <LiveWash move skipFlip={leavingGone} sig={rows.map((r) => r.key).join(",")}>
         {rowGroups.map((group) => (
           <div key={group.key}>
             <GroupHeader label={group.label} count={group.items.length} />

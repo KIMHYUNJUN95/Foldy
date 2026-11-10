@@ -5,11 +5,12 @@
 // [반환 처리] · [보관 연장 | 폐기 처리] · 상태 정정, 완료면 「관리자 예외 개입」 복원. 상자 · 칩 없음.
 import Image from "next/image";
 import { RotateCcw, Trash2, X } from "lucide-react";
+import { canDeleteRequestRecord, type RequestDeleteAccess } from "@/lib/request-delete-rule";
 import { useAdminPanelA11y } from "@/components/admin/shared/use-admin-panel-a11y";
 import type { Locale } from "@/lib/i18n";
 import type { AdminLostItemVM } from "@/lib/admin-lost-found";
 import { localizeLostFoundMemo } from "@/lib/lost-found-memo";
-import { fmtDate, fmtDateTime, isActive, tpl } from "./lost-found-console-data";
+import { fmtDate, fmtDateTime, isActive, lostGuestLine, tpl } from "./lost-found-console-data";
 import { categoryLabel, statusLabel, type LFCopy } from "./lost-found-console-shared";
 import { dueText, storageTotal } from "./lost-found-board";
 
@@ -23,6 +24,10 @@ type PanelProps = {
   locale: Locale;
   onClose: () => void;
   onAction: (kind: LFActionKind, id: string) => void;
+  /** 휴지통을 보일지 — 모바일과 같은 규칙 `canDeleteRequestRecord`(본인 것 또는 `request.delete_any`). 서버가 다시 본다. */
+  deleteAccess: RequestDeleteAccess;
+  /** 반환 · 폐기 · 연장 · 정정 · 복원 권한(`lost_found.handle`, 모바일과 같은 키). 없으면 아래 처리 단추를 숨긴다(서버가 다시 본다). */
+  canHandle: boolean;
   disabled?: boolean;
 };
 
@@ -38,7 +43,7 @@ function Gallery({ urls }: { urls: readonly string[] }) {
   );
 }
 
-export function LostFoundDetailPanel({ item, t, adminRestoreLabel, autoDisposeLabel, locale, onClose, onAction, disabled }: PanelProps) {
+export function LostFoundDetailPanel({ item, t, adminRestoreLabel, autoDisposeLabel, locale, onClose, onAction, canHandle, deleteAccess, disabled }: PanelProps) {
   const panelRef = useAdminPanelA11y<HTMLElement>(onClose, { disabled });
   if (!item) return null;
 
@@ -46,12 +51,7 @@ export function LostFoundDetailPanel({ item, t, adminRestoreLabel, autoDisposeLa
   const flag = active && item.isExpired ? t.expiredFlag : active && item.isDueSoon ? t.soonFlag : null;
   const total = storageTotal(item);
   const pct = Math.min(100, Math.round((item.storedDays / total) * 100));
-  const guest = item.guest
-    ? t.guestStay
-        .replace("{name}", item.guest.name)
-        .replace("{in}", fmtDate(item.guest.checkIn, locale))
-        .replace("{out}", fmtDate(item.guest.checkOut, locale))
-    : null;
+  const guest = item.guest ? lostGuestLine(item.guest, t.guestStay, locale) : null;
   const memo = item.handlingMemo ? localizeLostFoundMemo(item.handlingMemo, adminRestoreLabel, autoDisposeLabel) : null;
 
   return (
@@ -72,9 +72,11 @@ export function LostFoundDetailPanel({ item, t, adminRestoreLabel, autoDisposeLa
               <span>{categoryLabel(item.category, t)}</span>
             </span>
             <span className="lfp__acts">
-              <button type="button" className="lfp__del" title={t.del} aria-label={t.del} onClick={() => onAction("delete", item.id)}>
-                <Trash2 aria-hidden="true" />
-              </button>
+              {canDeleteRequestRecord({ canDeleteAny: deleteAccess.canDeleteAny, isOwner: item.reporterId === deleteAccess.userId }) ? (
+                <button type="button" className="lfp__del" title={t.del} aria-label={t.del} onClick={() => onAction("delete", item.id)}>
+                  <Trash2 aria-hidden="true" />
+                </button>
+              ) : null}
               <button type="button" className="panel__x" onClick={onClose} aria-label={t.close}>
                 <X />
               </button>
@@ -158,6 +160,7 @@ export function LostFoundDetailPanel({ item, t, adminRestoreLabel, autoDisposeLa
           ) : null}
         </div>
 
+        {canHandle ? (
         <div className="panel__foot lfp__foot">
           {active ? (
             <>
@@ -188,6 +191,7 @@ export function LostFoundDetailPanel({ item, t, adminRestoreLabel, autoDisposeLa
             </>
           )}
         </div>
+        ) : null}
       </aside>
     </>
   );

@@ -10,8 +10,10 @@ import { useRouter } from "next/navigation";
 import { Search, X } from "lucide-react";
 import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
 import { AdminDateRangePicker } from "@/components/admin/shared/admin-date-range-picker";
+import { adminActionErrorMessage } from "@/components/admin/shared/admin-action-error";
 import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import type { RequestDeleteAccess } from "@/lib/request-delete-rule";
 import type { AdminOrderVM } from "@/lib/admin-orders";
 import {
   rejectOrder,
@@ -23,6 +25,7 @@ import { updateOrderRequestStatus, updateOrderDeliveryDate } from "@/actions/ord
 import { deleteOrderRequest } from "@/actions/request-delete";
 import "@/components/admin/maintenance/maintenance-console.css";
 import "@/components/admin/lost-found/lost-found-console.css";
+import { ORDER_ITEM_LIMITS } from "@/lib/order-item-rules";
 import "./orders-console.css";
 import {
   LIST_STATUS,
@@ -47,6 +50,8 @@ import { OrdersDetailPanel, type OrdActionKind } from "./orders-detail-panel";
 import { OrdersActionModal, type OrdActionPayload } from "./orders-action-modal";
 
 type OrdersConsoleProps = {
+  /** 패널 휴지통 규칙(본인 id · `request.delete_any`). */
+  deleteAccess: RequestDeleteAccess;
   locale: Locale;
   orders: AdminOrderVM[];
   loadError: boolean;
@@ -62,7 +67,7 @@ function defaultRange(todayKey: string): { from: string; to: string } {
   return { from: iso(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()), to: todayKey };
 }
 
-export function OrdersConsole({ locale, orders, loadError, todayKey }: OrdersConsoleProps) {
+export function OrdersConsole({ deleteAccess, locale, orders, loadError, todayKey }: OrdersConsoleProps) {
   const router = useRouter();
   const dictionary = getDictionary(locale);
   const t = dictionary.admin.orders.console;
@@ -130,33 +135,29 @@ export function OrdersConsole({ locale, orders, loadError, todayKey }: OrdersCon
   }
 
   /**
-   * `router.refresh()` 는 **여기서 섞여 있다** — 액션마다 다르므로 일괄 제거하면 안 된다.
+   * 액션 뒤에 `router.refresh()` 를 부르지 않는다 — 모든 처리 액션이 서버에서 `/admin/orders` 를 재검증한다(2026-11-10 —
+   * `updateOrderRequestStatus` · `updateOrderDeliveryDate` 에도 넣었다. 그 전엔 이 두 갈래만 여기서 새로고침했다).
+   * 서버 액션이 경로를 재검증하면 응답에 갱신된 화면이 같이 오므로 추가 새로고침은 같은 데이터를 한 번 더 받을 뿐이다.
    *
-   *   reject / reopen / correct / edit → `revalidateOrders()` 가 /admin/orders 포함  ⇒ 제거함
-   *   deleteOrderRequest               → `revalidateAfterDelete` 가 포함              ⇒ 제거함
-   *   updateOrderRequestStatus         → /mobile/requests · /mobile/notifications 만  ⇒ 유지
-   *   updateOrderDeliveryDate          → 같음                                        ⇒ 유지
-   *
-   * 유지 쪽을 지우면 **처리 후 이 목록이 갱신되지 않는다.** (2026-08-11)
+   * 실패 토스트는 서버가 돌려준 이유대로(권한 · 그 사이 바뀜 · 저장 못 함) — `adminActionErrorMessage`.
    */
   function handleConfirmAction(kind: OrdActionKind, id: string, payload: OrdActionPayload) {
     startTransition(async () => {
       if (kind === "approve") {
         const result = await updateOrderRequestStatus({ orderId: id, targetStatus: "approved" });
         if (!result.ok) {
-          showToast(t.errS);
+          showToast(adminActionErrorMessage(result.error, shared));
           return;
         }
         setConfirm(null);
         showToast(t.tApprove);
-        router.refresh();
         return;
       }
 
       if (kind === "reject") {
         const result = await rejectOrder({ orderId: id, reason: payload.memo ?? "" });
         if (!result.ok) {
-          showToast(t.errS);
+          showToast(adminActionErrorMessage(result.reason, shared));
           return;
         }
         setConfirm(null);
@@ -176,19 +177,18 @@ export function OrdersConsole({ locale, orders, loadError, todayKey }: OrdersCon
             ? await updateOrderRequestStatus({ orderId: id, targetStatus: "ordered", ...delivery })
             : await updateOrderDeliveryDate({ orderId: id, ...delivery });
         if (!result.ok) {
-          showToast(t.errS);
+          showToast(adminActionErrorMessage(result.error, shared));
           return;
         }
         setConfirm(null);
         showToast(kind === "process" ? t.tProcess : t.tEditDeliv);
-        router.refresh();
         return;
       }
 
       if (kind === "reopen") {
         const result = await reopenOrder({ orderId: id });
         if (!result.ok) {
-          showToast(t.errS);
+          showToast(adminActionErrorMessage(result.reason, shared));
           return;
         }
         setConfirm(null);
@@ -203,7 +203,7 @@ export function OrdersConsole({ locale, orders, loadError, todayKey }: OrdersCon
           memo: payload.memo ?? "",
         });
         if (!result.ok) {
-          showToast(t.errS);
+          showToast(adminActionErrorMessage(result.reason, shared));
           return;
         }
         setConfirm(null);
@@ -214,13 +214,21 @@ export function OrdersConsole({ locale, orders, loadError, todayKey }: OrdersCon
       if (kind === "edit") {
         const result = await editOrder({
           orderId: id,
+          expectedUpdatedAt: payload.expectedUpdatedAt ?? "",
           title: payload.title ?? "",
           urgency: payload.urgency ?? "normal",
           reason: payload.reason ?? "",
           items: payload.items ?? [],
         });
         if (!result.ok) {
-          showToast(t.errS);
+          // 새로 넣거나 고친 품목이 규칙에 안 맞으면 무엇을 고칠지 알려 준다.
+          showToast(
+            result.reason === "invalid_item"
+              ? t.wInvalidItem
+              : result.reason === "too_many_items"
+                ? tpl(t.wTooManyItems, { max: ORDER_ITEM_LIMITS.maxItems })
+                : adminActionErrorMessage(result.reason, shared),
+          );
           return;
         }
         setConfirm(null);
@@ -231,7 +239,7 @@ export function OrdersConsole({ locale, orders, loadError, todayKey }: OrdersCon
       // 삭제
       const result = await deleteOrderRequest(id);
       if (!result.ok) {
-        showToast(t.errS);
+        showToast(adminActionErrorMessage(result.error, shared));
         return;
       }
       setConfirm(null);
@@ -274,14 +282,19 @@ export function OrdersConsole({ locale, orders, loadError, todayKey }: OrdersCon
   const exportBar = (
     <OrdersExportBar
       disabled={loadError || (view === "all" && listRows.length === 0)}
-      filters={{
-        startDate: filters.from,
-        endDate: filters.to,
-        status: view === "all" && filters.status !== "all" ? filters.status : undefined,
-        urgency: view === "all" && filters.urgency !== "all" ? filters.urgency : undefined,
-        building: filters.prop !== "all" ? filters.prop : undefined,
-        query: view === "all" && filters.query.trim() ? filters.query.trim() : undefined,
-      }}
+      // 처리 중 보기는 기간 고르기가 없다 — 숨은 기본 30일을 보내지 않고 「종결 안 된 주문 전부」(scope: "open")를 담는다(2026-11-10).
+      filters={
+        view === "all"
+          ? {
+              startDate: filters.from,
+              endDate: filters.to,
+              status: filters.status !== "all" ? filters.status : undefined,
+              urgency: filters.urgency !== "all" ? filters.urgency : undefined,
+              building: filters.prop !== "all" ? filters.prop : undefined,
+              query: filters.query.trim() ? filters.query.trim() : undefined,
+            }
+          : { scope: "open", building: filters.prop !== "all" ? filters.prop : undefined }
+      }
       labels={shared}
     />
   );
@@ -310,6 +323,14 @@ export function OrdersConsole({ locale, orders, loadError, todayKey }: OrdersCon
             todayKey={todayKey}
             calMonth={calMonth}
             onCalMonthChange={setCalMonth}
+            labels={{
+              prevMonth: shared.datePrevMonth,
+              nextMonth: shared.dateNextMonth,
+              prevYear: shared.datePrevYear,
+              nextYear: shared.dateNextYear,
+              open: shared.dateSelect,
+              thisMonth: shared.dateThisMonth,
+            }}
             onToday={() => {
               setCalMonth({ y: +todayKey.slice(0, 4), m: +todayKey.slice(5, 7) - 1 });
               setCalSel(todayKey);
@@ -496,6 +517,7 @@ export function OrdersConsole({ locale, orders, loadError, todayKey }: OrdersCon
         todayKey={todayKey}
         onClose={() => setSelectedId(null)}
         onAction={(kind, id) => setConfirm({ kind, id })}
+        deleteAccess={deleteAccess}
         disabled={confirm !== null}
       />
 
@@ -506,6 +528,7 @@ export function OrdersConsole({ locale, orders, loadError, todayKey }: OrdersCon
           t={t}
           locale={locale}
           todayKey={todayKey}
+          shared={shared}
           pending={isPending}
           onCancel={() => setConfirm(null)}
           onConfirm={handleConfirmAction}

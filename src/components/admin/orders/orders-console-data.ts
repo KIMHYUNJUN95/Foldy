@@ -125,25 +125,21 @@ export function weekWindow(todayKey: string): { from: number; to: number } {
 }
 
 /* ---------------- 포매터 ---------------- */
-export function fmtDate(d: string, lang: OrdersLang): string {
+/** 비었거나 잘못된 날짜면 「—」 — 던지면(RangeError) 콘솔 전체가 오류 화면이 된다(2026-11-10, 분실물과 같은 규칙). */
+export function fmtDate(d: string | null | undefined, lang: OrdersLang): string {
+  if (!d) return "—";
+  const date = new Date(`${d}T00:00:00+09:00`);
+  if (Number.isNaN(date.getTime())) return "—";
   return new Intl.DateTimeFormat(lang, {
     month: "short",
     day: "numeric",
     timeZone: "Asia/Tokyo",
-  }).format(new Date(`${d}T00:00:00+09:00`));
+  }).format(date);
 }
 export function fmtDateTime(ts: string | null | undefined, lang: OrdersLang): string {
   if (!ts) return "—";
   const [d, t] = ts.split(" ");
   return `${fmtDate(d, lang)} ${t}`;
-}
-/** fmtMonth(y, m0, lang) — m0은 0-based 월. */
-export function fmtMonth(y: number, m0: number, lang: OrdersLang): string {
-  return new Intl.DateTimeFormat(lang, {
-    year: "numeric",
-    month: "long",
-    timeZone: "UTC",
-  }).format(new Date(Date.UTC(y, m0, 1)));
 }
 const weekdayLabels = (lang: OrdersLang) =>
   Array.from({ length: 7 }, (_, day) =>

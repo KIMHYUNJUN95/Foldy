@@ -17,7 +17,13 @@ export default async function AdminOrdersPage() {
   return (
     <AdminShell activeItem="orders" title={title}>
       <LiveRefresh sources={requestLiveSources(session.organization.id)} />
-      <OrdersConsole locale={locale} orders={orders} loadError={loadError} todayKey={todayKey} />
+      <OrdersConsole
+        deleteAccess={{ canDeleteAny: session.capabilities.includes("request.delete_any"), userId: session.user.id }}
+        locale={locale}
+        orders={orders}
+        loadError={loadError}
+        todayKey={todayKey}
+      />
     </AdminShell>
   );
 }

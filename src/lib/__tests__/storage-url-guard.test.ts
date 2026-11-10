@@ -49,7 +49,8 @@ describe("lost-found handling rules", () => {
     expect(isValidLostItemTransition("registered", "disposed")).toBe(false);
     expect(isValidLostItemTransition("stored", "returned")).toBe(true);
     expect(isValidLostItemTransition("disposed", "stored")).toBe(false);
-    expect(isValidLostItemTransition("returned", "returned")).toBe(true);
+    // 종결 상태에서는 같은 상태 저장도 안 된다(2026-11-10).
+    expect(isValidLostItemTransition("returned", "returned")).toBe(false);
   });
 
   it("splits admin-restore system lines out of the editable memo", () => {

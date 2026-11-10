@@ -4,6 +4,7 @@
 // 담당하고, 여기서는 기록 열람 + 관리자 예외 개입(강제 완료 / 무효 / 삭제)만 한다.
 // maint-views.js 의 panel() 을 따른다.
 import Image from "next/image";
+import Link from "next/link";
 import { Trash2, TriangleAlert, X } from "lucide-react";
 import { useAdminPanelA11y } from "@/components/admin/shared/use-admin-panel-a11y";
 import type { Locale } from "@/lib/i18n";
@@ -11,8 +12,17 @@ import type { AdminMaintenanceReport } from "@/lib/admin-maintenance";
 import { fmtDate, fmtDateTime, fmtElapsed, isActive } from "./maintenance-console-data";
 import { categoryLabel, priorityLabel, statusLabel, type MaintCopy } from "./maintenance-console-shared";
 import { useRoomPlaceLabel } from "@/components/shared/building-names";
+import { canDeleteRequestRecord, type RequestDeleteAccess } from "@/lib/request-delete-rule";
 
 export type MaintExceptionKind = "force" | "void" | "del";
+
+// 연동된 청소 · 예약 — 콘솔의 해당 화면으로 바로 간다(2026-11-10, 예전엔 토스트만 떴다). 청소는 그날의 오늘 청소 화면
+// (`/admin/cleaning?date=`), 예약은 체크인 달 · 그 건물의 예약 캘린더(`/admin/calendar?month=&property=`).
+function reservationHref(checkIn: string, building: string | null): string {
+  const params = new URLSearchParams({ month: checkIn.slice(0, 7) });
+  if (building) params.set("property", building);
+  return `/admin/calendar?${params.toString()}`;
+}
 
 type PanelProps = {
   report: AdminMaintenanceReport | null;
@@ -20,7 +30,10 @@ type PanelProps = {
   locale: Locale;
   onClose: () => void;
   onException: (kind: MaintExceptionKind, id: string) => void;
-  onOpenLink: (kind: "clean" | "resv") => void;
+  /** 휴지통을 보일지 — 모바일과 같은 규칙 `canDeleteRequestRecord`(본인 것 또는 `request.delete_any`). 서버가 다시 본다. */
+  deleteAccess: RequestDeleteAccess;
+  /** 강제 완료 · 무효 권한(`maintenance_status_change`). 삭제는 서버가 본인 · `request.delete_any` 로 따로 본다. */
+  canHandle: boolean;
   disabled?: boolean;
 };
 
@@ -30,7 +43,8 @@ export function MaintenanceDetailPanel({
   locale,
   onClose,
   onException,
-  onOpenLink,
+  canHandle,
+  deleteAccess,
   disabled,
 }: PanelProps) {
   const bRoom = useRoomPlaceLabel();
@@ -39,7 +53,8 @@ export function MaintenanceDetailPanel({
 
   const occupied = report.occupied;
   const aging = report.aging;
-  const canAct = isActive(report);
+  const active = isActive(report);
+  const canAct = active && canHandle;
 
   const resv = report.link.reservation;
   const clean = report.link.cleaning;
@@ -58,9 +73,11 @@ export function MaintenanceDetailPanel({
               <span>{categoryLabel(report.category, t)}</span>
             </span>
             <span className="mwp__acts">
-              <button type="button" className="mwp__del" title={t.del} aria-label={t.del} onClick={() => onException("del", report.id)}>
-                <Trash2 aria-hidden="true" />
-              </button>
+              {canDeleteRequestRecord({ canDeleteAny: deleteAccess.canDeleteAny, isOwner: report.reporterId === deleteAccess.userId }) ? (
+                <button type="button" className="mwp__del" title={t.del} aria-label={t.del} onClick={() => onException("del", report.id)}>
+                  <Trash2 aria-hidden="true" />
+                </button>
+              ) : null}
               <button type="button" className="panel__x" onClick={onClose} aria-label={t.close}>
                 <X />
               </button>
@@ -104,7 +121,7 @@ export function MaintenanceDetailPanel({
             <dt>{t.pReportedAt}</dt>
             <dd>
               {fmtDateTime(report.createdAt, locale)}
-              {canAct ? <span className="mwp__muted"> · {fmtElapsed(report.createdAt, locale)}</span> : null}
+              {active ? <span className="mwp__muted"> · {fmtElapsed(report.createdAt, locale)}</span> : null}
             </dd>
             {report.completedAt ? (
               <>
@@ -118,15 +135,15 @@ export function MaintenanceDetailPanel({
             <dt>{t.pLinked}</dt>
             <dd>
               {clean ? (
-                <button type="button" className="mwp__link" onClick={() => onOpenLink("clean")}>
+                <Link className="mwp__link" href={`/admin/cleaning?date=${clean.date}`}>
                   {t.pCleaning} · {bRoom(clean.room)} {fmtDate(clean.date, locale)}
-                </button>
+                </Link>
               ) : null}
               {clean && resv ? <br /> : null}
               {resv && !occupied ? (
-                <button type="button" className="mwp__link" onClick={() => onOpenLink("resv")}>
+                <Link className="mwp__link" href={reservationHref(resv.checkIn, report.buildingRaw)}>
                   {t.pReservation} · {resv.guest}
-                </button>
+                </Link>
               ) : null}
               {!clean && (!resv || occupied) ? <span className="mwp__muted">{t.noLinked}</span> : null}
             </dd>

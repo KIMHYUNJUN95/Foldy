@@ -4,12 +4,12 @@
 // 월~일 달력(세로선 없음 · 주 사이 가로선만), 칸마다 그날 배송 칩(품목 · 건물), 오늘은 보라 동그라미,
 // 고른 날은 옅은 보라 바탕. 오른쪽에 그날 배송 목록(제목 · 건물 · 신청자 · 상태). 기간 배송은 걸친 날마다 칩.
 // 건물 고르기는 보기 줄(orders-console.tsx)에서 — 여기엔 이미 좁혀진 orders 가 온다.
-import { ChevronLeft, ChevronRight, PackageOpen, TriangleAlert } from "lucide-react";
+import { PackageOpen, TriangleAlert } from "lucide-react";
+import { AdminMonthPicker, type AdminMonthPickerLabels } from "@/components/admin/shared/admin-month-picker";
 import type { Locale } from "@/lib/i18n";
 import type { AdminOrderVM } from "@/lib/admin-orders";
-import { shiftMonthKey } from "@/components/admin/shared/admin-month-key";
-import { STATUS, dateToNum, delivOnDate, fmtMonth, iso, sortForBoard, tpl, WD } from "./orders-console-data";
-import { copyOf, type OrdersCopy } from "./orders-console-shared";
+import { STATUS, dateToNum, delivOnDate, iso, sortForBoard, tpl, WD } from "./orders-console-data";
+import { copyOf, localeTagOf, type OrdersCopy } from "./orders-console-shared";
 
 export type CalMonth = { y: number; m: number };
 
@@ -32,12 +32,10 @@ function monthKeyOf(m: CalMonth): string {
   return `${m.y}-${String(m.m + 1).padStart(2, "0")}`;
 }
 
-function shift(m: CalMonth, delta: number): CalMonth {
-  const key = shiftMonthKey(monthKeyOf(m), delta);
-  return { y: +key.slice(0, 4), m: +key.slice(5, 7) - 1 };
-}
-
-/** 보기 줄(orders-console.tsx)에 놓는 달 이동 — 「‹ 2026년 10월 › 오늘」(시안 OrderCal-PC 보기 줄의 달 자리). */
+/**
+ * 보기 줄(orders-console.tsx)에 놓는 달 이동 — 공용 `AdminMonthPicker`(CLAUDE.md 4a, 2026-11-10: 예전엔 여기서 ‹ › 를 따로 그렸다)
+ * + 「오늘」(이번 달로 가면서 오늘을 고른다). 주소는 바꾸지 않는다(`onSelect`).
+ */
 export function OrdersMonthNav({
   t,
   locale,
@@ -45,6 +43,7 @@ export function OrdersMonthNav({
   calMonth,
   onCalMonthChange,
   onToday,
+  labels,
 }: {
   t: OrdersCopy;
   locale: Locale;
@@ -52,17 +51,18 @@ export function OrdersMonthNav({
   calMonth: CalMonth;
   onCalMonthChange: (next: CalMonth) => void;
   onToday: () => void;
+  labels: AdminMonthPickerLabels;
 }) {
   const isThisMonth = calMonth.y === +todayKey.slice(0, 4) && calMonth.m === +todayKey.slice(5, 7) - 1;
   return (
     <span className="ow-mnav">
-      <button type="button" className="ow-navb" aria-label={t.wPrevMonth} onClick={() => onCalMonthChange(shift(calMonth, -1))}>
-        <ChevronLeft aria-hidden="true" />
-      </button>
-      <b className="num">{fmtMonth(calMonth.y, calMonth.m, locale)}</b>
-      <button type="button" className="ow-navb" aria-label={t.wNextMonth} onClick={() => onCalMonthChange(shift(calMonth, 1))}>
-        <ChevronRight aria-hidden="true" />
-      </button>
+      <AdminMonthPicker
+        basePath="/admin/orders"
+        labels={labels}
+        localeTag={localeTagOf(locale)}
+        onSelect={(ym) => onCalMonthChange({ y: +ym.slice(0, 4), m: +ym.slice(5, 7) - 1 })}
+        ym={monthKeyOf(calMonth)}
+      />
       {!isThisMonth ? (
         <button type="button" className="ow-link" onClick={onToday}>
           {t.calToday}

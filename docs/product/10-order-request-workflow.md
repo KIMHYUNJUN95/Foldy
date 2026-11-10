@@ -55,8 +55,8 @@ Requester-side UX priority:
 Staff/part-time staff creates order request
 Office Admin reviews request
 Office Admin approves or rejects
-If rejected, requester receives notification with rejection reason
-If approved, requester receives approval notification
+If rejected / approved, the requester sees it in the request detail (no notification yet — approve / reject notifications are
+deferred to the project-wide notification phase at the end of development; today only 「주문 처리」 and 「배송일 변경」 notify, 2026-11-10)
 Office Admin processes the order (주문 처리) — marks status as ordered
 Requester receives order-processed notification
 ```
@@ -247,18 +247,15 @@ Status transition rules (enforced server-side):
 
 Required notifications:
 
-### Approved
+### Approved — 미구현(알림 일괄 단계로 미룸)
 
-When Office Admin approves a request:
+When Office Admin approves a request: requester notification is **planned, not implemented** (2026-11-10 doc fix — this section used
+to read as if it worked). Deferred to the end-of-development notification batch.
 
-- Requester receives notification
+### Rejected — 미구현(알림 일괄 단계로 미룸)
 
-### Rejected
-
-When Office Admin rejects a request:
-
-- Requester receives notification
-- Rejection reason is included
+When Office Admin rejects a request: requester notification with the rejection reason is **planned, not implemented**. The reason is
+stored in `admin_memo` and shown on the request detail. Deferred to the notification batch.
 
 ### Order Processed (주문 처리)
 
@@ -478,7 +475,8 @@ which the console also reuses.
 주문 → 배송일 기입 → 캘린더 자동 반영**까지 끝낸다.
 
 **8종 액션 모달**로 구현됐다: approve · reject · process · editdeliv(배송일 수정) · reopen · correct ·
-edit · delete. 배송일 피커는 공용 `.calpop` 크롬을 재사용(단일/기간 토글). KPI strip은 위 "KPI strip (5)"
+edit · delete. 배송일은 단일/기간 토글 + 공용 피커(하루 `AdminDatePicker` · 기간 `AdminDateRangePicker`, 2026-11-10 — 그 전엔 창 안에
+따로 그린 달력이었다). 배송 캘린더 보기의 달 이동도 공용 `AdminMonthPicker`. KPI strip은 위 "KPI strip (5)"
 정의 그대로 5칸 구현됐다.
 
 ### 구 상세 라우트 상태 — 삭제 완료 (2026-07-17)
@@ -492,7 +490,7 @@ edit · delete. 배송일 피커는 공용 `.calpop` 크롬을 재사용(단일/
 ### 범위 밖 / 후속
 
 - **알림**은 이번에 붙이지 않는다 — 개발 막바지 **알림 일괄 구현 단계**에서 처리(프로젝트 전역 방침).
-  기존 승인/거절/주문처리/배송일변경 알림은 그대로 동작.
+  지금 동작하는 알림은 **주문 처리 · 배송일 변경 둘뿐**이다(승인 · 거절 알림은 구현된 적이 없다 — 2026-11-10 문서 정정).
 - **입고/도착 추적(`received` 활성화) · 비품 카탈로그 · 재고 · 단가**는 이번 콘솔 재구축 범위 밖(별도
   워크플로 확장 과제). `received`는 콘솔에서 계속 비활성 단계로 둔다.
 - **내보내기(Excel/PDF)**: 기존 `OrdersExportBar` + 공용 export primitives를 콘솔에서도 그대로 유지
@@ -553,6 +551,9 @@ Important:
 | staff | ✅ | ❌ |
 | part_time_staff | ✅ | ❌ |
 
+"Others' records" = `request.delete_any`. Until 2026-11-10 the registry and DB role table still gave it to field_manager (opposite to
+this table) — migration 202611100001 removed it.
+
 ### Entry point
 
 - Delete button is accessible directly from the **request list view** (icon button per card).
@@ -569,6 +570,12 @@ Important:
 
 - Orders in `ordered` or `received` status: only admin roles can delete (the order may already be placed externally).
 - Orders in `requested`, `approved`, or `closed` status: owner can delete.
+- The mobile list shows the trash button by the same rule — one shared helper, `canDeleteRequestRecord()` (`src/lib/request-delete-rule.ts`), so UI and server cannot drift (2026-11-10). "Admin" = the `request.delete_any` capability, never a hardcoded role list.
+- Removing a row collapses it immediately (`.row-collapse`), light haptic on success, error haptic + row restored on failure.
+
+### Photo limit
+
+- Order photos are capped at **5 per item** (not per order) — intended, keep as is (`order-item-row.tsx`).
 
 ### Server-side enforcement
 
@@ -598,9 +605,41 @@ Important:
 
 ## 2026-10-26 어드민 예외 개입 · 내보내기 정합성
 
-- 거절(`rejectOrder`) · 재오픈(`reopenOrder`) · 상태 정정(`correctOrderStatus`)은 읽은 상태로 조건부 업데이트(`.eq("status", 읽은 값)`)하고 0행이면 `invalid`(동시 변경).
+- 거절(`rejectOrder`) · 재오픈(`reopenOrder`) · 상태 정정(`correctOrderStatus`)은 읽은 상태로 조건부 업데이트(`.eq("status", 읽은 값)`)하고 0행이면 `stale`(동시 변경, 2026-11-10 전엔 `invalid`).
 - 정정으로 `ordered` 로 보내려면 배송일이 이미 있어야 한다(없으면 `invalid`). 거절 사유(`admin_memo`)는 종결 건을 되돌릴 때만 지우고, 거절 시 사유를 비워 두면 기존 메모를 유지한다.
 - Excel/PDF 내보내기는 기간 · 상태 외에 **긴급도 · 건물 · 검색어**(전체 기록 보기)도 서버에서 같이 거른다 — 화면에 보이는 목록과 같은 결과.
+
+## 2026-11-10 점검 정리
+
+- **실패 이유**: 콘솔 처리 액션은 읽은 뒤 상태가 바뀌었으면 `stale`(예전 `invalid`)을 돌려주고, 콘솔 토스트는 공용 `adminActionErrorMessage`
+  (`admin.shared.actionForbidden / actionStale / actionFailed`)로 권한 없음 · 그 사이 바뀜 · 저장 못 함을 나눠 보여 준다(예전엔 「불러오지 못했어요」).
+- **정정 → 종결**: 거절과 같은 규칙으로 배송일(`delivery_date` · `delivery_start_date` · `delivery_end_date`)을 비운다.
+- **내용 수정(`editOrder`)**: 종결(`closed`) 건은 고치지 않는다(다시 열기 뒤에) — 패널에서도 「요청 수정」이 안 보인다. 화면이 보낸 품목
+  목록을 그대로 저장하고, 품목 사진 · id 는 예전처럼 이름이 같거나 같은 자리의 기존 품목에서 물려받는다. 이름 · 수량이 빈 예전 품목은
+  원래부터 화면에 안 보이고 저장 때 빠진다(예전 동작 그대로). 품목 규칙은 모바일 등록과 같은 `src/lib/order-item-rules.ts` 하나 —
+  이름 필수, 수량은 **0보다 크고 9999 이하인 숫자(소수 허용 — 예전에 저장된 1.5 도 통과)**, 품목명 120자 · 메모 1000자 · 링크 2000자,
+  보낸 품목 40개까지(`ORDER_ITEM_LIMITS.maxItems` — 서버 · PC 수정 창 · 모바일 등록 폼 · 「n / 최대」 글이 같이 씀). 걸리면
+  `invalid_item`(「품목을 확인해 주세요…」, 주문 콘솔 사전 `wInvalidItem`) · `too_many_items`(`wTooManyItems`). 동시 편집은 행 전체로
+  본다 — 창을 연 때의 `updated_at`(`AdminOrderVM.updatedAt`)을 보내 그대로일 때만(읽은 상태 + `updated_at` 조건부 update) 쓰고, 다르면
+  `stale`. 모바일 등록은 예전엔 `Number(quantity) > 0` 만 봐서 「1e3」 같은 글이 들어가고 틀린 품목이 말없이 빠졌다 — 이제
+  `?error=invalid_item`.
+- **처리 창 구조**: 주문 처리 창(`.modal.lfm.owm`)은 transform 가운데 정렬 · 바깥 스크롤을 쓰지 않는다(inset + margin auto, 들어올 때
+  opacity 만, `overflow: visible`) — 공용 날짜 피커(기간 `.calpop` 은 fixed, 하루 `.adp__pop` 은 absolute)가 창 안에 그대로 뜨게.
+  분실물 처리 창이 되는 이유(`overflow: visible`)와 같다. 요청 수정 창(날짜 피커 없음)만 창 안 스크롤. 하루 달력은 이 창 안에서만
+  위로 연다(`.modal.lfm.owm .adp__pop { top: auto; bottom: calc(100% + 6px) }` — 날짜 칸이 창 아래쪽이라 1280×700 에서 아래로 열면
+  잘렸다). Esc 는 창이 캡처 단계에서 열린 피커(`.adp__pop` · `.calpop`)가 있으면 무시하고 피커만 닫힌다. 배송일 단추는 분실물 창과
+  같은 모양(`.lfm__nf--date`).
+- **배송일 수정**: `received`(화면엔 `ordered` 로 보임)도 받는다 — 단추는 보이는데 저장이 막혀 있었다.
+- **재검증**: `updateOrderRequestStatus`(승인 · 주문 · 거절) · `updateOrderDeliveryDate` 도 `/mobile/requests` · 상세 · `/admin/orders` 를
+  재검증한다. 콘솔의 `router.refresh()` 는 뺐다.
+- **내보내기 — 처리 중 보기**: 그 보기에는 기간 고르기가 없는데 숨은 기본 30일이 같이 넘어가 한 달 넘은 요청이 파일에서 빠졌다. 이제
+  `scope: "open"` — 기간 없이 **종결 안 된 주문 전부**(건물 고르기만 따름). 전체 기록 보기는 그대로(기간 · 상태 · 긴급도 · 건물 · 검색어).
+  규칙은 `src/lib/orders-export-filter.ts`.
+- **DB — 등록 막기**: 주문 처리 권한(`order_processor`)이 없으면 `requested` · 빈 배송일 · 빈 관리자 메모로만 INSERT 된다(트리거
+  `enforce_order_request_insert`, 202611100001). 예전 보호 트리거는 UPDATE 만 봤다.
+- **다시 보내기**: 같은 요청 id 로 다시 보내면(첫 번째가 이미 저장됨) 내 행일 때 성공으로 넘긴다(`isOwnResentRequest`).
+- **삭제**: 공용 `src/actions/request-delete.ts` 가 `canDeleteRequestRecord` 하나로 판정하고, 읽은 상태 그대로인 행만 지우며 지운 행 수를 본다
+  (읽은 뒤 `ordered` 로 넘어간 주문을 작성자가 지우던 틈을 막음).
 
 ## 실시간 갱신 (2026-10-29)
 

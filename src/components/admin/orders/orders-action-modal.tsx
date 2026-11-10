@@ -4,15 +4,17 @@
 // 화이트 리디자인(2026-10-14, 시안 OrderAct-PC · OrderEdit-PC): 분실물 처리 창(.lfm)과 같은 껍데기 — 제목 ·
 // 「제목 · 건물 · 품목 n · 총 m개」 · 설명 한 줄 → 칸 → [취소][확인]. × 없음, 닫기는 「취소」 하나(Esc · 바깥 누르기도 취소).
 // 승인 · 다시 열기 창의 메모 칸은 서버가 받지 않아 뺐다(예전엔 입력해도 버려졌다). 주문 처리 창의 메모도 같은 이유로 뺐다.
-// 배송일(주문 처리 · 배송일 수정)은 CLAUDE.md 4a 의 예외 — 하루/기간 토글이 필요해 창 안에 달력을 직접 그린다
-// (공용 .calpop 과 같은 칸 크기 · 오늘 점 · 보라 선택). 달 이동은 shiftMonthKey().
-import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Plus, Trash2 } from "lucide-react";
-import type { Locale } from "@/lib/i18n";
+// 배송일(주문 처리 · 배송일 수정)은 하루/기간 토글 + 공용 달력 — 하루는 `AdminDatePicker`, 기간은 `AdminDateRangePicker`
+// (CLAUDE.md 4a, 2026-11-10: 예전엔 창 안에 달력을 따로 그렸다).
+import { useEffect, useRef, useState } from "react";
+import { Plus, Trash2 } from "lucide-react";
+import { AdminDatePicker } from "@/components/admin/shared/admin-date-picker";
+import { AdminDateRangePicker } from "@/components/admin/shared/admin-date-range-picker";
+import type { Dictionary, Locale } from "@/lib/i18n";
 import type { AdminOrderVM } from "@/lib/admin-orders";
-import { shiftMonthKey } from "@/components/admin/shared/admin-month-key";
-import { LIST_STATUS, STATUS, dateToNum, fmtMonth, iso, tpl, WD, type OrderStatus } from "./orders-console-data";
-import { copyOf, type OrdersCopy } from "./orders-console-shared";
+import { ORDER_ITEM_LIMITS } from "@/lib/order-item-rules";
+import { LIST_STATUS, STATUS, tpl, type OrderStatus } from "./orders-console-data";
+import { copyOf, localeTagOf, type OrdersCopy } from "./orders-console-shared";
 import type { OrdActionKind } from "./orders-detail-panel";
 
 export type OrdActionPayload = {
@@ -26,6 +28,8 @@ export type OrdActionPayload = {
   urgency?: "high" | "normal";
   reason?: string;
   items?: { name: string; qty: string; link: string; memo: string }[];
+  /** 요청 수정 — 창을 연 때 본 주문의 `updated_at`(그 사이 바뀌었으면 서버가 stale). */
+  expectedUpdatedAt?: string;
 };
 
 type ActionModalProps = {
@@ -34,6 +38,8 @@ type ActionModalProps = {
   t: OrdersCopy;
   locale: Locale;
   todayKey: string;
+  /** 공용 달력 문구(`dictionary.admin.shared`). */
+  shared: Dictionary["admin"]["shared"];
   pending?: boolean;
   onCancel: () => void;
   onConfirm: (kind: OrdActionKind, id: string, payload: OrdActionPayload) => void;
@@ -51,91 +57,13 @@ const KIND_META: Record<OrdActionKind, { title: string; body: string; confirm: s
   delete: { title: "del", body: "wDeleteBody", confirm: "del", tone: "danger" },
 };
 
-type CalMonth = { y: number; m: number };
-
-function monthOf(key: string): CalMonth {
-  return { y: +key.slice(0, 4), m: +key.slice(5, 7) - 1 };
-}
-
-function dayLabel(key: string, locale: Locale): string {
-  return new Intl.DateTimeFormat(locale, { month: "long", day: "numeric", weekday: "short", timeZone: "UTC" }).format(
-    new Date(dateToNum(key) * 86400000),
-  );
-}
-
-function DeliveryCalendar({
-  t,
-  locale,
-  todayKey,
-  mode,
-  date,
-  start,
-  end,
-  onPick,
-}: {
-  t: OrdersCopy;
-  locale: Locale;
-  todayKey: string;
-  mode: "point" | "range";
-  date: string | null;
-  start: string | null;
-  end: string | null;
-  onPick: (key: string) => void;
-}) {
-  const [month, setMonth] = useState<CalMonth>(() => monthOf((mode === "range" ? start : date) ?? todayKey));
-  const days = new Date(Date.UTC(month.y, month.m + 1, 0)).getUTCDate();
-  const first = (new Date(Date.UTC(month.y, month.m, 1)).getUTCDay() + 6) % 7; // Mon = 0
-  const wd = Array.from({ length: 7 }, (_, i) => WD[locale][(i + 1) % 7]);
-  const mk = `${month.y}-${String(month.m + 1).padStart(2, "0")}`;
-  const move = (delta: number) => setMonth(monthOf(`${shiftMonthKey(mk, delta)}-01`));
-
-  return (
-    <div className="owm-cal">
-      <div className="owm-cal__h">
-        <button type="button" className="ow-navb" aria-label={t.wPrevMonth} onClick={() => move(-1)}>
-          <ChevronLeft aria-hidden="true" />
-        </button>
-        <b className="num">{fmtMonth(month.y, month.m, locale)}</b>
-        <button type="button" className="ow-navb" aria-label={t.wNextMonth} onClick={() => move(1)}>
-          <ChevronRight aria-hidden="true" />
-        </button>
-      </div>
-      <div className="owm-cal__g owm-cal__wd">
-        {wd.map((d, i) => (
-          <span key={i}>{d}</span>
-        ))}
-      </div>
-      <div className="owm-cal__g">
-        {Array.from({ length: first }, (_, i) => (
-          <span key={`b${i}`} />
-        ))}
-        {Array.from({ length: days }, (_, i) => {
-          const key = iso(month.y, month.m, i + 1);
-          const isEnd = mode === "point" ? key === date : key === start || key === end;
-          const inRange = mode === "range" && start && end && key > start && key < end;
-          return (
-            <button
-              key={key}
-              type="button"
-              className={`owm-day${isEnd ? " is-sel" : ""}${inRange ? " is-in" : ""}${key === todayKey ? " is-today" : ""}`}
-              aria-pressed={isEnd}
-              onClick={() => onPick(key)}
-            >
-              {i + 1}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 export function OrdersActionModal({
   kind,
   order,
   t,
   locale,
   todayKey,
+  shared,
   pending,
   onCancel,
   onConfirm,
@@ -165,29 +93,18 @@ export function OrdersActionModal({
   const [reason, setReason] = useState(order.reason);
   const [items, setItems] = useState(() => order.items.map((it) => ({ name: it.name, qty: it.qty, link: it.link, memo: it.memo })));
 
+  const modalRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape" && !pending) onCancel();
+      if (e.key !== "Escape" || pending) return;
+      // 날짜 피커(하루 `.adp__pop` · 기간 `.calpop`)가 열려 있으면 Esc 는 피커만 닫는다 — 피커가 document 에서 받아 닫으므로 창은
+      // 그대로 둔다. 캡처 단계(window)라 피커가 닫히기 전에 열려 있는지 볼 수 있다(2026-11-10).
+      if (modalRef.current?.querySelector(".adp__pop, .calpop")) return;
+      onCancel();
     }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
   }, [onCancel, pending]);
-
-  function handlePick(key: string) {
-    if (mode === "point") {
-      setDate(key);
-      return;
-    }
-    if (!start || (start && end)) {
-      setStart(key);
-      setEnd(null);
-    } else if (key < start) {
-      setEnd(start);
-      setStart(key);
-    } else {
-      setEnd(key);
-    }
-  }
 
   function updateItem(index: number, key: "name" | "qty" | "link" | "memo", value: string) {
     setItems((prev) => prev.map((it, i) => (i === index ? { ...it, [key]: value } : it)));
@@ -205,7 +122,7 @@ export function OrdersActionModal({
         onValidationError(t.edNeedItem);
         return;
       }
-      onConfirm(kind, order.id, { title, urgency, reason, items: cleaned });
+      onConfirm(kind, order.id, { title, urgency, reason, items: cleaned, expectedUpdatedAt: order.updatedAt });
       return;
     }
     if (isDeliv) {
@@ -224,17 +141,6 @@ export function OrdersActionModal({
     onConfirm(kind, order.id, {});
   }
 
-  const delivText =
-    mode === "point"
-      ? date
-        ? dayLabel(date, locale)
-        : ""
-      : start
-        ? end
-          ? `${dayLabel(start, locale)} – ${dayLabel(end, locale)}`
-          : `${dayLabel(start, locale)} – ${t.wPickEnd}`
-        : "";
-
   const sub =
     kind === "edit"
       ? `${order.title} · ${order.buildingLabel} · ${order.reporterName}`
@@ -244,6 +150,7 @@ export function OrdersActionModal({
     <>
       <div className="modal-scrim on" onClick={pending ? undefined : onCancel} />
       <div
+        ref={modalRef}
         className={`modal on lfm owm${isDeliv ? " owm--deliv" : ""}${kind === "edit" ? " owm--edit" : ""}`}
         role="dialog"
         aria-modal="true"
@@ -267,11 +174,42 @@ export function OrdersActionModal({
                 ))}
               </div>
             </div>
-            <label className="lfm__nf">
+            <div className="lfm__nf lfm__nf--date owm-date">
               <span className="lfm__nl">{mode === "point" ? t.wDateField : t.wRange}</span>
-              <input readOnly value={delivText} />
-            </label>
-            <DeliveryCalendar t={t} locale={locale} todayKey={todayKey} mode={mode} date={date} start={start} end={end} onPick={handlePick} />
+              {mode === "point" ? (
+                <AdminDatePicker
+                  value={date ?? ""}
+                  onChange={(value) => setDate(value || null)}
+                  localeTag={localeTagOf(locale)}
+                  ariaLabel={t.wDateField}
+                  placeholder={t.wDateField}
+                  labels={{ prevMonth: shared.datePrevMonth, nextMonth: shared.dateNextMonth, today: shared.dateToday }}
+                />
+              ) : (
+                <AdminDateRangePicker
+                  from={start ?? ""}
+                  to={end ?? ""}
+                  onChange={(from, to) => {
+                    setStart(from || null);
+                    setEnd(to || null);
+                  }}
+                  localeTag={localeTagOf(locale)}
+                  ariaLabel={t.wRange}
+                  emptyLabel={t.wRange}
+                  labels={{
+                    prevMonth: shared.datePrevMonth,
+                    nextMonth: shared.dateNextMonth,
+                    thisMonth: shared.dateThisMonth,
+                    reset: shared.dateReset,
+                    apply: shared.dateApply,
+                    pickYear: shared.datePickYear,
+                    pickMonth: shared.datePickMonth,
+                    typeStart: shared.dateTypeStart,
+                    typeEnd: shared.dateTypeEnd,
+                  }}
+                />
+              )}
+            </div>
           </>
         ) : null}
 
@@ -317,7 +255,7 @@ export function OrdersActionModal({
             <div className="owm-items">
               <div className="owm-items__h">
                 <b>{t.wItems}</b>
-                <span className="num">{tpl(t.wPhotosKept, { n: items.length })}</span>
+                <span className="num">{tpl(t.wPhotosKept, { n: items.length, max: ORDER_ITEM_LIMITS.maxItems })}</span>
               </div>
               {items.map((it, i) => (
                 <div className="owm-item" key={i}>
@@ -352,7 +290,7 @@ export function OrdersActionModal({
                   </div>
                 </div>
               ))}
-              {items.length < 40 ? (
+              {items.length < ORDER_ITEM_LIMITS.maxItems ? (
                 <button
                   type="button"
                   className="owm-add"

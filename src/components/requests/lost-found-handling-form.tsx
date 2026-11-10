@@ -21,12 +21,11 @@ import {
 } from "@/app/mobile/requests/lost-found/actions";
 import type { Dictionary } from "@/lib/i18n";
 import {
-  lostItemStatuses,
   LOST_FOUND_HANDLING_IMAGE_LIMIT,
   type LostItemStatus,
   type LostReturnMethod,
 } from "@/lib/lost-found-constants";
-import { isValidLostItemTransition } from "@/lib/lost-found-handling";
+import { lostItemFieldTargets } from "@/lib/lost-found-handling";
 import { haptic } from "@/lib/haptics";
 
 type LostFoundHandlingFormProps = {
@@ -159,7 +158,7 @@ export function LostFoundHandlingForm({
     void performSave();
   }
 
-  // 화이트 리디자인(2026-10-14, 시안 LFDetail-Phone): 상자 없는 「현장 처리」 — 5칸 상태 토글 · 이름표 메모 · 증빙 사진 · 저장(체크 + 진동).
+  // 화이트 리디자인(2026-10-14, 시안 LFDetail-Phone): 상자 없는 「현장 처리」 — 갈 수 있는 상태만 보이는 상태 토글 · 이름표 메모 · 증빙 사진 · 저장(체크 + 진동).
   return (
     <>
       <section className="mdw-handle">
@@ -169,15 +168,14 @@ export function LostFoundHandlingForm({
         </div>
 
         <div className="mdw-seg lfd-seg" role="radiogroup" aria-label={t.statusLabel}>
-          {lostItemStatuses.map((value) => {
-            // 지금 상태에서 갈 수 있는 상태만 누를 수 있다 — 서버와 같은 규칙(`isValidLostItemTransition`).
-            const reachable = isValidLostItemTransition(initialStatus, value);
+          {/* 지금 상태에서 갈 수 있는 상태만 보인다 — 서버와 같은 규칙(`lostItemFieldTargets` → `isValidLostItemTransition`).
+              「보관 중 → 폐기 예정」 같은 막힌 단계는 칩 자체가 없다(2026-11-10). */}
+          {lostItemFieldTargets(initialStatus).map((value) => {
             return (
               <button
                 aria-checked={status === value}
                 role="radio"
                 className={status === value ? "on" : undefined}
-                disabled={!reachable}
                 key={value}
                 onClick={() => {
                   setStatus(value);

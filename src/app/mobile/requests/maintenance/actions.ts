@@ -5,8 +5,10 @@
 // 어드민 상세 페이지 하나뿐이었다 — 문서(08-maintenance-workflow.md → Status Change Permission)가
 // 못박은 "현장이 모바일에서 처리한다"가 구현된 적이 없었다.
 //
-// 권한: part_time_staff 제외 전원. 앱 레벨에서 먼저 막고, DB의 RLS UPDATE 정책이 최종 게이트다
-// (마이그레이션 202607160001). 두 겹 중 RLS가 진짜 방어선이므로 영향 행 수를 반드시 확인한다 —
+// 권한: 권한 키 `maintenance_status_change` 하나(역할 기본: 대표 · 전무 · 오피스 · CS · 현장 관리자. 아르바이트 · 아르바이트 리더는
+// 역할로 못 받고 사람마다 켠다, 2026-10-21). 신고자 본인이라고 상태를 바꿀 수 있는 건 아니다 — DB 트리거
+// `enforce_maintenance_report_processing`(202611100001)이 키 없는 사람의 처리 칸 변경을 막는다. 앱 레벨에서 먼저 막고, DB의 RLS
+// UPDATE 정책 · 트리거가 최종 게이트다. RLS가 진짜 방어선이므로 영향 행 수를 반드시 확인한다 —
 // RLS가 행을 걸러내면 Supabase는 "0행 업데이트 + 에러 없음"을 돌려주기 때문에, 행 수를 안 보면
 // 권한 없는 사용자에게도 "변경됨"이라고 응답하게 된다(구 어드민 액션의 실제 버그).
 
@@ -48,10 +50,8 @@ function isValidUuid(value: string) {
 }
 
 /**
- * 상태 변경 권한 = part_time_staff 제외 전원, 또는 `maintenance_status_change` 권한 예외(override).
- * 오버라이드는 RLS에는 이미 반영돼 있었는데(마이그레이션 202607130004 → 202607160001에서 유지)
- * 앱 게이트가 파트타임을 먼저 거절해서 부여해도 UI상 아무 변화가 없었다. 조회 패턴은
- * `can_generate_report`(src/actions/task-report.ts)와 같다.
+ * 상태 변경 권한 = 권한 키 `maintenance_status_change`(역할 기본 + 개인 부여 · 차단). 아르바이트 · 아르바이트 리더는 역할로 못 받는다.
+ * PC 콘솔 강제 완료 · 무효(`applyMaintenanceException`)도 같은 키다(2026-11-10).
  */
 export async function canHandleMaintenance(
   organizationId: string,
@@ -97,7 +97,7 @@ export async function updateMaintenanceHandling(
   const supabase = await getSupabaseServerClient();
   const { data: existingRow } = await supabase
     .from("maintenance_reports")
-    .select("id, status, resolution_image_urls")
+    .select("id, status, resolution_image_urls, updated_at")
     .eq("id", reportId)
     .eq("organization_id", session.organization.id)
     .maybeSingle();
@@ -106,6 +106,7 @@ export async function updateMaintenanceHandling(
     id: string;
     status: MaintenanceStatus;
     resolution_image_urls: string[] | null;
+    updated_at: string;
   };
 
   // 완료 사진은 덮어쓰지 않고 이어 붙인다(2026-10-26) — 예전엔 새로 올린 사진 목록으로 통째로 바꿔서, 상태만 바꾸려고
@@ -141,13 +142,15 @@ export async function updateMaintenanceHandling(
     update.completed_by_admin = false;
   }
 
-  // 읽은 뒤 다른 사람이 상태를 바꿨으면 덮어쓰지 않는다 — 읽은 상태 그대로일 때만 쓴다.
+  // 읽은 뒤 다른 사람이 바꿨으면 덮어쓰지 않는다 — 읽은 상태 · 읽은 수정 시각 그대로일 때만 쓴다. 수정 시각까지 보는 건 완료 사진
+  // 이어 붙이기 때문이다(2026-11-10): 두 사람이 같은 상태에서 동시에 사진을 올리면 늦게 쓴 쪽이 먼저 쓴 쪽 사진을 지웠다.
   const { data: updated, error } = await supabase
     .from("maintenance_reports")
     .update(update)
     .eq("id", reportId)
     .eq("organization_id", session.organization.id)
     .eq("status", existing.status)
+    .eq("updated_at", existing.updated_at)
     .select("id");
 
   if (error) return { ok: false, error: "save_failed" };
@@ -155,12 +158,14 @@ export async function updateMaintenanceHandling(
     // 0행 = RLS 가 걸렀거나(권한), 그 사이 상태가 바뀌었다(동시 변경). 다시 읽어 구분한다.
     const { data: recheck } = await supabase
       .from("maintenance_reports")
-      .select("status")
+      .select("status, updated_at")
       .eq("id", reportId)
       .eq("organization_id", session.organization.id)
       .maybeSingle();
-    const nowStatus = (recheck as { status: MaintenanceStatus } | null)?.status;
-    if (nowStatus && nowStatus !== existing.status) return { ok: false, error: "conflict" };
+    const now = recheck as { status: MaintenanceStatus; updated_at: string } | null;
+    if (now && (now.status !== existing.status || now.updated_at !== existing.updated_at)) {
+      return { ok: false, error: "conflict" };
+    }
     return { ok: false, error: "forbidden" };
   }
 

@@ -37,6 +37,8 @@ export type OrderItemVM = {
 export type AdminOrderVM = {
   /** 실제 uuid. */
   id: string;
+  /** 행의 `updated_at` — 요청 수정이 창을 연 때 값으로 보내 그 사이 바뀌었으면 막는다(2026-11-10). */
+  updatedAt: string;
   /** 표시용 짧은 번호. "#" + id.slice(0,6). */
   shortId: string;
   title: string;
@@ -180,6 +182,7 @@ export async function getAdminOrders(
 
     return {
       id: row.id,
+      updatedAt: row.updated_at,
       shortId: `#${row.id.slice(0, 6)}`,
       title: row.title,
       buildingKey: row.building_name,

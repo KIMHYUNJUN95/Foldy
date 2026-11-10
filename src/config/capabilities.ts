@@ -470,9 +470,13 @@ export const CAPABILITIES = {
     systemOnly: false,
     developerOnly: false,
   },
-  /** 남이 쓴 요청(수리 · 분실물 · 주문) 삭제(예전 `DELETE_ANY_ROLES` 네 곳). docs/product/10 · 08 · 09 */
+  /**
+   * 남이 쓴 요청(수리 · 분실물 · 주문) 삭제(예전 `DELETE_ANY_ROLES` 네 곳). docs/product/10 · 08 · 09
+   * 현장 관리자는 빠진다 — 문서 08 · 09 · 10 은 「현장 관리자는 남의 요청을 못 지운다」인데 코드 · DB 만 열려 있었다(2026-11-10,
+   * 마이그레이션 202611100001).
+   */
   "request.delete_any": {
-    roles: ["owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager"],
+    roles: ["owner", "senior_managing_director", "office_admin", "cs_staff"],
     individualGrant: false,
     individualDeny: false,
     asksExpiry: false,

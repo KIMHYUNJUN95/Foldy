@@ -1,5 +1,5 @@
 /* 분실물 상세 화이트 리디자인(2026-10-14, 시안 LFDetail-Phone · LFDone-Phone) — maintenance-detail.css 의 .mdw 위에 분실물만의 것.
-   「자동 폐기까지」 막대(채워지며 등장) · 5칸 상태 토글 · 처리 기록 · 반환 확인 시트. */
+   「자동 폐기까지」 막대(채워지며 등장) · 갈 수 있는 상태만 보이는 상태 토글 · 처리 기록 · 반환 확인 시트. */
 .lfd-ok { color: #1f7a4d; font-weight: 600; }
 .lfd-clock { display: flex; flex-direction: column; gap: 10px; }
 .lfd-clock__h { display: flex; align-items: baseline; justify-content: space-between; font-size: 13px; color: #6b6878; }
@@ -10,11 +10,10 @@
 .lfd-bar i { display: block; height: 100%; border-radius: 3px; background: #16141f; transform-origin: left center; animation: lfd-fill 800ms cubic-bezier(.23, 1, .32, 1) 120ms both; }
 .lfd-bar i.is-ext { background: #b4b1bf; }
 @keyframes lfd-fill { from { transform: scaleX(0); } }
-.mdw-seg.lfd-seg { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+/* 갈 수 있는 상태만 보이므로(2~3칸, 2026-11-10) 칸 수를 고정하지 않고 보이는 칩끼리 나눈다. */
+.mdw-seg.lfd-seg { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; }
 .mdw-seg.lfd-seg button { padding: 0; font-size: 13px; white-space: nowrap; }
 /* 지금 상태에서 갈 수 없는 칸(서버 전이 규칙과 같음, 2026-10-26) — 흐리게, 누름 반응 없음. */
-.mdw-seg.lfd-seg button:disabled { opacity: .38; cursor: default; }
-.mdw-seg.lfd-seg button:disabled:active { transform: none; }
 /* 반환 방식 [직접 수령 | 배송] 2칸(2026-10-26 — 어드민 반환 창과 같은 선택). */
 .mdw-seg.lfd-method { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .lfd-hist__h { display: flex; align-items: center; gap: 10px; }

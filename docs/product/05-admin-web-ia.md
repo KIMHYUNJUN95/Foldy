@@ -356,7 +356,7 @@ Permissions · Invite Codes · Attendance Sites/QR 등)은 위 3개 그룹의 �
 - **올해가 아닌 기간은 버튼에 연도까지**(「2023년 2월 1일 – 2월 28일」). 올해 기간은 예전처럼 월 · 일만.
 - 라벨에 `pickYear` · `pickMonth`(접근성 이름)를 선택으로 더했다(공용 `dictionary.admin.shared.datePickYear` · `datePickMonth`).
   주지 않은 화면도 그대로 동작한다.
-- 발주 처리 모달(`orders-action-modal.tsx`)의 `.calpop` 사본에는 아직 없다(아래 「캘린더 격자가 두 벌이다」).
+- 발주 처리 모달(`orders-action-modal.tsx`)도 2026-11-10 부터 이 범위 피커를 그대로 쓴다(예전 `.calpop` 사본은 지웠다).
 
 #### 고를 수 없는 날 — `isDateDisabled` (2026-09-28)
 

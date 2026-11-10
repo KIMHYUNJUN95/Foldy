@@ -229,15 +229,24 @@ export function OrderActionBar({
       mode === "exact"
         ? { deliveryMode: "exact" as const, deliveryDate: date }
         : { deliveryMode: "range" as const, deliveryStartDate: start, deliveryEndDate: end };
-    const result =
-      kind === "edit-delivery"
-        ? await updateOrderDeliveryDate({ orderId, ...delivery })
-        : await updateOrderRequestStatus({
-            orderId,
-            targetStatus: kind === "approve" ? "approved" : kind === "ordered" ? "ordered" : "closed",
-            ...(kind === "ordered" ? delivery : {}),
-            ...(kind === "reject" ? { reason } : {}),
-          });
+    let result: Awaited<ReturnType<typeof updateOrderRequestStatus>> | Awaited<ReturnType<typeof updateOrderDeliveryDate>>;
+    try {
+      result =
+        kind === "edit-delivery"
+          ? await updateOrderDeliveryDate({ orderId, ...delivery })
+          : await updateOrderRequestStatus({
+              orderId,
+              targetStatus: kind === "approve" ? "approved" : kind === "ordered" ? "ordered" : "closed",
+              ...(kind === "ordered" ? delivery : {}),
+              ...(kind === "reject" ? { reason } : {}),
+            });
+    } catch {
+      // 네트워크가 끊겨 서버 액션이 던져도 버튼이 영영 잠기지 않게 한다.
+      setPending(false);
+      haptic("error");
+      setError(labels.errorSaveFailed);
+      return;
+    }
     setPending(false);
 
     if (!result.ok) {

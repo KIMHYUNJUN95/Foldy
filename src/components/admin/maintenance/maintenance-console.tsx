@@ -9,8 +9,10 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, TriangleAlert } from "lucide-react";
+import { adminActionErrorMessage } from "@/components/admin/shared/admin-action-error";
 import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import type { RequestDeleteAccess } from "@/lib/request-delete-rule";
 import type { AdminMaintenanceReport } from "@/lib/admin-maintenance";
 import { applyMaintenanceException, deleteMaintenanceReportById } from "@/app/admin/maintenance/actions";
 import "./maintenance-console.css";
@@ -21,6 +23,12 @@ import { MaintenanceDetailPanel, type MaintExceptionKind } from "./maintenance-d
 import { MaintenanceConfirmModal } from "./maintenance-confirm-modal";
 
 type MaintenanceConsoleProps = {
+  /** 패널 휴지통 규칙(본인 id · `request.delete_any`). */
+  deleteAccess: RequestDeleteAccess;
+  /** 강제 완료 · 무효 처리 권한(`maintenance_status_change`) — 없으면 단추를 숨긴다(서버가 다시 본다). */
+  canHandle: boolean;
+  /** 옛 상세 주소에서 넘어오면 그 건의 패널을 열고 시작한다(`?report=<id>`). */
+  initialReportId?: string | null;
   locale: Locale;
   reports: AdminMaintenanceReport[];
   loadError: boolean;
@@ -28,7 +36,7 @@ type MaintenanceConsoleProps = {
 
 type MaintView = "board" | "list" | "done";
 
-export function MaintenanceConsole({ locale, reports, loadError }: MaintenanceConsoleProps) {
+export function MaintenanceConsole({ canHandle, deleteAccess, initialReportId = null, locale, reports, loadError }: MaintenanceConsoleProps) {
   const router = useRouter();
   const dictionary = getDictionary(locale);
   const t = dictionary.maintenance.console;
@@ -48,7 +56,7 @@ export function MaintenanceConsole({ locale, reports, loadError }: MaintenanceCo
       query: "",
     };
   });
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialReportId);
   const [confirm, setConfirm] = useState<{ kind: MaintExceptionKind; id: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -109,7 +117,7 @@ export function MaintenanceConsole({ locale, reports, loadError }: MaintenanceCo
       if (kind === "del") {
         const result = await deleteMaintenanceReportById(id);
         if (!result.ok) {
-          showToast(t.errS);
+          showToast(adminActionErrorMessage(result.error, dictionary.admin.shared));
           return;
         }
         setConfirm(null);
@@ -120,7 +128,7 @@ export function MaintenanceConsole({ locale, reports, loadError }: MaintenanceCo
 
       const result = await applyMaintenanceException({ kind, memo, reportId: id });
       if (!result.ok) {
-        showToast(t.errS);
+        showToast(adminActionErrorMessage(result.reason, dictionary.admin.shared));
         return;
       }
       setConfirm(null);
@@ -259,7 +267,8 @@ export function MaintenanceConsole({ locale, reports, loadError }: MaintenanceCo
         locale={locale}
         onClose={() => setSelectedId(null)}
         onException={(kind, id) => setConfirm({ kind, id })}
-        onOpenLink={() => showToast(t.tLink)}
+        canHandle={canHandle}
+        deleteAccess={deleteAccess}
         disabled={confirm !== null}
       />
 

@@ -2,11 +2,8 @@
 
 import { AdminExportButtons, type AdminExportLabels } from "@/components/admin/shared/admin-export-buttons";
 import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
-import {
-  exportOrdersReport,
-  exportOrdersWorkbook,
-  type OrdersExportFilters,
-} from "@/app/admin/orders/actions";
+import { exportOrdersReport, exportOrdersWorkbook } from "@/app/admin/orders/actions";
+import type { OrdersExportFilters } from "@/lib/orders-export-filter";
 
 /**
  * 서버에서 렌더링한 주문·비품 필터 바와 공용 내보내기 버튼을 잇는 클라이언트 브리지.

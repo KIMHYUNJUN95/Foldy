@@ -140,7 +140,6 @@ insert into public.capability_roles (capability, role) values
   ('request.delete_any', 'senior_managing_director'::organization_role),
   ('request.delete_any', 'office_admin'::organization_role),
   ('request.delete_any', 'cs_staff'::organization_role),
-  ('request.delete_any', 'field_manager'::organization_role),
   ('bug.review', 'owner'::organization_role),
   ('bug.review', 'senior_managing_director'::organization_role),
   ('bug.review', 'office_admin'::organization_role),

@@ -276,3 +276,39 @@ export function planSnapshotTrim(
   }
   return { deleteIds, keep };
 }
+
+/**
+ * Beds24 가 「그 roomId 는 없다」고 답한 거절 — 저쪽에서 지워진 유닛. 오류 여러 개는 `; ` 로 이어 붙어 오므로(calendar-client)
+ * **모든 조각이** `invalid roomid` 일 때만 인정한다. 되읽기 누락으로 추측하지 않는다.
+ */
+export function isRoomGoneError(error: string | null | undefined): boolean {
+  if (typeof error !== "string") return false;
+  return error.split(";").every((part) => /^\s*invalid\s*room\s*id\W*$/i.test(part));
+}
+
+/**
+ * POST 응답을 「받아들여짐 · 지워진 유닛 · 그 밖의 거절」로 나눈다. `skippable` — 거절이 전부 지워진 유닛이고
+ * 받아들여진 유닛이 하나 이상일 때만 true. 그때만 지워진 유닛을 빼고 계속 진행한다.
+ *
+ * `hasCalendarData` — 쓰기 전 되읽기에서 그 유닛의 달력 항목이 있었는지. 있었다면 문구가 `invalid roomid` 여도 지워진 유닛이
+ * 아니라고 보고 일반 거절로 다룬다.
+ */
+export function splitRejectedPostItems(
+  items: ReadonlyArray<{ accepted: boolean; error?: string | null; externalRoomId: string }>,
+  hasCalendarData: (externalRoomId: string) => boolean = () => false,
+): { acceptedIds: string[]; goneIds: string[]; otherRejected: string[]; skippable: boolean } {
+  const acceptedIds: string[] = [];
+  const goneIds: string[] = [];
+  const otherRejected: string[] = [];
+  for (const item of items) {
+    if (item.accepted) acceptedIds.push(item.externalRoomId);
+    else if (isRoomGoneError(item.error) && !hasCalendarData(item.externalRoomId)) goneIds.push(item.externalRoomId);
+    else otherRejected.push(item.externalRoomId);
+  }
+  return {
+    acceptedIds,
+    goneIds,
+    otherRejected,
+    skippable: goneIds.length > 0 && otherRejected.length === 0 && acceptedIds.length > 0,
+  };
+}

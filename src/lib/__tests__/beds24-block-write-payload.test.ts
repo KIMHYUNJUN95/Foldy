@@ -4,6 +4,8 @@ import {
   buildUnblockSegments,
   diffBlockReadback,
   eachNight,
+  isRoomGoneError,
+  splitRejectedPostItems,
   validateBlockRange,
 } from "@/lib/beds24/block-write-payload";
 
@@ -218,5 +220,45 @@ describe("diffBlockReadback", () => {
         expect: "cleared",
       }),
     ).toEqual([]);
+  });
+});
+
+describe("isRoomGoneError — Beds24 에서 지워진 유닛 신호", () => {
+  it("invalid roomid 만 인정한다(대소문자 · 띄어쓰기 허용)", () => {
+    expect(isRoomGoneError("invalid roomid")).toBe(true);
+    expect(isRoomGoneError("Invalid room id")).toBe(true);
+    expect(isRoomGoneError("INVALID  ROOMID.")).toBe(true);
+    expect(isRoomGoneError("invalid date")).toBe(false);
+    expect(isRoomGoneError("invalid roomid; invalid date")).toBe(false);
+    expect(isRoomGoneError("invalid roomid; Invalid room id")).toBe(true);
+    expect(isRoomGoneError("rate limit")).toBe(false);
+    expect(isRoomGoneError(null)).toBe(false);
+    expect(isRoomGoneError(undefined)).toBe(false);
+  });
+});
+
+describe("splitRejectedPostItems", () => {
+  const ok = (id: string) => ({ accepted: true, error: null, externalRoomId: id });
+  const bad = (id: string, error: string | null) => ({ accepted: false, error, externalRoomId: id });
+
+  it("지워진 유닛만 거절됐고 받아들여진 게 있으면 건너뛸 수 있다", () => {
+    expect(splitRejectedPostItems([ok("1"), bad("2", "invalid roomid")])).toEqual({
+      acceptedIds: ["1"],
+      goneIds: ["2"],
+      otherRejected: [],
+      skippable: true,
+    });
+  });
+
+  it("쓰기 전 달력 데이터가 있던 유닛은 invalid roomid 여도 지워진 유닛이 아니다", () => {
+    const split = splitRejectedPostItems([ok("1"), bad("2", "invalid roomid")], (id) => id === "2");
+    expect(split.skippable).toBe(false);
+    expect(split.otherRejected).toEqual(["2"]);
+  });
+
+  it("다른 거절이 섞이거나 받아들여진 게 없으면 건너뛰지 않는다", () => {
+    expect(splitRejectedPostItems([ok("1"), bad("2", "invalid roomid"), bad("3", "x")]).skippable).toBe(false);
+    expect(splitRejectedPostItems([bad("2", "invalid roomid")]).skippable).toBe(false);
+    expect(splitRejectedPostItems([ok("1"), bad("2", null)]).skippable).toBe(false);
   });
 });

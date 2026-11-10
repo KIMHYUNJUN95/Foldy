@@ -381,3 +381,257 @@ describe("createRoomBlock — 되읽기 불일치 보상 롤백", () => {
     expect((upserted[0].payload as Array<{ end_date: string }>)[0].end_date).toBe("2026-11-20");
   });
 });
+
+function postedWithGone(acceptedIds: string[], gone: Array<{ id: string; error?: string }>) {
+  return {
+    credit: { remaining: 100, resetInSec: null },
+    items: [
+      ...acceptedIds.map((externalRoomId) => ({ accepted: true, error: null, errorCode: null, externalRoomId })),
+      ...gone.map((item) => ({
+        accepted: false,
+        error: item.error ?? "invalid roomid",
+        errorCode: null,
+        externalRoomId: item.id,
+      })),
+    ],
+  };
+}
+
+describe("Beds24 에서 지워진 유닛(invalid roomid, 2026-11-11)", () => {
+  const range = { endDate: "2026-11-10", startDate: "2026-11-10" };
+
+  it("걸기 — 지워진 유닛은 건너뛰고 나머지로 검증 · 저장한다", async () => {
+    const fake = createFakeSupabase({ room_block_snapshots: [], room_blocks: [], room_daily_rates: [], rooms: [] });
+    fetchCalendar
+      .mockResolvedValueOnce(calendarResponse({ "101": { "2026-11-10": { numAvail: 1, override: null } } }) as never)
+      .mockResolvedValueOnce(calendarResponse({ "101": { "2026-11-10": { override: "blackout" } } }) as never);
+    postCalendar.mockResolvedValueOnce(postedWithGone(["101"], [{ id: "999" }]) as never);
+
+    const result = await createRoomBlock({
+      externalRoomIds: ["101", "999"],
+      organizationId: ORG,
+      propertyName: "P",
+      range,
+      roomLabel: "101",
+      supabase: fake.client as never,
+    });
+
+    expect(result).toMatchObject({ ok: true, roomIds: ["101"], skippedRoomIds: ["999"] });
+    expect(postCalendar).toHaveBeenCalledTimes(1);
+    expect(fake.tables.room_block_snapshots.map((row) => row.external_room_id)).toEqual(["101"]);
+  });
+
+  it("걸기 — 지워진 유닛이 첫 번째여도 room_blocks 는 남은 유닛 id 로 적는다", async () => {
+    const fake = createFakeSupabase({ room_block_snapshots: [], room_blocks: [], room_daily_rates: [], rooms: [] });
+    fetchCalendar
+      .mockResolvedValueOnce(calendarResponse({ "101": { "2026-11-10": { numAvail: 1, override: null } } }) as never)
+      .mockResolvedValueOnce(calendarResponse({ "101": { "2026-11-10": { override: "blackout" } } }) as never);
+    postCalendar.mockResolvedValueOnce(postedWithGone(["101"], [{ id: "999", error: "Invalid room id" }]) as never);
+
+    const result = await createRoomBlock({
+      externalRoomIds: ["999", "101"],
+      organizationId: ORG,
+      propertyName: "P",
+      range,
+      roomLabel: "101",
+      supabase: fake.client as never,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(fake.tables.room_blocks[0].external_room_id).toBe("101");
+  });
+
+  it("걸기 — 지워진 유닛과 다른 거절이 섞이면 실패하고 받아들여진 유닛을 되돌린다", async () => {
+    const fake = createFakeSupabase({ room_block_snapshots: [], room_blocks: [], room_daily_rates: [], rooms: [] });
+    fetchCalendar.mockResolvedValueOnce(
+      calendarResponse({ "101": { "2026-11-10": { numAvail: 1, override: null } } }) as never,
+    );
+    postCalendar
+      .mockResolvedValueOnce(
+        postedWithGone(["101"], [{ id: "999" }, { error: "something else", id: "888" }]) as never,
+      )
+      .mockResolvedValueOnce(accepted(["101"]) as never);
+
+    const result = await createRoomBlock({
+      externalRoomIds: ["101", "999", "888"],
+      organizationId: ORG,
+      propertyName: "P",
+      range,
+      roomLabel: "101",
+      supabase: fake.client as never,
+    });
+
+    expect(result).toMatchObject({ ok: false, reason: "beds24_rejected" });
+    expect(postCalendar).toHaveBeenCalledTimes(2);
+  });
+
+  it("걸기 — 전부 지워진 유닛이면(받아들여진 게 없으면) 실패한다", async () => {
+    const fake = createFakeSupabase({ room_block_snapshots: [], room_blocks: [], room_daily_rates: [], rooms: [] });
+    fetchCalendar.mockResolvedValueOnce(calendarResponse({}) as never);
+    postCalendar.mockResolvedValueOnce(postedWithGone([], [{ id: "999" }]) as never);
+
+    const result = await createRoomBlock({
+      externalRoomIds: ["999"],
+      organizationId: ORG,
+      propertyName: "P",
+      range,
+      roomLabel: "101",
+      supabase: fake.client as never,
+    });
+
+    expect(result).toMatchObject({ ok: false, reason: "beds24_rejected" });
+  });
+
+  it("풀기 — 지워진 유닛은 건너뛰고 나머지만 검증한다", async () => {
+    const fake = createFakeSupabase({ room_block_snapshots: [], room_blocks: [], room_daily_rates: [], rooms: [] });
+    fetchCalendar
+      .mockResolvedValueOnce(blockedBefore("101", ["2026-11-10"]) as never)
+      .mockResolvedValueOnce(calendarResponse({ "101": { "2026-11-10": { override: null } } }) as never);
+    postCalendar.mockResolvedValueOnce(postedWithGone(["101"], [{ id: "999" }]) as never);
+
+    const result = await clearRoomBlock({
+      externalRoomIds: ["101", "999"],
+      organizationId: ORG,
+      propertyName: "P",
+      range,
+      roomLabel: "101",
+      supabase: fake.client as never,
+    });
+
+    expect(result).toMatchObject({ changedNights: ["2026-11-10"], ok: true, roomIds: ["101"], skippedRoomIds: ["999"] });
+    expect(postCalendar).toHaveBeenCalledTimes(1);
+  });
+
+  it("풀기 — 지워진 유닛과 다른 거절이 섞이면 실패하고 받아들여진 유닛을 다시 막는다", async () => {
+    const fake = createFakeSupabase({ room_block_snapshots: [], room_blocks: [], room_daily_rates: [], rooms: [] });
+    fetchCalendar.mockResolvedValueOnce(blockedBefore("101", ["2026-11-10"]) as never);
+    postCalendar
+      .mockResolvedValueOnce(postedWithGone(["101"], [{ id: "999" }, { error: "boom", id: "888" }]) as never)
+      .mockResolvedValueOnce(accepted(["101"]) as never);
+
+    const result = await clearRoomBlock({
+      externalRoomIds: ["101", "999", "888"],
+      organizationId: ORG,
+      propertyName: "P",
+      range,
+      roomLabel: "101",
+      supabase: fake.client as never,
+    });
+
+    expect(result).toMatchObject({ ok: false, reason: "beds24_rejected" });
+    expect(postCalendar).toHaveBeenCalledTimes(2);
+  });
+
+  it("걸기 — 건너뛴 뒤 verify_mismatch 면 남은 유닛만 되돌리고, 두 번째 읽기에서 지워진 id 가 빠진다", async () => {
+    const fake = createFakeSupabase({ room_block_snapshots: [], room_blocks: [], room_daily_rates: [], rooms: [] });
+    fetchCalendar
+      .mockResolvedValueOnce(calendarResponse({ "101": { "2026-11-10": { numAvail: 1, override: null } } }) as never)
+      .mockResolvedValueOnce(calendarResponse({ "101": { "2026-11-10": { override: null } } }) as never);
+    postCalendar
+      .mockResolvedValueOnce(postedWithGone(["101"], [{ id: "999" }]) as never)
+      .mockResolvedValueOnce(accepted(["101"]) as never);
+
+    const result = await createRoomBlock({
+      externalRoomIds: ["101", "999"],
+      organizationId: ORG,
+      propertyName: "P",
+      range,
+      roomLabel: "101",
+      supabase: fake.client as never,
+    });
+
+    expect(result).toMatchObject({ ok: false, reason: "verify_mismatch" });
+    expect(fetchCalendar.mock.calls[1][0]).toMatchObject({ externalRoomIds: ["101"] });
+    const rollback = postCalendar.mock.calls[1][0] as Array<{ roomId: number }>;
+    expect(rollback.map((item) => item.roomId)).toEqual([101]);
+  });
+
+  it("걸기 — 쓰기 전 달력 데이터가 있던 유닛이 invalid roomid 로 거절되면 실패한다", async () => {
+    const fake = createFakeSupabase({ room_block_snapshots: [], room_blocks: [], room_daily_rates: [], rooms: [] });
+    fetchCalendar.mockResolvedValueOnce(
+      calendarResponse({
+        "101": { "2026-11-10": { numAvail: 1, override: null } },
+        "999": { "2026-11-10": { numAvail: 1, override: null } },
+      }) as never,
+    );
+    postCalendar
+      .mockResolvedValueOnce(postedWithGone(["101"], [{ id: "999" }]) as never)
+      .mockResolvedValueOnce(accepted(["101"]) as never);
+
+    const result = await createRoomBlock({
+      externalRoomIds: ["101", "999"],
+      organizationId: ORG,
+      propertyName: "P",
+      range,
+      roomLabel: "101",
+      supabase: fake.client as never,
+    });
+
+    expect(result).toMatchObject({ ok: false, reason: "beds24_rejected" });
+  });
+
+  it("풀기 — 쓰기 전 달력 데이터가 있던 유닛이 invalid roomid 로 거절되면 실패하고 다시 막는다", async () => {
+    const fake = createFakeSupabase({ room_block_snapshots: [], room_blocks: [], room_daily_rates: [], rooms: [] });
+    fetchCalendar.mockResolvedValueOnce(
+      calendarResponse({
+        "101": { "2026-11-10": { override: "blackout" } },
+        "999": { "2026-11-10": { override: "blackout" } },
+      }) as never,
+    );
+    postCalendar
+      .mockResolvedValueOnce(postedWithGone(["101"], [{ id: "999" }]) as never)
+      .mockResolvedValueOnce(accepted(["101"]) as never);
+
+    const result = await clearRoomBlock({
+      externalRoomIds: ["101", "999"],
+      organizationId: ORG,
+      propertyName: "P",
+      range,
+      roomLabel: "101",
+      supabase: fake.client as never,
+    });
+
+    expect(result).toMatchObject({ ok: false, reason: "beds24_rejected" });
+    expect(postCalendar).toHaveBeenCalledTimes(2);
+  });
+
+  it("풀기 — 지워진 유닛의 room_blocks · room_daily_rates 도 우리 표에서 정리한다", async () => {
+    const fake = createFakeSupabase({
+      room_block_snapshots: [],
+      room_blocks: [
+        {
+          end_date: "2026-11-10",
+          external_room_id: "999",
+          id: "blk-gone",
+          organization_id: ORG,
+          override_kind: "blackout",
+          property_name: "P",
+          room_label: "101",
+          source: "beds24",
+          start_date: "2026-11-10",
+        },
+      ],
+      room_daily_rates: [
+        { id: "rate-1", organization_id: ORG, override_kind: "blackout", room_id: "room-999", stay_date: "2026-11-10" },
+      ],
+      rooms: [{ external_room_id: "999", id: "room-999", organization_id: ORG }],
+    });
+    fetchCalendar
+      .mockResolvedValueOnce(blockedBefore("101", ["2026-11-10"]) as never)
+      .mockResolvedValueOnce(calendarResponse({ "101": { "2026-11-10": { override: null } } }) as never);
+    postCalendar.mockResolvedValueOnce(postedWithGone(["101"], [{ id: "999" }]) as never);
+
+    const result = await clearRoomBlock({
+      externalRoomIds: ["101", "999"],
+      organizationId: ORG,
+      propertyName: "P",
+      range,
+      roomLabel: "101",
+      supabase: fake.client as never,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(fake.tables.room_blocks).toHaveLength(0);
+    expect(fake.tables.room_daily_rates[0].override_kind).toBe("none");
+  });
+});

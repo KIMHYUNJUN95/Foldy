@@ -17,7 +17,7 @@ import { requestMatchesSecret } from "@/lib/api-secret";
  * 새 테이블이 없는 이유
  * ----------------
  * `external_reviews_set_updated_at` 트리거가 **upsert 마다** `updated_at` 을 갱신한다. 수집은
- * 받아온 리뷰를 전부 다시 upsert 하므로, 한 주기라도 성공하면 `max(updated_at)` 이 그 시각으로
+ * 받아온 리뷰를 전부 다시 upsert 하므로, 한 주기라도 성공하면 그 조직의 `max(updated_at)` 이 그 시각으로
  * 움직인다. 즉 «마지막으로 수집이 테이블에 닿은 시각»을 실행 로그 테이블 없이 알 수 있다.
  * 새 스키마를 추가하는 비용보다 이쪽이 싸고, 무엇보다 **이미 검증된 신호**다(같은 방법으로
  * 이번 장애를 진단했다).
@@ -38,8 +38,8 @@ function authorize(request: NextRequest): { ok: true } | { ok: false; status: nu
   // 상수 시간 비교 · 후보 중 하나라도 맞으면 통과(2026-10-26, api-secret).
   if (
     requestMatchesSecret(request, [cronSecret, webhookSecret], {
+      // 쿼리(`?secret=`)로는 받지 않는다(2026-11-10) — 주소는 접속 기록 · 프록시 로그에 남는다. 워크플로는 헤더로 보낸다.
       headers: ["x-beds24-webhook-secret"],
-      query: true,
     })
   ) {
     return { ok: true };
@@ -56,23 +56,37 @@ async function handle(request: NextRequest) {
     );
   }
 
+  // **조직마다** 마지막으로 수집이 닿은 시각을 본다(2026-11-10). 예전엔 표 전체의 max(updated_at) 하나라, 한 조직만
+  // 수집돼도 다른 조직이 멈춘 것을 알 수 없었다. 리뷰가 한 건도 없는 조직은 판단하지 않는다(갓 도입).
   const supabase = getSupabaseServiceClient();
-  const { data, error } = await supabase
-    .from("external_reviews")
-    .select("updated_at")
-    .order("updated_at", { ascending: false })
-    .limit(1);
-
-  if (error) {
-    console.error("[beds24/reviews-sync/health] query failed", error.message);
+  const { data: orgRows, error: orgError } = await supabase.from("organizations").select("id").eq("status", "active");
+  if (orgError) {
+    console.error("[beds24/reviews-sync/health] organization query failed", orgError.message);
     return NextResponse.json({ ok: false, error: "query_failed" }, { status: 500 });
   }
+  const organizations: Array<{ organizationId: string; lastTouched: string | null; ageDays: number | null; stale: boolean }> = [];
+  for (const org of (orgRows ?? []) as Array<{ id: string }>) {
+    const { data, error } = await supabase
+      .from("external_reviews")
+      .select("updated_at")
+      .eq("organization_id", org.id)
+      .order("updated_at", { ascending: false })
+      .limit(1);
+    if (error) {
+      console.error("[beds24/reviews-sync/health] query failed", error.message);
+      return NextResponse.json({ ok: false, error: "query_failed" }, { status: 500 });
+    }
+    const touched = (data?.[0] as { updated_at: string } | undefined)?.updated_at ?? null;
+    const age = touched ? Math.floor((Date.now() - new Date(touched).getTime()) / 86_400_000) : null;
+    organizations.push({ organizationId: org.id, lastTouched: touched, ageDays: age, stale: age !== null && age >= STALE_AFTER_DAYS });
+  }
 
-  const lastTouched = (data?.[0] as { updated_at: string } | undefined)?.updated_at ?? null;
-  const ageMs = lastTouched ? Date.now() - new Date(lastTouched).getTime() : null;
-  const ageDays = ageMs === null ? null : Math.floor(ageMs / 86_400_000);
-  // 리뷰가 한 건도 없으면 «오래됐다» 고 말할 수 없다. 갓 도입한 조직을 매일 알리지 않는다.
-  const stale = ageDays !== null && ageDays >= STALE_AFTER_DAYS;
+  const staleOrgs = organizations.filter((org) => org.stale);
+  const stale = staleOrgs.length > 0;
+  // 응답 모양은 예전과 같다(`stale` · `ageDays` · `lastTouched`) — 가장 오래 멈춘 조직 기준. 조직별은 `organizations`.
+  const worst = [...staleOrgs].sort((a, b) => (b.ageDays ?? 0) - (a.ageDays ?? 0))[0] ?? null;
+  const lastTouched = worst?.lastTouched ?? organizations.map((o) => o.lastTouched).filter(Boolean).sort().at(-1) ?? null;
+  const ageDays = worst?.ageDays ?? (lastTouched ? Math.floor((Date.now() - new Date(lastTouched).getTime()) / 86_400_000) : null);
 
   let notified: string | null = null;
   if (stale) {
@@ -82,7 +96,7 @@ async function handle(request: NextRequest) {
     const result = await postSlackText(
       [
         ":rotating_light: *Foldy — 외부 리뷰 수집이 멈춘 것 같습니다*",
-        `마지막 수집: ${lastTouched} (약 ${ageDays}일 전)`,
+        `멈춘 조직 ${staleOrgs.length}곳 · 가장 오래된 마지막 수집: ${lastTouched} (약 ${ageDays}일 전)`,
         "GitHub Actions → “Beds24 external review sync” 실행 이력을 확인해 주세요.",
       ].join("\n"),
     );
@@ -98,6 +112,7 @@ async function handle(request: NextRequest) {
     lastTouched,
     ageDays,
     staleAfterDays: STALE_AFTER_DAYS,
+    organizations,
     notified,
   });
 }

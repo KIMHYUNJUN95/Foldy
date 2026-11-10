@@ -10,6 +10,7 @@ import { getDictionary } from "@/lib/i18n";
 import { tokyoDateOf } from "@/lib/tokyo-date";
 import { haptic } from "@/lib/haptics";
 import { getCanonicalPropertyName, localizePropertyName } from "@/lib/room-label-normalization";
+import { useRoomPlaceLabel } from "@/components/shared/building-names";
 import {
   REVIEW_SCALE,
   parseReviewBreakdown,
@@ -54,6 +55,7 @@ export function ReviewDetail({
   const dict = getDictionary(locale);
   const t = dict.complaints;
   const buildingLabels = dict.cleaning.buildingLabels;
+  const roomPlaceLabel = useRoomPlaceLabel();
   const router = useRouter();
 
   const scale = REVIEW_SCALE[review.provider];
@@ -125,6 +127,8 @@ export function ReviewDetail({
 
   const [showConvert, setShowConvert] = useState(false);
   const [convertError, setConvertError] = useState(false);
+  // 이미 전환된 리뷰 — 입력한 제목은 쓰이지 않는다는 걸 알리고 잠깐 뒤 그 컴플레인으로 간다.
+  const [convertLinked, setConvertLinked] = useState(false);
   const [isConverting, startConverting] = useTransition();
   const convertTitleRef = useRef<HTMLInputElement>(null);
   const convertBodyRef = useRef<HTMLTextAreaElement>(null);
@@ -144,11 +148,19 @@ export function ReviewDetail({
         convertBodyRef.current?.value ?? "",
       );
       if ("id" in res) {
-        haptic("success");
+        if (res.alreadyLinked) {
+          // 새로 저장한 게 아니다 — 성공 진동 대신 light + 안내, 읽을 틈을 두고 이동한다.
+          haptic("light");
+          setConvertLinked(true);
+          await new Promise((resolve) => window.setTimeout(resolve, 1200));
+        } else {
+          haptic("success");
+        }
         close();
         router.push(`/mobile/complaints/${res.id}`);
       } else {
         setConvertError(true);
+        haptic("error");
       }
     });
   }
@@ -157,7 +169,7 @@ export function ReviewDetail({
   const building = review.propertyName
     ? localizePropertyName(getCanonicalPropertyName(review.propertyName), buildingLabels)
     : "—";
-  const room = review.displayRoomLabel ?? reviewRoomFallbackLabel(review, t);
+  const room = roomPlaceLabel(review.displayRoomLabel ?? reviewRoomFallbackLabel(review, t));
   const risk = review.riskLevel === "risk";
 
   return (
@@ -308,6 +320,11 @@ export function ReviewDetail({
               {convertError ? (
                 <p className="fbw-err" role="alert">
                   {t.convertFailed}
+                </p>
+              ) : null}
+              {convertLinked ? (
+                <p className="fbw-info" role="status">
+                  {t.convertAlreadyLinked}
                 </p>
               ) : null}
               <div className="fbw-sheet__btns">

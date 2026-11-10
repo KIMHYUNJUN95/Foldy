@@ -3252,6 +3252,7 @@ export type Database = {
           id: string
           image_urls: string[]
           organization_id: string
+          submission_id: string | null
           updated_at: string
         }
         Insert: {
@@ -3263,6 +3264,7 @@ export type Database = {
           id?: string
           image_urls?: string[]
           organization_id: string
+          submission_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -3274,6 +3276,7 @@ export type Database = {
           id?: string
           image_urls?: string[]
           organization_id?: string
+          submission_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -3322,6 +3325,7 @@ export type Database = {
           room_id: string | null
           room_label: string | null
           status: string
+          submission_id: string | null
           title: string
           updated_at: string
         }
@@ -3346,6 +3350,7 @@ export type Database = {
           room_id?: string | null
           room_label?: string | null
           status?: string
+          submission_id?: string | null
           title: string
           updated_at?: string
         }
@@ -3370,6 +3375,7 @@ export type Database = {
           room_id?: string | null
           room_label?: string | null
           status?: string
+          submission_id?: string | null
           title?: string
           updated_at?: string
         }
@@ -5671,6 +5677,7 @@ export type Database = {
           id: string
           organization_id: string
           provider: string
+          source_char_count: number | null
           source_locale: string | null
           source_part: string
           source_text_hash: string
@@ -5685,6 +5692,7 @@ export type Database = {
           id?: string
           organization_id: string
           provider?: string
+          source_char_count?: number | null
           source_locale?: string | null
           source_part: string
           source_text_hash: string
@@ -5699,6 +5707,7 @@ export type Database = {
           id?: string
           organization_id?: string
           provider?: string
+          source_char_count?: number | null
           source_locale?: string | null
           source_part?: string
           source_text_hash?: string

@@ -145,6 +145,7 @@ Implementation note:
   - 폰: 화면 전체(상단 바 · 탭 바 포함)가 움직인다.
   - 폴드 · 태블릿: 레일 · 사이드바는 제자리, **오른쪽 본문만** 움직이고 이전 화면도 그 칸 안에만 보인다(아이패드 앱처럼).
   - **예외 — 화면 전체를 덮는 위층 화면**(사진 뷰어 · 출근 QR 스캔, 2026-10-13): 셸 밖 `<body>` 에 떠서 스와이프가 닿지 않으므로 `data-native-back-overlay` 를 달고 **왼쪽 위 ×** · Esc · 안드로이드 뒤로가기로 닫는다.
+    게스트 피드백 사진 크게 보기(`src/components/complaints/image-lightbox.tsx`, 2026-11-10)도 같은 표식 `data-native-back-overlay` + 넘기기 제스처 때문에 `data-swipe-back="off"` 를 단다.
   - 2분할 칸 안(`html[data-pane]`)과, 태블릿에서 오른쪽 칸이 열려 있는 동안은 받지 않는다(칸의 이동이 같은 history 에 섞인다).
 
   **어디서 받나.** 모든 `/mobile` 화면 — **메뉴 첫 화면(홈 · 청소 · 요청 …)도 받는다**(2026-10-09 사용자 결정 「돌아갈 곳이 있으면 다
@@ -1327,3 +1328,10 @@ Future navigation additions must also update the side-menu badge table and `getM
 
 같은 파일의 **측면 메뉴 스크롤러는 원래부터 이렇게 하고 있었다** — 본문만 빠져 있던 것을 맞춘 것이다.
 스크롤 동작(스크롤 인지 상단 크롬 · 당겨서 새로고침 · overscroll 격리)은 그대로다.
+
+### 게스트 피드백 — 방 이름 현지화 (2026-11-10)
+
+방 · 건물 이름은 데이터라 그릴 때만 현지화한다(CLAUDE.md 「Building names are data」). 게스트 피드백 모바일에서 그리는 곳:
+`review-list` · `complaint-list` · `review-rooms-board` · `complaint-detail` · `review-detail`(`src/components/complaints/*`) — 클라이언트는
+`useRoomPlaceLabel()` / `useBuildingName()`, 서버는 `localizeRoomPlaceLabel()`. PC 콘솔(건물 · 객실별 표 · 객실 고르기)도 같은 날 맞췄다.
+서버로 보내는 값(필터 · 등록)은 정규 이름 그대로. 자세한 것은 `docs/product/25-complaint-workflow.md` → 「2026-11-10 점검 보강」.

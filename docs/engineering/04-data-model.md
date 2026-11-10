@@ -1438,15 +1438,25 @@ review_translations (implemented)
   provider text not null default 'deepl'
   translated_at timestamptz not null default now()
   source_text_hash text not null
+  source_char_count integer                     -- 2026-11-10: characters of the source sent to DeepL
   created_at timestamptz not null default now()
   updated_at timestamptz not null default now()
   unique (external_review_id, source_part, target_locale)
 ```
 
-The server verifies `organization_id` against the parent review on every read/write. A translation is
+The server verifies `organization_id` against the parent review on every read/write. Rows with `source_part = 'private'` are not readable by `authenticated` (select policy excludes them, 2026-11-10) — the app reads translations with service_role only. A translation is
 reused only while `source_text_hash` equals the current source-review text hash; changed source text
-requires a fresh on-demand translation. Translation usage/cost telemetry belongs in a separate
-server-only sync/usage log, not in this user-facing record.
+requires a fresh on-demand translation — stored-translation reads (detail · export) also drop rows whose hash no
+longer matches (2026-11-10). Monthly DeepL usage is the sum of `source_char_count` over the month, read in
+1,000-row pages (rows written before the column fall back to `length(translated_text)`; the migration
+backfilled them from the current source).
+
+**2026-11-10 (`202611100003_complaints_hardening.sql`):**
+- `customer_complaints.submission_id uuid` · `complaint_comments.submission_id uuid` — client-generated id per compose /
+  send. Partial unique index `(organization_id, submission_id) where submission_id is not null` on each. Same id from
+  the same org returns the existing row id instead of inserting.
+- `external_reviews` column privileges: `authenticated` may select every column **except** `private_feedback` and
+  `raw_payload` (table-level select revoked, `anon` revoked). New columns need their own column grant.
 
 ### Period rating summaries (implemented derived query contract)
 

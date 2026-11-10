@@ -1,15 +1,18 @@
 // 고객 컴플레인(OTA 고객 컴플레인 기록) — 서버 전용 도메인 헬퍼.
 //
 // 읽기는 RLS 범위 서버 클라이언트를 쓴다(RLS 가 1차 방어선이며 조직 격리는
-// has_active_membership 으로). 쓰기는 명시적인 코드 수준 조직 +
-// 역할 게이트를 거친 뒤 service-role 클라이언트를 쓰며, `src/lib/bug-reports.ts` 를 따른다. 이미지 업로드는 정식 스토리지
-// 경로로 강제되며 세션 조직 id 로 만들어져 클라이언트가 다른 조직/기록 아래에 쓸 수 없다.
+// has_active_membership 으로). 쓰기는 명시적인 코드 수준 조직 + 권한 게이트(`complaintRights`) 를 거친 뒤
+// service-role 클라이언트를 쓴다. 이미지 업로드는 정식 스토리지 경로로 강제되며 세션 조직 id 로 만들어져
+// 클라이언트가 다른 조직/기록 아래에 쓸 수 없다.
 //
-// 최상위 불만은 하드 삭제한다(MVP 정책). 댓글에는 `deleted_at` 컬럼이 있고
-// 소프트 삭제하며 공지/게시판 댓글 규칙과 같다.
+// 컴플레인 본체는 하드 삭제한다(MVP 정책 — 사진 파일은 Storage 에 남는다, 다른 기능과 같은 알려진 한계).
+// 댓글은 `deleted_at` 으로 소프트 삭제하며 공지/게시판 댓글 규칙과 같다.
 //
-// 참고: `customer_complaints` / `complaint_comments` 는 아직 생성된 Database 타입에 없어서
-// 테이블 접근은 타입 없는 클라이언트 뷰를 거치고 행 형태는 명시적으로 캐스팅한다.
+// 등록 · 댓글은 화면이 보낸 `submission_id`(작성 한 번당 uuid 하나)로 중복을 막는다(2026-11-10) — 같은 id 가
+// 다시 오면 새 줄을 만들지 않고 먼저 만든 줄 id 를 돌려준다. DB 의 부분 유니크 인덱스가 경합까지 막는다.
+//
+// 표 타입은 `src/types/database.ts` 에 있지만 select 문자열 추론과 맞지 않아 타입 없는 뷰로 읽고 행 모양을
+// 명시적으로 캐스팅한다.
 
 import "server-only";
 
@@ -128,8 +131,7 @@ const COMPLAINT_COLS =
 const COMMENT_COLS =
   "id, complaint_id, organization_id, created_by_user_id, content, image_urls, created_at, updated_at, deleted_at";
 
-// `customer_complaints` / `complaint_comments` 는 아직 생성된 Database 타입에 없다. 이 뷰는
-// 스키마 제네릭을 떼어 타입이 재생성될 때까지 테이블 접근이 타입 검사를 통과하게 한다.
+// 스키마 제네릭을 떼어 select 문자열 추론 없이 표에 접근한다(행 모양은 명시 캐스팅).
 function untyped(client: SupabaseClient<Database>): SupabaseClient {
   return client as unknown as SupabaseClient;
 }
@@ -141,6 +143,24 @@ function requireOrg(session: AppSession): string {
   return session.organization.id;
 }
 
+type Who = { user: { id: string }; capabilities: readonly string[] };
+
+export type ComplaintRights = { edit: boolean; delete: boolean; changeStatus: boolean };
+
+/**
+ * 컴플레인 한 건에 대해 할 수 있는 일 — **서버 가드와 화면 노출이 함께 쓰는 단 하나의 판정**(2026-11-10).
+ *
+ * - 해결 · 다시 열기: `complaint.manage` 만. 예전엔 작성자 본인도 됐다(작성자 예외 없앰).
+ * - 수정 · 삭제: 작성자 본인이 **지금도** `complaint.write` 를 가졌거나, `complaint.manage`.
+ *   권한을 잃은 작성자가 자기 글을 계속 고치거나 지울 수 있던 구멍을 막는다.
+ * 플랫폼 개발자는 권한 목록이 전부 켜져 있어(platformBypass) 따로 분기하지 않는다.
+ */
+export function complaintRights(who: Who, complaint: Pick<Complaint, "createdByUserId">): ComplaintRights {
+  const manage = who.capabilities.includes("complaint.manage");
+  const ownWithWrite = complaint.createdByUserId === who.user.id && who.capabilities.includes("complaint.write");
+  return { edit: manage || ownWithWrite, delete: manage || ownWithWrite, changeStatus: manage };
+}
+
 export function canWriteComplaint(who: { capabilities: readonly string[] }): boolean {
   return who.capabilities.includes("complaint.write");
 }
@@ -149,27 +169,22 @@ export function canWriteComment(who: { capabilities: readonly string[] }): boole
   return who.capabilities.includes("complaint.comment");
 }
 
-/** 상태 변경(resolve/reopen): 작성자 본인 또는 owner/office_admin/super-admin. */
-export function canChangeStatus(
-  session: AppSession,
-  complaint: Pick<Complaint, "createdByUserId">,
-): boolean {
-  return (
-    complaint.createdByUserId === session.user.id ||
-    session.capabilities.includes("complaint.manage")
-  );
+/** 상태 변경(resolve/reopen) — `complaintRights().changeStatus`. */
+export function canChangeStatus(who: Who, complaint: Pick<Complaint, "createdByUserId">): boolean {
+  return complaintRights(who, complaint).changeStatus;
+}
+
+/** 삭제 — `complaintRights().delete`. 화면의 휴지통 노출도 이것으로 정한다. */
+export function canDeleteComplaint(who: Who, complaint: Pick<Complaint, "createdByUserId">): boolean {
+  return complaintRights(who, complaint).delete;
 }
 
 /**
- * 컴플레인 조정 권한(owner/office_admin/super-admin) 여부. UI에서 "작성자 본인 외에도 삭제/상태
- * 변경 버튼을 보여줄지" 판단하는 용도다. 실제 삭제 권한은 `deleteComplaint`가 서버에서 다시 검증한다.
+ * `complaint.manage` 여부(내보내기 · 남의 댓글 지우기). 컴플레인 한 건의 수정 · 삭제 · 상태 판정은
+ * `complaintRights` 를 쓴다.
  */
 export function canModerateComplaints(who: { capabilities: readonly string[] }): boolean {
   return who.capabilities.includes("complaint.manage");
-}
-
-function isComplaintAdmin(session: AppSession): boolean {
-  return session.capabilities.includes("complaint.manage");
 }
 
 function validateTitle(value: string): string {
@@ -208,9 +223,120 @@ function normalizeOptional(value: string | null | undefined): string | null {
   return trimmed ? trimmed : null;
 }
 
-function normalizeRating(value: number | null | undefined): number | null {
+/** 플랫폼별 만점 — 화면 `cx-platform.tsx` 의 `maxRating` 과 같다. 0 = 점수 없는 플랫폼. */
+const RATING_MAX: Record<ComplaintPlatform, number> = {
+  airbnb: 5,
+  booking: 10,
+  google: 5,
+  tripadvisor: 5,
+  jalan: 5,
+  rakuten: 5,
+  direct: 0,
+  other: 0,
+};
+
+/** 평점 — 없으면 null. 있으면 0 초과 · 플랫폼 만점 이하만(2026-11-10, 예전엔 범위를 안 봤다). 점수 없는 플랫폼은 null. */
+function normalizeRating(value: number | null | undefined, platform: ComplaintPlatform): number | null {
   if (value == null || Number.isNaN(value)) return null;
+  const max = RATING_MAX[platform];
+  // 점수 없는 플랫폼(직접 · 기타)은 남은 값을 버린다 — 화면에서 플랫폼을 바꾸면 고른 별이 남아 따라올 수 있다.
+  if (max === 0) return null;
+  if (!Number.isFinite(value) || value <= 0 || value > max) throw new Error("invalid_rating");
   return value;
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** 화면이 보낸 중복 막기 id — 없으면 null, 있으면 uuid 여야 한다. */
+function normalizeSubmissionId(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  if (!UUID_RE.test(trimmed)) throw new Error("invalid_submission");
+  return trimmed.toLowerCase();
+}
+
+/**
+ * 연결 id(건물 · 객실 · 예약)가 세션 조직 것인지 확인한다(2026-11-10). 예전엔 화면이 보낸 id 를 그대로 저장해
+ * 다른 조직의 객실 · 예약 id 를 걸 수 있었다. 형식이 틀리거나 우리 조직에 없으면 `invalid_link`.
+ */
+async function assertLinksInOrg(
+  organizationId: string,
+  links: { propertyId: string | null; roomId: string | null; reservationId: string | null },
+): Promise<void> {
+  const checks: Array<[string, string]> = [];
+  if (links.propertyId) checks.push(["properties", links.propertyId]);
+  if (links.roomId) checks.push(["rooms", links.roomId]);
+  if (links.reservationId) checks.push(["reservations", links.reservationId]);
+  if (checks.length === 0) return;
+  if (checks.some(([, id]) => !UUID_RE.test(id))) throw new Error("invalid_link");
+  const service = untyped(getSupabaseServiceClient());
+  const results = await Promise.all(
+    checks.map(([table, id]) =>
+      service.from(table).select("id").eq("id", id).eq("organization_id", organizationId).maybeSingle(),
+    ),
+  );
+  if (results.some((r) => r.error || !r.data)) throw new Error("invalid_link");
+}
+
+function isUniqueViolation(error: { code?: string } | null | undefined): boolean {
+  return error?.code === "23505";
+}
+
+/** `submission_id` 칸이 아직 없는 DB(마이그레이션 전) — 그때는 칸 없이 다시 넣는다. */
+function isMissingColumn(error: { code?: string } | null | undefined): boolean {
+  return error?.code === "PGRST204" || error?.code === "42703";
+}
+
+/**
+ * 같은 submission_id 로 이미 들어간 줄. `scope` 가 있으면(댓글 — `complaint_id`) 그 칸도 맞아야 한다 —
+ * 다른 컴플레인에 달린 줄을 «이미 저장됨»으로 돌려주면 안 되므로, 칸이 다르면 `invalid_submission`.
+ */
+async function findBySubmission(
+  table: string,
+  organizationId: string,
+  submissionId: string,
+  scope?: { column: string; value: string },
+): Promise<string | null> {
+  const { data, error } = await untyped(getSupabaseServiceClient())
+    .from(table)
+    .select(scope ? `id, ${scope.column}` : "id")
+    .eq("organization_id", organizationId)
+    .eq("submission_id", submissionId)
+    .maybeSingle();
+  if (error && !isMissingColumn(error)) throw new Error("save_failed");
+  const found = data as Record<string, unknown> | null;
+  if (!found) return null;
+  if (scope && found[scope.column] !== scope.value) throw new Error("invalid_submission");
+  return found.id as string;
+}
+
+/**
+ * 중복 막기 insert — 같은 submission_id 가 이미 있으면 그 id, 경합으로 유니크 위반이 나면 먼저 들어간 줄 id.
+ * submission_id 칸이 없는 DB 면 칸을 빼고 한 번 더 넣는다(배포 순서가 어긋나도 등록이 멈추지 않게).
+ */
+async function insertOnce(
+  table: string,
+  organizationId: string,
+  row: Record<string, unknown> & { id: string },
+  submissionId: string | null,
+  scope?: { column: string; value: string },
+): Promise<string> {
+  if (submissionId) {
+    const existing = await findBySubmission(table, organizationId, submissionId, scope);
+    if (existing) return existing;
+  }
+  const service = untyped(getSupabaseServiceClient());
+  const { error } = await service.from(table).insert(submissionId ? { ...row, submission_id: submissionId } : row);
+  if (!error) return row.id;
+  if (submissionId && isUniqueViolation(error)) {
+    const existing = await findBySubmission(table, organizationId, submissionId, scope);
+    if (existing) return existing;
+  }
+  if (submissionId && isMissingColumn(error)) {
+    const retry = await service.from(table).insert(row);
+    if (!retry.error) return row.id;
+  }
+  throw new Error("save_failed");
 }
 
 // 허용 이미지 형식 — SVG 는 스크립트를 품을 수 있어 막는다. 확장자는 파일명이 아니라 MIME 에서 정한다.
@@ -356,7 +482,11 @@ async function hydrateComplaints(
   return rows.map((row) => mapComplaint(row, info.get(row.created_by_user_id)));
 }
 
-/** 조직 컴플레인 목록 (최신순). 선택적 status / platform 필터. */
+/**
+ * 조직 컴플레인 목록 (최신순). 선택적 status / platform 필터.
+ * 1,000건 쪽으로 나눠 끝까지 읽는다(2026-11-10) — PostgREST 는 `range()` 없는 읽기를 1,000행에서 자르고,
+ * 이 목록은 화면 · 내보내기가 함께 쓴다.
+ */
 export async function listComplaints(input: {
   session: AppSession;
   status?: ComplaintStatus;
@@ -366,17 +496,33 @@ export async function listComplaints(input: {
   const organizationId = requireOrg(session);
 
   const supabase = await getSupabaseServerClient();
-  let query = untyped(supabase)
-    .from("customer_complaints")
-    .select(COMPLAINT_COLS)
-    .eq("organization_id", organizationId)
-    .order("created_at", { ascending: false });
-  if (input.status) query = query.eq("status", input.status);
-  if (input.platform) query = query.eq("platform", input.platform);
-
-  const { data, error } = await query;
-  if (error) return [];
-  return hydrateComplaints(organizationId, (data ?? []) as unknown as ComplaintRow[]);
+  const PAGE = 1000;
+  const rows: ComplaintRow[] = [];
+  const seen = new Set<string>();
+  for (let start = 0; ; start += PAGE) {
+    let query = untyped(supabase)
+      .from("customer_complaints")
+      .select(COMPLAINT_COLS)
+      .eq("organization_id", organizationId);
+    if (input.status) query = query.eq("status", input.status);
+    if (input.platform) query = query.eq("platform", input.platform);
+    const { data, error } = await query
+      .order("created_at", { ascending: false })
+      // 같은 시각이 여럿이면 쪽 경계에서 순서가 흔들린다 — id 로 고정한다.
+      .order("id", { ascending: false })
+      .range(start, start + PAGE - 1);
+    // 읽기 실패는 첫 쪽이든 중간 쪽이든 오류 — 빈 목록이나 앞 1,000건만 돌려주면 화면 · 내보내기가 «없음» · «전부»로 착각한다.
+    // 화면(PC · 모바일 페이지)은 받아서 안내를 보이고, 내보내기는 실패한다.
+    if (error) throw new Error("list_failed");
+    const page = (data ?? []) as unknown as ComplaintRow[];
+    for (const row of page) {
+      if (seen.has(row.id)) continue;
+      seen.add(row.id);
+      rows.push(row);
+    }
+    if (page.length < PAGE) break;
+  }
+  return hydrateComplaints(organizationId, rows);
 }
 
 /** 단건 조회. 조직 격리 확인. 없으면 null. */
@@ -413,9 +559,11 @@ export type ComplaintInput = {
   reservationId?: string | null;
   guestName?: string | null;
   imageUrls: string[];
+  /** 작성 한 번당 화면이 만든 uuid — 같은 값이 다시 오면 새로 만들지 않는다(선택). */
+  submissionId?: string | null;
 };
 
-/** 컴플레인 생성. 작성 권한 게이트 포함. id는 서버에서 생성. */
+/** 컴플레인 생성. 작성 권한 게이트 포함. id는 서버에서 생성. 같은 submissionId 면 먼저 만든 id. */
 export async function createComplaint(input: {
   session: AppSession;
   input: ComplaintInput;
@@ -426,9 +574,14 @@ export async function createComplaint(input: {
 
   const platform = validatePlatform(input.input.platform);
   const title = validateTitle(input.input.title);
+  const rating = normalizeRating(input.input.rating, platform);
+  const submissionId = normalizeSubmissionId(input.input.submissionId);
   validateImages(input.input.imageUrls, `${organizationId}/complaint-images/`);
+  const propertyId = normalizeOptional(input.input.propertyId);
+  const roomId = normalizeOptional(input.input.roomId);
+  const reservationId = normalizeOptional(input.input.reservationId);
+  await assertLinksInOrg(organizationId, { propertyId, roomId, reservationId });
 
-  const service = getSupabaseServiceClient();
   const id = randomUUID();
   const now = new Date().toISOString();
   const insert = {
@@ -441,20 +594,18 @@ export async function createComplaint(input: {
     status: "open" satisfies ComplaintStatus,
     description: normalizeOptional(input.input.description),
     image_urls: input.input.imageUrls,
-    rating: normalizeRating(input.input.rating),
-    property_id: normalizeOptional(input.input.propertyId),
+    rating,
+    property_id: propertyId,
     property_name: normalizeOptional(input.input.propertyName),
-    room_id: normalizeOptional(input.input.roomId),
+    room_id: roomId,
     room_label: normalizeOptional(input.input.roomLabel),
-    reservation_id: normalizeOptional(input.input.reservationId),
+    reservation_id: reservationId,
     guest_name: normalizeOptional(input.input.guestName),
     created_at: now,
     updated_at: now,
   };
 
-  const { error } = await untyped(service).from("customer_complaints").insert(insert);
-  if (error) throw new Error("save_failed");
-  return { id };
+  return { id: await insertOnce("customer_complaints", organizationId, insert, submissionId) };
 }
 
 async function loadComplaintForWrite(
@@ -474,7 +625,10 @@ async function loadComplaintForWrite(
 
 export type ComplaintPatch = Partial<ComplaintInput>;
 
-/** 수정. 작성자 본인 + open 상태일 때만. 플랫폼 개발자는 둘 다 예외(2026-10-23). */
+/**
+ * 수정. `complaintRights().edit`(작성자 + complaint.write, 또는 complaint.manage) + open 상태일 때만.
+ * 플랫폼 개발자는 open 조건만 예외(2026-10-23).
+ */
 export async function updateComplaint(input: {
   session: AppSession;
   id: string;
@@ -486,15 +640,16 @@ export async function updateComplaint(input: {
   const existing = await loadComplaintForWrite(id, organizationId);
   if (!existing) throw new Error("not_found");
   const developer = isPlatformDeveloper(session.user.role);
-  if (existing.created_by_user_id !== session.user.id && !developer) throw new Error("forbidden");
+  if (!complaintRights(session, { createdByUserId: existing.created_by_user_id }).edit) throw new Error("forbidden");
   if (existing.status !== "open" && !developer) throw new Error("not_editable");
 
   const update: Database["public"]["Tables"]["customer_complaints"]["Update"] = { updated_at: new Date().toISOString() };
   if (patch.platform !== undefined) update.platform = validatePlatform(patch.platform);
+  const effectivePlatform = (update.platform ?? existing.platform) as ComplaintPlatform;
   if (patch.title !== undefined) update.title = validateTitle(patch.title);
   if (patch.description !== undefined) update.description = normalizeOptional(patch.description);
   if (patch.platformRef !== undefined) update.platform_ref = normalizeOptional(patch.platformRef);
-  if (patch.rating !== undefined) update.rating = normalizeRating(patch.rating);
+  if (patch.rating !== undefined) update.rating = normalizeRating(patch.rating, effectivePlatform);
   if (patch.propertyId !== undefined) update.property_id = normalizeOptional(patch.propertyId);
   if (patch.propertyName !== undefined) update.property_name = normalizeOptional(patch.propertyName);
   if (patch.roomId !== undefined) update.room_id = normalizeOptional(patch.roomId);
@@ -507,6 +662,13 @@ export async function updateComplaint(input: {
     validateImages(patch.imageUrls, `${organizationId}/complaint-images/`, existing.image_urls ?? []);
     update.image_urls = patch.imageUrls;
   }
+  // 바뀐 연결 id 만 조직 확인(그대로 다시 온 기존 값은 이미 저장된 것).
+  await assertLinksInOrg(organizationId, {
+    propertyId: update.property_id && update.property_id !== existing.property_id ? update.property_id : null,
+    roomId: update.room_id && update.room_id !== existing.room_id ? update.room_id : null,
+    reservationId:
+      update.reservation_id && update.reservation_id !== existing.reservation_id ? update.reservation_id : null,
+  });
 
   const service = getSupabaseServiceClient();
   const { error } = await untyped(service)
@@ -517,7 +679,7 @@ export async function updateComplaint(input: {
   if (error) throw new Error("save_failed");
 }
 
-/** 삭제 (hard delete). 작성자 본인 또는 owner/office_admin/super-admin. */
+/** 삭제 (hard delete). `complaintRights().delete` — 작성자 + complaint.write, 또는 complaint.manage. */
 export async function deleteComplaint(input: {
   session: AppSession;
   id: string;
@@ -527,7 +689,7 @@ export async function deleteComplaint(input: {
 
   const existing = await loadComplaintForWrite(id, organizationId);
   if (!existing) throw new Error("not_found");
-  if (existing.created_by_user_id !== session.user.id && !isComplaintAdmin(session)) {
+  if (!complaintRights(session, { createdByUserId: existing.created_by_user_id }).delete) {
     throw new Error("forbidden");
   }
 
@@ -563,13 +725,18 @@ async function setComplaintStatus(
     update.resolved_by_user_id = null;
   }
 
+  // **읽은 상태일 때만 바꾼다**(2026-11-10). 두 사람이 거의 동시에 해결 / 다시 열기를 누르면 늦은 쪽이 먼저
+  // 쪽의 처리자 · 처리 시각을 덮어썼다. 그 사이 바뀌었으면 `stale` — 화면이 「다른 사람이 먼저 바꿨어요」를 띄운다.
   const service = getSupabaseServiceClient();
-  const { error } = await untyped(service)
+  const { data, error } = await untyped(service)
     .from("customer_complaints")
     .update(update)
     .eq("id", id)
-    .eq("organization_id", organizationId);
+    .eq("organization_id", organizationId)
+    .eq("status", existing.status)
+    .select("id");
   if (error) throw new Error("save_failed");
+  if (!Array.isArray(data) || data.length === 0) throw new Error("stale");
 }
 
 /** 상태 → resolved. */
@@ -678,10 +845,13 @@ export async function createComplaintComment(input: {
   complaintId: string;
   content: string;
   imageUrls: string[];
+  /** 남기기 한 번당 화면이 만든 uuid — 같은 값이 다시 오면 새로 만들지 않는다(선택). */
+  submissionId?: string | null;
 }): Promise<{ id: string }> {
   const { session, complaintId } = input;
   const organizationId = requireOrg(session);
   if (!canWriteComment(session)) throw new Error("forbidden");
+  const submissionId = normalizeSubmissionId(input.submissionId);
 
   const content = input.content.trim();
   if (!content) throw new Error("content_required");
@@ -690,7 +860,6 @@ export async function createComplaintComment(input: {
   const complaint = await loadComplaintForWrite(complaintId, organizationId);
   if (!complaint) throw new Error("not_found");
 
-  const service = getSupabaseServiceClient();
   const id = randomUUID();
   const now = new Date().toISOString();
   const insert = {
@@ -704,9 +873,9 @@ export async function createComplaintComment(input: {
     updated_at: now,
   };
 
-  const { error } = await untyped(service).from("complaint_comments").insert(insert);
-  if (error) throw new Error("save_failed");
-  return { id };
+  return {
+    id: await insertOnce("complaint_comments", organizationId, insert, submissionId, { column: "complaint_id", value: complaintId }),
+  };
 }
 
 /** 댓글 수정. 작성자 본인만(플랫폼 개발자 예외, 2026-10-23). */
@@ -736,7 +905,7 @@ export async function updateComplaintComment(input: {
   if (error) throw new Error("save_failed");
 }
 
-/** 댓글 삭제 (soft delete). 작성자 본인 또는 owner/office_admin/super-admin. */
+/** 댓글 삭제 (soft delete). 작성자 본인 또는 complaint.manage. */
 export async function deleteComplaintComment(input: {
   session: AppSession;
   commentId: string;
@@ -746,7 +915,7 @@ export async function deleteComplaintComment(input: {
 
   const existing = await loadCommentForWrite(commentId, organizationId);
   if (!existing || existing.deleted_at) throw new Error("not_found");
-  if (existing.created_by_user_id !== session.user.id && !isComplaintAdmin(session)) {
+  if (existing.created_by_user_id !== session.user.id && !canModerateComplaints(session)) {
     throw new Error("forbidden");
   }
 

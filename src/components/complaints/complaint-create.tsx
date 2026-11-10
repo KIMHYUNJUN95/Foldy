@@ -115,6 +115,7 @@ export function ComplaintCreate({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [titleError, setTitleError] = useState(false);
   const [submitError, setSubmitError] = useState(false);
+  const [photoError, setPhotoError] = useState(false);
   const [titleText, setTitleText] = useState("");
 
   const placeBuildings = useMemo(() => {
@@ -127,7 +128,9 @@ export function ComplaintCreate({
     [places, placeBuilding],
   );
 
-  const draftId = useRef(crypto.randomUUID()).current;
+  const [draftId] = useState(() => crypto.randomUUID());
+  // 같은 초안을 다시 보내도(느린 망에서 재시도 · 두 번 누름) 서버가 한 건으로 합치도록 초안마다 하나. 보내기에 성공하면 새 초안이라 새로 만든다.
+  const submissionRef = useRef<{ sig: string; id: string } | null>(null);
   const titleRef = useRef<HTMLInputElement>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -144,18 +147,39 @@ export function ComplaintCreate({
     event.target.value = "";
     if (!file || uploadedImages.length >= MAX_IMAGES) return;
 
+    setPhotoError(false);
     startTransition(async () => {
       // 서버 액션 본문 상한(1MB)을 넘지 않도록 업로드 전에 압축한다 (CLAUDE.md §8).
+      // 압축이 실패하면 원본을 그대로 보내지 않는다 — 큰 원본은 본문 상한에서 조용히 실패한다.
+      let compressed: File;
+      try {
+        compressed = await compressImageFile(file);
+      } catch {
+        setPhotoError(true);
+        haptic("error");
+        return;
+      }
       const formData = new FormData();
-      formData.append("file", await compressImageFile(file).catch(() => file));
-      const result = await uploadComplaintImageAction(draftId, formData);
+      formData.append("file", compressed);
+      let result: Awaited<ReturnType<typeof uploadComplaintImageAction>>;
+      try {
+        result = await uploadComplaintImageAction(draftId, formData);
+      } catch {
+        setPhotoError(true);
+        haptic("error");
+        return;
+      }
       if ("url" in result) {
         setUploadedImages((current) => [...current, result.url]);
+      } else {
+        setPhotoError(true);
+        haptic("error");
       }
     });
   }
 
   function handleRemoveImage(index: number) {
+    setPhotoError(false);
     setUploadedImages((current) => current.filter((_, currentIndex) => currentIndex !== index));
   }
 
@@ -179,8 +203,14 @@ export function ComplaintCreate({
       }
       if (guestName.trim()) formData.append("guest_name", guestName.trim());
 
+      // 입력이 그대로일 때만 같은 식별자를 쓴다 — 고친 내용이 첫 시도로 합쳐져 버려지지 않게.
+      const sig = JSON.stringify([...formData.entries()]);
+      if (submissionRef.current?.sig !== sig) submissionRef.current = { sig, id: crypto.randomUUID() };
+      formData.append("submission_id", submissionRef.current.id);
+
       const result = await createComplaintAction(formData);
       if ("id" in result) {
+        submissionRef.current = null;
         haptic("success");
         router.push(`/mobile/complaints/${result.id}`);
       } else {
@@ -373,6 +403,12 @@ export function ComplaintCreate({
           <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleImageChange} />
         </div>
       </section>
+
+      {photoError ? (
+        <p className="fbw-err" role="alert">
+          {t.photoUploadFailed}
+        </p>
+      ) : null}
 
       {submitError ? (
         <p className="fbw-err" role="alert">

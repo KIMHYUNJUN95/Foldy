@@ -42,7 +42,7 @@ export function ComplaintDeleteSheet({
         haptic("error");
         return;
       }
-      haptic("success");
+      haptic("light");
       close();
       router.replace("/mobile/complaints?view=manual");
     });

@@ -3,6 +3,7 @@ import { ComplaintsConsole } from "@/components/admin/complaints/complaints-cons
 import {
   canModerateComplaints,
   canChangeStatus,
+  canDeleteComplaint,
   canWriteComment,
   canWriteComplaint,
   getComplaint,
@@ -23,13 +24,14 @@ import {
   type ExternalReviewDetail,
   type ReviewListFilter,
 } from "@/lib/external-reviews";
-import { getStoredTranslations, type TranslationPart } from "@/lib/review-translate";
+import { getStoredTranslations, reviewTranslationSources, type TranslationPart } from "@/lib/review-translate";
 import { getReviewSyncStatus } from "@/lib/beds24/reviews-sync-manual";
 import { reviewSyncLabels } from "@/lib/review-sync-labels";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { getDictionary } from "@/lib/i18n";
 import { REVIEW_LIST_STEP, defaultReviewRange } from "@/lib/external-review-pages";
+import { resolveDateRangeParams } from "@/lib/iso-date-param";
 
 // 컴플레인 콘솔 — 수동 컴플레인 + Beds24 외부 리뷰 통합 검토.
 // 뷰 전환과 기간/필터는 전부 쿼리스트링으로 다뤄, 서버 렌더 한 번으로 끝난다.
@@ -77,9 +79,10 @@ export default async function AdminComplaintsPage({
   const dictionary = getDictionary(session.user.preferredLanguage);
 
   // 기본 기간은 최근 90일(오늘 포함, 도쿄 날짜) — Beds24 초기 수집 범위 · 모바일과 같은 창.
+  // 주소의 날짜는 실제로 있는 날(YYYY-MM-DD)만 받는다 — 틀린 쪽은 기본값, 시작이 끝보다 늦으면 둘 다 기본값
+  // (모바일과 같은 `resolveDateRangeParams`, 2026-11-10). 예전엔 아무 글자나 그대로 쿼리에 넣었다.
   const fallback = defaultReviewRange();
-  const from = params.from?.trim() || fallback.from;
-  const to = params.to?.trim() || fallback.to;
+  const { from, to } = resolveDateRangeParams(params.from?.trim(), params.to?.trim(), fallback);
 
   // 들어오면 **외부 리뷰**가 먼저 보인다(2026-10-01 사용자 요청 — 모바일과 같다). 다른 뷰는 탭(`?view=`)으로.
   const view =
@@ -127,7 +130,11 @@ export default async function AdminComplaintsPage({
     complaintDetail,
   ] = await Promise.all([
     filterPromise,
-    listComplaints({ session }),
+    // 목록을 다 못 읽었으면(`list_failed`) 콘솔 전체를 오류 화면으로 만들지 않는다 — 수기 보기에서만 안내한다.
+    listComplaints({ session }).catch((error: unknown) => {
+      console.error("[admin/complaints] list failed", error);
+      return null;
+    }),
     filterPromise.then(({ filter }) => listExternalReviews({ session, filter })),
     summarizeReviewsByPlace({ session, from, to, locale: session.user.preferredLanguage }),
     canWrite
@@ -146,6 +153,7 @@ export default async function AdminComplaintsPage({
               ? await getStoredTranslations({
                   externalReviewId: reviewId,
                   targetLocale: session.user.preferredLanguage,
+                  sources: reviewTranslationSources(review),
                 })
               : ({} as Partial<Record<TranslationPart, string>>),
         }))
@@ -184,10 +192,12 @@ export default async function AdminComplaintsPage({
         from={from}
         to={to}
         filter={filter}
-        complaints={complaints}
+        complaints={complaints ?? []}
+        complaintsLoadFailed={complaints === null}
         comments={comments}
         canComment={canWriteComment(session)}
         canChangeSelectedStatus={selectedComplaint ? canChangeStatus(session, selectedComplaint) : false}
+        canDeleteSelected={selectedComplaint ? canDeleteComplaint(session, selectedComplaint) : false}
         buildingOptions={buildingOptions.map(({ value, label }) => ({ value, label }))}
         building={building?.value ?? null}
         roomLabel={roomLabel}

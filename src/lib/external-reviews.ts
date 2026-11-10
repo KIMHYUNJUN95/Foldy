@@ -375,7 +375,15 @@ export async function listReviewBuildingOptions(input: {
   return [...grouped.values()].sort((a, b) => a.label.localeCompare(b.label, input.locale));
 }
 
-/** 외부 리뷰 상세. 목록과 달리 비공개 피드백을 포함한다. */
+/**
+ * 외부 리뷰 상세. 목록과 달리 비공개 피드백을 포함한다.
+ *
+ * `private_feedback` · `raw_payload` 는 일반 사용자 연결(PostgREST)로는 **읽을 수 없다**(2026-11-10 마이그레이션
+ * `202611100003` 이 칸 권한을 거뒀다 — 예전엔 조직 구성원 누구나 API 로 직접 꺼낼 수 있었다). 그래서 보통 칸은
+ * 사용자 연결로 읽어 RLS 가 «이 사람이 이 리뷰를 볼 수 있는지» 를 먼저 판정하고, 통과했을 때만 비공개 피드백을
+ * 서버 연결(service_role)로 같은 조직 · 같은 id 로 다시 읽는다. 보이는 사람은 그대로다(문서 25 — 리뷰 상세를 볼 수
+ * 있는 사람 = 조직 활성 구성원).
+ */
 export async function getExternalReview(input: {
   session: AppSession;
   id: string;
@@ -384,14 +392,23 @@ export async function getExternalReview(input: {
   const supabase = await getSupabaseServerClient();
   const { data, error } = await untyped(supabase)
     .from("external_reviews")
-    .select(`${REVIEW_COLS}, private_feedback`)
+    .select(REVIEW_COLS)
     .eq("organization_id", organizationId)
     .eq("id", input.id)
     .maybeSingle();
   if (error) throw error;
   if (!data) return null;
   const row = data as unknown as ReviewRow;
-  return { ...mapReview(row), privateFeedback: row.private_feedback ?? null };
+  const { data: privateRow, error: privateError } = await untyped(getSupabaseServiceClient())
+    .from("external_reviews")
+    .select("private_feedback")
+    .eq("organization_id", organizationId)
+    .eq("id", row.id)
+    .maybeSingle();
+  // 비공개 피드백만 못 읽었으면 상세 전체를 막지 않는다 — 비워 두고 서버 로그에 남긴다.
+  if (privateError) console.error("[external-reviews] private feedback read failed", { code: privateError.code, id: row.id });
+  const privateFeedback = (privateRow as { private_feedback: string | null } | null)?.private_feedback ?? null;
+  return { ...mapReview(row), privateFeedback };
 }
 
 // ────────────────────────────────────────────────────────────
@@ -678,13 +695,18 @@ export async function summarizeReviewsByPlace(input: {
  * 낮은 평점이라는 이유만으로 자동 생성하지 않는다 — 권한자가 명시적으로 부를 때만 실행된다.
  * 서버가 다시 확인하는 것: (1) `canWriteComplaint` 역할, (2) 리뷰가 세션 조직 소유,
  * (3) 이미 전환된 리뷰가 아닐 것. (3)은 부분 unique 인덱스로도 강제된다.
+ *
+ * **반쪽 상태를 남기지 않는다(2026-11-10).** 순서: 컴플레인 넣기 → 리뷰에 연결(아직 비어 있을 때만). 연결이
+ * 실패하거나 그 사이 다른 사람이 먼저 연결했으면 방금 넣은 컴플레인을 지운다(되돌리기). 이미 연결됐거나
+ * 경합으로 유니크 위반(23505)이 나면 오류 대신 **연결된 컴플레인 id** 를 `alreadyLinked: true` 로 돌려준다 —
+ * 화면은 그 컴플레인을 보여 주면 된다. 날것의 DB 오류는 밖으로 내보내지 않는다(`save_failed`).
  */
 export async function convertReviewToComplaint(input: {
   session: AppSession;
   reviewId: string;
   title: string;
   description?: string | null;
-}): Promise<{ complaintId: string }> {
+}): Promise<{ complaintId: string; alreadyLinked: boolean }> {
   const { session, reviewId } = input;
   const organizationId = requireOrg(session);
 
@@ -700,12 +722,12 @@ export async function convertReviewToComplaint(input: {
     .select(`${REVIEW_COLS}, organization_id, private_feedback`)
     .eq("id", reviewId)
     .maybeSingle();
-  if (reviewError) throw reviewError;
+  if (reviewError) throw new Error("save_failed");
   if (!review) throw new Error("not_found");
 
   const row = review as unknown as ReviewRow & { organization_id: string };
   if (row.organization_id !== organizationId) throw new Error("forbidden");
-  if (row.linked_complaint_id) throw new Error("already_linked");
+  if (row.linked_complaint_id) return { complaintId: row.linked_complaint_id, alreadyLinked: true };
 
   // 전환 시점의 점수·본문·문맥을 그대로 보존한다. 리뷰가 다시 동기화되거나 건물/객실
   // 마스터가 바뀌어도 티켓 자체는 그대로 읽힌다.
@@ -750,14 +772,102 @@ export async function convertReviewToComplaint(input: {
     })
     .select("id")
     .single();
-  if (insertError) throw insertError;
+  if (insertError) {
+    // 다른 사람이 같은 리뷰를 먼저 전환했다(부분 유니크 인덱스) — 그 컴플레인을 돌려준다.
+    if (insertError.code === "23505") {
+      const existing = await findComplaintForReview(untyped(service), organizationId, row.id);
+      if (existing) {
+        // 먼저 만든 쪽이 연결 전에 멈췄으면(컴플레인만 있고 리뷰 연결이 비었음) 여기서 마저 잇는다.
+        // 비어 있을 때만 — 이미 걸린 연결은 건드리지 않는다.
+        const { data: relinked, error: relinkError } = await untyped(service)
+          .from("external_reviews")
+          .update({ linked_complaint_id: existing })
+          .eq("id", row.id)
+          .eq("organization_id", organizationId)
+          .is("linked_complaint_id", null)
+          .select("id");
+        if (relinkError) {
+          // FK 위반 등 — 찾은 컴플레인이 그 사이 지워졌을 수 있다. 없는 id 를 돌려주지 않는다.
+          console.error("[external-reviews] convert relink failed", { code: relinkError.code, reviewId: row.id });
+          throw new Error("save_failed");
+        }
+        if (Array.isArray(relinked) && relinked.length > 0) return { complaintId: existing, alreadyLinked: true };
+        // 0줄 — 이미 연결이 걸려 있다. 그 연결이 찾은 컴플레인일 때만 돌려준다.
+        const { data: now } = await untyped(service)
+          .from("external_reviews")
+          .select("linked_complaint_id")
+          .eq("id", row.id)
+          .eq("organization_id", organizationId)
+          .maybeSingle();
+        if ((now as { linked_complaint_id: string | null } | null)?.linked_complaint_id === existing) {
+          return { complaintId: existing, alreadyLinked: true };
+        }
+        throw new Error("save_failed");
+      }
+    }
+    console.error("[external-reviews] convert insert failed", { code: insertError.code, reviewId: row.id });
+    throw new Error("save_failed");
+  }
+  const complaintId = (created as { id: string }).id;
 
-  const { error: linkError } = await untyped(service)
+  const { data: linked, error: linkError } = await untyped(service)
     .from("external_reviews")
-    .update({ linked_complaint_id: (created as { id: string }).id })
+    .update({ linked_complaint_id: complaintId })
     .eq("id", row.id)
-    .eq("organization_id", organizationId);
-  if (linkError) throw linkError;
+    .eq("organization_id", organizationId)
+    .is("linked_complaint_id", null)
+    .select("id, linked_complaint_id");
+  const linkedOk = !linkError && Array.isArray(linked) && linked.length > 0;
+  if (linkedOk) return { complaintId, alreadyLinked: false };
 
-  return { complaintId: (created as { id: string }).id };
+  // 연결이 안 된 것처럼 보인다 — 지우기 전에 리뷰를 다시 읽는다. 응답만 잃었고 실제로는 우리 컴플레인에 걸렸다면
+  // 지우면 안 된다(지우면 리뷰가 없는 컴플레인을 가리킨다).
+  if (linkError) console.error("[external-reviews] convert link failed", { code: linkError.code, reviewId: row.id });
+  const { data: current, error: currentError } = await untyped(service)
+    .from("external_reviews")
+    .select("linked_complaint_id")
+    .eq("id", row.id)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+  const linkedTo = (current as { linked_complaint_id: string | null } | null)?.linked_complaint_id ?? null;
+  if (!currentError && linkedTo === complaintId) return { complaintId, alreadyLinked: false };
+  if (currentError) {
+    // 지금 상태를 모른다 — 지우지 않고 실패로 돌려준다(다음 시도 때 23505 경로가 이 컴플레인을 찾아 잇는다).
+    console.error("[external-reviews] convert recheck failed", { code: currentError.code, reviewId: row.id });
+    throw new Error("save_failed");
+  }
+
+  // 되돌리기 — 연결 못 한 컴플레인을 남기지 않는다.
+  const { error: deleteError } = await untyped(service)
+    .from("customer_complaints")
+    .delete()
+    .eq("id", complaintId)
+    .eq("organization_id", organizationId);
+  if (deleteError) {
+    console.error("[external-reviews] convert rollback failed", { code: deleteError.code, complaintId, reviewId: row.id });
+  }
+  if (!linkedTo) throw new Error("save_failed");
+  // 남이 먼저 연결했다 — 그 컴플레인이 정말 있을 때만 돌려준다.
+  const { data: other } = await untyped(service)
+    .from("customer_complaints")
+    .select("id")
+    .eq("id", linkedTo)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+  if (!other) throw new Error("save_failed");
+  return { complaintId: linkedTo, alreadyLinked: true };
+}
+
+async function findComplaintForReview(
+  service: SupabaseClient,
+  organizationId: string,
+  reviewId: string,
+): Promise<string | null> {
+  const { data } = await service
+    .from("customer_complaints")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("external_review_id", reviewId)
+    .maybeSingle();
+  return (data as { id: string } | null)?.id ?? null;
 }

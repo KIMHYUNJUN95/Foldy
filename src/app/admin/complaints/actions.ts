@@ -1,66 +1,55 @@
 "use server";
 
-// 컴플레인 콘솔 서버 액션 — 외부 리뷰 → 수동 컴플레인 전환, 외부 리뷰 번역 요청.
+// 컴플레인 콘솔(PC) 서버 액션 — 외부 리뷰 → 수동 컴플레인 전환 · 외부 리뷰 번역 · 수기 등록 · 등록 사진 올리기.
 //
-// 둘 다 폼 데이터의 reviewId만 신뢰하지 않는다: `getExternalReview`/`convertReviewToComplaint`/
-// `translateReviewPart`가 세션 조직으로 다시 스코프를 좁힌다. 여기서는 진입 시점 권한만 먼저 막고,
-// 실패는 조용히 원래 상세로 되돌아간다 — 리뷰 상세 자체는 읽기 화면이라 별도 에러 배너 카피가 아직 없다.
+// 폼의 reviewId 만 신뢰하지 않는다: `getExternalReview`/`convertReviewToComplaint`/`translateReviewPart` 가
+// 세션 조직으로 다시 스코프를 좁힌다. **결과를 돌려준다**(2026-11-10) — 예전엔 실패를 삼키고 redirect 해서 화면이
+// 실패를 몰랐다. 화면(`review-panel-actions.tsx`)이 결과에 따라 오류 문구 · 오류 햅틱을 띄우고 성공하면 주소를 바꾼다.
+// 삭제 · 해결 · 처리 기록은 모바일과 같은 `src/actions/complaints.ts` 를 쓴다(화면별 저장 경로를 만들지 않는다).
 //
 // 도메인 계약: docs/product/25-complaint-workflow.md → "External Review Fields", "Review Translation"
 
-import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import {
-  canWriteComplaint,
-  createComplaint,
-  deleteComplaint,
-  uploadComplaintImage,
-  type ComplaintInput,
-} from "@/lib/complaints";
+import { canWriteComplaint, createComplaint, uploadComplaintImage, type ComplaintInput } from "@/lib/complaints";
 import { getCurrentAppSession } from "@/lib/session";
 import { convertReviewToComplaint, getExternalReview } from "@/lib/external-reviews";
-import { translateReviewPart, type TranslationPart } from "@/lib/review-translate";
+import { createTranslationBudget, translateReviewPart, type TranslationPart } from "@/lib/review-translate";
 
-/** redirectTo는 항상 이 콘솔 안에서만 온다 — open redirect 방지. */
-function redirectTarget(formData: FormData): string {
-  const target = String(formData.get("redirectTo") ?? "").trim();
-  return target.startsWith("/admin/complaints") ? target : "/admin/complaints";
+export type ConvertReviewResult = { ok: true; complaintId: string; alreadyLinked: boolean } | { error: string };
+export type TranslateReviewAllResult = { ok: true } | { error: "unavailable" | "forbidden" };
+
+function messageOf(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
 }
 
 /**
  * 외부 리뷰를 근거로 수동 컴플레인을 만든다.
  *
- * 제목을 비워 두면 리뷰 headline → 본문(원문 텍스트) 앞부분 순으로 기본값을 만든다. 실제 스냅샷
- * 보존과 중복 전환 방지는 `convertReviewToComplaint`가 담당한다.
+ * 제목은 리뷰 headline → 본문(원문 텍스트) 앞부분 순으로 기본값을 만든다. 스냅샷 보존 · 중복 전환 방지 · 반쪽 상태
+ * 되돌리기는 `convertReviewToComplaint` 가 맡는다. 이미 전환된 리뷰면 오류가 아니라 그 컴플레인을 돌려준다.
  */
-export async function convertReviewAction(formData: FormData): Promise<void> {
+export async function convertReviewAction(reviewId: string): Promise<ConvertReviewResult> {
   const session = await getCurrentAppSession();
-  const target = redirectTarget(formData);
-  if (!session) redirect("/admin/complaints");
-  if (!canWriteComplaint(session)) redirect(target);
-
-  const reviewId = String(formData.get("reviewId") ?? "").trim();
-  if (!reviewId) redirect(target);
-
-  const review = await getExternalReview({ session, id: reviewId });
-  if (!review) redirect(target);
-
-  const titleInput = String(formData.get("title") ?? "").trim();
-  const title =
-    titleInput ||
-    review.headline?.trim() ||
-    review.reviewText?.trim().slice(0, 60) ||
-    review.positiveReviewText?.trim().slice(0, 60) ||
-    review.negativeReviewText?.trim().slice(0, 60) ||
-    `${review.provider} ${review.externalReviewId}`;
+  if (!session || !canWriteComplaint(session)) return { error: "forbidden" };
+  const id = typeof reviewId === "string" ? reviewId.trim() : "";
+  if (!id) return { error: "not_found" };
 
   try {
-    await convertReviewToComplaint({ session, reviewId, title });
+    const review = await getExternalReview({ session, id });
+    if (!review) return { error: "not_found" };
+    const title =
+      review.headline?.trim() ||
+      review.reviewText?.trim().slice(0, 60) ||
+      review.positiveReviewText?.trim().slice(0, 60) ||
+      review.negativeReviewText?.trim().slice(0, 60) ||
+      `${review.provider} ${review.externalReviewId}`;
+    const { complaintId, alreadyLinked } = await convertReviewToComplaint({ session, reviewId: id, title });
     revalidatePath("/admin/complaints");
-  } catch {
-    // 이미 전환됐거나(already_linked) 권한/조직이 어긋난 경우 — 상세를 그대로 다시 보여준다.
+    revalidatePath("/mobile/complaints");
+    return { ok: true, complaintId, alreadyLinked };
+  } catch (error) {
+    return { error: messageOf(error, "save_failed") };
   }
-  redirect(target);
 }
 
 const MAX_IMAGES = 5;
@@ -81,8 +70,7 @@ function optional(formData: FormData, key: string): string | null {
  * 권한(`canWriteComplaint`)·조직 스코프·제목/플랫폼/이미지 검증은 전부 그 안에서 다시 이뤄지며,
  * 여기서 앞서 막는 것은 진입 시점 방어일 뿐이다.
  *
- * 결과를 반환하는 이유: 이 액션은 redirect 하는 다른 콘솔 액션과 달리 클라이언트 패널이 부르고,
- * 성공하면 패널을 닫고 실패하면 그 자리에서 사유를 보여 줘야 한다.
+ * 성공하면 패널을 닫고 실패하면 그 자리에서 사유를 보여 준다.
  */
 export async function createManualComplaintAction(
   formData: FormData,
@@ -114,6 +102,8 @@ export async function createManualComplaintAction(
     reservationId: optional(formData, "reservation_id"),
     guestName: optional(formData, "guest_name"),
     imageUrls,
+    // 작성 패널 한 번당 uuid — 두 번 눌러도 한 건만(2026-11-10, 모바일과 같은 계약).
+    submissionId: optional(formData, "submission_id"),
   };
 
   try {
@@ -150,43 +140,19 @@ export async function uploadManualComplaintImageAction(
 }
 
 /**
- * 수동 컴플레인 삭제 (MVP hard delete — 문서 25 §"컴플레인 본체는 hard delete").
- *
- * 권한(작성자 본인 또는 owner/office_admin/super-admin)은 `deleteComplaint`가 서버에서 다시 검증한다.
- * 폼의 complaintId만 신뢰하지 않는다. 되돌릴 수 없으므로 호출부(모달)에서 확인 UX를 거친다.
- * redirect 없이 revalidate만 한다 — 클라이언트가 목록에 남은 채로 서버 컴포넌트가 갱신된다.
- */
-export async function deleteComplaintAction(formData: FormData): Promise<void> {
-  const session = await getCurrentAppSession();
-  if (!session) return;
-
-  const id = String(formData.get("complaintId") ?? "").trim();
-  if (!id) return;
-
-  try {
-    await deleteComplaint({ session, id });
-  } catch {
-    // 이미 삭제됐거나(not_found) 권한/조직이 어긋난 경우 — 목록을 그대로 다시 그린다.
-  }
-  revalidatePath("/admin/complaints");
-}
-
-/**
  * 리뷰의 텍스트가 있는 파트(공개/긍정/부정/제목/비공개)를 현재 사용자 언어로 번역해 캐시에 남긴다.
  *
  * 이미 캐시된 조합은 `translateReviewPart`가 즉시 반환하므로, 이 액션은 "번역 보기"를 누를 때마다
- * 매번 불러도 새 DeepL 호출을 만들지 않는다.
+ * 매번 불러도 새 DeepL 호출을 만들지 않는다. 성공하면 화면이 `?tr=1` 로 바꿔 저장된 번역을 보여 준다.
  */
-export async function translateReviewAction(formData: FormData): Promise<void> {
+export async function translateReviewAction(reviewId: string): Promise<TranslateReviewAllResult> {
   const session = await getCurrentAppSession();
-  const target = redirectTarget(formData);
-  if (!session) redirect("/admin/complaints");
+  if (!session) return { error: "forbidden" };
+  const id = typeof reviewId === "string" ? reviewId.trim() : "";
+  if (!id) return { error: "unavailable" };
 
-  const reviewId = String(formData.get("reviewId") ?? "").trim();
-  if (!reviewId) redirect(target);
-
-  const review = await getExternalReview({ session, id: reviewId });
-  if (!review) redirect(target);
+  const review = await getExternalReview({ session, id }).catch(() => null);
+  if (!review) return { error: "unavailable" };
 
   const organizationId = session.organization.id;
   const targetLocale = session.user.preferredLanguage;
@@ -199,21 +165,26 @@ export async function translateReviewAction(formData: FormData): Promise<void> {
     { part: "private", text: review.privateFeedback },
   ];
 
-  await Promise.all(
+  // 한도는 한 번 읽어 조각들이 나눠 쓴다 — 조각마다 옛 합계로 따로 판정하지 않게.
+  const budget = createTranslationBudget();
+  const results = await Promise.all(
     parts
       .filter((entry): entry is { part: TranslationPart; text: string } => Boolean(entry.text?.trim()))
       .map((entry) =>
         translateReviewPart({
           organizationId,
-          externalReviewId: reviewId,
+          externalReviewId: review.id,
           part: entry.part,
           targetLocale,
           sourceText: entry.text,
           sourceLanguageCode: review.sourceLanguageCode,
+          budget,
         }),
       ),
   );
 
+  // 하나라도 못 했으면 실패로 알린다 — 예전엔 조용히 원문만 보였다. 된 조각은 저장돼 있어 다시 누르면 빠르다.
+  if (results.length === 0 || results.some((result) => result.status !== "ok")) return { error: "unavailable" };
   revalidatePath("/admin/complaints");
-  redirect(target);
+  return { ok: true };
 }

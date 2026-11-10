@@ -159,7 +159,7 @@ export function ImageLightbox({ images, startIndex, onClose, labels }: Props) {
   if (typeof document === "undefined") return null;
 
   return createPortal(
-    <div className="cx-lb" role="dialog" aria-modal>
+    <div className="cx-lb" role="dialog" aria-modal="true" data-native-back-overlay="" data-swipe-back="off">
       {/* 카운터 */}
       {images.length > 1 && (
         <div className="cx-lb__counter">{index + 1} / {images.length}</div>

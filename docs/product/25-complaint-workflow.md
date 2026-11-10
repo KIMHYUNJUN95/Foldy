@@ -139,8 +139,10 @@ Beds24가 제공하는 Airbnb 또는 Booking.com 리뷰의 로컬 사본이다. 
 작성 불가 역할: Field Manager, Staff, Part-time Staff.
 
 조직 내 모든 활성 구성원은 읽을 수 있다. 댓글은 Part-time Staff를 제외한 전 구성원이 작성할 수 있다.
-상태 변경은 기존 계약을 유지한다: 작성자는 본인 건, Owner / Office Admin은 전체, CS Staff는 본인 작성
-건만 `open ↔ resolved` 전환한다.
+**상태 변경(`open ↔ resolved`)은 `complaint.manage` 만 한다(2026-11-10 — 작성자 예외 없앰).** 수정 · 삭제는 작성자 본인이
+**지금도** `complaint.write` 를 가졌을 때, 아니면 `complaint.manage`. 판정은 `complaintRights()`(`src/lib/complaints.ts`) 한 곳이고
+서버 가드(`updateComplaint` · `deleteComplaint` · `resolve/reopen`)와 화면 노출(PC 패널 · 모바일 상세의 휴지통 · 해결 버튼)이 같은 함수를 쓴다.
+(위 「작성 가능 역할」 목록은 2026-10-22 이전 기준 — 지금 역할 기본은 아래 「권한 — CS 관리자 일」.)
 모바일 상세의 「해결」 · 「다시 열기」는 **누르자마자 반영**된다(2026-10-21 — `useOptimistic`, 성공 햅틱도 바로). 서버가 거절하면
 원래 상태로 돌아가고 오류 문구 + 오류 햅틱(권한 검사는 서버 그대로).
 
@@ -315,6 +317,8 @@ Airbnb 리뷰는 **양방향**이다. 호스트가 게스트에게 쓴 리뷰까
   재사용하므로, 원문이 매우 길지 않은 일반 리뷰 운영량에는 적합하다.
 - 월 사용량과 한도를 서버에서 조회·기록한다. 450,000자에 도달하면 새 자동 번역 요청을 중단하여
   무료 한도 초과를 막고, 다음 월 갱신 뒤 재개한다. 이미 저장된 번역은 계속 표시한다.
+  **사용량은 보낸 원문 글자 수(`review_translations.source_char_count`)를 이번 달 전부 더한다**(2026-11-10 — 예전엔
+  1,000행에서 잘리고 번역문 길이를 셌다). 사용량을 못 읽으면 새 번역을 멈춘다(한도 쪽으로 안전하게).
 - 번역 API 키는 서버 환경변수에만 둔다. 브라우저·클라이언트 로그·문서에 키를 노출하지 않는다.
 - **원문은 서버가 읽는다(2026-10-26).** `translateReviewPartAction(reviewId, part)` 는 조각 이름만 받고, 원문 · 원문 언어는
   서버가 `getExternalReview`(조직 RLS)로 `external_reviews` 에서 직접 꺼내 DeepL 에 보낸다. 예전엔 클라이언트가 보낸
@@ -460,6 +464,12 @@ Airbnb 비공개 피드백이며, 번역 결과도 상세에서 비공개 영역
   - **도는 중 잠금** `reviews_sync_run:<조직>`(5분) — 두 사람이 동시에 눌러도 한 번만. 화면이 중간에 닫히면 5분 뒤 풀린다.
   - **10분 잠금** — 끝난 뒤 10분은 다시 못 누른다(한 바퀴가 Beds24 크레딧 ~70). 아침 정기 수집도 끝나면 같은
     기록(`reviews_sync_done:<조직>`)을 남겨 잠금 · 「마지막 수집」에 들어간다.
+  - **이어 부를 위치는 서버가 갖는다(2026-11-10).** 다음 조각의 시작은 «도는 중» 잠금 줄의 `metadata.offset` 에만 있고
+    (`claimReviewSyncSlice`, 읽은 위치일 때만 앞으로 옮기는 조건부 갱신), 화면이 보내는 `offset` 은 받기만 하고 쓰지 않는다 —
+    예전엔 `offset: 0` 을 계속 보내 같은 조각을 몇 번이고 다시 돌릴 수 있었다. 끝난 실행은 `done` 표시로 다시 못 돈다(`lost`).
+    끝난 응답에 `availableAt`(다시 누를 수 있는 시각, 서버 값)을 싣는다. 화면 버튼은 서버 값만 따른다(기기 시계로 잠그지 않는다).
+  - **정기 수집도 같은 «도는 중» 잠금을 쓴다(2026-11-10).** 사람이 돌리는 중이면 크론은 그 조직을 건너뛰고(`busy_manual_sync`),
+    크론이 도는 중에 누르면 `busy`. 크론은 조직 첫 조각에서 잠금을 잡고(`locked_by = schedule`) 다 돌면 놓는다.
   - Beds24 쿨다운 중 · 동기화 일시정지(`BEDS24_SYNC_PAUSED`) · 크레딧 바닥(중간 멈춤 — 받은 만큼은 반영)은 실행하지
     않거나 멈추고 사유를 보여 준다.
 - 저장: 새 표를 만들지 않았다 — `beds24_sync_locks` 에 이름으로 구분해 둔다(`api_cooldown` 과 같은 방식).
@@ -551,9 +561,8 @@ Beds24 예약 웹훅 우선 원칙은 유지한다. 리뷰는 웹훅이 아닌 �
 - `연결 안 함`도 유효한 선택이다. 어느 방 건인지 모르는 컴플레인도 등록 자체는 가능해야 한다.
 - **수동 컴플레인 삭제** (구현 2026-08-06): 각 행에 삭제 버튼(휴지통)을 두고, 누르면 중앙 정렬 확인
   모달(공용 `.modal` + `.btn--danger`)을 거친다. 컴플레인 본체는 MVP **hard delete**이며 되돌릴 수 없고
-  연결된 댓글·처리 기록도 함께 사라지므로 확인 UX를 유지한다 (CLAUDE.md §9). 삭제 버튼은 **작성자 본인
-  또는 조정 권한(owner/office_admin/super-admin)**일 때만 노출하며, 실제 권한은 `deleteComplaint`가
-  서버에서 다시 검증한다. 삭제는 redirect 없이 목록을 그 자리에서 갱신한다.
+  연결된 댓글·처리 기록도 함께 사라지므로 확인 UX를 유지한다 (CLAUDE.md §9). 삭제 버튼은 **`canDeleteComplaint`**(작성자 + `complaint.write`,
+  또는 `complaint.manage`, 2026-11-10)일 때만 노출하며, 실제 권한은 `deleteComplaint`가 같은 판정으로 서버에서 다시 검증한다. 삭제는 redirect 없이 목록을 그 자리에서 갱신한다.
 - 행/상세 공통 정보: 플랫폼, 원점수와 위험도(리뷰), 건물, 객실, 예약 문맥, 날짜, 연결 여부.
 - **목록 행에서 리뷰 본문을 전량 표시한다** (구현 2026-08-06). 상세 패널을 열지 않아도 Booking.com은
   긍정/부정을 2단(긍정 왼쪽·부정 오른쪽)으로, Airbnb는 공개 리뷰 본문을 1단으로 보여준다. 본문이 없는
@@ -779,7 +788,7 @@ S5~S7 수동 컴플레인 화면과 3단 예약 피커, 삭제 확인 시트 역
   평점보다 훨씬 자주 필요하다.
 - 상태는 **칩 하나로만** 표시한다. 점(dot)과 병기하지 않는다.
 - **목록에서 바로 삭제할 수 있다.** 휴지통은 **삭제 권한이 있는 건에만** 붙고
-  (작성자 본인 또는 owner/office_admin/super-admin), 권한이 없으면 작성자 줄 오른쪽에
+  (`canDeleteComplaint` — 작성자 + `complaint.write`, 또는 `complaint.manage`), 권한이 없으면 작성자 줄 오른쪽에
   `삭제 권한 없음` 을 밝힌다. 버튼을 그냥 없애면 «왜 나만 안 되지»를 알 수 없다.
   실제 권한은 서버(`deleteComplaint`)가 다시 검증한다.
 - **삭제 확인은 공용 `BottomSheet`** 다 (목업 2j). v1 의 중앙 모달을 폐기했다 —
@@ -965,6 +974,8 @@ FBManual-Phone · FBCx-Phone · FBNew-Phone · FBNewConfirm-Phone · FBRooms-Pho
 보기는 누구나. 컴플레인 등록 · 리뷰를 컴플레인으로 가져오기(`complaint.write`), 해결 · 다시 열기 · 남의 것 관리(`complaint.manage`), 댓글(`complaint.comment`)은
 역할 기본으로 대표 · 전무 · CS 관리자만(개발자는 늘 가능). 다른 사람은 대표 · 전무 · 개발자가 사용자 화면에서 사람마다 켠다.
 상세 `docs/product/27-permission-override-workflow.md` 「게스트 피드백 = CS 관리자」.
+**2026-11-10:** 작성자라도 해결 · 다시 열기는 `complaint.manage` 가 있어야 하고, 자기 글 수정 · 삭제도 지금 `complaint.write` 가 있어야 한다
+(`complaintRights`, 아래 「2026-11-10 점검 보강」). 키는 개인 부여 닫힘(`individualGrant: false`)이지만 대표 · 전무 · 개발자는 키 정책과 무관하게 켠다.
 
 ## 2026-10-26 이미지 업로드 가드
 
@@ -988,3 +999,64 @@ FBManual-Phone · FBCx-Phone · FBNew-Phone · FBNewConfirm-Phone · FBRooms-Pho
 - 파일 이름 `guest-feedback_{reviews|rooms}_YYYYMMDD_YYYYMMDD.xlsx` · `guest-feedback_manual_YYYYMMDD.xlsx`. 제목 줄 = 기간 · 고른 조건 + 제목, 바닥 = 조직 / 생성일시(공용 양식).
 - 코드: `src/app/admin/complaints/export-actions.ts`(서버) · `src/components/admin/complaints/complaints-export.tsx`(버튼 + 토스트) ·
   `listComplaintCommentDigests()`(`lib/complaints.ts`) · `getStoredTranslationsForReviews()`(`lib/review-translate.ts`). 문구 `complaints.export*`(ko · ja · en).
+
+## 2026-11-10 점검 보강
+
+기능 점검(설계 실수 · 버그)에서 나온 것을 고쳤다. 사용자가 모두 승인. 마이그레이션 `202611100003_complaints_hardening.sql`.
+
+- **권한 한 곳** — `complaintRights()`: 해결 · 다시 열기 = `complaint.manage` 만(작성자 예외 없앰), 수정 · 삭제 = 작성자 + 지금도
+  `complaint.write`, 또는 `complaint.manage`. 서버 가드 · PC · 모바일 노출이 같은 함수(`canChangeStatus` · `canDeleteComplaint`).
+  권한 키는 역할 기본(`individualGrant: false`)이지만 대표 · 전무 · 개발자는 키 정책과 무관하게 사람마다 켤 수 있다(문서 27 `actorBypassesKeyPolicy`).
+- **상태 변경 경합** — 해결 / 다시 열기는 «읽은 상태일 때만» 바꾼다(조건부 갱신). 그 사이 다른 사람이 먼저 바꿨으면 `stale` →
+  PC · 모바일 모두 「다른 사람이 먼저 바꿨어요」(`complaints.wStatusStale`) + 오류 햅틱 + 새로 그리기(`router.refresh`).
+- **등록 · 댓글 중복 막기** — 화면이 작성 한 번당 uuid 를 `submission_id` 로 보낸다: 모바일 `createComplaintAction(formData)` ·
+  PC `createManualComplaintAction(formData)` 은 FormData `submission_id`, `createComplaintCommentAction(id, content, imageUrls, submissionId?)`
+  은 4번째 인자. 같은 조직에서 같은 id 가 다시 오면 새 줄을 만들지 않고 먼저 만든 id 를 돌려준다(조직별 부분 유니크 인덱스가 경합을 막는다).
+  없어도 예전처럼 등록된다. 등록 폼(모바일 · PC)은 **보낼 값이 지난 시도와 같으면 같은 id 를 다시 쓰고, 다르면 새 id**, 성공하면 비운다
+  (보내기 직전 값 비교 — 실패 뒤 내용을 고쳐 보내면 첫 시도 줄이 돌아오지 않는다). 처리 기록은 남기기 한 번당 id(글을 고치면 새 id).
+  댓글은 같은 id 를 찾을 때 **컴플레인도 맞아야** 한다 — 다른 컴플레인 댓글 id 면 `invalid_submission`.
+- **등록 검사** — 건물 · 객실 · 예약 id 는 세션 조직 것만(`invalid_link`), 평점은 0 초과 · 플랫폼 만점 이하(`invalid_rating`,
+  점수 없는 직접 · 기타는 남은 값을 버림).
+- **PC 삭제** — 결과를 돌려받아 실패면 확인 창 안에 「지우지 못했어요」(`complaints.wDeleteFailed`) + 오류 햅틱, 성공은 `light` 햅틱(삭제 규칙).
+  PC 도 모바일과 같은 `deleteComplaintAction(id)`(`src/actions/complaints.ts`)를 쓴다 — PC 전용 삭제 액션은 지웠다.
+- **PC 리뷰 전환 · 번역** — `<form>` + redirect 대신 결과를 받는 버튼(`review-panel-actions.tsx`): 실패면 문구(`convertFailed` · `translateFailed`)
+  + 오류 햅틱, 도는 동안 잠금. 전환은 끝나면 그 컴플레인 상세로 간다. **이미 전환된 리뷰는 오류가 아니라 연결된 컴플레인을 보여 준다**(모바일은 `light` 햅틱 + 「이미 등록된 컴플레인이 있어요」 `complaints.convertAlreadyLinked` 안내 뒤 이동 — 입력한 제목은 쓰이지 않는다)
+  (`convertReviewToComplaint` 가 `{ complaintId, alreadyLinked }`, 이 경우 PC 는 `light` 햅틱 — 새로 저장한 게 아니다). 전환은 «컴플레인 넣기 →
+  리뷰 연결(비어 있을 때만)». 연결이 안 된 것처럼 보이면 지우기 전에 리뷰를 다시 읽어, 실제로 우리 컴플레인에 걸렸으면 그대로 두고, 남이 먼저
+  걸었으면 우리 것을 지우고 **그 컴플레인이 정말 있을 때만** 돌려준다(연결 오류가 났던 경우도 같다, 없으면 `save_failed`). 다시 읽기마저 실패하면 지우지 않는다.
+  유니크 위반(23505)으로 먼저 만든 컴플레인을 찾았는데 리뷰 연결이 비어 있으면(반쪽 상태) 비어 있을 때만 마저 잇는다. 잇기가 오류(FK 위반 등)거나
+  0줄인데 리뷰가 그 컴플레인에 걸려 있지 않으면 `save_failed`. 되돌리기 삭제 실패는 서버 로그.
+  모바일 전환 실패는 오류 햅틱. DB 오류 글은 밖으로 내보내지 않는다(`save_failed`).
+- **비공개 피드백 · 원본 보호** — `external_reviews` 의 `private_feedback` · `raw_payload` 는 일반 사용자 연결(PostgREST)로 못 읽는다(칸 권한).
+  리뷰 상세는 보통 칸을 사용자 연결로 읽어 RLS 로 «볼 수 있는 사람» 을 먼저 판정하고, 통과하면 비공개 피드백만 서버 연결로 읽는다.
+  보이는 사람은 그대로(조직 활성 구성원 — 상세에서만). 비공개 피드백 서버 읽기만 실패하면 상세는 열고 그 칸만 비운다(서버 로그).
+  비공개 피드백의 **번역**(`review_translations.source_part = 'private'`)도 일반 사용자 읽기 정책에서 뺐다 — 번역은 서버만 읽는다(같은 마이그레이션).
+- **저장된 번역** — 원문이 바뀌면(해시 다름) 저장된 번역을 보여 주지도 내보내지도 않는다. 다음에 「번역」을 누르면 새로 만든다.
+  상세 화면은 이미 읽은 원문을 넘겨(`reviewTranslationSources`) 원문을 다시 읽지 않는다.
+- **번역 한도** — 사용량은 원문 글자 수(코드포인트, DB `char_length` 와 같게). PC 「번역 보기」는 조각 여러 개를 함께 번역하므로 한도를 한 번
+  읽어 나눠 쓴다(`createTranslationBudget` — 잡고 판정 · DeepL 실패면 돌려놓기). 예전엔 조각마다 같은 옛 합계로 판정해 합치면 한도를 넘길 수 있었다.
+  **알려진 한계** — 서로 다른 요청(다른 사람 · 다른 탭)이 동시에 번역하면 한도는 요청마다 따로 센다(DB 잠금 없음). 한도에 아주 가까울 때만 조금 넘을 수 있다.
+- **수집** — 다시 수집할 때 새로 못 찾은(null) 객실 · 예약 연결은 저장값을 지킨다(재연결이 채운 값이 지워졌다). 척도 밖 점수는 점수를 버리고
+  unrated 로 저장(예전엔 DB 제약에 걸려 그 쪽 전체가 실패). 쪽 upsert 가 실패하면 한 줄씩 다시 넣어 한 줄만 건너뛴다(DB 만, Beds24 재호출 없음).
+  재연결은 1,000행씩 범위를 정해 읽는다(최대 5,000). «도는 중» 잠금은 조각을 가져갈 때마다(수동) · 정기 수집이 이어 쓸 때마다
+  (`extendReviewSyncRun`, 내 lockId 일 때만) 5분 뒤로 늘린다 — 한 바퀴가 5분을 넘겨도 중간에 풀리지 않는다. 정기 수집은 사람이 도는 중(busy)일
+  때만 그 조직을 건너뛰고, 잠금 함수 자체가 실패하면 207 `organization_lock_failed` 로 드러낸다. 「지금 가져오기」는 끝날 때 받은 다시 누를 수 있는
+  시각(`availableAt`)으로 바로 잠근다 — 화면은 위치(offset)를 보내지 않는다. 수집 · 점검 · 재연결 주소는 비밀값을 **헤더로만** 받는다(`x-beds24-webhook-secret`,
+  쿼리 `?secret=` 은 안 받음). 수집 실패 응답(207)은 정해진 코드만(`organization_sync_failed`), 자세한 건 서버 로그. 수집 점검(health)은
+  **조직마다** 마지막 수집을 본다(응답에 `organizations` 추가, 기존 `stale` · `ageDays` 는 가장 오래 멈춘 조직 기준).
+- **목록** — 수기 컴플레인 목록 · 내보내기는 1,000건씩 끝까지 읽는다. 읽기가 실패하면(첫 쪽 · 중간 쪽 모두) 빈 목록이나 앞 1,000건만
+  조용히 돌려주지 않고 오류(`list_failed`)를 낸다. 화면(PC 수기 보기 · 모바일 목록)은 이 오류를 받아 콘솔 전체를 오류로 만들지 않고 목록 자리에
+  「목록을 다 못 읽었어요」(`complaints.listLoadFailedTitle` · `listLoadFailedSub`)를 보인다. 내보내기는 그대로 실패한다(빠진 파일을 만들지 않는다).
+- **PC 화면** — 상세 패널(리뷰 · 컴플레인)이 공용 `useAdminPanelA11y`(Esc · 스크롤 잠금 · 포커스). 삭제 확인 창이 열려 있으면 처리 중에도
+  Esc 를 창이 받아 패널까지 닫히지 않는다. 등록 패널 사진 빼기 버튼 이름
+  「사진 빼기」(`complaints.wRemovePhoto`) · 올리는 중엔 못 누름 · 사진 올리기 실패는 `photoUploadFailed`. 주소 날짜(`from` · `to`)는 실제
+  있는 날만(`resolveDateRangeParams`, 모바일과 같은 `src/lib/iso-date-param.ts` — 틀린 쪽은 기본 기간, 시작 > 끝이면 둘 다 기본). 건물 · 객실별 ·
+  객실 고르기의 방 이름은 현지화해서 그린다(`localizeRoomPlaceLabel`, 보내는 값은 정규 이름 그대로).
+- **모바일(같은 날 모바일 작업)** — 사진 올리기 실패 안내(`complaints.photoUploadFailed`), 사진 압축이 실패하면 원본을 보내지 않고 오류,
+  주소 날짜 검사(위와 같은 `iso-date-param.ts`), 「지금 가져오기」 잠금은 서버 값만 따름, 등록 · 처리 기록 `submission_id`.
+- **수정 때 평점 검사** — 등록은 `normalizeRating` 으로 범위를 보지만 수정 경로(`updateComplaint`)는 아직 같은 검사를 하지 않는다. 지금은 수정 화면에 평점 칸이 없어 그대로 두고, 수정 화면에 평점을 넣을 때 같이 고친다.
+- **알려진 한계(고치지 않음)** — 컴플레인을 지워도 사진 파일은 Storage 에 남는다(다른 기능과 같다). 공용 `compressImageFile`
+  (`announcement-image-uploader.tsx`)은 압축에 실패하면 원본을 돌려주는 분기가 있다 — 공용 부분이라 그대로 두고, 게스트 피드백 쪽 호출부가 막는다.
+- **배포 순서** — **코드 먼저, 마이그레이션 나중.** 새 코드는 마이그레이션 전에도 돈다: `submission_id` 칸이 없으면 칸 없이 다시 넣고(그동안 중복 막기는 꺼짐),
+  `source_char_count` 칸이 없으면 사용량은 번역문 길이로 세고 저장은 칸 없이 다시 한다, 비공개 피드백은 이미 서버 연결로 읽는다.
+  반대로 마이그레이션을 먼저 넣으면 옛 코드의 리뷰 상세(사용자 연결로 `private_feedback` 를 읽음)가 권한 오류로 깨진다.

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { X } from "lucide-react";
-import { convertReviewAction, translateReviewAction } from "@/app/admin/complaints/actions";
+import { ReviewConvertButton, ReviewTranslateButton } from "@/components/admin/complaints/review-panel-actions";
 import { REVIEW_SCALE, type ExternalReviewDetail, type ReviewProvider } from "@/lib/external-reviews";
 import { parseReviewBreakdown, reviewRoomFallbackLabel } from "@/lib/external-review-rules";
 import type { TranslationPart } from "@/lib/review-translate";
@@ -10,7 +10,8 @@ import { getCanonicalPropertyName, localizePropertyName } from "@/lib/room-label
 
 // 외부 리뷰 상세 패널 — 서버 컴포넌트. 화이트 리디자인(2026-10-14, 시안 FB-PC 오른쪽):
 // 큰 점수 → 제목 → 건물 · 객실 · 게스트 · 예약 → 세부 점수 막대 → 본문(번역) → 비공개 피드백 → 숙소 답글 →
-// 아래 「컴플레인으로 등록」. 상태는 여전히 쿼리스트링(review/tr), 전환 · 번역은 서버 액션 폼.
+// 아래 「컴플레인으로 등록」. 상태는 여전히 쿼리스트링(review/tr). 전환 · 번역은 결과를 받는 작은 클라이언트 버튼
+// (`review-panel-actions.tsx`, 2026-11-10 — 실패 문구 · 도는 동안 잠금).
 // 도메인 계약: docs/product/25-complaint-workflow.md → "External Review Fields", "Review Translation"
 
 const PROVIDER_LABEL: Record<ReviewProvider, string> = { airbnb: "Airbnb", booking: "Booking.com" };
@@ -33,10 +34,12 @@ type Props = {
   closeHref: string;
   showTranslation: boolean;
   originalHref: string;
-  translateRedirectTo: string;
+  /** 번역에 성공하면 갈 주소(`?tr=1`). */
+  translatedHref: string;
   translations: Partial<Record<TranslationPart, string>>;
   canConvert: boolean;
-  convertRedirectTo: string;
+  /** 전환 뒤 갈 컴플레인 상세 주소 — `COMPLAINT_ID_SLOT` 자리에 id. */
+  complaintHrefTemplate: string;
   linkedComplaintHref: string | null;
 };
 
@@ -59,10 +62,10 @@ export function ReviewDetailPanel({
   closeHref,
   showTranslation,
   originalHref,
-  translateRedirectTo,
+  translatedHref,
   translations,
   canConvert,
-  convertRedirectTo,
+  complaintHrefTemplate,
   linkedComplaintHref,
 }: Props) {
   const scale = REVIEW_SCALE[review.provider];
@@ -171,13 +174,13 @@ export function ReviewDetailPanel({
                   {copy.wTranslatedNote}
                 </Link>
               ) : (
-                <form action={translateReviewAction}>
-                  <input type="hidden" name="reviewId" value={review.id} />
-                  <input type="hidden" name="redirectTo" value={translateRedirectTo} />
-                  <button type="submit" className="cxw-link">
-                    {copy.wTranslate}
-                  </button>
-                </form>
+                <ReviewTranslateButton
+                  reviewId={review.id}
+                  translatedHref={translatedHref}
+                  label={copy.wTranslate}
+                  pendingLabel={copy.translating}
+                  failedLabel={copy.translateFailed}
+                />
               )
             ) : null}
           </div>
@@ -208,14 +211,15 @@ export function ReviewDetailPanel({
               {copy.wLinked} · {copy.viewLinkedComplaint}
             </Link>
           ) : canConvert ? (
-            <form action={convertReviewAction} className="cxw-pf__form">
-              <input type="hidden" name="reviewId" value={review.id} />
-              <input type="hidden" name="redirectTo" value={convertRedirectTo} />
+            <div className="cxw-pf__form">
               <span className="cxw-pf__note">{copy.wConvertNote}</span>
-              <button type="submit" className="cxw-btn is-pri">
-                {copy.convert}
-              </button>
-            </form>
+              <ReviewConvertButton
+                reviewId={review.id}
+                complaintHrefTemplate={complaintHrefTemplate}
+                label={copy.convert}
+                failedLabel={copy.convertFailed}
+              />
+            </div>
           ) : (
             <span className="cxw-pf__note">{copy.wConvertNote}</span>
           )}

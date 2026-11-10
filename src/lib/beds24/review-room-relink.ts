@@ -98,6 +98,10 @@ type ReservationRow = {
 
 type Patch = { room_id?: string; room_label?: string; reservation_id?: string };
 
+/** 재연결이 한 번에 읽는 쪽 크기와 상한 — 최근 리뷰부터. */
+const RELINK_PAGE = 1000;
+const RELINK_MAX_SCAN = 5000;
+
 function untyped(client: SupabaseClient<unknown>): SupabaseClient {
   return client as unknown as SupabaseClient;
 }
@@ -128,17 +132,27 @@ export async function relinkReviewRooms(input: {
 
   const db = untyped(getSupabaseServiceClient() as unknown as SupabaseClient<unknown>);
 
-  const { data: reviewData, error: reviewError } = await db
-    .from("external_reviews")
-    .select("id, provider, property_id, room_id, reservation_id, source_reservation_id, reviewed_at")
-    .eq("organization_id", organizationId)
-    .is("room_id", null)
-    .not("source_reservation_id", "is", null);
-  if (reviewError) {
-    skipped.push(`relink:reviews-${reviewError.code ?? "failed"}`);
-    return result;
+  // 1,000행씩 범위를 정해 읽는다(2026-11-10) — 예전엔 `range()` 없이 읽어 PostgREST 1,000행 상한에서 조용히
+  // 잘렸다. 한 번에 다루는 양은 RELINK_MAX_SCAN 으로 묶는다(남은 것은 다음 주기가 이어받는다).
+  const reviews: ReviewRow[] = [];
+  for (let start = 0; start < RELINK_MAX_SCAN; start += RELINK_PAGE) {
+    const { data: reviewData, error: reviewError } = await db
+      .from("external_reviews")
+      .select("id, provider, property_id, room_id, reservation_id, source_reservation_id, reviewed_at")
+      .eq("organization_id", organizationId)
+      .is("room_id", null)
+      .not("source_reservation_id", "is", null)
+      .order("reviewed_at", { ascending: false, nullsFirst: false })
+      .order("id", { ascending: true })
+      .range(start, Math.min(start + RELINK_PAGE, RELINK_MAX_SCAN) - 1);
+    if (reviewError) {
+      skipped.push(`relink:reviews-${reviewError.code ?? "failed"}`);
+      return result;
+    }
+    const page = (reviewData ?? []) as ReviewRow[];
+    reviews.push(...page);
+    if (page.length < RELINK_PAGE) break;
   }
-  const reviews = (reviewData ?? []) as ReviewRow[];
   result.scanned = reviews.length;
   if (reviews.length === 0) return result;
 

@@ -121,6 +121,8 @@ export async function createComplaintAction(formData: FormData): Promise<CreateR
     reservationId: optionalString(formData, "reservation_id"),
     guestName: optionalString(formData, "guest_name"),
     imageUrls: collectImageUrls(formData),
+    // 작성 한 번당 uuid — 두 번 눌러도, 응답을 못 받아 다시 보내도 한 건만 생긴다(선택, 2026-11-10).
+    submissionId: optionalString(formData, "submission_id"),
   };
 
   try {
@@ -203,6 +205,8 @@ export async function createComplaintCommentAction(
   complaintId: string,
   content: string,
   imageUrls: string[],
+  /** 남기기 한 번당 uuid — 같은 값이면 새 댓글을 만들지 않는다(선택, 2026-11-10). */
+  submissionId?: string,
 ): Promise<CreateResult> {
   const session = await getCurrentAppSession();
   if (!session || !hasOrganizationContext(session)) return { error: "no_org" };
@@ -212,7 +216,13 @@ export async function createComplaintCommentAction(
     : [];
 
   try {
-    const { id } = await createComplaintComment({ session, complaintId, content, imageUrls: urls });
+    const { id } = await createComplaintComment({
+      session,
+      complaintId,
+      content,
+      imageUrls: urls,
+      submissionId: typeof submissionId === "string" ? submissionId : null,
+    });
     revalidateComplaintSurfaces(complaintId);
     return { id };
   } catch (err) {
@@ -258,12 +268,13 @@ export async function convertReviewToComplaintAction(
   reviewId: string,
   title: string,
   description: string,
-): Promise<CreateResult> {
+): Promise<{ id: string; alreadyLinked: boolean } | ActionError> {
   const session = await getCurrentAppSession();
   if (!session || !hasOrganizationContext(session)) return { error: "no_org" };
 
   try {
-    const { complaintId } = await convertReviewToComplaint({
+    // 이미 전환된 리뷰면 새로 만들지 않고 연결된 컴플레인 id(alreadyLinked) — 화면이 안내 후 그쪽으로 간다.
+    const { complaintId, alreadyLinked } = await convertReviewToComplaint({
       session,
       reviewId,
       title,
@@ -271,7 +282,7 @@ export async function convertReviewToComplaintAction(
     });
     revalidateComplaintSurfaces(complaintId);
     revalidatePath(`/mobile/complaints/reviews/${reviewId}`);
-    return { id: complaintId };
+    return { id: complaintId, alreadyLinked };
   } catch (err) {
     return { error: messageFor(err) };
   }

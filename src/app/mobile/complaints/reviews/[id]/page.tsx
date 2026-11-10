@@ -7,7 +7,7 @@ import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getDictionary } from "@/lib/i18n";
 import { canWriteComplaint } from "@/lib/complaints";
 import { getExternalReview } from "@/lib/external-reviews";
-import { getStoredTranslations } from "@/lib/review-translate";
+import { getStoredTranslations, reviewTranslationSources } from "@/lib/review-translate";
 
 type PageProps = { params: Promise<{ id: string }> };
 
@@ -35,7 +35,7 @@ export default async function MobileReviewDetailPage({ params }: PageProps) {
   const locale = session.user.preferredLanguage;
   const dict = getDictionary(locale);
   const [translations, navBadges] = await Promise.all([
-    getStoredTranslations({ externalReviewId: id, targetLocale: locale }),
+    getStoredTranslations({ externalReviewId: id, targetLocale: locale, sources: reviewTranslationSources(review) }),
     getMobileNavBadges(),
   ]);
 

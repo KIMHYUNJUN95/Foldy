@@ -151,6 +151,29 @@ export type ParsedReview = {
 };
 
 /**
+ * 저장할 점수. 척도를 벗어난 점수는 `calcRiskLevel` 이 `unrated` 로 보는데, 점수를 그대로 두면 DB 제약
+ * `external_reviews_unrated_has_no_score` 에 걸려 **그 쪽(최대 100건) upsert 전체가 실패했다**(2026-11-10).
+ * unrated 면 점수를 버린다 — 원본 점수는 `raw_payload` 에 남는다.
+ */
+function storedScore(riskLevel: ReturnType<typeof calcRiskLevel>, rating: number | null): number | null {
+  return riskLevel === "unrated" ? null : rating;
+}
+
+type ReviewLinks = { room_id: string | null; room_label: string | null; reservation_id: string | null };
+
+/**
+ * 다시 수집한 리뷰의 객실 · 예약 연결 — **새로 못 찾은(null) 값은 저장된 연결을 지킨다**(2026-11-10).
+ *
+ * 수집 뒤 재연결(`review-room-relink.ts`)이 채운 객실 · 예약이, 다음 수집의 upsert 가 null 을 다시 써서 지워졌다
+ * (예약이 리뷰보다 늦게 들어온 Booking 리뷰 · 확인 코드가 안 맞는 Airbnb 리뷰). 객실 id 와 라벨은 짝으로 다룬다.
+ */
+export function keepStoredReviewLinks(next: ReviewLinks, stored: ReviewLinks | undefined): ReviewLinks {
+  if (!stored) return next;
+  const room = next.room_id ? { room_id: next.room_id, room_label: next.room_label } : { room_id: stored.room_id, room_label: stored.room_label };
+  return { ...room, reservation_id: next.reservation_id ?? stored.reservation_id };
+}
+
+/**
  * Airbnb `airbnbReview` → 행.
  *
  * Airbnb 리뷰는 양방향이다. 호스트가 쓴, 미제출, 숨김
@@ -171,12 +194,13 @@ export function parseAirbnbReview(payload: unknown): ParsedReview | null {
   if (reviewerRole && reviewerRole !== "guest") return null;
 
   const rating = num(row.overall_rating);
+  const riskLevel = calcRiskLevel("airbnb", rating);
   return {
     provider: "airbnb",
     externalReviewId: id,
-    ratingValue: rating,
+    ratingValue: storedScore(riskLevel, rating),
     ratingScale: REVIEW_SCALE.airbnb,
-    riskLevel: calcRiskLevel("airbnb", rating),
+    riskLevel,
     ratingBreakdown: Array.isArray(row.category_ratings) ? { category_ratings: row.category_ratings } : {},
     reviewedAt: iso(row.submitted_at) ?? iso(row.first_completed_at),
     sourceUpdatedAt: null,
@@ -223,12 +247,13 @@ export function parseBookingReview(payload: unknown): ParsedReview | null {
   }
 
   const reservation = num(row.reservation_id);
+  const riskLevel = calcRiskLevel("booking", rating);
   return {
     provider: "booking",
     externalReviewId: id,
-    ratingValue: rating,
+    ratingValue: storedScore(riskLevel, rating),
     ratingScale: REVIEW_SCALE.booking,
-    riskLevel: calcRiskLevel("booking", rating),
+    riskLevel,
     ratingBreakdown: Object.keys(breakdown).length > 0 ? { scoring: breakdown } : {},
     reviewedAt: iso(row.created_timestamp),
     sourceUpdatedAt: iso(row.last_change_timestamp),
@@ -659,11 +684,52 @@ export async function syncOrganizationReviews(input: {
           };
         });
 
-        const { error } = await db
+        // 저장된 연결을 먼저 읽어 null 로 덮어쓰지 않게 한다(`keepStoredReviewLinks`).
+        const { data: storedRows, error: storedError } = await db
           .from("external_reviews")
-          .upsert(payload, { onConflict: "organization_id,provider,external_review_id" });
-        if (error) skipped.push(`reviews-sync:upsert-${error.code ?? "failed"}`);
-        else result.upserted += payload.length;
+          .select("external_review_id, room_id, room_label, reservation_id")
+          .eq("organization_id", organizationId)
+          .eq("provider", target.provider)
+          .in(
+            "external_review_id",
+            payload.map((row) => row.external_review_id),
+          );
+        if (storedError) {
+          // 저장값을 모르면 덮어쓸 위험이 있다 — 이번 쪽은 건너뛰고 다음 주기에 다시 받는다.
+          skipped.push(`reviews-sync:stored-links-${storedError.code ?? "failed"}`);
+        } else {
+          const storedById = new Map(
+            ((storedRows ?? []) as Array<ReviewLinks & { external_review_id: string }>).map((row) => [row.external_review_id, row]),
+          );
+          const merged = payload.map((row) => ({
+            ...row,
+            ...keepStoredReviewLinks(row, storedById.get(row.external_review_id)),
+          }));
+          const { error } = await db
+            .from("external_reviews")
+            .upsert(merged, { onConflict: "organization_id,provider,external_review_id" });
+          if (!error) {
+            result.upserted += merged.length;
+          } else {
+            // 한 줄이 제약에 걸려도 쪽 전체를 잃지 않게 한 줄씩 다시 넣는다(Beds24 를 다시 부르지 않는다 — DB 만).
+            skipped.push(`reviews-sync:upsert-${error.code ?? "failed"}`);
+            for (const row of merged) {
+              const single = await db
+                .from("external_reviews")
+                .upsert(row, { onConflict: "organization_id,provider,external_review_id" });
+              if (single.error) {
+                console.error("[beds24/reviews-sync] row skipped", {
+                  code: single.error.code,
+                  externalReviewId: row.external_review_id,
+                  provider: row.provider,
+                });
+                skipped.push(`reviews-sync:row-${row.provider}-${row.external_review_id}-${single.error.code ?? "failed"}`);
+              } else {
+                result.upserted += 1;
+              }
+            }
+          }
+        }
       }
 
       // Airbnb는 `page` 파라미터가 무시되고 `nextPageExists`도 항상 false다 — 루프를 돌면

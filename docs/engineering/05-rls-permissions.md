@@ -769,21 +769,31 @@ Business rules enforced by the implemented server actions:
 - SELECT: `is_platform_admin()` 또는 `has_active_membership(organization_id)`.
 - INSERT / UPDATE / DELETE: authenticated 직접 정책을 만들지 않는다. Beds24 동기화 서버 경로만
   service role로 UPSERT하며, 같은 조직 안에서만 예약·객실·컴플레인 연결을 검증한다.
-- `raw_payload`는 일반 UI 쿼리의 선택 컬럼에 넣지 않는다. 필요한 최소 표시 필드만 반환한다.
-- `private_feedback`(Airbnb 비공개 피드백)은 조직 활성 멤버 읽기 범위 안에 있으나, OTA에 공개되지 않은
-  내용이므로 목록·집계 쿼리에서는 선택하지 않고 **상세 조회에서만** 반환한다. 위험도·평점 집계에
-  반영하지 않는다.
+- **칸 단위 읽기 권한(2026-11-10, `202611100003`)**: `authenticated` 에는 표 전체 `select` 가 없고 `private_feedback` ·
+  `raw_payload` 를 **뺀** 칸에만 `select` 가 있다(`anon` 은 권한 없음). 예전 표 전체 grant(`202608050001`)로는 조직 구성원
+  누구나 PostgREST 로 Beds24 원본과 비공개 피드백을 직접 꺼낼 수 있었다. 사용자 연결의 `select *` · 두 칸 select 는
+  `permission denied` 다. **이 표에 칸을 더하면 `authenticated` 에 그 칸 select 를 따로 줘야 한다.**
+- `raw_payload`는 서버(service_role) 전용 — 수집 · 재연결 · 진단만 읽는다.
+- `private_feedback`(Airbnb 비공개 피드백)은 보이는 사람은 그대로(조직 활성 멤버, **상세에서만**)이지만 읽는 길은
+  서버다: `getExternalReview` 가 보통 칸을 사용자 연결로 읽어 RLS 로 접근을 판정한 뒤, 통과하면 이 칸만 service_role 로
+  같은 조직 · 같은 id 로 읽는다. 목록·집계 · 내보내기에는 넣지 않고 위험도·평점 집계에 반영하지 않는다.
 - 외부 리뷰에서 수동 컴플레인을 만드는 서버 액션은 `canWriteComplaint` 역할을 재검증하고,
-  review와 새 complaint의 `organization_id`가 일치하는지 확인한다. 동일 리뷰의 중복 전환을 거부한다.
+  review와 새 complaint의 `organization_id`가 일치하는지 확인한다. 동일 리뷰의 중복 전환은 만들지 않고 이미 연결된
+  컴플레인 id 를 돌려준다(부분 유니크 인덱스 + 연결이 비어 있을 때만 연결, 실패하면 넣은 컴플레인을 지운다, 2026-11-10).
+- 수기 컴플레인 수정 · 삭제 · 상태 변경 서버 가드는 `complaintRights()` 하나(상태 = `complaint.manage`, 수정 · 삭제 =
+  작성자 + `complaint.write` 또는 `complaint.manage`). 등록 시 건물 · 객실 · 예약 id 가 세션 조직 것인지 확인한다.
+  `customer_complaints` · `complaint_comments` 의 `submission_id` 는 조직별 부분 유니크(중복 등록 막기).
 - `review_translations` SELECT는 부모 `external_reviews`와 동일하게 조직 활성 멤버 및 platform admin으로
-  한정한다. INSERT / UPDATE / DELETE는 authenticated에 직접 허용하지 않고, 서버의 DeepL 요청·캐시 경로만
+  한정한다. **단 `source_part = 'private'`(비공개 피드백 번역) 줄은 일반 사용자 select 에서 뺀다**(2026-11-10,
+  `202611100003` 정책 `review translations: members read non-private` 로 교체 — 원문 칸 권한 회수와 맞춤). 앱은 번역을
+  서버(service_role)로만 읽고 쓰며, 상세는 사용자 연결로 리뷰를 읽어 볼 수 있는지 판정한 뒤에만 부른다. INSERT / UPDATE / DELETE는 authenticated에 직접 허용하지 않고, 서버의 DeepL 요청·캐시 경로만
   service role로 처리한다. 부모 리뷰와 translation의 조직 ID 일치, 목표 locale(`ko`/`ja`/`en`),
   `source_part`(`review`/`positive`/`negative`/`headline`/`private`), 원문 hash를 서버에서 검증한다.
 - Beds24 리뷰 수집 경로는 `rooms.external_room_id` / `properties.external_property_id`가 요청 조직에
   속하는지 확인한 뒤에만 호출 대상에 넣는다. Booking.com 리뷰의 `reservation_id` 역조회도 같은 조직의
   `reservations`로 한정하며, 조직이 다르면 예약·객실을 연결하지 않고 null로 남긴다.
 
-이 정책은 기획 단계이며 새 migration과 함께 구현한다. 기존 적용 migration은 수정하지 않는다.
+위 정책은 `202608050001`(표 · RLS) 과 `202611100003`(칸 권한 · 중복 막기) 로 구현돼 있다. 기존 적용 migration 은 수정하지 않는다.
 
 ## Attendance / Payroll tables
 

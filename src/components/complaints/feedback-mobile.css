@@ -216,6 +216,7 @@ a.fbw-pct { display: inline-flex; align-items: center; justify-content: flex-end
 .fbw-send:disabled { opacity: .4; cursor: default; }
 .fbw-send:not(:disabled):active { transform: scale(.94); }
 .fbw-err { margin: 0; font-size: 13px; font-weight: 600; color: #c5282e; }
+.fbw-info { margin: 0; font-size: 13px; font-weight: 600; color: var(--primary); }
 .fbw-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 50px; padding: 0 16px; border: 0; border-radius: 14px; font: inherit; font-size: 16px; font-weight: 600; text-decoration: none; cursor: pointer; transition: background 150ms ease, transform 140ms ease, opacity 150ms ease; }
 .fbw-btn svg { width: 18px; height: 18px; }
 .fbw-btn:active:not(:disabled) { transform: scale(.98); }

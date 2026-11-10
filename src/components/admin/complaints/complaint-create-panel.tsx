@@ -68,6 +68,9 @@ export type CreatePanelLabels = {
   titleRequired: string;
   createFailed: string;
   platformDirect: string;
+  /** 사진 빼기 버튼(아이콘만) 이름. */
+  removePhoto: string;
+  photoUploadFailed: string;
 };
 
 type Props = {
@@ -97,6 +100,9 @@ export function ComplaintCreatePanel({ labels, reservations, places, onClose }: 
   const [error, setError] = useState<string | null>(null);
 
   const draftId = useRef(crypto.randomUUID()).current;
+  // 중복 막기 id — 보낼 값이 지난 시도와 같을 때만 다시 쓴다(응답 전 다시 누름 · 실패 뒤 그대로 다시 보내기).
+  // 고친 뒤 다시 보내면 새 id — 예전엔 패널 하나 = id 하나라, 실패 뒤 내용을 고쳐 보내도 첫 시도 줄이 돌아올 수 있었다.
+  const submissionRef = useRef<{ fingerprint: string; id: string } | null>(null);
   const titleRef = useRef<HTMLInputElement>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -153,11 +159,12 @@ export function ComplaintCreatePanel({ labels, reservations, places, onClose }: 
       formData.append("file", await compressImageFile(file).catch(() => file));
       const result = await uploadManualComplaintImageAction(draftId, formData);
       if ("url" in result) setImages((current) => [...current, result.url]);
-      else setError(labels.createFailed);
+      else setError(labels.photoUploadFailed);
     });
   }
 
   function handleSubmit() {
+    if (isPending) return;
     const title = titleRef.current?.value.trim() ?? "";
     if (!title) {
       setError(labels.titleRequired);
@@ -191,10 +198,19 @@ export function ComplaintCreatePanel({ labels, reservations, places, onClose }: 
       (linkMode === "reservation" ? (selectedReservation?.guest.trim() ?? "") : "");
     if (guest) formData.append("guest_name", guest);
 
+    // 보낼 값 전체로 지문을 만든다 — 같으면 같은 id, 다르면 새 id(2026-11-10).
+    const fingerprint = JSON.stringify([...formData.entries()].map(([key, value]) => [key, String(value)]));
+    if (submissionRef.current?.fingerprint !== fingerprint) {
+      submissionRef.current = { fingerprint, id: crypto.randomUUID() };
+    }
+    formData.append("submission_id", submissionRef.current.id);
+
     startTransition(async () => {
       const result = await createManualComplaintAction(formData);
-      if ("id" in result) onClose();
-      else setError(labels.createFailed);
+      if ("id" in result) {
+        submissionRef.current = null;
+        onClose();
+      } else setError(labels.createFailed);
     });
   }
 
@@ -388,7 +404,10 @@ export function ComplaintCreatePanel({ labels, reservations, places, onClose }: 
                   <Image src={url} alt="" width={96} height={96} />
                   <button
                     type="button"
-                    aria-label={labels.close}
+                    aria-label={labels.removePhoto}
+                    title={labels.removePhoto}
+                    // 올리는 중에는 뺄 수 없다 — 순서가 엇갈려 엉뚱한 사진이 빠질 수 있다.
+                    disabled={isPending}
                     onClick={() => setImages((current) => current.filter((_, i) => i !== index))}
                   >
                     <X aria-hidden="true" />

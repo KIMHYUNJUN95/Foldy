@@ -2,7 +2,7 @@ import Link from "next/link";
 import "./feedback-mobile.css";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import type { BuildingSummary, PlaceSummary, PlatformStat } from "@/lib/external-reviews";
-import { getCanonicalPropertyName } from "@/lib/room-label-normalization";
+import { getCanonicalPropertyName, localizeRoomPlaceLabel } from "@/lib/room-label-normalization";
 
 /** `riskRatio` 는 이미 퍼센트(0~100)다. 20% 이상은 빨강 — PC 콘솔과 같은 경계. */
 const HOT = 20;
@@ -25,7 +25,10 @@ function avg(stat: PlatformStat, digits: number): string {
  * 집계는 PC 와 같은 `summarizeReviewsByPlace` — 화면별 집계를 따로 만들지 않는다. 플랫폼 평균은 척도가 달라 합치지 않는다.
  */
 export function ReviewRoomsBoard({ locale, summaries, from, to, by }: Props) {
-  const t = getDictionary(locale).complaints;
+  const dict = getDictionary(locale);
+  const t = dict.complaints;
+  const buildingLabels = dict.cleaning.buildingLabels;
+  const roomName = (name: string) => localizeRoomPlaceLabel(name, buildingLabels);
 
   const drill = (buildingName: string, room?: string) => {
     const params = new URLSearchParams({ view: "reviews", risk: "1", from, to, building: getCanonicalPropertyName(buildingName) });
@@ -72,8 +75,8 @@ export function ReviewRoomsBoard({ locale, summaries, from, to, by }: Props) {
 
   const flat = summaries.flatMap((building) =>
     building.rooms.length === 0
-      ? [{ key: building.key, place: building as PlaceSummary, name: building.label || building.name, sub: building.standalone ? t.standalone : "", href: drill(building.name) }]
-      : building.rooms.map((room) => ({ key: `${building.key}-${room.key}`, place: room, name: room.name, sub: building.label || building.name, href: drill(building.name, room.name) })),
+      ? [{ key: building.key, place: building as PlaceSummary, name: building.label || roomName(building.name), sub: building.standalone ? t.standalone : "", href: drill(building.name) }]
+      : building.rooms.map((room) => ({ key: `${building.key}-${room.key}`, place: room, name: roomName(room.name), sub: building.label || roomName(building.name), href: drill(building.name, room.name) })),
   );
   flat.sort((a, b) => (b.place.riskRatio ?? -1) - (a.place.riskRatio ?? -1));
 
@@ -111,7 +114,7 @@ export function ReviewRoomsBoard({ locale, summaries, from, to, by }: Props) {
             <section className="fbw-bld" key={building.key}>
               <div className="fbw-bld__h">
                 <span className="fbw-bld__name">
-                  <b>{building.label || building.name}</b>
+                  <b>{building.label || roomName(building.name)}</b>
                   {building.standalone ? <small>{t.standalone}</small> : null}
                   {building.unmappedCount > 0 ? <small>{t.unmapped.replace("{n}", String(building.unmappedCount))}</small> : null}
                 </span>
@@ -124,7 +127,7 @@ export function ReviewRoomsBoard({ locale, summaries, from, to, by }: Props) {
                   {building.rooms.map((room) => (
                     <div className="fbw-room" key={room.key}>
                       <span className="fbw-room__name">
-                        <b>{room.name}</b>
+                        <b>{roomName(room.name)}</b>
                       </span>
                       <Bar place={room} />
                       <span className="fbw-room__sub num">{roomLine(room)}</span>

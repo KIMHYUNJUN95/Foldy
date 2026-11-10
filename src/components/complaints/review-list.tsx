@@ -7,7 +7,7 @@ import type { ReviewSyncStatus } from "@/lib/beds24/reviews-sync-manual";
 import { reviewSyncLabels } from "@/lib/review-sync-labels";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { tokyoDateOf } from "@/lib/tokyo-date";
-import { getCanonicalPropertyName, localizePropertyName } from "@/lib/room-label-normalization";
+import { getCanonicalPropertyName, localizePropertyName, localizeRoomPlaceLabel } from "@/lib/room-label-normalization";
 import { REVIEW_SCALE, reviewRoomFallbackLabel } from "@/lib/external-review-rules";
 import type { ExternalReview, ReviewProvider } from "@/lib/external-reviews";
 
@@ -153,10 +153,10 @@ export function ReviewList({
           ariaLabel={t.metaRoom}
           align="right"
           disabled={!building || roomOptions.length === 0}
-          label={roomLabel ?? t.wDdAllRooms}
+          label={roomLabel ? localizeRoomPlaceLabel(roomLabel, buildingLabels) : t.wDdAllRooms}
           options={[
             { label: t.wAllRooms, href: hrefWith({ rl: null, page: null }), on: !roomLabel },
-            ...roomOptions.map((room) => ({ label: room, href: hrefWith({ rl: room, page: null }), on: roomLabel === room })),
+            ...roomOptions.map((room) => ({ label: localizeRoomPlaceLabel(room, buildingLabels), href: hrefWith({ rl: room, page: null }), on: roomLabel === room })),
           ]}
         />
       </div>
@@ -202,7 +202,7 @@ export function ReviewList({
                 : review.reviewText || t.scoreOnlyNote;
             const place = `${
               review.propertyName ? localizePropertyName(getCanonicalPropertyName(review.propertyName), buildingLabels) : "—"
-            } · ${review.displayRoomLabel ?? reviewRoomFallbackLabel(review, t)}`;
+            } · ${localizeRoomPlaceLabel(review.displayRoomLabel ?? reviewRoomFallbackLabel(review, t), buildingLabels)}`;
             return (
               <Link key={review.id} href={`/mobile/complaints/reviews/${review.id}`} className="fbw-rv">
                 <span className="fbw-rv__score">

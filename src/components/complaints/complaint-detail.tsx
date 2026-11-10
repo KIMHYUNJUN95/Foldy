@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useOptimistic, useState, useTransition } from "react";
+import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -12,6 +12,7 @@ import { getDictionary } from "@/lib/i18n";
 import { tokyoDateOf } from "@/lib/tokyo-date";
 import { haptic } from "@/lib/haptics";
 import { getCanonicalPropertyName, localizePropertyName } from "@/lib/room-label-normalization";
+import { useRoomPlaceLabel } from "@/components/shared/building-names";
 import type { Complaint, ComplaintComment } from "@/lib/complaints";
 import {
   resolveComplaintAction,
@@ -64,22 +65,22 @@ export function ComplaintDetail({
   complaint,
   comments,
   locale,
-  currentUserId,
-  canModerate,
+  canDelete,
   canChangeStatus,
   canComment,
 }: {
   complaint: Complaint;
   comments: ComplaintComment[];
   locale: string;
-  currentUserId: string;
-  canModerate: boolean;
+  /** 휴지통 노출 — 서버 가드와 같은 `canDeleteComplaint`(작성자 + complaint.write, 또는 complaint.manage). */
+  canDelete: boolean;
   canChangeStatus: boolean;
   canComment: boolean;
 }) {
   const dict = getDictionary(locale);
   const t = dict.complaints;
   const buildingLabels = dict.cleaning.buildingLabels;
+  const roomPlaceLabel = useRoomPlaceLabel();
   const c = complaint;
   const router = useRouter();
   const [lightbox, setLightbox] = useState<{ src: string; caption: string } | null>(null);
@@ -87,25 +88,34 @@ export function ComplaintDetail({
   const [deleting, setDeleting] = useState(false);
   const [justResolved, setJustResolved] = useState(false);
   const [error, setError] = useState(false);
+  const [stale, setStale] = useState(false);
   const [isPending, startTransition] = useTransition();
+  // 같은 댓글을 다시 보내도 한 건이 되도록 댓글마다 하나(재시도에도 그대로). 성공하면 새 댓글이라 새로 만든다.
+  const commentSubmissionId = useRef<string | null>(null);
 
   // 해결 · 다시 열기는 누르자마자 반영(2026-10-21 네이티브 점검 — 즉시 반영). 실패하면 전환이 끝날 때 원래 상태로 돌아간다.
   const [status, setOptimisticStatus] = useOptimistic(c.status);
   const open = status === "open";
   const max = ratingMax(c.platform);
-  const canDelete = canModerate || c.createdByUserId === currentUserId;
   const building = c.propertyName ? localizePropertyName(getCanonicalPropertyName(c.propertyName), buildingLabels) : null;
-  const place = building ? `${building}${c.roomLabel ? ` · ${c.roomLabel}` : ""}` : "—";
+  const place = building ? `${building}${c.roomLabel ? ` · ${roomPlaceLabel(c.roomLabel)}` : ""}` : "—";
 
   function handleStatus() {
     setError(false);
+    setStale(false);
     const resolving = open;
     startTransition(async () => {
       setOptimisticStatus(resolving ? "resolved" : "open");
       if (resolving) setJustResolved(true);
       const res = resolving ? await resolveComplaintAction(c.id) : await reopenComplaintAction(c.id);
       if ("error" in res) {
-        setError(true);
+        // 다른 사람이 먼저 바꿨으면 옛 상태가 남지 않게 다시 받아 온다(PC 패널과 같은 처리).
+        if (res.error === "stale") {
+          setStale(true);
+          router.refresh();
+        } else {
+          setError(true);
+        }
         setJustResolved(false);
         haptic("error");
         return;
@@ -121,12 +131,14 @@ export function ComplaintDetail({
     if (!text || isPending) return;
     setError(false);
     startTransition(async () => {
-      const res = await createComplaintCommentAction(c.id, text, []);
+      commentSubmissionId.current ??= crypto.randomUUID();
+      const res = await createComplaintCommentAction(c.id, text, [], commentSubmissionId.current);
       if ("error" in res) {
         setError(true);
         haptic("error");
         return;
       }
+      commentSubmissionId.current = null;
       setCommentText("");
       haptic("light");
       router.refresh();
@@ -233,7 +245,11 @@ export function ComplaintDetail({
               value={commentText}
               aria-label={t.wLogPlaceholder}
               placeholder={t.wLogPlaceholder}
-              onChange={(e) => setCommentText(e.target.value)}
+              onChange={(e) => {
+                // 글을 고치면 다른 댓글이다 — 이전 시도의 식별자로 고친 글이 묻히지 않게 새로 받는다.
+                commentSubmissionId.current = null;
+                setCommentText(e.target.value);
+              }}
             />
             <button type="button" className="fbw-send" aria-label={t.wSend} onClick={handleComment} disabled={isPending || !commentText.trim()}>
               <ArrowRight aria-hidden="true" />
@@ -242,9 +258,9 @@ export function ComplaintDetail({
         ) : null}
       </section>
 
-      {error ? (
+      {error || stale ? (
         <p className="fbw-err" role="alert">
-          {t.wActionFailed}
+          {stale ? t.wStatusStale : t.wActionFailed}
         </p>
       ) : null}
 

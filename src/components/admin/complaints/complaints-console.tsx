@@ -5,6 +5,7 @@ import { ReviewSyncButton, type ReviewSyncButtonLabels } from "@/components/comp
 import type { ReviewSyncStatus } from "@/lib/beds24/reviews-sync-manual";
 import { ReviewDetailPanel, type ReviewPanelLabels } from "@/components/admin/complaints/review-detail-panel";
 import { ReviewDetailOverlay } from "@/components/admin/complaints/review-detail-overlay";
+import { COMPLAINT_ID_SLOT } from "@/components/admin/complaints/complaint-id-slot";
 import { ManualComplaintList } from "@/components/admin/complaints/manual-complaint-list";
 import { ComplaintDetailPanel } from "@/components/admin/complaints/complaint-detail-panel";
 import { ComplaintCreateLauncher } from "@/components/admin/complaints/complaint-create-launcher";
@@ -49,9 +50,13 @@ type Props = {
   to: string;
   filter: ReviewListFilter;
   complaints: Complaint[];
+  /** 수기 컴플레인 목록을 끝까지 못 읽었다(`list_failed`) — 빈 목록 대신 안내를 보인다. */
+  complaintsLoadFailed: boolean;
   comments: ComplaintComment[];
   canComment: boolean;
   canChangeSelectedStatus: boolean;
+  /** 열린 컴플레인을 지울 수 있는가 — `canDeleteComplaint`(서버 가드와 같은 판정). */
+  canDeleteSelected: boolean;
   currentUserId: string;
   canModerate: boolean;
   canWrite: boolean;
@@ -245,7 +250,8 @@ export function ComplaintsConsole(props: Props) {
         ariaLabel: copy.metaRoom,
         options: [
           { value: "all", label: copy.wAllRooms },
-          ...summaryOfBuilding.rooms.map((room) => ({ value: room.name, label: room.name })),
+          // 값은 정규 이름 그대로(서버 필터 키), 보이는 글자만 현지화.
+          ...summaryOfBuilding.rooms.map((room) => ({ value: room.name, label: localizeRoomPlaceLabel(room.name, buildingLabels) })),
         ],
       });
     }
@@ -319,6 +325,8 @@ export function ComplaintsConsole(props: Props) {
           ratingNone: copy.ratingNone,
           titleRequired: copy.titleRequired,
           createFailed: copy.createFailed,
+          removePhoto: copy.wRemovePhoto,
+          photoUploadFailed: copy.photoUploadFailed,
           platformDirect: copy.platformDirect,
         }}
       />
@@ -408,10 +416,10 @@ export function ComplaintsConsole(props: Props) {
             closeHref={closeHref}
             showTranslation={props.showTranslation}
             originalHref={reviewHref(selectedReview.id)}
-            translateRedirectTo={href({ review: selectedReview.id, tr: "1" })}
+            translatedHref={href({ review: selectedReview.id, tr: "1" })}
             translations={props.translations}
             canConvert={props.canConvert}
-            convertRedirectTo={reviewHref(selectedReview.id)}
+            complaintHrefTemplate={complaintHref(COMPLAINT_ID_SLOT)}
             linkedComplaintHref={selectedReview.linkedComplaintId ? complaintHref(selectedReview.linkedComplaintId) : null}
           />
         </ReviewDetailOverlay>
@@ -428,7 +436,7 @@ export function ComplaintsConsole(props: Props) {
             closeHref={closeHref}
             canComment={props.canComment}
             canChangeStatus={props.canChangeSelectedStatus}
-            canDelete={props.canModerate || selectedComplaint.createdByUserId === props.currentUserId}
+            canDelete={props.canDeleteSelected}
             linkedReviewHref={null}
           />
         </ReviewDetailOverlay>
@@ -610,6 +618,7 @@ function ManualView({
   buildingLabels,
   copy,
   complaints,
+  complaintsLoadFailed,
   building,
   manualStatus,
   manualPlatform,
@@ -666,7 +675,15 @@ function ManualView({
         </div>
         <span className="cxw-count">{fill(copy.wManualSort, { n: rows.length })}</span>
       </div>
-      {rows.length === 0 ? (
+      {complaintsLoadFailed ? (
+        <div className="cxw-empty" role="alert">
+          <span className="cxw-empty__ic">
+            <MessageSquareWarning aria-hidden="true" />
+          </span>
+          <b>{copy.listLoadFailedTitle}</b>
+          <span>{copy.listLoadFailedSub}</span>
+        </div>
+      ) : rows.length === 0 ? (
         <div className="cxw-empty">
           <span className="cxw-empty__ic">
             <MessageSquareWarning aria-hidden="true" />
@@ -706,6 +723,7 @@ function ManualView({
 
 function RoomsView({
   copy,
+  buildingLabels,
   summaries,
   roomsBy,
   roomsSort,
@@ -748,7 +766,12 @@ function RoomsView({
     const flat = summaries.flatMap((building) =>
       building.rooms.length === 0
         ? [{ place: building as PlaceSummary, name: building.label || building.name, sub: building.standalone ? copy.standalone : "", link: drill(building.name) }]
-        : building.rooms.map((room) => ({ place: room, name: room.name, sub: building.label || building.name, link: drill(building.name, room.name) })),
+        : building.rooms.map((room) => ({
+            place: room,
+            name: localizeRoomPlaceLabel(room.name, buildingLabels),
+            sub: building.label || building.name,
+            link: drill(building.name, room.name),
+          })),
     );
     const sorted = [...flat].sort((a, b) => sortKey(b.place) - sortKey(a.place));
     return (
@@ -792,7 +815,7 @@ function RoomsView({
             {byKey(building.rooms).map((room) => (
               <div className="cxw-rr is-room" key={room.key}>
                 <span className="cxw-rr__name">
-                  <b>{room.name}</b>
+                  <b>{localizeRoomPlaceLabel(room.name, buildingLabels)}</b>
                 </span>
                 <PlatformCell stat={room.airbnb} copy={copy} digits={2} />
                 <PlatformCell stat={room.booking} copy={copy} digits={1} />

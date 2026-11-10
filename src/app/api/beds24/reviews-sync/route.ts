@@ -1,7 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { syncOrganizationReviews } from "@/lib/beds24/reviews-sync";
 import { isBeds24SyncPaused } from "@/lib/beds24/sync-control";
-import { recordReviewSyncDone } from "@/lib/beds24/reviews-sync-manual";
+import {
+  extendReviewSyncRun,
+  getReviewSyncRun,
+  recordReviewSyncDone,
+  REVIEW_SYNC_RUN_TTL_MS,
+  REVIEW_SYNC_SCHEDULE_LOCKER,
+  reviewSyncRunLockName,
+  scheduleRunLockPlan,
+} from "@/lib/beds24/reviews-sync-manual";
+import { acquireBeds24Lock, releaseBeds24Lock } from "@/lib/beds24/sync-locks";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { requestMatchesSecret } from "@/lib/api-secret";
 
@@ -50,7 +59,7 @@ const FULL_SINCE_DAYS = 180;
 /**
  * 리뷰 수집 호출 인가. /api/beds24/reconcile 와 같은 규약:
  * - Vercel Cron 의 `Authorization: Bearer <CRON_SECRET>` 헤더, 또는
- * - Beds24 웹훅 시크릿 (헤더/쿼리로 수동 실행).
+ * - Beds24 웹훅 시크릿 (`x-beds24-webhook-secret` 헤더로 수동 실행 — 쿼리는 받지 않는다).
  * 서버에 둘 다 설정돼 있지 않으면 엔드포인트는 닫힌 채(404) 유지한다.
  */
 function authorize(request: NextRequest): { ok: true } | { ok: false; status: number } {
@@ -63,8 +72,8 @@ function authorize(request: NextRequest): { ok: true } | { ok: false; status: nu
   // 상수 시간 비교 · 보낸 후보(Bearer / 헤더 / 쿼리) 중 하나라도 맞으면 통과(2026-10-26, api-secret).
   if (
     requestMatchesSecret(request, [cronSecret, webhookSecret], {
+      // 쿼리(`?secret=`)로는 받지 않는다(2026-11-10) — 주소는 접속 기록 · 프록시 로그에 남는다. 워크플로는 헤더로 보낸다.
       headers: ["x-beds24-webhook-secret"],
-      query: true,
     })
   ) {
     return { ok: true };
@@ -153,6 +162,52 @@ async function handle(request: NextRequest) {
     return NextResponse.json({ ok: true, done: true, mode: "no_organizations" }, { status: 200 });
   }
 
+  // 수동 「지금 가져오기」와 같은 «도는 중» 잠금을 나눠 쓴다(2026-11-10, `scheduleRunLockPlan`).
+  // 사람이 돌리는 중이면 이 조직은 건너뛴다 — 같은 함수 · 같은 창이라 두 번 돌면 크레딧만 쓴다.
+  const supabase = getSupabaseServiceClient();
+  const lockName = reviewSyncRunLockName(currentOrganizationId);
+  const plan = scheduleRunLockPlan(await getReviewSyncRun(supabase, currentOrganizationId));
+  let lockId: string | null = null;
+  let lockError = false;
+  if (plan.kind === "reuse") {
+    // 앞 조각에서 잡은 잠금을 이어 쓸 때마다 시간을 늘린다 — 못 늘리면(이미 풀려 남이 잡음) 건너뛴다.
+    lockId = (await extendReviewSyncRun(supabase, currentOrganizationId, plan.lockId)) ? plan.lockId : null;
+  } else if (plan.kind === "acquire") {
+    const lock = await acquireBeds24Lock(supabase, lockName, REVIEW_SYNC_SCHEDULE_LOCKER, REVIEW_SYNC_RUN_TTL_MS);
+    lockId = lock.acquired ? lock.lockId : null;
+    lockError = !lock.acquired && lock.reason === "error";
+  }
+  if (!lockId && lockError) {
+    // 잠금 RPC 자체가 실패했다 — «사람이 돌리는 중»이 아니니 조용히 건너뛰지 않고 실패로 드러낸다.
+    const nextOrganizationId = organizationIds[startIndex + 1] ?? null;
+    return NextResponse.json(
+      {
+        ok: false,
+        done: nextOrganizationId === null,
+        mode: "partial_failure",
+        organizationId: currentOrganizationId,
+        error: "organization_lock_failed",
+        nextOrganizationId,
+        nextOffset: nextOrganizationId === null ? null : 0,
+      },
+      { status: 207 },
+    );
+  }
+  if (!lockId) {
+    const nextOrganizationId = organizationIds[startIndex + 1] ?? null;
+    return NextResponse.json(
+      {
+        ok: true,
+        done: nextOrganizationId === null,
+        mode: "busy_manual_sync",
+        organizationId: currentOrganizationId,
+        nextOrganizationId,
+        nextOffset: nextOrganizationId === null ? null : 0,
+      },
+      { status: 200 },
+    );
+  }
+
   let result;
   try {
     result = await syncOrganizationReviews({
@@ -162,8 +217,9 @@ async function handle(request: NextRequest) {
       limit,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "reviews_sync_failed";
-    console.error("[beds24/reviews-sync] organization failed", currentOrganizationId, message);
+    // 자세한 오류는 서버 로그에만 — 응답에는 정해진 코드만 싣는다(2026-11-10, 내부 메시지 노출 막기).
+    console.error("[beds24/reviews-sync] organization failed", currentOrganizationId, error);
+    await releaseBeds24Lock(supabase, lockName, lockId);
     // 한 조직이 실패해도 나머지는 계속되어야 하므로, 다음 조직을 가리켜 돌려준다.
     // 실패 사실은 207 로 드러내 워크플로가 빨간불로 남긴다.
     const nextOrganizationId = organizationIds[startIndex + 1] ?? null;
@@ -173,7 +229,7 @@ async function handle(request: NextRequest) {
         done: nextOrganizationId === null,
         mode: "partial_failure",
         organizationId: currentOrganizationId,
-        error: message,
+        error: "organization_sync_failed",
         nextOrganizationId,
         nextOffset: nextOrganizationId === null ? null : 0,
       },
@@ -184,11 +240,15 @@ async function handle(request: NextRequest) {
   // 이 조직을 끝까지 돌았다 — 「지금 가져오기」 버튼의 「마지막 수집」 · 10분 잠금에 정기 수집도 넣는다
   // (`reviews-sync-manual.ts`). 크레딧이 바닥나 멈춘 경우는 끝난 것이 아니다.
   if (result.nextOffset === null && !result.stoppedEarly) {
-    await recordReviewSyncDone(getSupabaseServiceClient(), {
+    await recordReviewSyncDone(supabase, {
       by: "schedule",
       organizationId: currentOrganizationId,
       upserted: result.upserted,
     });
+  }
+  // 이 조직을 다 돌았거나(또는 크레딧으로 멈췄거나) — 잠금을 놓는다. 남은 조각이 있으면 다음 호출이 이어 쓴다.
+  if (result.nextOffset === null || result.stoppedEarly) {
+    await releaseBeds24Lock(supabase, lockName, lockId);
   }
 
   // 이 조직에 남은 조각이 있으면 같은 조직을 이어서, 없으면 다음 조직의 0번부터.

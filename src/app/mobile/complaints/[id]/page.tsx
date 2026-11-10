@@ -9,7 +9,7 @@ import {
   getComplaint,
   listComplaintComments,
   canChangeStatus,
-  canModerateComplaints,
+  canDeleteComplaint,
   canWriteComment,
 } from "@/lib/complaints";
 
@@ -50,8 +50,7 @@ export default async function MobileComplaintDetailPage({ params }: PageProps) {
         complaint={complaint}
         comments={comments}
         locale={locale}
-        currentUserId={session.user.id}
-        canModerate={canModerateComplaints(session)}
+        canDelete={canDeleteComplaint(session, complaint)}
         canChangeStatus={canChangeStatus(session, complaint)}
         canComment={canWriteComment(session)}
       />

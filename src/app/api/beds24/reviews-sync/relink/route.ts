@@ -34,8 +34,8 @@ function authorize(request: NextRequest): { ok: true } | { ok: false; status: nu
   // 상수 시간 비교 · 후보 중 하나라도 맞으면 통과(2026-10-26, api-secret).
   if (
     requestMatchesSecret(request, [cronSecret, webhookSecret], {
+      // 쿼리(`?secret=`)로는 받지 않는다(2026-11-10) — 주소는 접속 기록 · 프록시 로그에 남는다. 워크플로는 헤더로 보낸다.
       headers: ["x-beds24-webhook-secret"],
-      query: true,
     })
   ) {
     return { ok: true };

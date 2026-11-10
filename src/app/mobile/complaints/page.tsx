@@ -1,3 +1,4 @@
+import { resolveDateRangeParams } from "@/lib/iso-date-param";
 import { redirect } from "next/navigation";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { SplitList } from "@/components/shell/split-list";
@@ -114,19 +115,24 @@ export default async function MobileComplaintsPage({ searchParams }: PageProps) 
   const view = params.view === "manual" || params.view === "rooms" ? params.view : "reviews";
   const locale = session.user.preferredLanguage;
   const dict = getDictionary(locale);
-  const isDate = (v?: string) => Boolean(v && /^\d{4}-\d{2}-\d{2}$/.test(v));
   // 기본 기간 — 최근 90일(오늘 포함, 도쿄 날짜). 리뷰 · 건물 · 객실별 · PC 콘솔 공통.
   const fallback = defaultReviewRange();
-  const from = isDate(params.from) ? params.from! : fallback.from;
-  const to = isDate(params.to) ? params.to! : fallback.to;
+  const { from, to } = resolveDateRangeParams(params.from, params.to, fallback);
   const rangeDays = matchPresetDays(from, to);
   const canCreate = canWriteComplaint(session);
 
   // 보기마다 필요한 쿼리를 배지 · 미처리 건수와 같은 단계에서 시작한다(직렬로 기다리지 않는다).
   const navBadgesPromise = getMobileNavBadges();
-  const complaintsPromise = view === "manual" ? listComplaints({ session }) : null;
+  // 목록을 다 못 읽었으면(`list_failed`) 오류 화면 대신 목록 자리에 안내를 보인다(null).
+  const complaintsPromise =
+    view === "manual"
+      ? listComplaints({ session }).catch((error: unknown) => {
+          console.error("[mobile/complaints] list failed", error);
+          return null;
+        })
+      : null;
   const openCountPromise = complaintsPromise
-    ? complaintsPromise.then((list) => list.filter((c) => c.status === "open").length)
+    ? complaintsPromise.then((list) => (list ? list.filter((c) => c.status === "open").length : countOpenComplaints(session)))
     : countOpenComplaints(session);
   const summariesPromise = view === "manual" ? null : summarizeReviewsByPlace({ session, from, to, locale });
 
@@ -244,7 +250,7 @@ export default async function MobileComplaintsPage({ searchParams }: PageProps) 
     <MobileShell activeItem="complaints" badges={navBadges} title={dict.complaints.pageTitle} split>
       <SplitList detail="complaints">
         {head(openCount, { view }, false)}
-        <ComplaintList locale={locale} complaints={complaints} />
+        <ComplaintList locale={locale} complaints={complaints ?? []} loadFailed={complaints === null} />
       </SplitList>
     </MobileShell>
   );

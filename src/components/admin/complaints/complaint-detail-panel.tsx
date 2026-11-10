@@ -86,6 +86,8 @@ export function ComplaintDetailPanel({
     resolve: copy.wResolve,
     reopen: copy.wReopen,
     failed: copy.wActionFailed,
+    deleteFailed: copy.wDeleteFailed,
+    stale: copy.wStatusStale,
   };
 
   const rows: [string, React.ReactNode][] = [[copy.wFieldPlace, place]];

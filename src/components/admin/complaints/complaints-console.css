@@ -368,6 +368,10 @@
 /* ── 상세 패널 즉시 닫기 ──
    ReviewDetailOverlay가 닫기 클릭 즉시 .is-closing을 걸어, 서버 왕복을 기다리지 않고 스크림은 페이드,
    패널은 오른쪽으로 슬라이드아웃한다. 열릴 때의 adm-panel-in / adm-scrim-in 은 override 한다. */
+/* 패널이 열릴 때 포커스를 받는 감싸개(useAdminPanelA11y) — 포커스 링은 그리지 않는다. */
+.adm .rpanel-wrap:focus {
+  outline: none;
+}
 .adm .rpanel-wrap.is-closing .panel-scrim {
   animation: none;
   opacity: 0;

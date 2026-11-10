@@ -105,11 +105,10 @@ export function ReviewSyncButton({ variant, lastSyncedAt, availableAt, running, 
     setMessage(null);
     setProgress({ done: 0, total: 0 });
     let runId: string | null = null;
-    let offset = 0;
     try {
       // 조각 수 상한 — 서버가 커서를 못 넘기는 일이 생겨도 무한히 돌지 않는다(대상 70곳 / 12 ≈ 6).
       for (let step = 0; step < 40; step += 1) {
-        const result = await syncReviewsNowStep({ offset, runId });
+        const result = await syncReviewsNowStep({ runId });
         if (!result.ok) {
           if (result.error === "too_soon" && result.retryAt) setLockedUntil(result.retryAt);
           setMessage({ bad: true, text: errorText(result) });
@@ -119,14 +118,13 @@ export function ReviewSyncButton({ variant, lastSyncedAt, availableAt, running, 
         runId = result.runId;
         setProgress({ done: result.processed, total: result.total });
         if (result.done) {
-          const now = new Date();
-          setLast(now.toISOString());
-          setLockedUntil(new Date(now.getTime() + 10 * 60 * 1000).toISOString());
+          // 마지막 수집 시각은 서버가 정한다 — 새로 받은 값이 props 로 내려오면 위에서 따라간다(기기 시계로 계산하지 않는다).
           setMessage({ bad: false, text: labels.done });
+          // 다시 누를 수 있는 시각은 서버가 같이 준다 — 새로고침 전에 눌러도 too_soon 이 나지 않게 바로 잠근다.
+          if (result.availableAt) setLockedUntil(result.availableAt);
           router.refresh();
           return;
         }
-        offset = result.nextOffset ?? 0;
       }
       setMessage({ bad: true, text: labels.errFailed });
     } catch {

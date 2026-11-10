@@ -5,7 +5,7 @@ import "./feedback-mobile.css";
 import { platformName } from "./cx-platform";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { tokyoDateOf } from "@/lib/tokyo-date";
-import { getCanonicalPropertyName, localizePropertyName } from "@/lib/room-label-normalization";
+import { getCanonicalPropertyName, localizePropertyName, localizeRoomPlaceLabel } from "@/lib/room-label-normalization";
 import type { Complaint } from "@/lib/complaints";
 
 function md(iso: string): string {
@@ -18,13 +18,34 @@ function md(iso: string): string {
  * 「미처리 · 오래된 순」 → 「처리 완료 · 최근 순」 두 묶음, 한 줄씩(상태 점 · 제목 · 플랫폼 · 건물 · 객실 · 작성자 · 날짜).
  * 등록은 머리의 「+ 컴플레인 등록」(떠 있는 + 버튼은 뺐다), 삭제는 상세에서(확인 시트). 서버 컴포넌트.
  */
-export function ComplaintList({ locale, complaints }: { locale: Locale; complaints: Complaint[] }) {
+export function ComplaintList({
+  locale,
+  complaints,
+  loadFailed = false,
+}: {
+  locale: Locale;
+  complaints: Complaint[];
+  /** 목록을 끝까지 못 읽었다(`list_failed`) — 빈 목록 대신 안내. */
+  loadFailed?: boolean;
+}) {
   const dict = getDictionary(locale);
   const t = dict.complaints;
   const buildingLabels = dict.cleaning.buildingLabels;
 
   const open = complaints.filter((c) => c.status === "open").sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   const done = complaints.filter((c) => c.status !== "open").sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+  if (loadFailed) {
+    return (
+      <div className="fbw fbw-empty" role="alert">
+        <span className="fbw-empty__ic">
+          <MessageSquareWarning aria-hidden="true" />
+        </span>
+        <b>{t.listLoadFailedTitle}</b>
+        <span>{t.listLoadFailedSub}</span>
+      </div>
+    );
+  }
 
   if (complaints.length === 0) {
     return (
@@ -40,7 +61,7 @@ export function ComplaintList({ locale, complaints }: { locale: Locale; complain
 
   const row = (c: Complaint) => {
     const place = c.propertyName
-      ? `${localizePropertyName(getCanonicalPropertyName(c.propertyName), buildingLabels)}${c.roomLabel ? ` · ${c.roomLabel}` : ""}`
+      ? `${localizePropertyName(getCanonicalPropertyName(c.propertyName), buildingLabels)}${c.roomLabel ? ` · ${localizeRoomPlaceLabel(c.roomLabel, buildingLabels)}` : ""}`
       : null;
     const meta = [platformName(c.platform, dict), place, c.authorName].filter(Boolean).join(" · ");
     return (

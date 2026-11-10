@@ -1,5 +1,5 @@
 -- 셀프 체크인 직원 통화 (2026-11-06). 문서: docs/product/46-self-checkin-staff-call.md §3 · §4
--- 상태: **운영 DB 미적용.** 적용은 사용자 확인 뒤(CLAUDE.md 규칙 10).
+-- 상태: 운영 적용 2026-11-10(사용자 SQL Editor). 알림 만들기 정책은 운영 모양(202610160003)을 지키고 종류 제한만 더함.
 --
 -- 통화 자체는 저장하지 않는다. 이 표에는 시각 · 건물 · 기기 · 받은 직원 · 누른 단계 · 언어만 남긴다.
 -- `alter type ... add value` 를 트랜잭션 안에서 돌려도 되도록 이 파일 안에서는 새 enum 값을 쓰지 않는다
@@ -66,15 +66,16 @@ alter type public.notification_type add value if not exists 'checkin_call_missed
 alter type public.notification_type add value if not exists 'checkin_staff_check';
 
 -- ── 체크인 알림은 서버만 만든다 ─────────────────────────────────────────────
--- 정책 본문은 202606030001 그대로이고 종류 제한만 더한다. 조직 멤버가 가짜 전화 알림을 넣지 못하게.
+-- 정책 본문은 202610160003(쿼리당 한 번 계산) 뒤의 운영 모양 그대로이고 종류 제한만 더한다. 조직 멤버가 가짜 전화 알림을 넣지 못하게.
+-- 202606030001 의 옛 모양(`auth.uid()` · `has_active_membership(organization_id)` 행마다 계산)으로 되돌리지 않는다(2026-11-10 운영 적용 전 확인).
 -- `type::text` 로 비교하므로 위에서 더한 enum 값을 이 트랜잭션에서 쓰지 않는다.
 drop policy "org members can create notifications for org recipients" on public.notifications;
 create policy "org members can create notifications for org recipients"
 on public.notifications
 for insert
 with check (
-  auth.uid() is not null
-  and public.has_active_membership(organization_id)
+  (select auth.uid()) is not null
+  and organization_id = any ((select public.current_user_active_organization_ids())::uuid[])
   and exists (
     select 1
     from public.memberships m

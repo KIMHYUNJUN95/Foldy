@@ -46,7 +46,7 @@
 
 ## 4. 데이터
 
-새 마이그레이션 `202611060001_checkin_staff_calls.sql` (운영 적용은 사용자 허락 뒤).
+새 마이그레이션 `202611060001_checkin_staff_calls.sql` (운영 적용 2026-11-10 — 알림 만들기 정책은 202610160003 의 쿼리당 한 번 계산 모양을 지키고 종류 제한만 더함).
 
 `checkin.staff_calls`: `id uuid pk`, `organization_id`, `property_key`, `device_id`, `stay_id uuid null`(해당 stay 참조, stay 삭제 시 null), `room_name text unique`, `status`, `step`, `language`, `ring_deadline_at`, `created_at`, `accepted_at`, `accepted_by uuid`, `ended_at`, `ended_by text`('guest' · 'staff' · 'timeout' · 'system'). RLS 켬 · 정책 없음 · authenticated 권한 없음(다른 `checkin` 표와 같음).
 

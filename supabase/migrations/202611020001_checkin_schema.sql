@@ -1,7 +1,7 @@
 -- 셀프 체크인 `checkin` 스키마 (2026-11-02, 초안).
 --
 -- 설계: docs/engineering/16-self-checkin-technical-design.md §3 · docs/product/44-self-checkin-prd.md
--- 상태: **초안 — 운영 DB 에 적용하지 않는다.** 적용은 사용자 확인 뒤(CLAUDE.md 규칙 10).
+-- 상태: 운영 적용 2026-11-10(사용자 허락).
 --
 -- 원칙(43 §8-9): 기존 Foldy 에 영향 없음.
 --   · `public` 표는 바꾸지 않는다. `checkin` → `public` 외래 키도 두지 않는다(id 값만 저장).

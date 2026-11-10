@@ -93,7 +93,7 @@ apps/checkin-kiosk/                  ← Android 네이티브 앱 (Kotlin · Jet
     kiosk/     (Device Owner · Lock Task · 부팅 자동 실행)
     data/      (Room 암호화 DB · 전송 큐 WorkManager · API 클라이언트)
     contract/  (서버 계약 JSON 모델 — apps/checkin 과 같은 스키마)
-supabase/migrations/202611020001_checkin_schema.sql    ← 같은 이력에 추가만 (43 §8-9) · 초안, 운영 미적용
+supabase/migrations/202611020001_checkin_schema.sql    ← 같은 이력에 추가만 (43 §8-9) · 운영 적용 2026-11-10
 Foldy(루트) src/app/admin/checkin · src/app/mobile/checkin · src/actions/checkin   ← 직원 화면 (추가만, 4단계)
 ```
 
@@ -123,7 +123,7 @@ Foldy(루트) src/app/admin/checkin · src/app/mobile/checkin · src/actions/che
 | `checkin.deletions` | stay_key · deleted_at · counts | 자동 삭제 기록(개인 정보 없음) |
 
 - **RLS**: `checkin.*` 전 표에 RLS 를 켜고 **정책은 하나도 두지 않는다** = service_role 말고 전부 거부. 손님 · 기기 쓰기는 서버 라우트, 직원 읽기 · 쓰기는 Foldy 서버 액션(§4-1) — 모두 service_role. authenticated · anon 에는 스키마 usage · 표 권한이 없다(2026-11-04 독립 검사: 표 전체 SELECT 를 주면 API 노출 순간 직원 JWT 로 체크인 코드 · 여권 번호 · MRZ · 토큰 해시 · PIN 해시를 기록 없이 읽고 `audit_log` 도 위조할 수 있었다).
-- **마이그레이션 초안(2026-11-02, `202611020001_checkin_schema.sql`, 운영 미적용)**: 표 11개 + 비공개 버킷 `checkin-documents`(60MB, jpeg · png · webp · mp4 · webm). 위 표의 나머지 2개(`stay_tokens` · `claim_attempts`)는 `202611020002` — 합 13개. 자식 표에도 `organization_id` 를 넣어 한 줄로 조직을 거른다. `storage.objects` 정책은 두지 않는다(파일은 서버가 서명 URL 로만). **권한 키 등록은 `202611040001_checkin_capabilities.sql`(2026-11-04, 운영 미적용)** — 판정은 앱 서버(`checkinGate`)가 하고 이 표들을 보는 RLS 정책은 없다. `idle_seconds_input`(30~900) · `idle_seconds_done`(5~120)은 계약 스키마와 같은 범위로 DB 에서도 막는다.
+- **마이그레이션 초안(2026-11-02, `202611020001_checkin_schema.sql`, 운영 적용 2026-11-10)**: 표 11개 + 비공개 버킷 `checkin-documents`(60MB, jpeg · png · webp · mp4 · webm). 위 표의 나머지 2개(`stay_tokens` · `claim_attempts`)는 `202611020002` — 합 13개. 자식 표에도 `organization_id` 를 넣어 한 줄로 조직을 거른다. `storage.objects` 정책은 두지 않는다(파일은 서버가 서명 URL 로만). **권한 키 등록은 `202611040001_checkin_capabilities.sql`(2026-11-04, 운영 미적용)** — 판정은 앱 서버(`checkinGate`)가 하고 이 표들을 보는 RLS 정책은 없다. `idle_seconds_input`(30~900) · `idle_seconds_done`(5~120)은 계약 스키마와 같은 범위로 DB 에서도 막는다.
 - **stays 생성**: Foldy Beds24 웹훅은 손대지 않는다. `apps/checkin` 의 `jobs/sync-stays`(5분 크론) 가 `public.reservations` 의 오늘 −1 ~ +30일 예약을 읽어 `stays` · `stay_rooms` 를 만들고 코드를 발급한다. **한 stay = 채널 예약 번호(`original_reservation_id`) 하나** — 방 여러 개 예약(같은 번호 줄이 여럿, 최근 6개월 19건)은 stay 1개 + `stay_rooms` 여러 개로 묶어, 예약 번호로 찾으면 방 전부가 한 번에 열린다(43 방 여러 개 규칙). 취소 · 날짜 · 인원 변경도 여기서 따라간다(체크인 뒤 변경은 기록만).
 - **sync-stays 동작(2026-11-02 구현, `apps/checkin/src/lib/sync/plan.ts` 판단 · `run.ts` 읽기 쓰기 · `GET|POST /api/jobs/sync-stays`)**:
   - 읽는 범위: `public.reservations` 체크인 날짜 도쿄 오늘 −1 ~ +30일(취소 포함, 1,000줄씩). 묶음 = (조직, `original_reservation_id`). 번호가 비면 건너뛴다.
@@ -160,7 +160,7 @@ Foldy(루트) src/app/admin/checkin · src/app/mobile/checkin · src/actions/che
 - 속도 제한: `find` 기기당 분당 20회, `guest/[token]` IP 당 분당 30회, `enroll` 분당 5회. 토큰 32바이트 랜덤 · DB 엔 sha256. 모든 응답에 `contract_version`.
 - 업로드: 클라이언트 → Supabase Storage 서명 URL 직접. 여권 JPEG 긴 변 2,400px · 품질 85(MRZ 가 읽히는 수준), 동영상 H.264 720p ≤ 5초 × n(상한 60초 · 약 1MB/초).
 - **손님 웹 여권 업로드는 서명 URL 대신 서버 multipart(2026-11-02 구현)**: 폰이 긴 변 2,400px · JPEG 0.85 로 줄여 `POST /api/guest/[token]/passport`(`guest_id` · `file`) 로 보낸다 → 서버가 앞 바이트로 형식 확인(jpeg · png · webp) · 10MB 상한 · stay 당 시간 40장 → `checkin-documents` 에 올리고 `guest_documents` 줄. 다시 올리면 앞 줄에 `replaced_by` 를 채우고 앞 파일은 지운다. 사진 한 장이 작아(≈1MB) 서명 URL 왕복 두 번보다 단순하다. 태블릿 동영상은 크기가 커서 서명 URL(`/api/kiosk/upload-url`) 그대로.
-- **`claim` 시도 기록(2026-11-02)**: `checkin.claim_attempts`(마이그레이션 `202611020002_checkin_guest_web.sql`, 운영 미적용) — IP 원문 없이 `HMAC(IP + 건물, CHECKIN_HASH_SECRET)`. 같은 키 10분 안 5회 실패 → 마지막 실패 + 10분까지 잠금(429 `locked`, `locked_until`), 같은 IP 분당 30회(429 `rate_limited`). 실패 응답은 `not_found` + 남은 횟수뿐 — 어느 칸이 틀렸는지 말하지 않는다.
+- **`claim` 시도 기록(2026-11-02)**: `checkin.claim_attempts`(마이그레이션 `202611020002_checkin_guest_web.sql`, 운영 적용 2026-11-10) — IP 원문 없이 `HMAC(IP + 건물, CHECKIN_HASH_SECRET)`. 같은 키 10분 안 5회 실패 → 마지막 실패 + 10분까지 잠금(429 `locked`, `locked_until`), 같은 IP 분당 30회(429 `rate_limited`). 실패 응답은 `not_found` + 남은 횟수뿐 — 어느 칸이 틀렸는지 말하지 않는다.
 - **링크 토큰은 찾을 때마다 하나 더 발급, 앞 링크도 그대로 열림(2026-11-02 수정)**: `checkin.stay_tokens`(토큰 sha256 · stay · 만든 때, stay 지우면 같이 지움) — 32바이트 base64url 원문은 한 번만 돌려준다. stay 당 최근 10개만 남긴다. 일행에게 보낸 링크가 다시 찾기로 닫히지 않게 하려는 것. `stays.pre_reg_token_hash` 는 쓰지 않는다.
 - **실제 인원(2026-11-02)**: `stays.party_size` — 손님이 「이 사람은 안 와요」로 줄인 인원(null = 예약 인원). 명부 자리 = max(저장한 사람, party_size). 동의 화면은 저장한 사람 ≥ party_size 일 때만 열리고, 예약 인원 ≠ 명부 인원이면 「예약 N명 · 명부 M명 — 직원이 확인」 한 줄(막지 않음, 43 §8). 직원 화면 표시는 4단계.
 - **직원 통화(2026-11-06)**: 환경 변수 `LIVEKIT_URL` · `LIVEKIT_API_KEY` · `LIVEKIT_API_SECRET`(서버 전용, 없으면 호출이 `unconfigured`). 계약 JSON 에 `staffCallEnabled`(`property_settings.staff_call_enabled`, 기본 false, `CONTRACT_VERSION` 유지). 시간 초과는 스케줄러 없이 읽기 · 쓰기 때 판정한다. `settingsVersion` 은 `settingsVersionOf()`(`<updated_at>|call:<켜짐>`) 한 곳에서 만든다. `settings` · `ping` · 호출은 `readDeviceSettings()` 로 읽어, 코드가 마이그레이션보다 먼저 나가도 칼럼 없음(`42703`)을 꺼짐으로 처리한다. `GET /api/kiosk/call/[id]` 는 `accepted` 를 읽을 때마다 `checkin.can_take_call` 로 받은 직원을 다시 확인한다. `POST /api/kiosk/complete` 는 체크인이 처음 끝날 때 직원 확인이 필요한 분이 있으면 `checkin_staff_check` 알림(`checkin.view`)을 넣는다. 다시 불러도 또 보내지 않고, 실패해도 완료를 막지 않는다.
@@ -178,7 +178,7 @@ Foldy(루트) src/app/admin/checkin · src/app/mobile/checkin · src/actions/che
 - **계약 확장(2026-11-02, `CONTRACT_VERSION` 은 1 그대로)**: `termsText` · `idleSecondsInput`(30~900) · `idleSecondsDone`(5~120) · `mrzAutofill` · `supportContacts`(phone · line · whatsapp) · `staffPin`. 계약은 `buildContract(property_settings 줄)`(`src/lib/contract/build.ts`)이 만든다 — 줄이 없으면 기본값(4개 언어 · 칸: 이름(로마자) · 주소 필수, 국적 · 여권 번호 · 전 숙박지 · 다음 행선지는 외국인만 필수). 이름(로마자)은 설정으로도 필수를 끌 수 없다. 칸 이름은 사전 `fields` 4개 언어.
 - **직원 PIN(FR-K18)**: `property_settings.staff_pin_hash` = `pbkdf2-sha256$120000$<salt base64>$<hash base64>`(32바이트, `src/lib/device/pin.ts` `hashPin` · `verifyPin`, PIN 은 숫자 4~8자리). 계약의 `staffPin` 은 이 해시를 나눈 값(원문 PIN 은 어디에도 없음) — 태블릿이 오프라인에서도 같은 방식(Java `PBKDF2WithHmacSHA256`)으로 대조한다. PIN 을 정하는 화면은 4단계(건물 설정).
 
-### 4-1. 직원 서버 (Foldy, 2026-11-04 구현 · 화면은 다음 단계 · 마이그레이션 운영 미적용)
+### 4-1. 직원 서버 (Foldy, 2026-11-04 구현 · 화면은 다음 단계 · 마이그레이션 운영 적용 2026-11-10)
 
 | 액션(`src/actions/checkin/*`) | 권한 | 하는 일 |
 | --- | --- | --- |
@@ -304,7 +304,7 @@ Foldy(루트) src/app/admin/checkin · src/app/mobile/checkin · src/actions/che
 ## 9. 단계 (코드 착수는 사용자 컨펌 뒤)
 
 1. 루트 세 줄(tsconfig exclude · eslint ignore · vitest exclude) · `apps/checkin` 뼈대 · `checkin` 스키마 마이그레이션(로컬) · 계약 스키마(zod) · `sync-stays` — Foldy 빌드 확인
-   - 2026-11-02 진행: 루트 세 줄 ✅ · 뼈대(`/p/[building]` 시작 화면 · `/api/health` · 4개 언어 사전 · 서비스 클라이언트) ✅ · 마이그레이션 초안 ✅(운영 미적용) · 계약 스키마 ✅ · `sync-stays` ✅(아래 「sync-stays 동작」, 운영 연결 전)
+   - 2026-11-02 진행: 루트 세 줄 ✅ · 뼈대(`/p/[building]` 시작 화면 · `/api/health` · 4개 언어 사전 · 서비스 클라이언트) ✅ · 마이그레이션 초안 ✅(운영 적용 2026-11-10) · 계약 스키마 ✅ · `sync-stays` ✅(아래 「sync-stays 동작」, 운영 연결 전)
 2. 사전 등록 웹(명부 · 여권 업로드 · 동의) · 링크 발급 · 리마인드 크론
    - 2026-11-02 진행: 찾기(`/p/[building]` — 예약 번호 또는 전화 뒤 4자리 · 못 찾음 · 잠금) ✅ · 명부(`/r/[token]`) · 사람별 입력(`…/guest/[id]`) · 여권 사진 · 동의(`…/terms`) · 완료(코드) · 체크인 뒤 읽기 전용 ✅ · 4개 언어 ✅ · 단위 테스트 37개 ✅. **리마인드 크론은 보류**(메시지 보낼 길이 아직 없음 — L0 만). 실제 DB 왕복 테스트 · 운영 연결 전
 3. 태블릿 앱: 뼈대(Compose · 기기 등록 · 계약 받기 · 잠금) → 찾기 · 명부 → 카메라 · MRZ → 동영상 → 완료 → 오프라인 큐

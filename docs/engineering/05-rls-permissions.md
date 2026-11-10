@@ -548,7 +548,7 @@ Read:
 Update:
 
 - User can mark own notifications as read.
-- 칸 권한으로 `read_at` 만 바꿀 수 있다(`202611060001`, 운영 미적용). `type` · `payload` · `href` · `recipient_user_id` 등은 `service_role` 만.
+- 칸 권한으로 `read_at` 만 바꿀 수 있다(`202611060001`, 운영 적용 2026-11-10). `type` · `payload` · `href` · `recipient_user_id` 등은 `service_role` 만.
 
 Create:
 
@@ -1687,7 +1687,7 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 - 남이 나를 새 할 일에 넣으면 `tasks` INSERT 는 그 순간 내가 아직 참여자가 아니라 RLS 에 걸려 안 오고, `task_participants`(`user_id=eq.나`) INSERT 가 온다.
 - 클라이언트는 신호만 쓴다(행 값을 화면에 쓰지 않음). 구독 전에 사용자 JWT 를 `realtime.setAuth()` 로 싣는다 — anon 으로 붙으면 org 필터가 거절된다.
 
-## 2026-11-04 셀프 체크인 직원 — `checkin.view` · `checkin.documents` · `checkin.manage` (`202611040001`, 운영 미적용)
+## 2026-11-04 셀프 체크인 직원 — `checkin.view` · `checkin.documents` · `checkin.manage` (`202611040001`, 운영 적용 2026-11-10)
 
 - 기본 대표 · 전무, 개발자는 통과(`platformBypass`), 그 밖은 개인 부여만. 기한 · 차단 없음(`ops_admin.access` 와 같은 정책, 43 §8-16).
 - `checkin.view`: 도착 목록 · 명부 · 체크인 코드 보기. `checkin.documents`: 여권 사진 · 얼굴 영상 · 「확인함」. `checkin.manage`: 기기 · 건물 설정.
@@ -1697,7 +1697,7 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 - 민감 응답: 파일은 서명 URL 3분 · 볼 때마다 기록, `checkin.documents` 없으면 파일 줄 없음. 체크인 코드는 별도 액션 · 볼 때마다 기록(값 없음). `storage_path` · `mrz_raw` · `token_hash` · `staff_pin_hash` 는 화면으로 보내지 않는다.
 - 확인: 로컬 PGlite 에 마이그레이션을 돌려 표 13 · 정책 0 · RLS 전부 켜짐, authenticated · anon 의 SELECT · `audit_log` INSERT 거부(42501), service_role 쓰기 통과를 봤다(Supabase 역할 · `auth` · `storage` 는 흉내, 2026-11-04). 서버 액션 테스트는 가짜 DB 이고 Supabase 실제 프로젝트에서는 아직 안 돌려 봤다. 적용 전 할 일: 마이그레이션 2 + 1개 적용(사용자 컨펌) · API 노출 스키마에 `checkin` 추가.
 
-## 2026-11-06 셀프 체크인 직원 통화 — `checkin.call` · `checkin.notify_staff` (`202611060001`, 운영 미적용)
+## 2026-11-06 셀프 체크인 직원 통화 — `checkin.call` · `checkin.notify_staff` (`202611060001`, 운영 적용 2026-11-10)
 
 - 권한 키 `checkin.call`(전화 받기): 기본 대표 · 전무, 개인 부여 가능, 기한 · 차단 없음. 명부 열람(`checkin.view`)과 나눈 키다.
 - 직원 액션의 문은 `checkinCallGate`(`src/lib/checkin/staff-call-server.ts`)다: 온보딩 상태 `ready`(정지 · 비활성 거부) + 세션 + 조직 + 그 키(`checkin.call`, `getStaffCallStay` 만 `checkin.view`). `checkinGate` 와 달리 `admin_web.access` 를 요구하지 않는다 — 관리자 웹 없는 야간 직원이 받는 키라서다. 끊기 · 상태 읽기는 그 위에서 받은 본인 또는 `checkin.manage` 만. 다른 체크인 액션은 `checkinGate` 그대로다.

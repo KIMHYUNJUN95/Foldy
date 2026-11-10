@@ -7,6 +7,7 @@ import type {
   AdminLinenBuildingOption,
   AdminLinenItemOption,
   AdminLinenRecordVM,
+  AdminLinenReturnData,
 } from "@/lib/admin-linen-returns";
 import type { Locale } from "@/lib/i18n";
 
@@ -100,6 +101,7 @@ export function quantityOfItem(record: AdminLinenRecordVM, itemId: string): numb
 export function buildingOptionsOf(
   records: readonly AdminLinenRecordVM[],
   all: readonly AdminLinenBuildingOption[],
+  localeTag = "ko-KR",
 ): AdminLinenBuildingOption[] {
   // 조회 기간에 기록이 없는 건물도 고를 수 있어야 "이 건물은 반품이 없다"를 확인할 수 있다.
   const map = new Map<string, AdminLinenBuildingOption>();
@@ -111,13 +113,16 @@ export function buildingOptionsOf(
     if (!record.buildingName || map.has(record.buildingName)) continue;
     map.set(record.buildingName, { name: record.buildingName, label: record.buildingLabel });
   }
-  return [...map.values()].sort((a, b) => a.label.localeCompare(b.label, "ko"));
+  return [...map.values()].sort((a, b) => a.label.localeCompare(b.label, localeTag));
 }
 
 export type RegistrantOption = { id: string; name: string };
 
 /** 등록자 필터 옵션 — 이름만 노출한다(담당 건물 보조줄은 목록을 어지럽혀서 제외). */
-export function registrantOptionsOf(records: readonly AdminLinenRecordVM[]): RegistrantOption[] {
+export function registrantOptionsOf(
+  records: readonly AdminLinenRecordVM[],
+  localeTag = "ko-KR",
+): RegistrantOption[] {
   const map = new Map<string, string>();
   for (const record of records) {
     if (!record.registeredById || map.has(record.registeredById)) continue;
@@ -125,7 +130,7 @@ export function registrantOptionsOf(records: readonly AdminLinenRecordVM[]): Reg
   }
   return [...map.entries()]
     .map(([id, name]) => ({ id, name }))
-    .sort((a, b) => a.name.localeCompare(b.name, "ko"));
+    .sort((a, b) => a.name.localeCompare(b.name, localeTag));
 }
 
 /** 수정 폼에서 고를 수 있는 품목 = 전역 품목 + 이 건물 전용 품목. 서버 검증과 같은 규칙. */
@@ -197,9 +202,19 @@ export function quantityByItemOf(records: readonly AdminLinenRecordVM[]): Map<st
 }
 
 // ── 내보내기 페이로드 (Excel / PDF) ────────────────────────────────────────
-// 콘솔이 화면에 그린 것과 같은 값을 서버 액션에 그대로 넘긴다 — 다른 콘솔(청소·주문·근태)과 같은
-// 방식이라, 내보낸 파일은 언제나 "지금 보고 있는 조건 그대로"가 된다. 로케일은 서버가
-// `session.user.preferredLanguage` 에서 정하므로 여기서 넘기지 않는다.
+// 2026-11-10: 콘솔은 **기간 · 보기 · 필터만**(`LinenExportQuery`) 서버 액션에 넘기고, 서버가 `getAdminLinenReturns` 로 같은 기간을
+// 다시 읽어 `buildLinenExportPayload` 로 표를 만든다 — 클라이언트가 보낸 행을 그대로 파일에 쓰지 않는다(조작 · 남의 조직 행 방지).
+// 화면과 같은 함수로 거르므로 내보낸 파일은 여전히 "지금 보고 있는 조건 그대로"다. 로케일은 서버가 세션에서 정한다.
+
+export type LinenExportQuery = {
+  from: string;
+  to: string;
+  view: "records" | "items";
+  /** 건물명 · 품목 id · 등록자 id 또는 "all". */
+  building: string;
+  item: string;
+  registrant: string;
+};
 
 export type LinenRecordExportRow = {
   /** "2026.07.30 16:32" */
@@ -233,6 +248,73 @@ export type LinenExportPayload = {
   records: LinenRecordExportRow[];
   items: LinenItemExportRow[];
 };
+
+/**
+ * 콘솔 화면과 같은 규칙으로 내보낼 표를 만든다. 품목 필터는 「기록」 보기에서만 적용한다 —
+ * 「품목별 수량」 보기에서는 화면에 적용되지 않으므로 파일에도 적용하지 않는다.
+ */
+export function buildLinenExportPayload(
+  data: Pick<AdminLinenReturnData, "records" | "items" | "buildings">,
+  query: LinenExportQuery,
+  localeTag = "ko-KR",
+): LinenExportPayload {
+  const { records, items, buildings } = data;
+  const scopedRecords = records.filter(
+    (record) =>
+      (query.building === "all" || record.buildingName === query.building) &&
+      (query.registrant === "all" || record.registeredById === query.registrant),
+  );
+  const itemApplied = query.view !== "items" && query.item !== "all";
+  const exportRecords = itemApplied
+    ? scopedRecords.filter((record) => record.lines.some((line) => line.itemId === query.item))
+    : scopedRecords;
+  const allBuildingRecords = records.filter(
+    (record) => query.registrant === "all" || record.registeredById === query.registrant,
+  );
+  const buildingLabel =
+    query.building === "all"
+      ? null
+      : (buildingOptionsOf(records, buildings, localeTag).find((option) => option.name === query.building)?.label ??
+        query.building);
+  const itemName = items.find((item) => item.id === query.item)?.name ?? null;
+  const registrantName =
+    query.registrant === "all"
+      ? null
+      : (registrantOptionsOf(records, localeTag).find((option) => option.id === query.registrant)?.name ?? null);
+  const scope = [buildingLabel, itemApplied ? itemName : null, registrantName].filter(Boolean);
+  const allQuantities = query.building === "all" ? null : quantityByItemOf(allBuildingRecords);
+  return {
+    from: query.from,
+    to: query.to,
+    building: buildingLabel,
+    scopeLabel: scope.join(" · "),
+    records: exportRecords.map((record) => ({
+      registeredAt: fmtDateTime(record.registeredAt),
+      building: record.buildingLabel,
+      items: record.lines.map((line) => `${line.name} ${line.quantity}`).join(" · "),
+      kinds: record.lines.length,
+      totalQuantity: record.totalQuantity,
+      registrant: record.registrantName,
+      note: record.note ?? "",
+    })),
+    items: aggregateByItem(scopedRecords, items).map((row) => ({
+      name: row.name,
+      quantity: row.quantity,
+      allBuildingQuantity: allQuantities ? (allQuantities.get(row.itemId) ?? 0) : null,
+      recordCount: row.recordCount,
+      lastAt: row.lastAt ? fmtDateTime(row.lastAt) : null,
+    })),
+  };
+}
+
+/**
+ * PC 수정 저장이 거절된 뒤 화면 처리. 그사이 다른 사람이 고쳤거나(stale) 기록이 사라졌으면 수정 창을 닫고 새로 불러온다 —
+ * 창의 입력값은 연 때의 값이라, 열어 둔 채 다시 저장하면 남의 수정을 덮어쓴다. 입력 오류는 창을 열어 두고 고치게 한다.
+ */
+export function linenSaveFailureOutcome(reason: string): { closeEditor: boolean; refresh: boolean } {
+  const reload = reason === "stale" || reason === "not_found";
+  return { closeEditor: reload, refresh: reload };
+}
 
 // ── avatar palette (청소/수리/분실물 콘솔과 같은 결정적 해시 → 사용자별 고정 색) ──
 const AVATAR_PALETTE = [

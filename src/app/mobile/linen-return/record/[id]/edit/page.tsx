@@ -78,8 +78,10 @@ export default async function LinenReturnEditPage({ params, searchParams }: Page
           <h1 className="lnw-title">{buildingLabel}</h1>
         </div>
 
+      {/* key = updatedAt — 저장이 stale 로 돌아오면 최신 값으로 폼을 새로 그린다(예전 입력값으로 남의 수정을 덮어쓰지 않게). */}
       <LinenReturnCreateForm
         building={record.buildingName}
+        key={record.updatedAt}
         buildingLabel={buildingLabel}
         copy={copy}
         imgCopy={dict.requestImages}
@@ -97,6 +99,7 @@ export default async function LinenReturnEditPage({ params, searchParams }: Page
         reporterName={record.registrantName}
         serverError={serverError}
         submitLabel={copy.editAction}
+        updatedAt={record.updatedAt}
       />
       </div>
     </MobileShell>

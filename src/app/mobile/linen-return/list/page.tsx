@@ -2,6 +2,7 @@ import Link from "next/link";
 import { LiveWash } from "@/components/shared/live-wash";
 import { redirect } from "next/navigation";
 import { ChevronRight, Plus } from "lucide-react";
+import { LinenLoadError } from "@/components/linen-return/linen-load-error";
 import { LinenBuildingSwitch } from "@/components/linen-return/linen-building-switch";
 import { LinenReturnSuccess } from "@/components/linen-return/linen-return-success";
 import { MobileShell } from "@/components/shell/mobile-shell";
@@ -18,7 +19,7 @@ import {
 } from "@/lib/linen-returns";
 import { getMobileNavBadges } from "@/lib/nav-badges";
 import { getOnboardingState } from "@/lib/onboarding";
-import { localizePropertyName } from "@/lib/room-label-normalization";
+import { localizeBuildingName } from "@/lib/room-label-normalization";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 
 type PageProps = {
@@ -74,14 +75,26 @@ export default async function LinenReturnListPage({ searchParams }: PageProps) {
   const locale = session.user.preferredLanguage;
   const dict = getDictionary(locale);
   const copy = dict.linenReturn;
-  const buildingLabel = localizePropertyName(building, dict.cleaning.buildingLabels);
+  const buildingLabel = localizeBuildingName(building, dict.cleaning.buildingLabels);
 
-  const [records, navBadges, allBuildings, stats] = await Promise.all([
-    getLinenReturnsByBuilding(session, building),
-    navBadgesPromise,
-    getLinenBuildings(session),
-    getLinenBuildingStats(session),
-  ]);
+  let loaded;
+  try {
+    loaded = await Promise.all([
+      getLinenReturnsByBuilding(session, building),
+      navBadgesPromise,
+      getLinenBuildings(session),
+      getLinenBuildingStats(session),
+    ]);
+  } catch {
+    // 조회 실패를 「기록 없음」으로 보이지 않게 — 화면 안 안내 + 다시 시도.
+    const navBadges = await navBadgesPromise.catch(() => undefined);
+    return (
+      <MobileShell activeItem="linen-return" badges={navBadges} title={buildingLabel}>
+        <LinenLoadError copy={copy} retryHref={`/mobile/linen-return/list?building=${encodeURIComponent(building)}`} />
+      </MobileShell>
+    );
+  }
+  const [records, navBadges, allBuildings, stats] = loaded;
   const ym = getCurrentTokyoYearMonth();
   const monthKey = `${ym.year}-${String(ym.month).padStart(2, "0")}`;
   const monthRecords = records.filter((r) => tokyoParts(r.registeredAt).ym === monthKey);
@@ -89,7 +102,7 @@ export default async function LinenReturnListPage({ searchParams }: PageProps) {
   const created = createdId ? records.find((r) => r.id === createdId) : undefined;
   const buildingOptions = allBuildings.map((name) => ({
     name,
-    label: localizePropertyName(name, dict.cleaning.buildingLabels),
+    label: localizeBuildingName(name, dict.cleaning.buildingLabels),
     monthCount: stats[name]?.count ?? 0,
   }));
 

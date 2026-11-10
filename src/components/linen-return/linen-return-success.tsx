@@ -8,6 +8,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Check } from "lucide-react";
 import { haptic } from "@/lib/haptics";
+import { linenDraftKey } from "@/lib/linen-mobile-form";
 
 /** 등록 폼이 저장 직전에 남기는 「방금 보낸 것」 — 합쳐진 기록이면 기록 합계가 아니라 이번에 더한 장수를 보여 주려고. */
 export const LINEN_JUST_SAVED_KEY = "foldy-linen-just-saved";
@@ -32,6 +33,15 @@ export function LinenReturnSuccess({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(show);
+  // 저장이 확인됐으니 이 건물의 임시 저장(제출 id · 지문)을 지운다 — 다음 등록은 새 id.
+  useEffect(() => {
+    if (!show) return;
+    try {
+      window.sessionStorage.removeItem(linenDraftKey("create", building));
+    } catch {
+      // 못 지워도 1시간 뒤 저절로 무시된다.
+    }
+  }, [show, building]);
   // 서버 HTML 과 같게 첫 그림은 비우고, 붙은 뒤에 sessionStorage 를 읽는다(하이드레이션 불일치 방지).
   const hydrated = useSyncExternalStore(
     () => () => {},

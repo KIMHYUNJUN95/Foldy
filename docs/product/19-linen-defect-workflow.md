@@ -147,6 +147,14 @@ Instead, the system merges the new submission into that day's existing record:
 This keeps the building ledger compact during repetitive field work while preserving day-based
 history.
 
+Atomicity and resend (2026-11-10): the merge runs inside one DB function, `linen_submit_return`
+(`202611100002`). It takes a transaction lock on (organization, building, author, Tokyo day), so two
+first submissions arriving together still make one record, and quantities are added with
+`quantity = quantity + n` (no read-then-write overwrite). Each submission carries the form's `id`
+(the client-made uuid, also the photo folder and the new record id); a resend with the same id is a
+no-op that returns the same record. A different id adds again. Photos over 5 after merging, or any
+other failure, rolls back the whole submission.
+
 The system must automatically store:
 
 - registered date/time
@@ -455,6 +463,9 @@ exist in this console.
   with a 수량 total row.
 - The title bar carries the period **and** the applied filters (건물 · 품목 · 등록자) so the file is
   self-describing.
+- The console sends only the period, view and filters; the server re-reads that period with
+  `getAdminLinenReturns` and builds the sheets with `buildLinenExportPayload` (2026-11-10). Rows sent
+  by the browser are never written into the file.
 - The export always mirrors what is on screen. The item filter is only applied when it is actually
   visible (기록 view) — exporting from the 품목별 수량 view never silently narrows the 기록 sheet.
 - Export locale is resolved server-side from the actor's `preferredLanguage`; the client never sends
@@ -600,6 +611,23 @@ Single duvet cover 12 units / 5 records
 Pillow cover 8 units / 3 records
 ```
 
+### Mobile Screen Behavior Notes (2026-11-10 점검)
+
+- **Double-submit lock (create + edit):** the form locks with a ref the instant submit starts (upload through server
+  response); the button stays disabled and shows the spinner until the response ends or an upload fails.
+- **Submit id:** the create form sends `id` (a `crypto.randomUUID()` made when the form mounts). A retry after a failed
+  save reuses the same id; changing quantities, memo or photos makes a new one. The server treats the same id as one record.
+- **Input survives a server error:** before calling the server action the form keeps quantities, memo, submit id and the
+  already-uploaded photo URLs in `sessionStorage` (key per mode + building + record). When the page comes back with
+  `?error=`, they are restored and uploaded photos are not uploaded again. Opening the form without an error clears it.
+  Edit forms may get an optional `updatedAt` prop, sent as a hidden field.
+- **Haptics:** `error` once when a server error comes back or an upload fails; nothing for input validation (no items);
+  delete uses `light` (not `success`); a failed delete closes the confirm sheet so the page error is visible.
+- **Ledger:** moving month or range remounts the view (filters start fresh); `year`/`month` outside 2000..current year+1
+  fall back to this month; item-aggregate gap rows are matched by item id, not name.
+- **Load failure:** list, ledger and detail show an in-screen message with a retry link instead of an empty/“no record” state.
+- Building names are localized where drawn (`localizeBuildingName` / `useBuildingName`); sort uses the viewer locale.
+
 ## Current Default Item List (2026-06-15)
 
 The current global default linen-return catalog is:
@@ -670,6 +698,11 @@ Not required in first slice:
 - authors can edit their own records
 - non-authors cannot edit other users' records
 - admin-capable roles can edit all records
+- authors keep edit/delete rights only while their membership is active (2026-11-10, RLS)
+- an edit saves header and item lines in one DB transaction (`linen_update_return`); if someone else
+  saved the record after the editor opened it (`updated_at` changed), the save is refused with `stale`
+  and nothing is written (2026-11-10)
+- items that were turned inactive can stay on a record that already has them (same building)
 - saving an edit never leaves a record without its items: lines are added and changed first and removed
   last, and a failed save keeps the previous items (2026-10-19 — before that, an admin editing another
   user's record could wipe all of its items)
@@ -838,3 +871,25 @@ corrected" 로 명시돼 있었다. 코드 주석의 "photo editing is deferred"
 ## 2026-10-26 — 관리자 린넨 기록 수정: 사진 주소 검증
 
 `updateAdminLinenRecord` 는 새로 붙은 사진 주소가 우리 `request-images` 버킷의 `{조직}/linen-returns/{기록 id}/` 아래 파일인지 확인한다(`isOwnStoragePublicUrl`). 이미 저장돼 있던 주소는 그대로 두고, 최대 5장.
+
+## 2026-11-10 — 점검 보강: 사진 저장소 · 증빙 칸 · 같은 날 합치기 · 동시 수정 · 내보내기
+
+마이그레이션 `202611100002_linen_returns_hardening.sql`(운영 미적용), 판정 함수 `src/lib/linen-return-rules.ts`(모바일 · PC 공용).
+
+- **사진이 아예 안 올라가던 문제**: `202610220001` 이 요청 사진 저장소 정책을 다시 만들면서 폴더 목록에서 `linen-returns` 를 빠뜨려,
+  그 뒤 린넨 사진 올리기 · 지우기가 막혀 있었다. 폴더를 되돌렸다. 지우기는 「내가 올린 것 또는 `linen.manage`」.
+- **등록 시각 · 등록자 보호**: DB 트리거가 등록 때 등록 시각을 지금으로, 등록자는 본인으로만 받고, 수정 때 두 칸을 막는다(서버 키는 통과).
+- **같은 날 합치기**: 위 §2 「Atomicity and resend」. 화면 계약은 그대로(`created=<id>`, 합쳐지면 `&merged=1`).
+- **수정**: 머리 · 품목 줄 한 번에 저장, 동시 수정은 `stale`(모바일 `?error=stale`, PC 「다른 사람이 이 기록을 먼저 고쳤어요…」 알림 뒤 새로 불러옴).
+  모바일 수정 폼은 hidden `updatedAt`, PC 수정 창은 기록의 `updatedAt` 을 함께 보낸다. 값이 없으면 이 검사만 건너뛴다.
+  `stale` 뒤에는 예전 입력값으로 다시 저장하지 못하게 PC 는 수정 창을 닫고 상세 패널을 새 값으로, 모바일은 폼을 새 값으로 다시 그린다.
+- **같은 제출 id 로 건물만 바꿔 동시에 보내도** 제출 id 잠금이 먼저라 둘째는 「이미 처리됨」. 형식이 틀린 품목 id · 수량, 합친 수량이 정수 범위를
+  넘는 경우는 `invalid_item` · `invalid_quantity` 로 돌려준다.
+- **사진 주소 규칙(한 함수)**: 등록은 같은 조직 `linen-returns/{uuid}/` 아래 파일(폼이 실패 뒤 새 제출 id 를 만들어도 임시 저장에서 되살린
+  예전 폴더 사진을 보내기 때문), 수정은 그 기록 폴더 + 이미 저장돼 있던 주소. 어긋나면 `invalid_photo`.
+- **삭제**: 지워진 행이 0이면(권한 등) `delete_failed` · PC 오류.
+- **PC**: 조회 기간 최대 366일(넘으면 끝 날짜 기준으로 자름), 건물 이름은 `localizeBuildingName`, 정렬은 보는 사람 언어,
+  수정 창 사진 준비 실패 문구 · 올린 사진은 저장이 거절돼도 다시 올리지 않음 · 창 안 포커스 가두기.
+- **퇴사 · 정지**: 작성자라도 활성 멤버가 아니면 수정 · 삭제 RLS 에서 막힌다.
+- 건물 이름이 객실 마스터에 있는지는 DB 가 아니라 서버 액션(`isKnownBuilding`)이 본다 — 마스터는 이름 정규화 · 운영 제외 건물 규칙을 앱에서 거쳐야 같은 목록이 나온다.
+- **알려진 한계**: 기록 삭제 · 사진 교체 · 저장 거절 뒤 사진 파일은 저장소에 남는다(다른 요청 기능과 같음).

@@ -7,25 +7,24 @@ import {
   getLinenReturnRecordById,
   revalidateLinenReturnPaths,
 } from "@/lib/linen-returns";
-import { replaceLinenRecordLines } from "@/lib/linen-return-lines";
+import {
+  LINEN_MAX_PHOTOS,
+  areLinenPhotoUrlsAllowed,
+  linenAllowedItemIds,
+  linenRpcErrorReason,
+  parseLinenLines,
+} from "@/lib/linen-return-rules";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
-import type { Database } from "@/types/database";
-
-type RawLine = { itemId?: string; quantity?: unknown };
-
-/** CLAUDE.md §8 — 기능당 5장. 어드민 콘솔(`updateAdminLinenRecord`)과 같은 상한. */
-const MAX_PHOTOS = 5;
 
 function cleanText(value: FormDataEntryValue | null) {
   return String(value ?? "").trim();
 }
 
-function parseLines(value: string): RawLine[] {
+function parseLines(value: string): unknown[] {
   try {
     const parsed = JSON.parse(value) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((l) => l && typeof l === "object") as RawLine[];
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
@@ -63,13 +62,14 @@ export async function deleteLinenReturnRecord(formData: FormData) {
   }
 
   const supabase = await getSupabaseServerClient();
-  // 라인 항목은 헤더와 함께 cascade 삭제된다.
-  const { error } = await supabase
+  // 라인 항목은 헤더와 함께 cascade 삭제된다. 지워진 행 수를 본다 — RLS 가 막으면 오류 없이 0행이다.
+  const { data: deleted, error } = await supabase
     .from("linen_return_records")
     .delete()
     .eq("id", recordId)
-    .eq("organization_id", session.organization.id);
-  if (error) {
+    .eq("organization_id", session.organization.id)
+    .select("id");
+  if (error || !deleted || deleted.length === 0) {
     redirect(`/mobile/linen-return/record/${recordId}?building=${encodeURIComponent(record.buildingName)}&error=delete_failed`);
   }
 
@@ -101,61 +101,52 @@ export async function updateLinenReturnRecord(formData: FormData) {
 
   const building = record.buildingName;
   const note = cleanText(formData.get("note"));
-  const rawLines = parseLines(cleanText(formData.get("linesJson")));
 
+  // 고를 수 있는 품목 = 이 건물의 활성 품목 + 이미 이 기록에 있던 품목(비활성이 됐어도 그대로 저장할 수 있게).
   const catalog = await getActiveLinenItems(session, building);
-  const validItemIds = new Set(catalog.map((item) => item.id));
-
-  const seen = new Set<string>();
-  const lines: { itemId: string; quantity: number }[] = [];
-  for (const raw of rawLines) {
-    const itemId = String(raw.itemId ?? "").trim();
-    const quantity = Number(raw.quantity);
-    if (!itemId || !validItemIds.has(itemId)) {
-      redirect(editPath(recordId, building, "invalid_item"));
-    }
-    if (!Number.isInteger(quantity) || quantity <= 0) {
-      redirect(editPath(recordId, building, "invalid_quantity"));
-    }
-    if (seen.has(itemId)) {
-      redirect(editPath(recordId, building, "duplicate_item"));
-    }
-    seen.add(itemId);
-    lines.push({ itemId, quantity });
-  }
-
-  if (lines.length === 0) {
-    redirect(editPath(recordId, building, "missing_items"));
+  const parsed = parseLinenLines(
+    parseLines(cleanText(formData.get("linesJson"))),
+    linenAllowedItemIds({
+      activeIds: catalog.map((item) => item.id),
+      building,
+      existing: { building, itemIds: record.lines.map((line) => line.itemId) },
+    }),
+  );
+  if (!parsed.ok) {
+    redirect(editPath(recordId, building, parsed.reason));
   }
 
   // 사진은 폼이 보낸 집합으로 통째로 교체한다 — 남긴 기존 URL + 새로 올린 URL.
-  // 어드민 콘솔의 사진 수정과 같은 규칙이라, 현장도 자기 기록의 사진을 정정할 수 있다.
-  const imageUrls = formData
-    .getAll("imageUrls")
-    .map((value) => String(value))
-    .filter((url) => url.startsWith("https://") || url.startsWith("http://"));
-  if (imageUrls.length > MAX_PHOTOS) {
+  // 새 주소는 이 기록 폴더(`{조직}/linen-returns/{기록 id}/`)만, 이미 저장돼 있던 주소는 폴더가 달라도 그대로(PC 콘솔과 같은 함수).
+  const imageUrls = [...new Set(formData.getAll("imageUrls").map((value) => String(value)).filter(Boolean))];
+  if (imageUrls.length > LINEN_MAX_PHOTOS) {
     redirect(editPath(recordId, building, "too_many_photos"));
   }
-
-  const supabase = await getSupabaseServerClient();
-
-  const headerUpdate: Database["public"]["Tables"]["linen_return_records"]["Update"] = {
-    note: note || null,
-    image_urls: imageUrls,
-  };
-  const { error: headerError } = await supabase
-    .from("linen_return_records")
-    .update(headerUpdate)
-    .eq("id", recordId)
-    .eq("organization_id", session.organization.id);
-  if (headerError) {
-    redirect(editPath(recordId, building, "save_failed"));
+  if (
+    !areLinenPhotoUrlsAllowed(imageUrls, {
+      organizationId: session.organization.id,
+      folderId: recordId,
+      kept: record.imageUrls,
+    })
+  ) {
+    redirect(editPath(recordId, building, "invalid_photo"));
   }
 
-  const replaced = await replaceLinenRecordLines(supabase, recordId, lines);
-  if (!replaced.ok) {
-    redirect(editPath(recordId, building, "save_failed"));
+  // 머리 · 품목 줄을 한 트랜잭션으로(반쪽 저장 없음). 폼이 hidden `updatedAt`(연 때의 값)을 보내면
+  // 그사이 다른 사람이 고친 경우 'stale' 로 돌려보낸다 — 보내지 않으면 이 검사만 건너뛴다.
+  const expectedUpdatedAt = cleanText(formData.get("updatedAt")) || null;
+  const supabase = await getSupabaseServerClient();
+  const { error } = await supabase.rpc("linen_update_return", {
+    p_record_id: recordId,
+    p_expected_updated_at: expectedUpdatedAt,
+    p_building: null,
+    p_note: note,
+    p_image_urls: imageUrls,
+    p_lines: parsed.lines,
+  });
+  if (error) {
+    const reason = linenRpcErrorReason(error.message);
+    redirect(editPath(recordId, building, reason ?? "save_failed"));
   }
 
   revalidateLinenReturnPaths();

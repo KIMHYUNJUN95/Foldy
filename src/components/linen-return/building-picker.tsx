@@ -8,7 +8,7 @@ import { ChevronRight } from "lucide-react";
 import { rememberLinenBuilding } from "@/components/linen-return/linen-building-switch";
 import "@/components/linen-return/linen-mobile.css";
 import type { Dictionary, Locale } from "@/lib/i18n";
-import { localizePropertyName } from "@/lib/room-label-normalization";
+import { useBuildingName } from "@/components/shared/building-names";
 
 type BuildingStat = { count: number; lastAt: string | null };
 
@@ -20,14 +20,15 @@ type BuildingPickerProps = {
   stats: Record<string, BuildingStat>;
 };
 
-export function BuildingPicker({ buildingLabels, buildings, copy, stats }: BuildingPickerProps) {
+export function BuildingPicker({ buildings, copy, locale, stats }: BuildingPickerProps) {
+  const buildingName = useBuildingName();
   const localized = useMemo(
     () =>
       buildings
-        .map((name) => ({ name, label: localizePropertyName(name, buildingLabels) }))
+        .map((name) => ({ name, label: buildingName(name) }))
         // 어드민 린넨 콘솔의 건물 선택지와 같은 규칙 — 표시 라벨 기준으로 정렬한다.
-        .sort((a, b) => a.label.localeCompare(b.label, "ko")),
-    [buildings, buildingLabels],
+        .sort((a, b) => a.label.localeCompare(b.label, locale)),
+    [buildings, buildingName, locale],
   );
 
   return (

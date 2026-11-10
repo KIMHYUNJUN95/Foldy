@@ -13,9 +13,11 @@ import "server-only";
 import { organizationRoles, type Role } from "@/config/roles";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { getActiveRoomCatalogServer } from "@/lib/rooms";
-import { localizePropertyName } from "@/lib/room-label-normalization";
+import { clampLinenRange } from "@/lib/linen-return-rules";
+import { localizeBuildingName } from "@/lib/room-label-normalization";
 import type { AppSession } from "@/lib/session";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { tokyoDayEndExclusive, tokyoDayStart, tokyoToday, ymdShift } from "@/lib/tokyo-date";
 import type { Database } from "@/types/database";
 
 type RecordRow = Database["public"]["Tables"]["linen_return_records"]["Row"];
@@ -54,6 +56,8 @@ export type AdminLinenRecordVM = {
   photos: string[];
   /** 작성자 본인 또는 관리자 역할일 때만 수정·삭제 가능(서버에서 다시 검증한다). */
   canManage: boolean;
+  /** 동시 수정 막기 — 수정 창이 저장할 때 그대로 돌려보낸다(DB 함수 linen_update_return). */
+  updatedAt: string;
 };
 
 export type AdminLinenItemOption = {
@@ -104,33 +108,22 @@ function tokyoStamp(iso: string): string {
   return `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get("minute")}`;
 }
 
-/** 도쿄 기준 오늘의 "YYYY-MM-DD". */
+/** 도쿄 기준 오늘의 "YYYY-MM-DD" — 공용 `tokyoToday`. */
 export function todayKeyTokyo(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: TOKYO_TZ,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
+  return tokyoToday();
 }
 
 /** 기본 조회 기간 — 이번 달(Tokyo) 1일 ~ 말일. 계획 문서의 "current Tokyo calendar month". */
 export function defaultRangeTokyo(): { from: string; to: string } {
-  const today = todayKeyTokyo();
-  const [year, month] = today.split("-").map(Number);
-  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
-  return { from: `${today.slice(0, 7)}-01`, to: `${today.slice(0, 7)}-${String(lastDay).padStart(2, "0")}` };
+  const first = `${tokyoToday().slice(0, 7)}-01`;
+  const [year, month] = first.split("-").map(Number);
+  const nextFirst = month === 12 ? `${year + 1}-01-01` : `${year}-${String(month + 1).padStart(2, "0")}-01`;
+  return { from: first, to: ymdShift(nextFirst, -1) };
 }
 
-// 양끝 포함 도쿄 날짜 범위 [from 00:00 JST, to+1 00:00 JST). JST 는 UTC+9 이므로 어느 날의 00:00 JST 는
-// 그보다 9시간 앞선 UTC 시각이다 — 운영 날짜를 UTC ISO 문자열 자르기로 구하지 말 것.
+// 양끝 포함 도쿄 날짜 범위 [from 00:00 JST, to+1 00:00 JST) — 공용 src/lib/tokyo-date.ts 경계.
 function tokyoDayRange(from: string, to: string): { fromIso: string; toIso: string } {
-  const [fy, fm, fd] = from.split("-").map(Number);
-  const [ty, tm, td] = to.split("-").map(Number);
-  return {
-    fromIso: new Date(Date.UTC(fy, fm - 1, fd, -9, 0, 0)).toISOString(),
-    toIso: new Date(Date.UTC(ty, tm - 1, td + 1, -9, 0, 0)).toISOString(),
-  };
+  return { fromIso: tokyoDayStart(from), toIso: tokyoDayEndExclusive(to) };
 }
 
 function isMissingTableError(message: string): boolean {
@@ -194,7 +187,8 @@ export async function getAdminLinenReturns(
 
   try {
     const supabase = await getSupabaseServerClient();
-    const [start, end] = from <= to ? [from, to] : [to, from];
+    // 거꾸로면 바로잡고 366일을 넘으면 자른다 — 주소창에 몇 년치를 넣어 한 번에 다 읽지 못하게(화면 page.tsx 도 같은 함수).
+    const { from: start, to: end } = clampLinenRange(from, to);
     const { fromIso, toIso } = tokyoDayRange(start, end);
 
     const { data, error } = await supabase
@@ -276,7 +270,7 @@ export async function getAdminLinenReturns(
         id: row.id,
         shortId: shortIdOf(row.id),
         buildingName: row.building_name,
-        buildingLabel: localizePropertyName(row.building_name, buildingLabels),
+        buildingLabel: localizeBuildingName(row.building_name, buildingLabels),
         registeredAt: tokyoStamp(row.registered_at),
         registeredById: row.registered_by_user_id,
         registrantName: registrantNames.get(row.registered_by_user_id) ?? "",
@@ -285,6 +279,7 @@ export async function getAdminLinenReturns(
         note: row.note,
         photos: row.image_urls ?? [],
         canManage: canManage(session, row.registered_by_user_id),
+        updatedAt: row.updated_at,
       };
     });
 
@@ -301,6 +296,6 @@ export async function getLinenBuildingNames(
 ): Promise<AdminLinenBuildingOption[]> {
   const catalog = (await getActiveRoomCatalogServer(session.organization.id)) ?? [];
   return [...new Set(catalog.map((item) => item.propertyName))]
-    .map((name) => ({ name, label: localizePropertyName(name, buildingLabels) }))
-    .sort((a, b) => a.label.localeCompare(b.label, "ko"));
+    .map((name) => ({ name, label: localizeBuildingName(name, buildingLabels) }))
+    .sort((a, b) => a.label.localeCompare(b.label, session.user.preferredLanguage));
 }

@@ -1053,9 +1053,25 @@ note text
 image_urls text[] not null default '{}'
 registered_by_user_id uuid not null references profiles(id) on delete restrict
 registered_at timestamptz not null default now()
+submission_ids uuid[] not null default '{}'   -- 2026-11-10, processed submission ids (GIN index)
 created_at timestamptz not null default now()
 updated_at timestamptz not null default now()
 ```
+
+2026-11-10 (`202611100002`):
+
+- `registered_at` / `registered_by_user_id` are field evidence. Trigger `linen_return_records_evidence_guard`
+  forces `registered_at = now()` on insert, requires `registered_by_user_id = auth.uid()`, and blocks changing
+  either column on update. Calls without `auth.uid()` (service_role, cron) pass.
+- Same-day merge goes through `linen_submit_return(p_organization_id, p_submission_id, p_building, p_note,
+  p_image_urls, p_lines jsonb)` → `{record_id, merged, duplicate}`. SECURITY INVOKER (caller's RLS applies),
+  advisory xact lock on (org, building, author, Tokyo day), `quantity = quantity + n` via `on conflict`,
+  max 5 photos after merging. A submission id already in `submission_ids` (or equal to a record id) is a no-op.
+  New records use the submission id as their id (same as the photo folder).
+- Edits go through `linen_update_return(p_record_id, p_expected_updated_at, p_building, p_note, p_image_urls,
+  p_lines jsonb)` → new `updated_at`. One transaction for header + lines; a different `updated_at` raises
+  `linen:stale`. Errors are raised as `linen:<reason>` and read by `linenRpcErrorReason` (`src/lib/linen-return-rules.ts`).
+- `building_name` is still checked against the room master only in server actions (`isKnownBuilding`).
 
 ## linen_return_record_items
 
@@ -1072,6 +1088,9 @@ sort_order integer not null default 0
 created_at timestamptz not null default now()
 unique (return_record_id, linen_item_id)
 ```
+
+Trigger `linen_return_record_items_same_org` (2026-11-10) rejects a line whose `linen_item_id` belongs to a
+different organization than the record.
 
 ## tasks
 

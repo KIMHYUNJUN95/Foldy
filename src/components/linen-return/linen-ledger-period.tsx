@@ -8,6 +8,7 @@ import {
   type DateRangeValue,
 } from "@/components/requests/date-range-calendar";
 import type { Dictionary, Locale } from "@/lib/i18n";
+import { shiftLedgerMonth } from "@/lib/linen-mobile-form";
 
 type LinenLedgerPeriodProps = {
   building: string;
@@ -20,11 +21,6 @@ type LinenLedgerPeriodProps = {
   range: DateRangeValue;
   year: number;
 };
-
-function shiftMonth(year: number, month: number, delta: number) {
-  const base = new Date(Date.UTC(year, month - 1 + delta, 1));
-  return { year: base.getUTCFullYear(), month: base.getUTCMonth() + 1 };
-}
 
 export function LinenLedgerPeriod({
   building,
@@ -41,7 +37,7 @@ export function LinenLedgerPeriod({
   const buildingParam = encodeURIComponent(building);
 
   function goMonth(delta: number) {
-    const next = shiftMonth(year, month, delta);
+    const next = shiftLedgerMonth(year, month, delta);
     router.push(
       `/mobile/linen-return/ledger?building=${buildingParam}&year=${next.year}&month=${next.month}`,
     );

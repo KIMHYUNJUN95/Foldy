@@ -4012,6 +4012,7 @@ export type Database = {
           organization_id: string
           registered_at: string
           registered_by_user_id: string
+          submission_ids: string[]
           updated_at: string
         }
         Insert: {
@@ -4023,6 +4024,7 @@ export type Database = {
           organization_id: string
           registered_at?: string
           registered_by_user_id: string
+          submission_ids?: string[]
           updated_at?: string
         }
         Update: {
@@ -4034,6 +4036,7 @@ export type Database = {
           organization_id?: string
           registered_at?: string
           registered_by_user_id?: string
+          submission_ids?: string[]
           updated_at?: string
         }
         Relationships: [
@@ -7262,6 +7265,28 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      linen_submit_return: {
+        Args: {
+          p_building: string
+          p_image_urls: string[]
+          p_lines: Json
+          p_note: string
+          p_organization_id: string
+          p_submission_id: string
+        }
+        Returns: Json
+      }
+      linen_update_return: {
+        Args: {
+          p_building: string | null
+          p_expected_updated_at: string | null
+          p_image_urls: string[]
+          p_lines: Json
+          p_note: string
+          p_record_id: string
+        }
+        Returns: string
+      }
       promote_staff_id_document: {
         Args: {
           p_document_id: string

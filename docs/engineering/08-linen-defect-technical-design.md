@@ -124,13 +124,18 @@ authorization.
 - `updateAdminLinenRecord` — validates building against the org room catalog (`isKnownBuilding`
   equivalent), re-derives the selectable item set (global items + that building's items) from the DB,
   and enforces positive-integer quantities, no duplicate item, at least one line, and ≤5 photos.
-  The header update payload contains **only** `building_name`, `note`, `image_urls` — the evidence
-  columns are structurally excluded. Line items are reconciled by `replaceLinenRecordLines`
-  (`src/lib/linen-return-lines.ts`, shared with the mobile edit): **insert new → update changed →
-  delete removed**, and a failure in a later step undoes the earlier ones. (Until 2026-10-19 this was
-  delete-all + insert; with the author-only INSERT policy an admin editing someone else's record lost
-  every line. Migration `202610190014` aligns the INSERT policy with update/delete.)
-- `deleteAdminLinenRecord` — hard delete of the header; line items cascade.
+  Since 2026-11-10 the save is one call to the DB function `linen_update_return` (migration
+  `202611100002`): header (`building_name`, `note`, `image_urls`) and item lines are written in one
+  transaction, so a failure leaves nothing half-saved, and the console's `updatedAt` must still match
+  or the save is refused with `stale` (the edit window closes and the panel reloads). The evidence
+  columns are protected by a DB trigger as well. The old app-side line reconciliation
+  (`src/lib/linen-return-lines.ts`, insert → update → delete with manual undo) was removed. (Until
+  2026-10-19 lines were delete-all + insert; with the author-only INSERT policy an admin editing
+  someone else's record lost every line. Migration `202610190014` aligned the INSERT policy.)
+- `deleteAdminLinenRecord` — hard delete of the header; line items cascade. Zero deleted rows (RLS)
+  returns `forbidden`.
+- Known limit: after a record delete, a photo replacement or a refused save, the photo files stay in
+  storage (same as the other request features).
 - Both write `audit_logs` through the service-role client with
   `action = linen_return_console_update | linen_return_console_delete`,
   `target_type = linen_return_record`, and a before/after (or pre-delete) snapshot in `metadata`.

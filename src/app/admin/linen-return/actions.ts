@@ -10,11 +10,13 @@
 //  · 권한: 작성자 본인 또는 관리자 역할 — UI 노출 여부와 무관하게 서버에서 다시 검증한다
 //  · 추적: 수정·삭제는 audit_logs 에 actor / time / action / 변경 스냅샷을 남긴다
 
-import type {
-  LinenExportPayload,
-  LinenItemExportRow,
+import {
+  buildLinenExportPayload,
+  type LinenExportPayload,
+  type LinenExportQuery,
+  type LinenItemExportRow,
 } from "@/components/admin/linen-return/linen-console-data";
-import { isAdminCapableRole, isOrganizationRole } from "@/lib/admin-linen-returns";
+import { getAdminLinenReturns, isAdminCapableRole, isOrganizationRole } from "@/lib/admin-linen-returns";
 import { requireAdminSession } from "@/lib/admin-session";
 import {
   buildAdminExportMeta,
@@ -29,11 +31,17 @@ import {
   type AdminTableSheet,
 } from "@/lib/admin-table-workbook";
 import { getDictionary } from "@/lib/i18n";
-import { replaceLinenRecordLines } from "@/lib/linen-return-lines";
-import { revalidateLinenReturnPaths } from "@/lib/linen-returns";
+import {
+  LINEN_MAX_PHOTOS,
+  areLinenPhotoUrlsAllowed,
+  clampLinenRange,
+  linenAllowedItemIds,
+  linenRpcErrorReason,
+  parseLinenLines,
+} from "@/lib/linen-return-rules";
+import { isValidIsoDate, revalidateLinenReturnPaths } from "@/lib/linen-returns";
 import { getActiveRoomCatalogServer } from "@/lib/rooms";
 import { hasOrganizationContext, type AppSession } from "@/lib/session";
-import { isOwnStoragePublicUrl } from "@/lib/storage-url-guard";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import type { Database } from "@/types/database";
@@ -43,9 +51,6 @@ import { bestEffortWrite } from "@/lib/db-write-guard";
 type RecordRow = Database["public"]["Tables"]["linen_return_records"]["Row"];
 type ItemRow = Database["public"]["Tables"]["linen_items"]["Row"];
 type LineRow = Database["public"]["Tables"]["linen_return_record_items"]["Row"];
-
-/** 사진 상한 — CLAUDE.md §8 의 기능당 5장 정책(프로젝트 업무 예외는 여기 해당 없음). */
-const MAX_PHOTOS = 5;
 
 export type LinenConsoleLineInput = { itemId: string; quantity: number };
 
@@ -62,6 +67,9 @@ export type LinenConsoleResult =
         | "duplicate_item"
         | "missing_items"
         | "too_many_photos"
+        | "invalid_photo"
+        /** 그사이 다른 사람이 먼저 고쳤다 — 다시 열어서 고친다. */
+        | "stale"
         | "error";
     };
 
@@ -144,6 +152,8 @@ export async function updateAdminLinenRecord(input: {
   lines: LinenConsoleLineInput[];
   note: string;
   photos: string[];
+  /** 수정 창을 연 때의 updated_at — 그사이 다른 사람이 고쳤으면 `stale`. 없으면 이 검사만 건너뛴다. */
+  updatedAt?: string | null;
 }): Promise<LinenConsoleResult> {
   const guarded = await guard(input.recordId);
   if (!guarded.ok) return guarded;
@@ -153,58 +163,65 @@ export async function updateAdminLinenRecord(input: {
   if (!(await isKnownBuilding(session, building))) return { ok: false, reason: "invalid_building" };
 
   const photos = [...new Set((Array.isArray(input.photos) ? input.photos : []).filter((url): url is string => typeof url === "string" && url.length > 0))];
-  if (photos.length > MAX_PHOTOS) return { ok: false, reason: "too_many_photos" };
+  if (photos.length > LINEN_MAX_PHOTOS) return { ok: false, reason: "too_many_photos" };
   // 새로 붙은 사진 주소는 업로더가 쓰는 우리 저장소 `{조직}/linen-returns/{기록 id}/` 아래 파일만 받는다.
-  // 이미 저장돼 있던 주소(모바일 등록 때의 다른 폴더 포함)는 그대로 둔다.
-  const keptUrls = new Set(record.image_urls ?? []);
-  const photoPrefix = `${session.organization.id}/linen-returns/${record.id}/`;
-  if (!photos.every((url) => keptUrls.has(url) || isOwnStoragePublicUrl(url, "request-images", photoPrefix))) {
-    return { ok: false, reason: "error" };
+  // 이미 저장돼 있던 주소(모바일 등록 때의 다른 폴더 포함)는 그대로 둔다 — 모바일 수정과 같은 함수.
+  if (
+    !areLinenPhotoUrlsAllowed(photos, {
+      organizationId: session.organization.id,
+      folderId: record.id,
+      kept: record.image_urls ?? [],
+    })
+  ) {
+    return { ok: false, reason: "invalid_photo" };
   }
 
   const supabase = await getSupabaseServerClient();
 
-  // 선택 가능한 품목 = 조직의 활성 품목 중 전역(building_name null) 또는 이 건물 전용.
-  const { data: itemData, error: itemError } = await supabase
-    .from("linen_items")
-    .select("id, building_name, is_active")
-    .eq("organization_id", session.organization.id)
-    .eq("is_active", true);
-  if (itemError) return { ok: false, reason: "error" };
-  const validItemIds = new Set(
-    ((itemData ?? []) as Array<Pick<ItemRow, "id" | "building_name" | "is_active">>)
-      .filter((row) => row.building_name === null || row.building_name === building)
-      .map((row) => row.id),
+  // 선택 가능한 품목 = 조직의 활성 품목 중 전역(building_name null) 또는 이 건물 전용 + (건물이 그대로면) 이미 이 기록에 있던 품목.
+  const [{ data: itemData, error: itemError }, { data: beforeData, error: beforeError }] = await Promise.all([
+    supabase
+      .from("linen_items")
+      .select("id, building_name, is_active")
+      .eq("organization_id", session.organization.id)
+      .eq("is_active", true),
+    supabase
+      .from("linen_return_record_items")
+      .select("linen_item_id, quantity, sort_order")
+      .eq("return_record_id", record.id)
+      .order("sort_order", { ascending: true }),
+  ]);
+  if (itemError || beforeError) return { ok: false, reason: "error" };
+  const beforeLines = (beforeData ?? []) as Array<Pick<LineRow, "linen_item_id" | "quantity" | "sort_order">>;
+  const parsed = parseLinenLines(
+    Array.isArray(input.lines) ? input.lines : [],
+    linenAllowedItemIds({
+      activeIds: ((itemData ?? []) as Array<Pick<ItemRow, "id" | "building_name" | "is_active">>)
+        .filter((row) => row.building_name === null || row.building_name === building)
+        .map((row) => row.id),
+      building,
+      existing: { building: record.building_name, itemIds: beforeLines.map((line) => line.linen_item_id) },
+    }),
   );
+  if (!parsed.ok) return { ok: false, reason: parsed.reason };
+  const lines = parsed.lines;
 
-  const seen = new Set<string>();
-  const lines: LinenConsoleLineInput[] = [];
-  for (const raw of input.lines ?? []) {
-    const itemId = String(raw?.itemId ?? "").trim();
-    const quantity = Number(raw?.quantity);
-    if (!itemId || !validItemIds.has(itemId)) return { ok: false, reason: "invalid_item" };
-    if (!Number.isInteger(quantity) || quantity <= 0) return { ok: false, reason: "invalid_quantity" };
-    if (seen.has(itemId)) return { ok: false, reason: "duplicate_item" };
-    seen.add(itemId);
-    lines.push({ itemId, quantity });
-  }
-  if (lines.length === 0) return { ok: false, reason: "missing_items" };
-
+  // 머리 · 품목 줄을 한 트랜잭션으로(반쪽 저장 없음) + 동시 수정 막기. 등록 시각 · 등록자는 DB 트리거가 지킨다.
   const note = input.note.trim();
-  const headerUpdate: Database["public"]["Tables"]["linen_return_records"]["Update"] = {
-    building_name: building,
-    note: note || null,
-    image_urls: photos,
-  };
-  const { error: headerError } = await supabase
-    .from("linen_return_records")
-    .update(headerUpdate)
-    .eq("id", record.id)
-    .eq("organization_id", session.organization.id);
-  if (headerError) return { ok: false, reason: "error" };
+  const { error: saveError } = await supabase.rpc("linen_update_return", {
+    p_record_id: record.id,
+    p_expected_updated_at: input.updatedAt ?? null,
+    p_building: building,
+    p_note: note,
+    p_image_urls: photos,
+    p_lines: lines,
+  });
+  if (saveError) {
+    const reason = linenRpcErrorReason(saveError.message);
+    if (reason && reason !== "too_many_photos_merged") return { ok: false, reason };
+    return { ok: false, reason: "error" };
+  }
 
-  const replaced = await replaceLinenRecordLines(supabase, record.id, lines);
-  if (!replaced.ok) return { ok: false, reason: "error" };
 
   await writeAudit({
     organizationId: session.organization.id,
@@ -216,7 +233,7 @@ export async function updateAdminLinenRecord(input: {
         building_name: record.building_name,
         note: record.note,
         photo_count: (record.image_urls ?? []).length,
-        lines: replaced.before.map((l) => ({ item_id: l.linen_item_id, quantity: l.quantity })),
+        lines: beforeLines.map((l) => ({ item_id: l.linen_item_id, quantity: l.quantity })),
       },
       after: {
         building_name: building,
@@ -245,12 +262,17 @@ export async function deleteAdminLinenRecord(recordId: string): Promise<LinenCon
     .select("linen_item_id, quantity")
     .eq("return_record_id", record.id);
 
-  const { error } = await supabase
+  // 지워진 행 수를 본다 — RLS 가 막으면 오류 없이 0행이다.
+  const { data: deleted, error } = await supabase
     .from("linen_return_records")
     .delete()
     .eq("id", record.id)
-    .eq("organization_id", session.organization.id);
+    .eq("organization_id", session.organization.id)
+    .select("id");
   if (error) return { ok: false, reason: "error" };
+  // 오류 없이 0행 = RLS 가 막았다(권한이 그사이 바뀜 등).
+  if (!deleted || deleted.length === 0) return { ok: false, reason: "forbidden" };
+
 
   await writeAudit({
     organizationId: session.organization.id,
@@ -389,14 +411,53 @@ function isEmpty(payload: LinenExportPayload): boolean {
   return payload.records.length === 0;
 }
 
+function cleanFilter(value: unknown): string {
+  return typeof value === "string" && value.length > 0 && value.length <= 200 ? value : "all";
+}
+
+/**
+ * 내보낼 표를 서버에서 다시 만든다 — 콘솔은 기간 · 보기 · 필터만 보낸다(클라이언트가 보낸 행은 받지 않는다).
+ * 기간은 화면과 같은 규칙(달력 날짜 · 366일 상한), 조회는 세션 조직 범위의 getAdminLinenReturns.
+ */
+async function loadExportPayload(
+  session: AppSession,
+  query: LinenExportQuery,
+  meta: AdminExportMeta,
+): Promise<LinenExportPayload | null> {
+  if (!hasOrganizationContext(session)) return null;
+  if (!isValidIsoDate(String(query?.from)) || !isValidIsoDate(String(query?.to))) return null;
+  const range = clampLinenRange(query.from, query.to);
+  const data = await getAdminLinenReturns(
+    session,
+    range.from,
+    range.to,
+    getDictionary(meta.locale).cleaning.buildingLabels,
+  );
+  if (data.loadError) return null;
+  return buildLinenExportPayload(
+    data,
+    {
+      from: range.from,
+      to: range.to,
+      view: query.view === "items" ? "items" : "records",
+      building: cleanFilter(query.building),
+      item: cleanFilter(query.item),
+      registrant: cleanFilter(query.registrant),
+    },
+    meta.localeTag,
+  );
+}
+
 export async function exportLinenReturnWorkbook(
-  payload: LinenExportPayload,
+  query: LinenExportQuery,
 ): Promise<AdminWorkbookExportResult> {
   const session = await requireAdminSession();
-  if (isEmpty(payload)) return { ok: false, reason: "empty" };
 
   try {
     const meta = buildAdminExportMeta(session);
+    const payload = await loadExportPayload(session, query, meta);
+    if (!payload) return { ok: false, reason: "error" };
+    if (isEmpty(payload)) return { ok: false, reason: "empty" };
     const sheets = sheetsOf(payload, meta);
     const base64 = await buildAdminTableWorkbookBase64({
       orgName: meta.orgName,
@@ -415,13 +476,15 @@ export async function exportLinenReturnWorkbook(
 }
 
 export async function exportLinenReturnReport(
-  payload: LinenExportPayload,
+  query: LinenExportQuery,
 ): Promise<AdminReportExportResult> {
   const session = await requireAdminSession();
-  if (isEmpty(payload)) return { ok: false, reason: "empty" };
 
   try {
     const meta = buildAdminExportMeta(session);
+    const payload = await loadExportPayload(session, query, meta);
+    if (!payload) return { ok: false, reason: "error" };
+    if (isEmpty(payload)) return { ok: false, reason: "empty" };
     const html = buildAdminTableReportHtml({
       orgName: meta.orgName,
       generatedLabel: meta.generatedLabel,

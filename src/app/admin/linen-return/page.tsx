@@ -5,6 +5,7 @@ import {
   getAdminLinenReturns,
 } from "@/lib/admin-linen-returns";
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
+import { clampLinenRange } from "@/lib/linen-return-rules";
 import { isValidIsoDate } from "@/lib/linen-returns";
 import { getDictionary, getLocalizedText, localizedNavigationLabels } from "@/lib/i18n";
 
@@ -24,9 +25,11 @@ export default async function AdminLinenReturnPage({
 
   const locale = session.user.preferredLanguage;
   const fallback = defaultRangeTokyo();
-  const from =
-    typeof params.from === "string" && isValidIsoDate(params.from) ? params.from : fallback.from;
-  const to = typeof params.to === "string" && isValidIsoDate(params.to) ? params.to : fallback.to;
+  // 거꾸로면 바로잡고 366일을 넘으면 끝 날짜 기준으로 자른다 — 데이터 층(getAdminLinenReturns)과 같은 함수라 화면 기간과 조회 기간이 같다.
+  const { from, to } = clampLinenRange(
+    typeof params.from === "string" && isValidIsoDate(params.from) ? params.from : fallback.from,
+    typeof params.to === "string" && isValidIsoDate(params.to) ? params.to : fallback.to,
+  );
 
   // 건물 표기는 청소·분실물·수리 콘솔과 같은 사전을 쓴다(모바일 린넨 화면과도 동일).
   const data = await getAdminLinenReturns(
@@ -45,10 +48,10 @@ export default async function AdminLinenReturnPage({
         data={data}
         defaultFrom={fallback.from}
         defaultTo={fallback.to}
-        from={from <= to ? from : to}
+        from={from}
         locale={locale}
         organizationId={session.organization.id}
-        to={from <= to ? to : from}
+        to={to}
       />
     </AdminShell>
   );

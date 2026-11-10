@@ -4,6 +4,7 @@ import { getDictionary, type Locale } from "@/lib/i18n";
 import { getActiveRoomCatalogServer } from "@/lib/rooms";
 import type { AppSession } from "@/lib/session";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { isCalendarYmd, tokyoDayEndExclusive, tokyoDayStart, tokyoToday } from "@/lib/tokyo-date";
 import type { Database } from "@/types/database";
 
 // 기본으로 심어 둔 카탈로그 행은 안정적인 `code` 를 가지며, 그 현지화 라벨을 보여 준다.
@@ -35,6 +36,8 @@ export type LinenReturnRecord = {
   imageUrls: string[];
   registeredAt: string;
   registeredByUserId: string;
+  /** 동시 수정 막기용 — 수정 폼이 hidden `updatedAt` 으로 돌려보낸다(DB 함수 linen_update_return). */
+  updatedAt: string;
   registrantName: string;
   lines: LinenReturnLine[];
   totalQuantity: number;
@@ -63,21 +66,17 @@ function isOrganizationRole(role: Role): boolean {
 export type TokyoYearMonth = { year: number; month: number }; // month: 1-12
 
 export function getCurrentTokyoYearMonth(): TokyoYearMonth {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Tokyo",
-    year: "numeric",
-    month: "2-digit",
-  }).formatToParts(new Date());
-  const year = Number(parts.find((p) => p.type === "year")?.value);
-  const month = Number(parts.find((p) => p.type === "month")?.value);
+  const [year, month] = tokyoToday().split("-").map(Number);
   return { year, month };
 }
 
-// JST 는 UTC+9: 1일 00:00 JST 는 그보다 9시간 앞선 UTC 시점이다.
-function tokyoMonthRange({ year, month }: TokyoYearMonth) {
-  const from = new Date(Date.UTC(year, month - 1, 1, -9, 0, 0)).toISOString();
-  const to = new Date(Date.UTC(year, month, 1, -9, 0, 0)).toISOString();
-  return { from, to };
+function monthKey({ year, month }: TokyoYearMonth): string {
+  return `${year}-${String(month).padStart(2, "0")}-01`;
+}
+
+// 도쿄 1일 0시 ~ 다음 달 1일 0시(반열린 구간) — 공용 src/lib/tokyo-date.ts 경계.
+function tokyoMonthRange(period: TokyoYearMonth) {
+  return { from: tokyoDayStart(monthKey(period)), to: tokyoDayStart(monthKey(shiftTokyoMonth(period, 1))) };
 }
 
 export function shiftTokyoMonth(ym: TokyoYearMonth, delta: number): TokyoYearMonth {
@@ -229,6 +228,7 @@ async function hydrateRecords(
       imageUrls: record.image_urls ?? [],
       registeredAt: record.registered_at,
       registeredByUserId: record.registered_by_user_id,
+      updatedAt: record.updated_at,
       registrantName: registrantNames.get(record.registered_by_user_id) ?? "",
       lines: recordLines,
       totalQuantity: recordLines.reduce((sum, l) => sum + l.quantity, 0),
@@ -306,20 +306,12 @@ export async function getLinenLedgerRecords(
 
 // 도쿄 날짜 범위 포함 구간 [startDate 00:00 JST, endDate+1 00:00 JST).
 function tokyoDayRange(startDate: string, endDate: string) {
-  const [sy, sm, sd] = startDate.split("-").map(Number);
-  const [ey, em, ed] = endDate.split("-").map(Number);
-  const from = new Date(Date.UTC(sy, sm - 1, sd, -9, 0, 0)).toISOString();
-  const to = new Date(Date.UTC(ey, em - 1, ed + 1, -9, 0, 0)).toISOString();
-  return { from, to };
+  return { from: tokyoDayStart(startDate), to: tokyoDayEndExclusive(endDate) };
 }
 
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-
+/** 달력에 있는 YYYY-MM-DD 인가 — 공용 `isCalendarYmd` 와 같다(예전 이름 유지). */
 export function isValidIsoDate(value: string): boolean {
-  if (!ISO_DATE.test(value)) return false;
-  const [y, m, d] = value.split("-").map(Number);
-  const date = new Date(y, m - 1, d);
-  return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d;
+  return isCalendarYmd(value);
 }
 
 /** 명시적으로 포함하는 도쿄 날짜 범위의 건물별 기록(원장 사용자 지정 기간). */

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { LinenLoadError } from "@/components/linen-return/linen-load-error";
 import { LinenReturnDetailActions } from "@/components/linen-return/linen-return-detail-actions";
 import { LightboxThumbs } from "@/components/shell/lightbox-thumbs";
 import "@/components/linen-return/linen-mobile.css";
@@ -9,7 +10,7 @@ import { getDictionary, type Locale } from "@/lib/i18n";
 import { canManageLinenRecord, getLinenReturnRecordById } from "@/lib/linen-returns";
 import { getMobileNavBadges } from "@/lib/nav-badges";
 import { getOnboardingState } from "@/lib/onboarding";
-import { localizePropertyName } from "@/lib/room-label-normalization";
+import { localizeBuildingName } from "@/lib/room-label-normalization";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 
 type PageProps = {
@@ -48,7 +49,22 @@ export default async function LinenReturnDetailPage({ params, searchParams }: Pa
     redirect("/mobile/unavailable");
   }
 
-  const record = await getLinenReturnRecordById(session, id);
+  let record;
+  try {
+    record = await getLinenReturnRecordById(session, id);
+  } catch {
+    // 조회 실패는 「기록 없음」으로 튕기지 않고 화면 안에서 안내한다.
+    const dictOnFail = getDictionary(session.user.preferredLanguage);
+    const badgesOnFail = await navBadgesPromise.catch(() => undefined);
+    return (
+      <MobileShell activeItem="linen-return" badges={badgesOnFail} title={dictOnFail.linenReturn.detailTitle}>
+        <LinenLoadError
+          copy={dictOnFail.linenReturn}
+          retryHref={`/mobile/linen-return/record/${encodeURIComponent(id)}${query.building ? `?building=${encodeURIComponent(query.building)}` : ""}`}
+        />
+      </MobileShell>
+    );
+  }
   if (!record) {
     redirect("/mobile/linen-return");
   }
@@ -56,7 +72,7 @@ export default async function LinenReturnDetailPage({ params, searchParams }: Pa
   const locale = session.user.preferredLanguage;
   const dict = getDictionary(locale);
   const copy = dict.linenReturn;
-  const buildingLabel = localizePropertyName(record.buildingName, dict.cleaning.buildingLabels);
+  const buildingLabel = localizeBuildingName(record.buildingName, dict.cleaning.buildingLabels);
   const canManage = canManageLinenRecord(session, record);
   const errorMessage = query.error ? copy.errors[query.error] ?? null : null;
 
@@ -72,7 +88,7 @@ export default async function LinenReturnDetailPage({ params, searchParams }: Pa
         <div className="lnw-detail__kick">
           <span>{buildingLabel}</span>
           <span>{copy.eyebrow}</span>
-          {canManage ? <LinenReturnDetailActions building={record.buildingName} copy={copy} recordId={record.id} /> : null}
+          {canManage ? <LinenReturnDetailActions building={record.buildingName} copy={copy} errorCode={query.error} recordId={record.id} /> : null}
         </div>
         <h1 className="lnw-detail__t">{formatDateTime(record.registeredAt, locale)}</h1>
         <p className="lnw-detail__s">{copy.wRegBy.replace("{who}", record.registrantName)}</p>

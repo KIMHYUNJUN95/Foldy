@@ -28,13 +28,11 @@ import "@/components/admin/lost-found/lost-found-console.css";
 import "@/components/admin/orders/orders-console.css";
 import "./linen-console.css";
 import {
-  aggregateByItem,
   buildingOptionsOf,
-  fmtDateTime,
+  linenSaveFailureOutcome,
   localeTagOf,
-  quantityByItemOf,
   registrantOptionsOf,
-  type LinenExportPayload,
+  type LinenExportQuery,
   type LinenFilters,
 } from "./linen-console-data";
 import { LinenRecordList } from "./linen-record-list";
@@ -87,10 +85,10 @@ export function LinenReturnConsole({
   const { records, items, buildings, loadError } = data;
 
   const buildingOptions = useMemo(
-    () => buildingOptionsOf(records, buildings),
-    [records, buildings],
+    () => buildingOptionsOf(records, buildings, localeTag),
+    [records, buildings, localeTag],
   );
-  const registrantOptions = useMemo(() => registrantOptionsOf(records), [records]);
+  const registrantOptions = useMemo(() => registrantOptionsOf(records, localeTag), [records, localeTag]);
 
   // 기간은 이미 서버 쿼리에서 적용됐다. 여기서는 건물/품목/등록자만 좁힌다.
   const scopedRecords = useMemo(
@@ -135,58 +133,16 @@ export function LinenReturnConsole({
   const hasFilter =
     filters.building !== "all" || filters.registrant !== "all" || (view !== "items" && filters.item !== "all");
 
-  // 내보내기 payload — 화면에 그린 것과 같은 값(기간 · 필터 · 두 뷰의 표)을 그대로 담는다.
+  // 내보내기는 기간 · 보기 · 필터만 보낸다 — 표는 서버가 같은 규칙(buildLinenExportPayload)으로 다시 만든다(2026-11-10).
   // 로케일은 서버가 세션에서 정하므로 여기서 넘기지 않는다(공용 export 계약).
-  const exportPayload = useMemo<LinenExportPayload>(() => {
-    // 품목 필터는 「기록」 뷰에서만 노출된다. 「품목별 수량」 뷰에서는 화면에 적용되지 않으므로
-    // 내보내기에서도 적용하지 않는다 — 파일이 화면과 다른 조건으로 나가지 않게.
-    const itemApplied = view !== "items" && filters.item !== "all";
-    const exportRecords = itemApplied ? listRecords : scopedRecords;
-    const scope = [
-      buildingFilterLabel,
-      itemApplied ? itemFilterName : null,
-      filters.registrant === "all"
-        ? null
-        : (registrantOptions.find((option) => option.id === filters.registrant)?.name ?? null),
-    ].filter(Boolean);
-    const allQuantities = filters.building === "all" ? null : quantityByItemOf(allBuildingRecords);
-    return {
-      from,
-      to,
-      building: buildingFilterLabel,
-      scopeLabel: scope.join(" · "),
-      records: exportRecords.map((record) => ({
-        registeredAt: fmtDateTime(record.registeredAt),
-        building: record.buildingLabel,
-        items: record.lines.map((line) => `${line.name} ${line.quantity}`).join(" · "),
-        kinds: record.lines.length,
-        totalQuantity: record.totalQuantity,
-        registrant: record.registrantName,
-        note: record.note ?? "",
-      })),
-      items: aggregateByItem(scopedRecords, items).map((row) => ({
-        name: row.name,
-        quantity: row.quantity,
-        allBuildingQuantity: allQuantities ? (allQuantities.get(row.itemId) ?? 0) : null,
-        recordCount: row.recordCount,
-        lastAt: row.lastAt ? fmtDateTime(row.lastAt) : null,
-      })),
-    };
-  }, [
-    allBuildingRecords,
-    buildingFilterLabel,
-    filters.building,
-    filters.item,
-    filters.registrant,
+  const exportQuery: LinenExportQuery = {
     from,
-    itemFilterName,
-    items,
-    listRecords,
-    registrantOptions,
-    scopedRecords,
     to,
     view,
-  ]);
+    building: filters.building,
+    item: filters.item,
+    registrant: filters.registrant,
+  };
 
   function applyRange(nextFrom: string, nextTo: string) {
     setSelectedId(null);
@@ -209,9 +165,19 @@ export function LinenReturnConsole({
   function handleSave(payload: LinenEditPayload) {
     if (!selected) return;
     startTransition(async () => {
-      const result = await updateAdminLinenRecord({ recordId: selected.id, ...payload });
+      const result = await updateAdminLinenRecord({ recordId: selected.id, updatedAt: selected.updatedAt, ...payload });
       if (!result.ok) {
-        showToast(linen.errors[result.reason] ?? t.tError);
+        showToast(
+          result.reason === "stale"
+            ? t.tStale
+            : result.reason === "invalid_photo"
+              ? t.ePhotoInvalid
+              : (linen.errors[result.reason] ?? t.tError),
+        );
+        // 그사이 바뀐 · 사라진 기록이면 수정 창을 닫고 상세 패널을 새 값으로 다시 그린다(예전 입력값으로 덮어쓰지 않게).
+        const outcome = linenSaveFailureOutcome(result.reason);
+        if (outcome.closeEditor) setEditOpen(false);
+        if (outcome.refresh) router.refresh();
         return;
       }
       setEditOpen(false);
@@ -305,10 +271,10 @@ export function LinenReturnConsole({
         value={filters.registrant}
       />
       <AdminExportButtons
-        disabled={loadError || exportPayload.records.length === 0}
+        disabled={loadError || visible.length === 0}
         labels={shared}
-        onExportPdf={() => exportLinenReturnReport(exportPayload)}
-        onExportXls={() => exportLinenReturnWorkbook(exportPayload)}
+        onExportPdf={() => exportLinenReturnReport(exportQuery)}
+        onExportXls={() => exportLinenReturnWorkbook(exportQuery)}
         onToast={showToast}
       />
     </div>

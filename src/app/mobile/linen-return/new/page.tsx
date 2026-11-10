@@ -7,7 +7,7 @@ import { getDictionary } from "@/lib/i18n";
 import { getActiveLinenItems, getLinenBuildings, getLinenBuildingStats, isKnownBuilding } from "@/lib/linen-returns";
 import { getMobileNavBadges } from "@/lib/nav-badges";
 import { getOnboardingState } from "@/lib/onboarding";
-import { localizePropertyName } from "@/lib/room-label-normalization";
+import { localizeBuildingName } from "@/lib/room-label-normalization";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 
 type PageProps = {
@@ -42,7 +42,7 @@ export default async function LinenReturnNewPage({ searchParams }: PageProps) {
   const locale = session.user.preferredLanguage;
   const dict = getDictionary(locale);
   const copy = dict.linenReturn;
-  const buildingLabel = localizePropertyName(building, dict.cleaning.buildingLabels);
+  const buildingLabel = localizeBuildingName(building, dict.cleaning.buildingLabels);
 
   const [items, navBadges, allBuildings, stats] = await Promise.all([
     getActiveLinenItems(session, building),
@@ -53,7 +53,7 @@ export default async function LinenReturnNewPage({ searchParams }: PageProps) {
   const today = new Intl.DateTimeFormat(locale, { month: "long", day: "numeric", weekday: "short", timeZone: "Asia/Tokyo" }).format(new Date());
   const buildingOptions = allBuildings.map((name) => ({
     name,
-    label: localizePropertyName(name, dict.cleaning.buildingLabels),
+    label: localizeBuildingName(name, dict.cleaning.buildingLabels),
     monthCount: stats[name]?.count ?? 0,
   }));
 

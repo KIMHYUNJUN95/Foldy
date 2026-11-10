@@ -64,7 +64,7 @@ export function LinenDetailPanel({ record, t, units, localeTag, disabled, onClos
                 </button>
               ) : null}
               <button aria-label={t.close} className="panel__x" onClick={onClose} type="button">
-                <X />
+                <X aria-hidden="true" />
               </button>
             </span>
           </div>
@@ -154,11 +154,43 @@ export function LinenEditModal({ record, t, errors, catalog, buildings, localeTa
   const [formError, setFormError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const busy = saving || uploading;
 
+  // 창이 열리면 포커스를 창 안으로 옮기고, 닫히면 연 자리(「기록 수정」 단추)로 돌려준다.
+  useEffect(() => {
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    dialogRef.current?.focus();
+    return () => opener?.focus();
+  }, []);
+
+  // Esc 로 닫기 + Tab 을 창 안에 가둔다(공용 부품을 건드리지 않고 이 창 안에서만).
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape" && !busy) onCancel();
+      if (e.key === "Escape" && !busy) {
+        onCancel();
+        return;
+      }
+      if (e.key !== "Tab" || !dialogRef.current) return;
+      const focusables = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]):not([tabindex="-1"]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((el) => el.offsetParent !== null || el === document.activeElement);
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement;
+      if (e.shiftKey && (active === first || active === dialogRef.current)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      } else if (!dialogRef.current.contains(active)) {
+        e.preventDefault();
+        first.focus();
+      }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -194,12 +226,17 @@ export function LinenEditModal({ record, t, errors, catalog, buildings, localeTa
     if (files.some((f) => f.size > MAX_BYTES)) return setFormError(tpl(t.ePhotoSize, { max: Math.round(MAX_BYTES / (1024 * 1024)) }));
     if (photoCount + files.length > MAX_PHOTOS) return setFormError(tpl(t.ePhotoLimit, { max: MAX_PHOTOS }));
     setFormError(null);
-    const items = await Promise.all(
-      files.map(async (file) => {
-        const compressed = await compressImageFile(file);
-        return { id: `${Date.now()}-${Math.random()}`, file: compressed, previewUrl: URL.createObjectURL(compressed) };
-      }),
-    );
+    let items: PreviewItem[];
+    try {
+      items = await Promise.all(
+        files.map(async (file) => {
+          const compressed = await compressImageFile(file);
+          return { id: `${Date.now()}-${Math.random()}`, file: compressed, previewUrl: URL.createObjectURL(compressed) };
+        }),
+      );
+    } catch {
+      return setFormError(t.ePhotoCompress);
+    }
     setPending((prev) => [...prev, ...items]);
   }
 
@@ -216,6 +253,10 @@ export function LinenEditModal({ record, t, errors, catalog, buildings, localeTa
         setUploading(false);
         return setFormError(errors.save_failed);
       }
+      // 올린 사진은 이제 저장소 주소다 — 저장이 거절돼 다시 눌러도 같은 파일을 또 올리지 않게 바로 옮겨 둔다.
+      for (const item of pending) URL.revokeObjectURL(item.previewUrl);
+      setPhotos(nextPhotos);
+      setPending([]);
       setUploading(false);
     }
     setFormError(null);
@@ -225,7 +266,7 @@ export function LinenEditModal({ record, t, errors, catalog, buildings, localeTa
   return (
     <>
       <div className="modal-scrim on" onClick={busy ? undefined : onCancel} />
-      <div aria-labelledby="lnm-title" aria-modal="true" className="modal on lfm owm lnm" role="dialog">
+      <div aria-labelledby="lnm-title" aria-modal="true" className="modal on lfm owm lnm" ref={dialogRef} role="dialog" tabIndex={-1}>
         <div className="lfm__h">
           <h2 id="lnm-title">{t.wEditTitle}</h2>
           <span>{tpl(t.wEditSub, { when: whenOf(record, localeTag), who: record.registrantName })}</span>

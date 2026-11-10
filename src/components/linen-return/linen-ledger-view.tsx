@@ -7,6 +7,7 @@ import { useMemo, useRef, useState, useEffect } from "react";
 import Link from "next/link";
 import { Check, ChevronDown } from "lucide-react";
 import type { Dictionary, Locale } from "@/lib/i18n";
+import { aggregateWithCatalog } from "@/lib/linen-mobile-form";
 import type { LinenItemOption, LinenReturnRecord } from "@/lib/linen-returns";
 
 type LinenLedgerViewProps = {
@@ -85,7 +86,7 @@ export function LinenLedgerView({
         agg.set(l.itemId, entry);
       }
     }
-    return Array.from(agg.values()).sort((a, b) => b.qty - a.qty);
+    return Array.from(agg, ([id, v]) => ({ id, ...v })).sort((a, b) => b.qty - a.qty);
   }, [filtered, itemId]);
   const maxQty = aggregate.length ? aggregate[0].qty : 1;
 
@@ -96,15 +97,7 @@ export function LinenLedgerView({
 
   const buildingParam = encodeURIComponent(building);
   // 품목 집계: 반품이 없던 품목도 0 으로 보여 준다(「반품 없음」과 「품목 없음」을 구분 — PC 품목별 수량과 같다).
-  const aggRows = (() => {
-    const rows = [...aggregate];
-    if (!itemId) {
-      for (const it of catalog) {
-        if (!rows.some((r) => r.name === it.name)) rows.push({ name: it.name, qty: 0, count: 0 });
-      }
-    }
-    return rows;
-  })();
+  const aggRows = itemId ? aggregate : aggregateWithCatalog(aggregate, catalog);
 
   return (
     <div className="lnw-ledger" ref={wrapRef}>
@@ -201,8 +194,8 @@ export function LinenLedgerView({
             </div>
           ) : (
             <div className="lnw-agg">
-              {aggRows.map((row, idx) => (
-                <div className={`lnw-agg__row${row.qty === 0 ? " is-zero" : ""}`} key={`${row.name}-${idx}`}>
+              {aggRows.map((row) => (
+                <div className={`lnw-agg__row${row.qty === 0 ? " is-zero" : ""}`} key={row.id}>
                   <div className="lnw-agg__h">
                     <span>{row.name}</span>
                     <span className="num">

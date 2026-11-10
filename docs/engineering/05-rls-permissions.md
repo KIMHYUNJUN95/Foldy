@@ -602,18 +602,21 @@ All tables below follow the standard org-isolation base: a row is accessible onl
 Implemented.
 
 - Read: all active org members (platform-admin bypass).
-- Create / update / delete: admin-capable roles (owner, office_admin, cs_staff, field_manager) plus platform admin — manage the item master. (Admin UI deferred; RLS is ready.)
+- Create / update / delete: `linen.manage` (role defaults: owner, senior_managing_director, office_admin, cs_staff, field_manager) plus platform admin — manage the item master. (Admin UI deferred; RLS is ready.)
 
 ## linen_return_records
 
 - Read: all active org members.
-- Create: all active org members.
-- Update / delete: author-only, plus admin-capable roles.
+- Create: all active org members, `registered_by_user_id = auth.uid()`.
+- Update / delete: the author **while an active member** (2026-11-10), plus `linen.manage` and platform admin.
+- Evidence columns (`registered_at`, `registered_by_user_id`): trigger forces `now()` / the caller on insert and blocks changes on update (service_role passes). 2026-11-10, `202611100002`.
+- Writes from the app go through `linen_submit_return` (same-day merge, submission-id idempotent) and `linen_update_return` (edit, `updated_at` check). Both are SECURITY INVOKER, so the policies above apply unchanged.
 
 ## linen_return_record_items
 
 - Read: follows parent `linen_return_records` visibility.
-- Create / update / delete: same mutation rule as the parent record (author or admin-capable roles).
+- Create / update / delete: same mutation rule as the parent record (author while an active member, `linen.manage`, platform admin). UPDATE has the same WITH CHECK (2026-11-10).
+- `linen_item_id` must belong to the record's organization (trigger, 2026-11-10).
   - 2026-10-19: 초기 마이그레이션(202606100002)의 INSERT 정책만 「작성자 본인」으로 좁아 문서와 달랐다 —
     관리자가 남의 기록 품목을 고치면 DELETE 만 되고 INSERT 가 막혀 품목이 사라졌다. `202610190014` 가
     INSERT 를 UPDATE · DELETE 와 같은 범위(작성자 + 관리 역할 + 플랫폼 관리자)로 맞춘다.
@@ -1536,6 +1539,9 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 - 공지 사진(`announcement-images`) 업로드 = 역할 비교 대신 `announcement.create`(사람마다 켠 작성 권한으로 사진도).
 - 경로 첫 칸(조직 id)은 정규식이 맞을 때만 uuid 로 바꿔 `has_capability` 에 넘긴다(틀리면 null → 권한 없음).
 - 검증: 운영에서 트랜잭션 안에 데모 계정을 아르바이트로 바꿔 흉내 → 요청 사진 업로드 성공, 공지 사진 업로드 거절 → rollback.
+- **2026-11-10 보강(`202611100002`, 운영 미적용):** 이 마이그레이션이 폴더 목록에서 `linen-returns` 를 빠뜨려 린넨 반품 사진 올리기 · 지우기가
+  막혀 있었다. 같은 정책 이름 · 같은 다른 조건으로 다시 만들고 `linen-returns` 만 더했다. 지우기는 그 폴더에서 「내가 올린 것 또는 `linen.manage`」,
+  다른 폴더는 그대로(내 것 또는 `request.delete_any`).
 
 ## 2026-10-22 청소 배정 담당 바꾸기 — `cleaning.assign_swap`
 

@@ -1,9 +1,9 @@
 # foldy-checkin
 
-셀프 체크인 손님 웹 + 서버 API. Foldy 와 **따로** 빌드 · 배포한다(Vercel 프로젝트 `foldy-checkin`, Root Directory `apps/checkin`).
+셀프 체크인 손님 웹 + 서버 API. Foldy 와 **따로** 빌드 · 배포한다(Vercel 프로젝트 `foldy-checkin`, Root Directory `apps/checkin`). Vercel 에서는 루트 고정을 끄고 webpack 으로 빌드한다(`next.config.ts` · `vercel.json`, 이유는 `docs/engineering/16` §7).
 
 - 설계: `docs/engineering/16-self-checkin-technical-design.md` · 요구: `docs/product/44-self-checkin-prd.md`
-- DB: 같은 Supabase 의 `checkin` 스키마(`supabase/migrations/202611020001_checkin_schema.sql`, 초안 — 운영 미적용)
+- DB: 같은 Supabase 의 `checkin` 스키마(`supabase/migrations/202611020001_checkin_schema.sql` 외, 운영 적용 2026-11-10)
 - 환경 변수(서버 전용): `SUPABASE_URL` · `SUPABASE_SERVICE_ROLE_KEY` · `LIVEKIT_URL` · `LIVEKIT_API_KEY` · `LIVEKIT_API_SECRET`(직원 통화, 없으면 호출이 `unconfigured`, 운영 URL 은 `wss://` 필수)
 
 ```bash

@@ -5,7 +5,7 @@ import { officeAdminAssignableRoles } from "@/config/roles";
 import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
 import { DEFAULT_INVITE_MAX_USES, buildInviteName, defaultInviteExpiry, generateInviteCode } from "@/lib/invite-code-gen";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
-import { isYmd, tokyoToday } from "@/lib/tokyo-date";
+import { isYmd, tokyoDayEndExclusive, tokyoToday } from "@/lib/tokyo-date";
 import { INVITE_AUDIT_TARGET, logUserAudit } from "@/lib/user-audit";
 import { actorCanManageUsersInOrg } from "@/lib/user-management-access";
 import type { Database } from "@/types/database";
@@ -29,7 +29,8 @@ export const INVITE_DEFAULT_ROLES = [
 ] as const satisfies readonly OrganizationRole[];
 
 export type InviteActor = { userId: string; role: Role };
-export type InviteError = "forbidden" | "invalid_invite" | "duplicate_code" | "save_failed";
+/** `invalid_code` — 직접 넣은 코드가 형식(6~32자 · 영문 대문자 · 숫자 · 하이픈)에 맞지 않음(2026-11-11). */
+export type InviteError = "forbidden" | "invalid_invite" | "invalid_code" | "duplicate_code" | "save_failed";
 export type InviteResult = { ok: true } | { ok: false; error: InviteError };
 
 type InviteInsert = Database["public"]["Tables"]["invite_codes"]["Insert"];
@@ -65,8 +66,18 @@ function normalizeInviteCode(value: string) {
   return value.trim().toUpperCase().replace(/\s+/g, "-");
 }
 
+/**
+ * 직접 넣는 코드의 형식(2026-11-11) — 자동 코드(`HARU-K7M2QP`, 영문 대문자 · 숫자 · 하이픈)와 같은 글자만, 6~32자.
+ * 짧은 코드는 맞혀 보기 쉽고, 한글 · 기호는 말로 불러 주거나 옮겨 적을 때 틀린다. 정리(`normalizeInviteCode`) 뒤에 본다.
+ */
+const MANUAL_INVITE_CODE = /^[A-Z0-9](?:[A-Z0-9-]{4,30})[A-Z0-9]$/;
+export function isValidManualInviteCode(code: string): boolean {
+  return MANUAL_INVITE_CODE.test(code);
+}
+
+/** 만료 = 고른 날의 **도쿄** 23:59:59(2026-11-11). 전에는 UTC 23:59:59 라 도쿄로는 다음 날 오전 8:59 까지 쓰였다. */
 function dateToExpiry(value: string) {
-  return new Date(`${value}T23:59:59.000Z`).toISOString();
+  return new Date(Date.parse(tokyoDayEndExclusive(value)) - 1000).toISOString();
 }
 
 /** 자동 생성되는 초대코드 이름을 만든 사람의 표시 언어로 쓰기 위한 조회. */
@@ -120,6 +131,7 @@ export async function createInviteCodeAs(
 
   const codeSource = organization.slug || organization.name;
   const isAutoCode = !rawCode;
+  if (!isAutoCode && !isValidManualInviteCode(normalizeInviteCode(rawCode))) return { ok: false, error: "invalid_code" };
 
   // `invite_codes.code` 는 전역 unique 다. 자동 생성 코드가 부딪히면 조용히 다시 뽑고, 사용자가
   // 직접 넣은 코드가 부딪히면 그 사실을 알려준다 — 말없이 다른 코드로 바꿔치기하면 안 된다.
@@ -163,14 +175,34 @@ export async function setInviteCodeActiveAs(
   if (!(await actorCanManageUsersInOrg(actor.userId, actor.role, input.organizationId))) {
     return { ok: false, error: "forbidden" };
   }
+  const service = getSupabaseServiceClient();
+  // 다시 켜기는 만들기와 같은 역할 확인을 거친다(2026-11-11) — 오피스 관리자가 대표가 만들어 끈 「오피스 관리자」 초대를 다시 켜면
+  // 자기가 만들 수 없는 역할을 내주는 셈이다. 끄기는 권한을 줄이는 쪽이라 확인하지 않는다.
+  if (input.active) {
+    const { data: invite, error: readError } = await service
+      .from("invite_codes")
+      .select("default_role")
+      .eq("id", input.inviteCodeId)
+      .eq("organization_id", input.organizationId)
+      .maybeSingle();
+    if (readError) return { ok: false, error: "save_failed" };
+    const defaultRole = (invite as { default_role: OrganizationRole } | null)?.default_role;
+    if (!defaultRole) return { ok: false, error: "invalid_invite" };
+    if (!(await selectableInviteRolesInOrg(actor, input.organizationId)).includes(defaultRole)) {
+      return { ok: false, error: "forbidden" };
+    }
+  }
   // 쓰기를 조직 범위로 제한한다 — 게이트는 호출자가 이 조직의 초대를 관리할 수 있다는 것만 증명할 뿐,
   // 주어진 코드가 이 조직의 것임은 증명하지 않는다. 이게 없으면 초대 관리자가 id 로 다른 조직의 코드를 켜고 끌 수 있다.
-  const { error } = await getSupabaseServiceClient()
+  const { data: changed, error } = await service
     .from("invite_codes")
     .update({ is_active: input.active })
     .eq("id", input.inviteCodeId)
-    .eq("organization_id", input.organizationId);
+    .eq("organization_id", input.organizationId)
+    .select("id");
   if (error) return { ok: false, error: "save_failed" };
+  // 바뀐 줄이 없으면(없는 코드 · 다른 조직 코드) 기록하지 않는다.
+  if (((changed ?? []) as unknown[]).length === 0) return { ok: false, error: "invalid_invite" };
   await logUserAudit({
     organizationId: input.organizationId,
     actorUserId: actor.userId,
@@ -192,12 +224,14 @@ export async function deleteInviteCodeAs(
   }
   // 완전 삭제(MVP 삭제 정책). 조직 범위. 이 코드로 이미 가입한 구성원은
   // 멤버십을 그대로 유지하며, 코드 레코드만 지워진다.
-  const { error } = await getSupabaseServiceClient()
+  const { data: removed, error } = await getSupabaseServiceClient()
     .from("invite_codes")
     .delete()
     .eq("id", input.inviteCodeId)
-    .eq("organization_id", input.organizationId);
+    .eq("organization_id", input.organizationId)
+    .select("id");
   if (error) return { ok: false, error: "save_failed" };
+  if (((removed ?? []) as unknown[]).length === 0) return { ok: false, error: "invalid_invite" };
   await logUserAudit({
     organizationId: input.organizationId,
     actorUserId: actor.userId,

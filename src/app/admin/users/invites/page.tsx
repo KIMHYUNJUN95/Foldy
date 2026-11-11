@@ -21,7 +21,7 @@ import {
 } from "@/lib/invite-code-gen";
 import { tokyoToday } from "@/lib/tokyo-date";
 import { requireAdminSession } from "@/lib/admin-session";
-import { actorCanOpenUserManagement } from "@/lib/user-management-access";
+import { actorCanManageUsersInOrg } from "@/lib/user-management-access";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import type { Database } from "@/types/database";
 
@@ -43,8 +43,8 @@ function firstParam(value: string | string[] | undefined) {
 
 export default async function AdminUsersInvitesPage({ searchParams }: PageProps) {
   const session = await requireAdminSession();
-  // /admin/users 와 같은 게이트: developer, 또는 위임된 manage_users 를 가진 조직.
-  if (!(await actorCanOpenUserManagement(session.user.id, session.user.role))) {
+  // /admin/users 와 같은 게이트 — 보여 줄 코드의 조직(세션 조직) 기준(2026-11-11). 「어느 조직에서든」이면 다른 조직 코드가 보였다.
+  if (!(await actorCanManageUsersInOrg(session.user.id, session.user.role, session.organization.id))) {
     redirect("/admin");
   }
 

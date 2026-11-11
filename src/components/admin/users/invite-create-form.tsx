@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { RefreshCw } from "lucide-react";
 import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
 import { AdminDatePicker } from "@/components/admin/shared/admin-date-picker";
 import { buildInviteName, generateInviteCode } from "@/lib/invite-code-gen";
+import { countText } from "@/lib/count-text";
 
 export type InviteCreateOrganization = {
   id: string;
@@ -37,7 +39,8 @@ export type InviteCreateFormCopy = {
 };
 
 type InviteCreateFormProps = {
-  action: (formData: FormData) => void | Promise<void>;
+  /** 서버가 결과를 돌려준다(2026-11-11) — 성공일 때만 폼을 비운다. 배너는 예전처럼 주소 쿼리(`?created=1` · `?error=키`)로 띄운다. */
+  action: (formData: FormData) => Promise<{ ok: true } | { ok: false; error: string }>;
   organizations: InviteCreateOrganization[];
   roles: { value: string; label: string }[];
   /** 도쿄 기준 오늘 (YYYY-MM-DD) — 기본 이름의 날짜와 만료일 하한. */
@@ -93,6 +96,32 @@ export function InviteCreateForm({
     setCode(generateInviteCode(organization?.codeSource ?? organization?.name ?? ""));
   }
 
+  const [pending, setPending] = useState(false);
+  const router = useRouter();
+  const pathname = usePathname();
+
+  async function submit(formData: FormData) {
+    if (pending) return;
+    setPending(true);
+    try {
+      const result = await action(formData);
+      if (!result.ok) {
+        // 실패(형식 · 중복 코드 등) — 고칠 수 있게 입력값을 그대로 두고, 배너만 띄운다.
+        router.replace(`${pathname}?error=${encodeURIComponent(result.error)}`, { scroll: false });
+        return;
+      }
+      // 같은 코드로 두 번 만들면 중복이라 막힌다 — 성공한 뒤에만 새 코드 · 새 이름으로 비운다(모바일 초대와 같게).
+      regenerateCode();
+      setNameTouched(false);
+      setName("");
+      router.replace(`${pathname}?created=1`, { scroll: false });
+    } catch {
+      /* 네트워크 실패 — 폼은 그대로 두고 다시 누를 수 있게 푼다 */
+    } finally {
+      setPending(false);
+    }
+  }
+
   function handleOrganizationChange(nextId: string) {
     setOrganizationId(nextId);
     regenerateCode(nextId);
@@ -103,12 +132,12 @@ export function InviteCreateForm({
     Math.round((Date.parse(`${expiresAt}T00:00:00+09:00`) - Date.parse(`${today}T00:00:00+09:00`)) / 86_400_000),
   );
   const expiresText = expiresAt
-    ? `${new Intl.DateTimeFormat(localeTag, { timeZone: "Asia/Tokyo", month: "long", day: "numeric" }).format(new Date(`${expiresAt}T12:00:00+09:00`))} (${copy.days.replace("{n}", String(expiresDays))})`
+    ? `${new Intl.DateTimeFormat(localeTag, { timeZone: "Asia/Tokyo", month: "long", day: "numeric" }).format(new Date(`${expiresAt}T12:00:00+09:00`))} (${countText(copy.days, expiresDays)})`
     : "—";
 
   // 화이트 리디자인(2026-10-14, 시안 Invite-PC): 이름표 칸 둘(조직 · 역할) → 자동으로 채운 값 요약 → 「세부 설정 바꾸기」로 펼쳐 덮어쓰기.
   return (
-    <form action={action} className="usi-form">
+    <form action={submit} className="usi-form" aria-busy={pending}>
       <input type="hidden" name="organizationId" value={organizationId} />
       <div className="usi-fd">
         <span className="usi-fd__l" aria-hidden="true">{copy.organization}</span>
@@ -195,7 +224,7 @@ export function InviteCreateForm({
           </div>
           <div>
             <dt>{copy.maxUsesLabel}</dt>
-            <dd className="num">{copy.times.replace("{n}", maxUses)}</dd>
+            <dd className="num">{countText(copy.times, maxUses)}</dd>
           </div>
         </dl>
       )}
@@ -212,7 +241,7 @@ export function InviteCreateForm({
       <input type="hidden" name="expiresAt" value={expiresAt} />
       <input type="hidden" name="maxUses" value={maxUses} />
 
-      <button className="usi-submit" disabled={organizations.length === 0} type="submit">
+      <button className="usi-submit" disabled={organizations.length === 0 || pending} type="submit">
         {copy.submit}
       </button>
     </form>

@@ -153,17 +153,54 @@ Delete:
 
 ## profiles
 
-Read:
+Read (2026-11-11 사용자 관리 점검 — `202611110003_user_management_hardening.sql`):
 
-- User can read their own profile.
-- Organization members can read profiles of users in the same organization directory.
-- Platform admins can read all.
+- 행 범위(RLS 「users can read own profile」)는 그대로: 본인 · 같은 조직 활성 멤버 · 플랫폼 개발자.
+- **칸 범위는 `id` · `name` · `phone_number` 만**(`authenticated` 칸 권한, 표 SELECT 회수). 동료가 보는 것은 이름 · 전화뿐이다
+  (사용자 결정). 생년월일 · 성별 · 국적 · 입사일 · 가타카나 · 영문 이름 · 삭제 시각 등은 사용자 세션으로 읽을 수 없다.
+  `select *` 도 거부된다. 칸 권한은 본인 읽기에도 걸린다 — 본인(또는 플랫폼 개발자)의 전체 행은
+  `public.read_profile(target_user_id default null)`(security definer)로만 읽는다.
+- 앱은 이 변경으로 바뀌지 않는다: 사용자 세션 읽기는 전부 `id, name` · `id, name, phone_number` · 임베드 `profiles(name)` 이고
+  (2026-11-11 전수 grep), 본인 프로필 · 세션 · 온보딩 · 계정 · 사용자 관리 · 서류 · 급여 · 연차 읽기는 service role 이다.
+  **새 코드가 사용자 세션으로 profiles 의 다른 칸을 읽으면 `permission denied` 가 난다** — service role 로 읽거나 칸을 추가하는 마이그레이션이 필요하다.
+- `anon` 은 아무것도 못 읽는다.
 
 Update:
 
-- User can update their own profile.
-- Admin-capable roles can update limited profile/admin fields if needed.
-- The "users can update own profile" policy also covers `bottom_nav_tabs` (per-user mobile bottom-bar customization); no separate policy is required.
+- **본인은 화면 설정 칸만**: `preferred_language` · `theme_preference` · `bottom_nav_tabs` · `ops_calendar_mode`(칸 권한).
+  전에는 정책에 칸 제한이 없어 본인이 `hire_date`(연차 부풀리기) · `deleted_at` · `can_generate_report` 등을 PATCH 로 바꿀 수 있었다.
+- 이름 · 전화 · 성별 · 생년월일 · 국적/이름 세 가지는 검증을 거쳐야 해서 서버 액션(service role)만 쓴다(`src/app/account/actions.ts` ·
+  `src/app/onboarding/actions.ts`). 입사일 · 리포트 권한 등 관리 칸은 service role 서버 액션 · RPC 만.
+- `authenticated` 의 insert · delete · truncate 도 회수(프로필 만들기는 온보딩 서버 액션의 service role upsert).
+
+## memberships — 마지막 대표 트리거 (2026-11-11)
+
+- `memberships_enforce_last_owner`(**AFTER** UPDATE OF role, status, organization_id OR DELETE, FOR EACH ROW) — 활성 owner 행을 강등 ·
+  비활성 · 삭제 · 조직 이동할 때 그 조직 행을 `FOR NO KEY UPDATE` 로 잠근 뒤 남은 활성 owner 를 센다. 0 이면 `raise 'last_owner'`(P0001).
+  AFTER 라 문장이 끝난 뒤 돌아 **한 문장이 owner 여러 줄을 바꾸는 경우**(한 UPDATE 로 owner 둘 정지)도 본다 — BEFORE ROW 는 같은 문장의
+  다른 줄 변경을 못 봐 놓쳤다. 두 owner 가 서로를 동시에 강등 · 정지하는 경합도 조직 행 잠금으로 막는다(앱 확인 `guardLastOwner` 는
+  친절한 오류용으로 남는다).
+- 조직 자체가 지워질 때(organizations → memberships cascade)는 조직 행이 이미 없어 통과한다. 회원 탈퇴(`deleteAccount`)의
+  「모든 멤버십 removed」도 마지막 대표면 막힌다 — 앱이 먼저 확인해 `{ error: "last_owner" }` 를 돌려준다.
+- 앱은 DB 오류 메시지 `last_owner` 를 같은 오류 키로 바꾼다(`setMemberRole` · `setMemberStatus` · `deleteMember` · `deleteAccount`).
+
+### 멤버십 변경 · 삭제는 한 거래 함수로 (2026-11-11, service role 전용)
+
+- `apply_membership_change(p_membership_id, p_actor_user_id, p_expected_role, p_role, p_status)` → `{result: ok|stale|not_found|last_owner, revoked}`:
+  멤버십 줄 잠금 → 기대 역할 확인(다르면 `stale`) → 역할 · 상태 저장(역할이 바뀌면 급여 담당 · 결재자 끄기) → 역할 변경이거나 비활성 상태면
+  이 조직의 개인 부여 · 차단 전부 회수. 함께 되거나 함께 안 된다 — 전에는 앱이 회수 → 저장을 따로 해, 뒤 단계가 실패하면 활성인데 차단(deny)만
+  사라졌다. 마지막 대표 트리거 오류는 거래 안에서 잡아 `last_owner` 로 돌려준다(아무것도 안 바뀜).
+- `delete_membership_atomic(p_membership_id, p_actor_user_id, p_delete_profile)` → `{result, revoked, profile_deleted}`: 회수 → 멤버십 삭제 →
+  (다른 조직 멤버십이 없고 요청했으면) 프로필 삭제.
+- 로그인(auth) 잠금 · 삭제는 거래에 넣을 수 없다. 순서:
+  - **정지 · 제외**: 거래 → 로그인 잠금. 잠금이 실패하면 `save_failed` 지만 DB 는 「정지 + 회수」로 맞다 — 로그인은 돼도 세션
+    (`getCurrentAppSession`: 활성 멤버십 없으면 세션 없음)과 온보딩(`suspended` 화면)이 막는다.
+  - **활성화**: 잠금 풀기 → 거래. 거래가 실패하면 원래 잠겨 있던 사람만 다시 잠근다.
+  - **완전 삭제**: 거래 → auth 삭제. auth 삭제가 실패하면 프로필 · 멤버십 없는 빈 로그인을 잠가 두고 성공으로 돌려준다
+    (전에는 auth 를 먼저 지워 로그인 없는 멤버십 · 프로필이 남을 수 있었다).
+- `join_organization_with_invite_code` 실행 권한은 service role 만(로그인 사용자 · anon 회수) — 앱은 service role 로만 부르고, 사유별 오류로
+  코드 존재를 맞혀 보는 길을 막는다. 앱도 `invite_expired` · `invite_inactive` · `invite_maxed` 를 `invalid_invite` 로 합친다(`resolveInviteRpcError`).
+- 세션 행 읽기(`getIdentityRows`)는 개인 권한 · 멤버십 · 플랫폼 관리자 중 하나라도 못 읽으면 예외(fail closed). 첫 개발자 가능 여부 개수를 못 읽으면 「불가」.
 
 ## memberships
 
@@ -192,17 +229,14 @@ Important:
 
 ## invite_codes
 
-Read:
+Read / Create / Update / Delete (2026-11-11 사용자 관리 점검):
 
-- Owner
-- Office Admin
-- Platform admins
-
-Create/update:
-
-- Owner
-- Office Admin
-- Platform admins
+- **로그인 사용자의 직접 읽기 · 쓰기 없음.** 정책 「owner office admin can manage invite codes」(FOR ALL)를 지우고 `authenticated` · `anon`
+  의 표 권한을 전부 회수했다(`202611110003_user_management_hardening.sql`). 그 정책은 `default_role` 을 보지 않아 office_admin 이
+  PostgREST 로 `default_role = 'owner'` 초대를 넣어 대표 계정을 만들 수 있었다.
+- 만들기 · 끄기 · 켜기 · 삭제는 service role 서버 함수(`src/lib/invite-codes-server.ts`), 목록 · 개수 읽기도 service role
+  (`/admin/users/invites` · `/mobile/users/invites` · `user-management-data.ts`). 코드는 가입 비밀값이라 읽기 정책도 두지 않는다.
+- 다시 켜기도 만들기와 같은 역할 확인(그 조직에서 줄 수 있는 기본 역할인가)을 거친다. 바뀐 줄이 없으면(없는 코드 · 다른 조직) 기록하지 않는다.
 
 Use:
 
@@ -218,6 +252,12 @@ As-built note (2026-06-18):
 
 - `validateInviteCode` (`src/lib/auth-invite.ts`) and the onboarding `previewInviteCode` server action read `invite_codes` (and the target `organizations.name`) via the **service role, server-side only**, and require an authenticated user — so the preview is not an open invite-probing endpoint. Preview is read-only; it does **not** consume the code.
 - Final join still goes through the atomic `join_organization_with_invite_code` RPC (increments `used_count` + creates the membership) — the preview never grants access on its own.
+- (2026-11-11) The preview returns one generic `invalid_invite` for missing / expired / inactive / exhausted / suspended-org codes
+  (no rate limit on this action, so distinct reasons would let someone probe which codes exist). The join RPC now also rejects codes
+  of a non-`active` organization, and an `invited` membership activated through it takes the code's `default_role`, honours
+  `max_uses` and increments `used_count` (it used to keep the pre-set role and skip both checks).
+- (2026-11-11) First platform-admin claim is the atomic `claim_first_platform_admin(p_user_id)` RPC (service role only; table lock →
+  count → insert), replacing the count-then-insert race in `claimFirstPlatformAdmin`.
 
 ## properties / rooms
 

@@ -84,6 +84,16 @@ export const getIdentityRows = cache(async (userId: string): Promise<IdentityRow
       .is("revoked_at", null),
   ]);
 
+  // 권한 판정에 쓰는 세 표 중 하나라도 못 읽으면 세션 · 온보딩 판정을 만들지 않는다(2026-11-11, fail closed).
+  // · 개인 부여 · 차단: 빈 목록으로 두면 차단(deny)이 사라져 막아 둔 기능이 역할 기본값으로 열린다.
+  // · 멤버십 · 플랫폼 관리자: 「없음」으로 두면 활성 직원이 「조직 가입」 온보딩으로, 개발자가 일반 계정으로 떨어진다.
+  // 요청 하나가 오류 화면이 되고 다시 시도하면 된다. 프로필은 아래 대체 읽기가 있어 그대로 둔다.
+  if (overrideRes.error || membershipRes.error || platformAdminRes.error) {
+    const failed = overrideRes.error ? "overrides" : membershipRes.error ? "memberships" : "platform_admins";
+    const message = (overrideRes.error ?? membershipRes.error ?? platformAdminRes.error)?.message ?? "";
+    throw new Error(`[identity-rows] ${failed} read failed: ${message}`);
+  }
+
   let profile = profileRes.data as IdentityProfileRow | null;
   if (profileRes.error) {
     const { data: fallbackProfile } = await service

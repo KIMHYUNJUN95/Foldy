@@ -37,7 +37,23 @@ export function InviteDeleteButton({ inviteCodeId, organizationId, labels }: Inv
       {open ? (
         <>
           <div className="modal-scrim on usw-scrim" onClick={sending ? undefined : () => setOpen(false)} />
-          <form action={deleteInviteCode} onSubmit={() => setSending(true)} className="modal on usw-modal" role="dialog" aria-modal="true" aria-labelledby={`usi-del-${inviteCodeId}`}>
+          <form
+            onSubmit={async (event) => {
+              event.preventDefault();
+              if (sending) return;
+              const data = new FormData(event.currentTarget);
+              setSending(true);
+              try {
+                // 성공 · 실패 모두 서버가 목록으로 되돌리고(redirect) 결과 줄을 띄운다. 던져도 창이 잠기지 않게 finally 로 푼다.
+                await deleteInviteCode(data);
+              } catch {
+                /* 네트워크 실패 — 창을 닫고 목록이 그대로 남는다 */
+              } finally {
+                setSending(false);
+                setOpen(false);
+              }
+            }}
+            className="modal on usw-modal" role="dialog" aria-modal="true" aria-labelledby={`usi-del-${inviteCodeId}`}>
             <input name="inviteCodeId" type="hidden" value={inviteCodeId} />
             <input name="organizationId" type="hidden" value={organizationId} />
             <div className="usw-modal__h">

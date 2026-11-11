@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { Check, Copy, Phone, Search, Users, X } from "lucide-react";
 import "./directory.css";
 import { useIsTablet } from "@/components/shell/split-list";
+import { copyTextToClipboard } from "@/lib/copy-to-clipboard";
+import { countText } from "@/lib/count-text";
 import { haptic } from "@/lib/haptics";
 import { formatPhoneDisplay, phoneHref } from "@/lib/phone-format";
 
@@ -83,7 +85,7 @@ export function DirectoryView({ people, orgName, locale, copy }: { people: Direc
         <div className="drw-h">
           <h1>{copy.title}</h1>
           <span className="num">
-            {orgName} · {copy.countUnit.replace("{n}", String(total))}
+            {orgName} · {countText(copy.countUnit, total)}
           </span>
         </div>
         <label className="drw-search">
@@ -174,13 +176,7 @@ function Profile({ person, copy, locale }: { person: DirectoryPerson; copy: Dire
     : "—";
 
   async function copyNumber() {
-    let ok = false;
-    try {
-      await navigator.clipboard.writeText(person.phone);
-      ok = true;
-    } catch {
-      ok = false;
-    }
+    const ok = await copyTextToClipboard(person.phone);
     haptic(ok ? "success" : "error");
     setCopyState(ok ? "copied" : "failed");
     window.setTimeout(() => setCopyState("idle"), 1600);

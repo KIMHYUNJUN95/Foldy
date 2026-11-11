@@ -25,7 +25,8 @@ import { getDictionary, type Locale } from "@/lib/i18n";
 import { haptic } from "@/lib/haptics";
 import { idDocChip } from "@/lib/staff-documents/chip";
 import { MAX_PRINT_PEOPLE } from "@/lib/staff-documents/print";
-import { tokyoToday } from "@/lib/tokyo-date";
+import { settleAction } from "@/lib/settle-action";
+import { tokyoDateOf, tokyoToday } from "@/lib/tokyo-date";
 
 /**
  * 사용자 콘솔 — 화이트 리디자인(2026-10-14, 시안 Users-PC · UsersGrant-PC · UsersDeact-PC).
@@ -64,6 +65,14 @@ function errorText(code: string | undefined, dict: Dict): string {
       return c.errProtected;
     case "last_owner":
       return c.errLastOwner;
+    case "stale":
+      return c.errStale;
+    case "delete_failed":
+      return c.errDeleteFailed;
+    case "invalid_member":
+      return c.errInvalidMember;
+    case "invalid_override":
+      return c.errInvalidOverride;
     case "min_one_approver":
       return c.errMinApprover;
     case "hourly_excluded":
@@ -138,7 +147,8 @@ export function UsersConsole({
   const visibleIds = useMemo(() => new Set(filtered.map((m) => m.userId)), [filtered]);
   const pickedVisible = picked.filter((id) => visibleIds.has(id));
 
-  const joined = (value: string | null) => (value ? value.slice(0, 10).replaceAll("-", ".") : "—");
+  // 가입일은 도쿄 날짜로(timestamptz 를 UTC 로 자르면 오전 0~9시 가입이 하루 전으로 보인다) — 패널의 longDate 와 같은 기준.
+  const joined = (value: string | null) => (value ? (tokyoDateOf(value) ?? "").replaceAll("-", ".") || "—" : "—");
   const open = (id: string) => router.push(`/admin/users?member=${id}`, { scroll: false });
   const close = () => router.push("/admin/users", { scroll: false });
   const filtersOn = Boolean(query || fRole || fStatus || fDoc);
@@ -388,7 +398,14 @@ function MemberPanel({
 
   function run(task: () => Promise<{ ok: boolean; error?: string }>, success: string, rollback?: () => void) {
     startTransition(async () => {
-      const result = await task();
+      const settled = await settleAction(task);
+      if (settled.thrown) {
+        haptic("error");
+        rollback?.();
+        onToast(c.errSaveFailed);
+        return;
+      }
+      const result = settled.value;
       if (result.ok) {
         haptic("success");
         onToast(success);
@@ -396,6 +413,8 @@ function MemberPanel({
         haptic("error");
         rollback?.();
         onToast(errorText(result.error, dict));
+        // 다른 사람이 먼저 바꿨다 — 화면이 보여 준 값이 낡았으니 새로 불러온다.
+        if (result.error === "stale") router.refresh();
       }
     });
   }
@@ -649,7 +668,7 @@ function MemberPanel({
                   if (value === role) return;
                   const before = optRole;
                   setOptRole(value);
-                  run(() => setMemberRole(m.membershipId, value), c.wToastRole, () => setOptRole(before));
+                  run(() => setMemberRole(m.membershipId, value, role), c.wToastRole, () => setOptRole(before));
                 }}
               />
               <span className="usw-set__k">{u.status}</span>
@@ -758,8 +777,14 @@ function MemberPanel({
               return;
             }
             startTransition(async () => {
-              const result = await deleteMember(m.membershipId);
+              const settled = await settleAction(() => deleteMember(m.membershipId));
               setConfirm(null);
+              if (settled.thrown) {
+                haptic("error");
+                onToast(c.errSaveFailed);
+                return;
+              }
+              const result = settled.value;
               if (result.ok) {
                 haptic("success");
                 onToast(c.wToastDeleted);

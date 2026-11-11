@@ -127,10 +127,16 @@ export const getOnboardingState = cache(async (): Promise<OnboardingState> => {
   const activeMemberships = memberships.filter((m) => m.status === "active");
 
   // 「처음 쓰는 사람이 플랫폼 관리자를 가져갈 수 있는가」는 준비가 안 된 경우에만 화면에 쓰인다 — 그때만 센다.
+  // 개수를 못 읽으면 「가져갈 수 있다」로 보지 않는다(2026-11-11) — 실제 등록은 claim_first_platform_admin RPC 가 다시 확인하지만,
+  // 이미 개발자가 있는 운영에서 아무에게나 「첫 개발자 되기」 버튼을 보여 주면 안 된다.
   const countCanClaimPlatformAdmin = async () => {
-    const { count } = await service
+    const { count, error } = await service
       .from("platform_admins")
       .select("id", { count: "exact", head: true });
+    if (error) {
+      console.error("[onboarding] platform admin count failed", error.message);
+      return false;
+    }
     return (count ?? 0) === 0;
   };
 

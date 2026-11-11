@@ -13,6 +13,7 @@
 import { Printer } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
+import { countText } from "@/lib/count-text";
 import { recordIdDocumentPrint } from "@/app/account/id-card/print/actions";
 import {
   PRINT_CONFIDENTIAL,
@@ -130,7 +131,7 @@ export function IdCardPrintView({
       <div className="icp-bar">
         <div className="icp-bar__row">
           <p className="icp-bar__count">
-            {people.length > 0 ? copy.printCount.replace("{n}", String(people.length)) : copy.printEmpty}
+            {people.length > 0 ? countText(copy.printCount, people.length) : copy.printEmpty}
           </p>
           {people.length > 0 ? (
             <>

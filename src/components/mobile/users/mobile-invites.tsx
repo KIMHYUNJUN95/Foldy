@@ -6,7 +6,10 @@ import { Check, ChevronRight, CircleAlert, Copy, Ellipsis, RefreshCw } from "luc
 import { createMobileInviteCode, deleteMobileInviteCode, setMobileInviteActive } from "@/app/mobile/users/actions";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { DatePickerSheet } from "@/components/shell/date-picker-sheet";
+import { copyTextToClipboard } from "@/lib/copy-to-clipboard";
+import { countText } from "@/lib/count-text";
 import { haptic } from "@/lib/haptics";
+import { settleAction } from "@/lib/settle-action";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { buildInviteName, generateInviteCode } from "@/lib/invite-code-gen";
 import { MobileUsersHead } from "./mobile-users-head";
@@ -102,15 +105,7 @@ export function MobileInvites({
   const live = rows.filter((row) => row.state === "live").length;
 
   async function copy(row: MobileInviteRow) {
-    let ok = false;
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(row.code);
-        ok = true;
-      }
-    } catch {
-      ok = false;
-    }
+    const ok = await copyTextToClipboard(row.code);
     haptic(ok ? "success" : "error");
     if (!ok) {
       show({ kind: "bad", text: c.wInvCopyFailed });
@@ -120,16 +115,24 @@ export function MobileInvites({
     window.setTimeout(() => setCopied((current) => (current === row.id ? null : current)), 1500);
   }
 
+  /** 서버 액션이 던졌을 때(네트워크 끊김) — error 햅틱 + 실패 문구. */
+  function failed() {
+    haptic("error");
+    show({ kind: "bad", text: dict.admin.users.console.errSaveFailed });
+  }
+
   function create() {
     startTransition(async () => {
-      const result = await createMobileInviteCode({
+      const settled = await settleAction(() => createMobileInviteCode({
         organizationId: orgId,
         defaultRole: role,
         code,
         name: advanced ? name : "",
         expiresAt,
         maxUses,
-      });
+      }));
+      if (settled.thrown) return failed();
+      const result = settled.value;
       if (result.ok) {
         haptic("success");
         show({ kind: "done", text: c.mInvCreated });
@@ -146,7 +149,9 @@ export function MobileInvites({
   function toggle(row: MobileInviteRow) {
     const active = row.state === "off";
     startTransition(async () => {
-      const result = await setMobileInviteActive({ inviteCodeId: row.id, organizationId: row.organizationId, active });
+      const settled = await settleAction(() => setMobileInviteActive({ inviteCodeId: row.id, organizationId: row.organizationId, active }));
+      if (settled.thrown) return failed();
+      const result = settled.value;
       if (result.ok) {
         haptic("success");
         show({ kind: "done", text: active ? c.mInvTurnedOn : c.mInvTurnedOff });
@@ -163,7 +168,12 @@ export function MobileInvites({
     setLeavingId(row.id);
     haptic("light");
     startTransition(async () => {
-      const result = await deleteMobileInviteCode({ inviteCodeId: row.id, organizationId: row.organizationId });
+      const settled = await settleAction(() => deleteMobileInviteCode({ inviteCodeId: row.id, organizationId: row.organizationId }));
+      if (settled.thrown) {
+        setLeavingId((current) => (current === row.id ? null : current));
+        return failed();
+      }
+      const result = settled.value;
       if (result.ok) {
         show({ kind: "done", text: c.mInvDeleted });
         router.refresh();
@@ -246,13 +256,13 @@ export function MobileInvites({
           {advanced ? (
             <button type="button" className="val" aria-haspopup="dialog" onClick={() => setSheet("date")}>
               <span className="num">
-                {expiresText} <span style={{ color: "#6f6c7c" }}>({c.wInvDays.replace("{n}", String(days))})</span>
+                {expiresText} <span style={{ color: "#6f6c7c" }}>({countText(c.wInvDays, days)})</span>
               </span>
               <ChevronRight className="muw-chev" aria-hidden="true" />
             </button>
           ) : (
             <b className="num">
-              {expiresText} <span style={{ color: "#6f6c7c" }}>({c.wInvDays.replace("{n}", String(days))})</span>
+              {expiresText} <span style={{ color: "#6f6c7c" }}>({countText(c.wInvDays, days)})</span>
             </b>
           )}
         </div>
@@ -267,7 +277,7 @@ export function MobileInvites({
               aria-label={c.mInvUses}
             />
           ) : (
-            <b className="num">{c.wInvTimes.replace("{n}", maxUses)}</b>
+            <b className="num">{countText(c.wInvTimes, maxUses)}</b>
           )}
         </div>
       </div>

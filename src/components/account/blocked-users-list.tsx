@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { haptic } from "@/lib/haptics";
 import { unblockBoardUser } from "@/actions/board-moderation";
 
 /** 계정 → 보안 「차단한 사용자」 — 게시판 차단 해제(2026-10-06). */
@@ -10,16 +11,27 @@ export function BlockedUsersList({
   bare = false,
 }: {
   users: { id: string; name: string }[];
-  copy: { title: string; body: string; empty: string; unblock: string; unknown: string };
+  copy: { title: string; body: string; empty: string; unblock: string; unknown: string; failed: string };
   /** 모바일 계정 화이트 리디자인 — 공용 BottomSheet 안에 넣을 때: 바깥 상자 · 제목 없이, 버튼은 옅은 회색. */
   bare?: boolean;
 }) {
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
 
   async function onUnblock(id: string) {
     setPendingId(id);
+    setFailed(false);
     try {
-      await unblockBoardUser(id); // 액션이 /account 를 revalidate — refresh 중복 금지
+      const result = await unblockBoardUser(id); // 액션이 /account 를 revalidate — refresh 중복 금지
+      if ("error" in result) {
+        haptic("error");
+        setFailed(true);
+      } else {
+        haptic("light");
+      }
+    } catch {
+      haptic("error");
+      setFailed(true);
     } finally {
       setPendingId(null);
     }
@@ -28,6 +40,11 @@ export function BlockedUsersList({
   return (
     <div className={bare ? "" : "rounded-xl border border-border px-4 py-3"}>
       {bare ? null : <p className="text-sm font-bold">{copy.title}</p>}
+      {failed ? (
+        <p className="mt-1 text-[13px] font-semibold text-destructive" role="alert">
+          {copy.failed}
+        </p>
+      ) : null}
       <p className={bare ? "text-[13px] leading-5 text-text-3" : "mt-0.5 text-xs text-muted-foreground"}>{copy.body}</p>
       {users.length === 0 ? (
         <p className={bare ? "py-6 text-center text-[13px] text-text-3" : "mt-2 text-[13px] font-semibold text-muted-foreground"}>{copy.empty}</p>

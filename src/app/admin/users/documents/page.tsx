@@ -7,7 +7,7 @@ import { hasOrganizationContext } from "@/lib/session";
 import { loadStaffDocumentRoster } from "@/lib/staff-documents/roster-server";
 import { loadCurrentIdDocument } from "@/lib/staff-documents/server";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
-import { actorCanOpenUserManagement } from "@/lib/user-management-access";
+import { actorCanManageUsersInOrg } from "@/lib/user-management-access";
 import { loadUsableInviteCount } from "@/lib/user-management-data";
 
 type PageProps = {
@@ -24,7 +24,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  */
 export default async function AdminStaffDocumentsPage({ searchParams }: PageProps) {
   const session = await requireAdminSession();
-  if (!(await actorCanOpenUserManagement(session.user.id, session.user.role))) redirect("/admin");
+  if (!(await actorCanManageUsersInOrg(session.user.id, session.user.role, session.organization.id))) redirect("/admin");
   if (!hasOrganizationContext(session) || !session.capabilities.includes("staff_documents.view")) redirect("/admin/users");
 
   const params = (await searchParams) ?? {};

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { AdminShell } from "@/components/shell/admin-shell";
 import { UsersConsole } from "@/components/admin/users/users-console";
 import { requireAdminSession } from "@/lib/admin-session";
-import { actorCanOpenUserManagement } from "@/lib/user-management-access";
+import { actorCanManageUsersInOrg } from "@/lib/user-management-access";
 import { getDictionary } from "@/lib/i18n";
 import { countDocsPeople, loadMemberPanel, loadUsableInviteCount, loadUserDirectory } from "@/lib/user-management-data";
 
@@ -18,8 +18,9 @@ type PageProps = {
  */
 export default async function AdminUsersPage({ searchParams }: PageProps) {
   const session = await requireAdminSession();
-  // 사용자 관리는 기본적으로 개발자 전용이며, 개발자가 `user.manage` 로 위임할 수 있다.
-  if (!(await actorCanOpenUserManagement(session.user.id, session.user.role))) {
+  // 문은 **보여 줄 명단의 조직(지금 세션 조직)** 기준으로 연다(2026-11-11) — 전에는 「어느 조직에서든 관리 가능」이면 열려,
+  // B 조직 대표가 A 조직(세션 조직) 명단 · 패널을 봤다. 개발자는 그대로 전부.
+  if (!(await actorCanManageUsersInOrg(session.user.id, session.user.role, session.organization.id))) {
     redirect("/admin");
   }
   const params = (await searchParams) ?? {};

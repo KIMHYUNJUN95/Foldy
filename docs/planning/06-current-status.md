@@ -4,6 +4,8 @@
 
 > 2026-10-25: 남은 일 전체(결정 대기 · 개발 순서 · 사용자 할 일 · 출시 일정)는 `docs/planning/19-open-tasks.md` 한곳에 모았다. 운영 마이그레이션은 `202610230008` 까지 전부 적용 확인.
 
+**2026-11-11 사용자 관리 점검 — 서버 · DB · 모바일 · PC** (결정 로그 2026-11-11 · 문서 05 · 04 · 01 · 04-organization-invitations · 17 · 27) — 동료의 민감한 프로필 칸(생일 · 성별 · 국적) 직접 읽기 막음(`id · name · phone_number` 만, 나머지는 `read_profile()`), 본인 프로필 직접 수정은 화면 설정 칸만(입사일로 연차 늘리기 막음), 초대 코드 브라우저 직접 쓰기 막음(사무 관리자 오너 코드 · 사용 횟수 · 만료를 가입 함수가 DB 에서 확인), 마지막 오너 삭제 · 정지 · 강등 막음(트리거), 멤버 변경 · 삭제를 DB 함수 한 트랜잭션으로(`apply_membership_change` · `delete_membership_atomic`), 화면 게이트를 지금 조직 기준으로, 읽기 실패 시 권한 없음으로, 언어 저장 · 초대 만들기 실패 시 되돌림, 역할 바꾸는 사이 다른 사람이 먼저 바꿨으면 알림, 초대 만료는 도쿄 23:59:59. 마이그레이션 `202611110003_user_management_hardening.sql` — **운영 적용은 코드 배포 바로 뒤에**(새 코드가 새 함수를 씀). 테스트 2633 · lint · build 통과. 남김: 오너 넘기기 기능 없음, ja/en 화면 직접 확인 못 함.
+
 **2026-11-11 워드마크 글꼴 저장소 파일로** (문서 design/00) — f7a75a20 배포가 Vercel 빌드에서 두 번 실패(`Can't resolve '@vercel/turbopack-next/internal/font/google/font'`, Noto Serif 만, Vercel CLI 65.14). `Noto_Serif`(next/font/google) → `next/font/local` + `src/app/fonts/noto-serif-latin(-italic).woff2`(가변 600–700, OFL). 모양 · 변수 이름(`--font-wordmark`)은 그대로.
 
 **2026-11-11 근태 · 연차 · 교통비 점검 — 서버 · DB · 모바일 · PC** (문서 21 · 24 · 26 · 39 · 11 · 04 · 05 · 05-admin-web-ia · 16) — 마감된 달 정정 요청이 급여에서 빠지던 문제, 교통비 연결 항목 트리거가 항상 실패하던 문제, 연차 FIFO 가 만료분에 사용을 넣던 문제, 승인된 연차 전 칸 노출 정책을 고쳤다. 사람 · 달 단위 잠금(`attendance_sessions_month_guard`) · 확인 함수 RPC · 연차 원자 승인 · 기준 잔여 「확인 전」 · 원래 쉬는 날 빼기(`excluded_dates`) · 본인 승인 금지 · 잔여 초과 사유 · QR 정확도 100m · 교통비 받는 달 공용 함수(`transport-month.ts`). 마이그레이션 `202611110001`(근태) · `202611110002`(연차 · 교통비) — 운영 적용 순서: 0001 → 코드 배포 → 0002. 남김: ja/en 화면 직접 확인 못 함, 리마인더 cron 은 알림 일괄 때, QR 위치 속임은 설계 한계.

@@ -17,6 +17,7 @@ import { DatePickerSheet } from "@/components/shell/date-picker-sheet";
 import { capabilityGroupOf, groupPermissionRows } from "@/config/capability-groups";
 import { isOrgTopAdmin, officeAdminAssignableRoles, organizationRoles, type Role } from "@/config/roles";
 import { haptic } from "@/lib/haptics";
+import { settleAction } from "@/lib/settle-action";
 import { formatPhoneDisplay, phoneHref } from "@/lib/phone-format";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { tokyoToday } from "@/lib/tokyo-date";
@@ -62,6 +63,14 @@ function errorText(code: string | undefined, dict: Dict): string {
       return c.errProtected;
     case "last_owner":
       return c.errLastOwner;
+    case "stale":
+      return c.errStale;
+    case "delete_failed":
+      return c.errDeleteFailed;
+    case "invalid_member":
+      return c.errInvalidMember;
+    case "invalid_override":
+      return c.errInvalidOverride;
     case "min_one_approver":
       return c.errMinApprover;
     case "hourly_excluded":
@@ -136,7 +145,14 @@ export function MobileMemberDetail({
 
   function run(task: () => Promise<{ ok: boolean; error?: string }>, success: string, rollback?: () => void, undo?: () => void) {
     startTransition(async () => {
-      const result = await task();
+      const settled = await settleAction(task);
+      if (settled.thrown) {
+        haptic("error");
+        rollback?.();
+        show({ kind: "bad", text: c.errSaveFailed });
+        return;
+      }
+      const result = settled.value;
       if (result.ok) {
         haptic("success");
         show({ kind: undo ? "undo" : "done", text: success, onUndo: undo });
@@ -144,6 +160,8 @@ export function MobileMemberDetail({
         haptic("error");
         rollback?.();
         show({ kind: "bad", text: errorText(result.error, dict) });
+        // 다른 사람이 먼저 바꿨다 — 화면이 보여 준 값이 낡았으니 새로 불러온다.
+        if (result.error === "stale") router.refresh();
       }
     });
   }
@@ -158,12 +176,12 @@ export function MobileMemberDetail({
     const before = role;
     setOptRole(next);
     run(
-      () => setMemberRole(m.membershipId, next),
+      () => setMemberRole(m.membershipId, next, before),
       c.mToastRole.replace("{role}", roleLabel(next)),
       () => setOptRole(null),
       () => {
         setOptRole(before);
-        run(() => setMemberRole(m.membershipId, before), c.mUndone, () => setOptRole(next));
+        run(() => setMemberRole(m.membershipId, before, next), c.mUndone, () => setOptRole(next));
       },
     );
   }
@@ -628,7 +646,14 @@ export function MobileMemberDetail({
                     return;
                   }
                   startTransition(async () => {
-                    const result = await deleteMember(m.membershipId);
+                    const settled = await settleAction(() => deleteMember(m.membershipId));
+                    if (settled.thrown) {
+                      haptic("error");
+                      close();
+                      show({ kind: "bad", text: c.errSaveFailed });
+                      return;
+                    }
+                    const result = settled.value;
                     if (result.ok) {
                       haptic("success");
                       close();

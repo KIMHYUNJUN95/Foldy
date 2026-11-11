@@ -28,8 +28,6 @@ import { resolveInviteRpcError } from "@/lib/invite-errors";
 import { normalizeNextPathForSurface, normalizePathForSurface } from "@/lib/surface-routing";
 import type { Database } from "@/types/database";
 
-type PlatformAdminInsert =
-  Database["public"]["Tables"]["platform_admins"]["Insert"];
 type ProfileInsert = Database["public"]["Tables"]["profiles"]["Insert"];
 
 // 프로젝트의 database.ts 는 모든 테이블에서 Relationships 를 생략해
@@ -46,6 +44,10 @@ type RpcClient = {
     fn: string,
     args: Record<string, unknown>,
   ): Promise<{ data: JoinRpcRow[] | null; error: { message: string } | null }>;
+};
+
+type ClaimRpcClient = {
+  rpc(fn: string, args: Record<string, unknown>): Promise<{ data: string | null; error: { message: string } | null }>;
 };
 
 function cleanText(value: FormDataEntryValue | null) {
@@ -95,13 +97,6 @@ type InvitePreviewResult =
   | { ok: true; organizationName: string; roleCategory: string }
   | { ok: false; errorKey: string };
 
-const INVITE_PREVIEW_ERROR_MAP: Record<string, string> = {
-  invalid: "invalid_invite",
-  expired: "invite_expired",
-  inactive: "invite_inactive",
-  maxed_out: "invite_maxed",
-};
-
 export async function previewInviteCode(
   code: string,
 ): Promise<InvitePreviewResult> {
@@ -116,12 +111,11 @@ export async function previewInviteCode(
   const trimmed = code.trim();
   if (!trimmed) return { ok: false, errorKey: "missing_invite" };
 
+  // 없음 · 만료 · 꺼짐 · 다 씀 · 정지 조직을 **같은 오류**로 돌려준다(2026-11-11) — 이 액션에는 횟수 제한이 없어, 사유가 갈리면
+  // 「이 코드는 있다(만료됐을 뿐)」를 하나씩 맞혀 볼 수 있다. 가입하는 사람에게는 「코드를 다시 확인해 달라」 한 문구면 충분하다.
   const validation = await validateInviteCode(trimmed);
   if (!validation.ok) {
-    return {
-      ok: false,
-      errorKey: INVITE_PREVIEW_ERROR_MAP[validation.error] ?? "invalid_invite",
-    };
+    return { ok: false, errorKey: "invalid_invite" };
   }
 
   const service = getSupabaseServiceClient();
@@ -244,36 +238,25 @@ export async function joinOrganizationWithInviteCode(formData: FormData) {
   );
 }
 
+/**
+ * 첫 플랫폼 개발자 등록. 「센 다음 넣기」를 한 거래 RPC(`claim_first_platform_admin`, 202611110003)로 한다(2026-11-11) — 전에는 두 사람이
+ * 동시에 누르면 둘 다 0 을 보고 둘 다 개발자가 될 수 있었다. RPC 가 표를 잠근 뒤 세고 넣는다.
+ */
 export async function claimFirstPlatformAdmin() {
   const user = await requireUser();
   const service = getSupabaseServiceClient();
 
-  const [{ data: profile }, { count }] = await Promise.all([
-    service.from("profiles").select("id").eq("id", user.id).maybeSingle(),
-    service
-      .from("platform_admins")
-      .select("id", { count: "exact", head: true }),
-  ]);
-
-  if (!profile) {
+  const { data, error } = await (service as unknown as ClaimRpcClient).rpc("claim_first_platform_admin", { p_user_id: user.id });
+  if (error) {
+    redirect("/onboarding?error=platform_admin_failed");
+  }
+  if (data === "profile_required") {
     redirect("/onboarding?error=profile_required");
   }
-
-  if ((count ?? 0) > 0) {
+  if (data === "platform_admin_exists") {
     redirect("/onboarding?error=platform_admin_exists");
   }
-
-  const platformAdmin: PlatformAdminInsert = {
-    is_active: true,
-    role: "developer_super_admin",
-    user_id: user.id,
-  };
-
-  const { error } = await service
-    .from("platform_admins")
-    .insert(platformAdmin);
-
-  if (error) {
+  if (data !== "ok") {
     redirect("/onboarding?error=platform_admin_failed");
   }
 

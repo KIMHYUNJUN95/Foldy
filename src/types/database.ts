@@ -7353,6 +7353,21 @@ export type Database = {
       automation_tick_token_ok: { Args: { p_token: string }; Returns: boolean }
       beds24_tick_if_needed: { Args: never; Returns: string }
       beds24_tick_token_ok: { Args: { p_token: string }; Returns: boolean }
+      apply_membership_change: {
+        Args: {
+          p_actor_user_id: string
+          p_expected_role: Database["public"]["Enums"]["organization_role"]
+          p_membership_id: string
+          p_role?: Database["public"]["Enums"]["organization_role"]
+          p_status?: Database["public"]["Enums"]["membership_status"]
+        }
+        Returns: Json
+      }
+      claim_first_platform_admin: { Args: { p_user_id: string }; Returns: string }
+      delete_membership_atomic: {
+        Args: { p_actor_user_id: string; p_delete_profile: boolean; p_membership_id: string }
+        Returns: Json
+      }
       claim_due_task_report_schedules: {
         Args: { p_limit?: number }
         Returns: {
@@ -7570,6 +7585,10 @@ export type Database = {
           p_session_id: string
         }
         Returns: boolean
+      }
+      read_profile: {
+        Args: { target_user_id?: string }
+        Returns: Database["public"]["Tables"]["profiles"]["Row"][]
       }
       reopen_attendance_month_atomic: {
         Args: {

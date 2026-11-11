@@ -58,6 +58,13 @@ export async function validateInviteCode(
   if (data.max_uses !== null && data.used_count >= data.max_uses) {
     return { ok: false, error: "maxed_out" };
   }
+  // 정지 · 보관 조직의 코드는 쓸 수 없다(2026-11-11) — 가입 RPC 도 같은 확인을 한다(202611110003).
+  const { data: org, error: orgError } = await service
+    .from("organizations")
+    .select("status")
+    .eq("id", data.organization_id)
+    .maybeSingle();
+  if (orgError || (org as { status: string } | null)?.status !== "active") return { ok: false, error: "invalid" };
 
   return {
     ok: true,

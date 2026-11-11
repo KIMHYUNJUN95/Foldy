@@ -24,9 +24,13 @@ import { getSupabaseServiceClient } from "@/lib/supabase/service";
 
 export type ActiveOverride = { permission_key: string; effect: CapabilityEffect };
 
-/** 한 사용자의 활성 개인 부여·차단(회수 안 됐고, 기한이 있으면 아직 안 지난 것). */
+/**
+ * 한 사용자의 활성 개인 부여·차단(회수 안 됐고, 기한이 있으면 아직 안 지난 것). **읽기 실패면 `null`**(2026-11-11) —
+ * 빈 목록으로 흘리면 차단(deny) 행까지 사라져 「막아 둔 기능」이 역할 기본값으로 다시 열린다(fail-open). 호출자는 `null` 이면
+ * 권한을 하나도 주지 않는다.
+ */
 const loadActiveOverrides = cache(
-  async (organizationId: string, userId: string): Promise<ActiveOverride[]> => {
+  async (organizationId: string, userId: string): Promise<ActiveOverride[] | null> => {
     const supabase = getSupabaseServiceClient();
     const { data, error } = await supabase
       .from("membership_permission_overrides")
@@ -36,10 +40,10 @@ const loadActiveOverrides = cache(
       .is("revoked_at", null);
 
     if (error) {
-      // 조회 실패를 「권한 없음」으로 흘린다. 부여를 못 읽어 막히는 것이 잘못 열어 주는 것보다 낫다.
+      // 조회 실패는 「권한 없음」이다(역할 기본 권한 포함). 부여를 못 읽어 막히는 것이 잘못 열어 주는 것보다 낫다.
       // 조용하면 안 된다 — 사람이 「어제까지 되던 게 안 된다」를 겪게 된다.
       console.error("[capabilities] override read failed:", error.message);
-      return [];
+      return null;
     }
 
     const now = Date.now();
@@ -94,6 +98,7 @@ export function isActiveOverrideRow(row: { expires_at: string | null }, now = Da
 export const resolveCapabilities = cache(
   async (input: CapabilityInput): Promise<Capability[]> => {
     const overrides = await loadActiveOverrides(input.organizationId, input.userId);
+    if (!overrides) return [];
     return computeCapabilities(input.role, overrides);
   },
 );
@@ -124,6 +129,8 @@ export const memberCapabilities = cache(
     ]);
     const row = m.data as { role: string; status: string } | null;
     const role: Role | null = pa.data ? "developer_super_admin" : row?.status === "active" ? (row.role as Role) : null;
+    // 멤버십 · 개발자 행 읽기가 실패해도 권한 없음으로 본다.
+    if (pa.error || m.error || !overrides) return [];
     return role ? computeCapabilities(role, overrides) : [];
   },
 );
@@ -140,6 +147,11 @@ export async function memberIdsWithCapability(organizationId: string, capability
       .eq("permission_key", capability)
       .is("revoked_at", null),
   ]);
+  // 차단 행을 못 읽으면 막아 둔 사람에게 알림이 가므로 아무에게도 보내지 않는다.
+  if (mRes.error || oRes.error) {
+    console.error("[capabilities] memberIdsWithCapability read failed:", (mRes.error ?? oRes.error)?.message);
+    return [];
+  }
   const overrides = ((oRes.data ?? []) as { user_id: string; effect: string; expires_at: string | null }[]).filter(
     (r) => isActiveOverrideRow(r),
   );

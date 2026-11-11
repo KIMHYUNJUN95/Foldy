@@ -194,7 +194,7 @@ export function IdCardFlow({
       result = { ok: false, reason: "failed" };
     }
     if (result.ok) {
-      haptic("success");
+      haptic("light"); // 읽기만 끝났다 — 저장은 확인 단계 뒤라 success 는 거기서(햅틱 공용 규칙)
       setFields(result.fields);
       setReadFields(result.fields);
       setUnsure(result.unsure);

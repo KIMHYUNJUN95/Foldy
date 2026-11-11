@@ -3,18 +3,16 @@ import { resolve } from "path";
 import { describe, expect, it } from "vitest";
 import { INVITE_ERROR_KEYS, resolveInviteRpcError } from "../invite-errors";
 
-const KNOWN_INVITE_KEYS = [
-  "missing_invite",
-  "invalid_invite",
-  "invite_inactive",
-  "invite_expired",
-  "invite_maxed",
-  "membership_blocked",
-] as const;
+const KNOWN_INVITE_KEYS = ["missing_invite", "invalid_invite", "membership_blocked"] as const;
 
 describe("resolveInviteRpcError — RPC error key mapping", () => {
   it.each(KNOWN_INVITE_KEYS)("passes known key %s through unchanged", (key) => {
     expect(resolveInviteRpcError(key)).toBe(key);
+  });
+
+  // 2026-11-11: 만료 · 꺼짐 · 다 씀을 따로 보여 주면 「이 코드는 있다」를 맞혀 볼 수 있다 — 미리보기와 같은 한 오류로.
+  it.each(["invite_expired", "invite_inactive", "invite_maxed"])("hides why code %s failed → invalid_invite", (key) => {
+    expect(resolveInviteRpcError(key)).toBe("invalid_invite");
   });
 
   it.each(["forbidden", "missing_user", "internal_error", "unknown", ""])(

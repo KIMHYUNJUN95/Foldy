@@ -5,7 +5,7 @@ import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { STAFF_DOCUMENT_BUCKET } from "@/lib/staff-documents/server";
 import { loadUploadTarget } from "@/lib/staff-documents/roster-server";
-import { actorCanOpenUserManagement } from "@/lib/user-management-access";
+import { actorCanManageUsersInOrg } from "@/lib/user-management-access";
 import {
   EMPTY_ID_FIELDS,
   adminUploadFields,
@@ -24,7 +24,7 @@ import {
  *
  * 사진: 저장소 insert 정책은 본인 경로만 허락한다. 그래서 서버가 권한을 본 뒤 **대상 사람 경로**의 일회용 서명 업로드 주소를
  * 만들어 준다(`prepareStaffIdUpload`) — 정책은 그대로 두고, 남의 경로에 올릴 수 있는 길은 이 액션 하나다.
- * 문: 화면과 같은 문 — 사용자 관리(`actorCanOpenUserManagement`) + `staff_documents.view` + 대상이 이 조직 활성 멤버(개발자 계정 제외). 자기 서류는 대신 올리지 않는다(개발자 예외 — 확인과 같은 규칙).
+ * 문: 화면과 같은 문 — 사용자 관리(`actorCanManageUsersInOrg`, 세션 조직 기준) + `staff_documents.view` + 대상이 이 조직 활성 멤버(개발자 계정 제외). 자기 서류는 대신 올리지 않는다(개발자 예외 — 확인과 같은 규칙).
  * 거부는 `forbidden` 결과로 돌려준다(redirect 하지 않는다 — 폰 사용자를 관리자 화면으로 던지지 않게).
  */
 
@@ -38,7 +38,7 @@ async function reviewerSession() {
   if (!session || !hasOrganizationContext(session)) return null;
   if (!session.capabilities.includes("staff_documents.view")) return null;
   // 보기 권한만 따로 받은 사람이 액션을 직접 불러 「확인함」을 쓰지 못하게 화면 문과 맞춘다.
-  if (!(await actorCanOpenUserManagement(session.user.id, session.user.role))) return null;
+  if (!(await actorCanManageUsersInOrg(session.user.id, session.user.role, session.organization.id))) return null;
   return session;
 }
 

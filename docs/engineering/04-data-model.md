@@ -144,7 +144,13 @@ Auth/onboarding notes (updated 2026-06-18):
   derived server-side: Korean → Japanese → English name. The DB only enforces format/length — the per-nationality
   rule lives in `validateIdentityNames()` and is re-checked in `submitOnboardingProfile` and `updateAccountProfile`.
   Existing rows stay null; the session flags `identityIncomplete` and `/mobile` shows a once-a-day fill sheet.
-  Readable by the same-org members like the rest of `profiles` (existing RLS, unchanged).
+  **2026-11-11:** same-org members can no longer read these columns — colleagues read only `id` · `name` · `phone_number`
+  (column grants, `202611110003`). Self / platform-admin full row: service role, or `read_profile()` from a user session.
+- **Column privileges (2026-11-11, `202611110003_user_management_hardening.sql`):** `authenticated` may SELECT only `id, name, phone_number`
+  and UPDATE only `preferred_language, theme_preference, bottom_nav_tabs, ops_calendar_mode`. Everything else (`hire_date`, `deleted_at`,
+  `can_generate_report`, `birth_date`, identity names …) is server (service role) only. See 05-rls-permissions.md → profiles.
+- `updateAccountProfile` saves and validates **only the fields that changed** (2026-11-11) — a language-only change no longer fails on a
+  legacy-format phone or an empty gender.
 
 `can_generate_report` (migration `supabase/migrations/202606130001_profile_report_access.sql`) is a
 per-user override for the Todo **daily-report generator** (업무일지; free, template-based — no LLM).
@@ -201,6 +207,12 @@ left_at timestamptz  -- added 202610230004; 떠난(suspended · removed) 시각,
 created_at timestamptz
 updated_at timestamptz
 ```
+
+Last-owner guard (2026-11-11, `202611110003`): AFTER ROW trigger `memberships_enforce_last_owner` rejects (`last_owner`) any update/delete
+that leaves an organization that still exists with zero active owners — including one statement changing several owner rows (it runs
+after the statement and counts with the org row locked). Role/status changes and member deletes go through the service-role-only
+transaction functions `apply_membership_change` / `delete_membership_atomic` (membership change + override revocation commit together). Manual status changes accept only `active` · `suspended` · `removed`
+(`invited` is no longer settable by hand — it locked the login with no way to self-activate).
 
 `team_id` (migration `202607140001`, **not yet applied**) links the membership to its 현장/사무실 team
 (see `teams` above). Assigned/edited via `setMemberTeam` in `/admin/users/[id]`. `on delete set null`
@@ -296,6 +308,10 @@ Business rules (2026-06-18 planning baseline):
 - all other role categories: `expires_at = within 3 months`, `max_uses = 100` by default
 - Invite-code management UI is deferred; initial org/owner/code bootstrap is manual DB/admin-script work
 - Additional organizations can be joined by reusing the same account and entering another valid invite code
+- (2026-11-11) `expires_at` = the chosen day's **Tokyo** 23:59:59 (was UTC 23:59:59 → usable until 08:59 JST next day).
+- (2026-11-11) A hand-typed code is normalized (upper-case, spaces → `-`) and must match `^[A-Z0-9][A-Z0-9-]{4,30}[A-Z0-9]$`
+  (6–32 chars, same alphabet as auto codes); otherwise `invalid_code`.
+- (2026-11-11) No direct `authenticated` / `anon` access at all (service role only). Join RPC rejects codes of a non-active organization.
 
 ## platform_admins
 

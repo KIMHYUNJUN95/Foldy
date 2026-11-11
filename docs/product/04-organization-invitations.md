@@ -470,6 +470,16 @@ Required:
 - Role permissions must be checked on backend/database level.
 - Removed users should lose access immediately.
 - Invite codes should expire or be revocable.
+
+As-built hardening (2026-11-11, `202611110003_user_management_hardening.sql`):
+
+- `invite_codes` has no direct `authenticated` / `anon` access — every read/write is a service-role server function. (The old
+  FOR ALL policy let an office admin insert a `default_role = owner` invite through PostgREST.)
+- Re-activating an invite runs the same role check as creating one (an office admin cannot re-enable an office-admin invite).
+- Hand-typed codes: 6–32 chars, `A-Z 0-9 -` after normalization, else `invalid_code`. Expiry = chosen day's Tokyo 23:59:59.
+- Onboarding preview shows one generic `invalid_invite` for missing / expired / off / used-up / suspended-org codes.
+- Join RPC rejects codes of a non-active organization; an `invited` membership joins with the code's role and counts a use.
+- First platform-admin claim is one atomic RPC (`claim_first_platform_admin`).
 - Part-time staff can view guest/reservation information except price/revenue fields.
 
 ## Post-Login Routing

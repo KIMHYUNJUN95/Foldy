@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { Role } from "@/config/roles";
 import { createInviteCodeAs, deleteInviteCodeAs, setInviteCodeActiveAs } from "@/lib/invite-codes-server";
@@ -177,7 +178,12 @@ async function inviteActorOrRedirect() {
   return { userId, role };
 }
 
-export async function createInviteCode(formData: FormData) {
+/**
+ * 초대 만들기 — **결과를 돌려준다**(2026-11-11). 전에는 주소 쿼리로만 넘겨, 폼이 성공 · 실패를 몰라 실패(`invalid_code` ·
+ * `duplicate_code`)에도 입력한 코드 · 이름을 비웠다. 폼(invite-create-form.tsx)이 결과를 보고 같은 주소 쿼리(`?created=1` ·
+ * `?error=키`)로 옮겨 배너를 그대로 띄우고, 성공일 때만 비운다. 로그인 없음 · 권한 없음은 예전처럼 redirect.
+ */
+export async function createInviteCode(formData: FormData): Promise<{ ok: true } | { ok: false; error: string }> {
   const actor = await inviteActorOrRedirect();
   const result = await createInviteCodeAs(actor, {
     organizationId: String(formData.get("organizationId") ?? ""),
@@ -187,7 +193,9 @@ export async function createInviteCode(formData: FormData) {
     expiresAt: String(formData.get("expiresAt") ?? ""),
     maxUses: String(formData.get("maxUses") ?? ""),
   });
-  redirect(result.ok ? "/admin/users/invites?created=1" : `/admin/users/invites?error=${result.error}`);
+  if (!result.ok) return { ok: false, error: result.error };
+  revalidatePath("/admin/users/invites");
+  return { ok: true };
 }
 
 async function toggleInvite(formData: FormData, active: boolean) {

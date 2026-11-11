@@ -218,14 +218,18 @@ export async function grantMemberOverride(input: {
   };
 }
 
-/** 소프트 폐기: revoked_at + revoked_by 를 설정한다. 조직 범위라 다른 조직의 예외는 폐기할 수 없다. */
+/**
+ * 소프트 폐기: revoked_at + revoked_by 를 설정한다. 조직 범위 + **대상 사용자 범위**(2026-11-11) — 다른 조직 · 다른 사람의 지정은
+ * 폐기할 수 없다. `changed` 는 실제로 바뀐 줄이 있었는가(이미 회수됐거나 남의 것이면 false — 호출자는 기록을 남기지 않는다).
+ */
 export async function revokeMemberOverride(input: {
   overrideId: string;
   organizationId: string;
+  userId: string;
   revokedByUserId: string;
-}): Promise<{ ok: true } | { ok: false; error: string }> {
+}): Promise<{ ok: true; changed: boolean } | { ok: false; error: string }> {
   const service = getSupabaseServiceClient();
-  const { error } = await service
+  const { data, error } = await service
     .from("membership_permission_overrides")
     .update({
       revoked_at: new Date().toISOString(),
@@ -233,9 +237,11 @@ export async function revokeMemberOverride(input: {
     })
     .eq("id", input.overrideId)
     .eq("organization_id", input.organizationId)
-    .is("revoked_at", null);
+    .eq("user_id", input.userId)
+    .is("revoked_at", null)
+    .select("id");
   if (error) return { ok: false, error: "revoke_failed" };
-  return { ok: true };
+  return { ok: true, changed: ((data ?? []) as unknown[]).length > 0 };
 }
 
 /**

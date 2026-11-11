@@ -199,6 +199,8 @@ Confirmed:
 
 - Organization members can see other organization members.
 - Members can see phone numbers for calling.
+- **(2026-11-11 사용자 결정)** 동료가 볼 수 있는 프로필 칸은 **이름 · 전화뿐**이다. 생년월일 · 성별 · 국적 · 입사일 · 가타카나 · 영문 이름은
+  본인 · 사용자 관리 화면(서버가 service role 로 읽음) · 플랫폼 개발자만. DB 칸 권한으로 막는다(05-rls-permissions.md → profiles).
 
 Open privacy questions:
 
@@ -217,6 +219,23 @@ Admin-capable roles should be able to:
 - Deactivate user
 
 Regular users should not be able to change another user's role or status.
+
+Server rules (2026-11-11 사용자 관리 점검):
+
+- **문 = 세션 조직.** `/admin/users` · `/mobile/users/*` 는 「세션 조직(보여 줄 명단의 조직)에서 사용자 관리 가능」일 때만 열린다
+  (`actorCanManageUsersInOrg(…, session.organization.id)`). 전에는 다른 조직에서의 관리 권한으로 세션 조직 명단이 열렸다.
+- **역할 경합:** `setMemberRole(membershipId, role, expectedRole?)` — 지금 역할이 `expectedRole` 과 다르거나 쓰는 순간 바뀌어 있으면 `stale`.
+- **대표 판정은 대상 조직의 역할로**(첫 멤버십 역할이 아님).
+- **변경 + 권한 회수는 한 거래:** 역할 변경 · 비활성/정지 · 삭제는 멤버십 변경과 개인 부여 · 차단 회수를 한 DB 거래로 한다(실패면 둘 다 안 됨,
+  `save_failed` / `delete_failed`). 로그인 잠금은 정지 땐 거래 뒤, 활성화 땐 거래 앞(실패하면 되돌림). 완전 삭제는 거래 뒤에 로그인 계정을 지우고,
+  그게 실패하면 빈 로그인을 잠근다. 자세한 순서: 05-rls-permissions.md 「멤버십 변경 · 삭제는 한 거래 함수로」.
+- **마지막 대표:** 앱 확인 + DB 트리거(`memberships_enforce_last_owner`) 둘 다. 트리거 오류도 `last_owner` 로 돌려준다. 회원 탈퇴도 마지막 활성
+  대표면 `{ error: "last_owner" }`.
+- **상태 `invited` 는 수동 지정 불가**(`invalid_member`) — 로그인이 잠긴 채 스스로 풀 길이 없었다.
+- **완전 삭제 이력 확인:** 근태 · 청소 · 연차 · 신분 서류 개수 조회가 하나라도 실패하면 `delete_failed`(0 으로 보지 않는다).
+- **권한 회수(개별):** 그 사람의 활성 지정이 아니면 `invalid_override`, 기록 없음.
+- **회원 탈퇴:** `deleteUser` 결과를 보고 실패면 `{ error: "delete_failed" }`(전엔 무시하고 로그인 화면으로). 플랫폼 개발자면 `platform_admins.is_active` 를 끈다 — 활성 개발자 판정(`is_platform_admin()` · 개발자 표시 · 보호 대상)에서 빠진다. 첫 개발자 등록 판정(`claim_first_platform_admin` · 온보딩 개수)은 활성 여부와 무관하게 행이 하나라도 있으면 막으므로 바뀌지 않는다(탈퇴로 「첫 개발자」 자리가 열리지 않는다).
+- **계정 저장:** 바뀐 칸만 검사 · 저장 — 언어만 바꿀 때 예전 형식 전화 · 빈 성별 때문에 막히지 않는다.
 
 ## 모바일 사용자 관리 (2026-10-20)
 

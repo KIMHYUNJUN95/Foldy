@@ -101,6 +101,9 @@ Can:
   `user.manage` by role (before: developer default + delegation only, so an owner needed a developer to open it).
   Other roles still need an individual `user.manage` grant, which only developers can give. Protected-target rules
   (owner · 전무 · developer accounts, last owner, self) are unchanged. See `docs/product/27-permission-override-workflow.md`.
+  **2026-11-11:** the screens open only when the owner can manage users in the **session organization** (the roster shown), and the
+  "last active owner" rule is also enforced by a DB trigger (`memberships_enforce_last_owner`) so two owners demoting each other at the
+  same time cannot leave zero owners. The last active owner cannot delete their own account (`last_owner`).
 - View all records
 - Configure permissions
 - Access admin web

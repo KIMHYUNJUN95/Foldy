@@ -294,6 +294,8 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             deleteAccountDesc: dictionary.common.deleteAccountDesc,
             deleteAccountWarning: dictionary.common.deleteAccountWarning,
             deleteAccountConfirm: dictionary.common.deleteAccountConfirm,
+            lastOwner: dictionary.common.deleteAccountLastOwner,
+            failed: dictionary.common.accountActionFailed,
           }}
         />
       </div>
@@ -305,6 +307,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           empty: dictionary.accountProfile.blockedUsersEmpty,
           unblock: dictionary.accountProfile.unblock,
           unknown: dictionary.board.reportsAuthorUnknown,
+          failed: dictionary.common.accountActionFailed,
         }}
       />
       <MyReportsList
@@ -324,6 +327,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           empty: dictionary.accountProfile.myReportsEmpty,
           withdraw: dictionary.accountProfile.withdrawReport,
           unknown: dictionary.board.reportsAuthorUnknown,
+          failed: dictionary.common.accountActionFailed,
         }}
       />
       {/* 약관 · 개인정보처리방침 · 고객지원 — App Store 심사는 앱 안에서도 이 문서들에 닿을 수
@@ -464,6 +468,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
               empty: ap.blockedUsersEmpty,
               unblock: ap.unblock,
               unknown: dictionary.board.reportsAuthorUnknown,
+              failed: dictionary.common.accountActionFailed,
             },
             reportsList: {
               title: ap.myReportsTitle,
@@ -471,6 +476,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
               empty: ap.myReportsEmpty,
               withdraw: ap.withdrawReport,
               unknown: dictionary.board.reportsAuthorUnknown,
+              failed: dictionary.common.accountActionFailed,
             },
             deleteSheet: {
               cancel: dictionary.common.cancel,
@@ -479,6 +485,8 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
               deleteAccountDesc: dictionary.common.deleteAccountDesc,
               deleteAccountWarning: dictionary.common.deleteAccountWarning,
               deleteAccountConfirm: dictionary.common.deleteAccountConfirm,
+              lastOwner: dictionary.common.deleteAccountLastOwner,
+              failed: dictionary.common.accountActionFailed,
             },
           }}
           help={[

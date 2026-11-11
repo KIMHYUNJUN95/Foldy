@@ -9,14 +9,14 @@
  * · 도움(제안함 · 버그 신고 · 이용약관 · 개인정보 처리방침 · 고객지원) → 회색 「로그아웃」 · 작은 빨간 「계정 삭제」(기존 확인 시트) · 버전.
  *
  * 저장은 기존 `updateAccountProfile` 그대로다 — 이 액션은 이름 · 전화 · 성별 · 언어를 한꺼번에 받으므로, 한 칸만 고칠 때도 나머지는
- * 지금 값을 숨은 칸으로 함께 보낸다. See docs/product/17-user-profile-directory.md 「계정 화면 — 화이트 리디자인(모바일)」.
+ * 지금 값을 숨은 칸으로 함께 보낸다(서버는 바뀐 칸만 검사 · 저장). 언어 3칸만 결과를 돌려주는 `updateAccountLanguage` 를 쓴다(2026-11-11). See docs/product/17-user-profile-directory.md 「계정 화면 — 화이트 리디자인(모바일)」.
  */
 
 import Link from "next/link";
 import type { CSSProperties, MouseEvent, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { updateAccountProfile } from "@/app/account/actions";
+import { updateAccountLanguage, updateAccountProfile } from "@/app/account/actions";
 import { signOut } from "@/app/auth/actions";
 import { BlockedUsersList } from "@/components/account/blocked-users-list";
 import { DeleteAccountSheet } from "@/components/account/delete-account-sheet";
@@ -56,11 +56,11 @@ export type AccountMobileCopy = {
   incomplete: { title: string; body: string } | null;
   /** 국적 + 이름 세 가지(docs/product/41 §2) — 「이름」 줄을 누르면 이 칸들을 고친다. */
   identity: IdentityCopy;
-  blockedList: { title: string; body: string; empty: string; unblock: string; unknown: string };
-  reportsList: { title: string; body: string; empty: string; withdraw: string; unknown: string };
+  blockedList: { title: string; body: string; empty: string; unblock: string; unknown: string; failed: string };
+  reportsList: { title: string; body: string; empty: string; withdraw: string; unknown: string; failed: string };
   deleteSheet: {
     cancel: string; deleteAccount: string; deleteAccountTitle: string; deleteAccountDesc: string; deleteAccountWarning: string;
-    deleteAccountConfirm: string;
+    deleteAccountConfirm: string; lastOwner: string; failed: string;
   };
 };
 
@@ -219,6 +219,10 @@ export function AccountMobile({ user, organization, bottomTabsLabel, blockedUser
     if (lang !== user.language) langFormRef.current?.requestSubmit();
   }, [lang, user.language]);
 
+  // 저장 실패는 **이 호출의 결과로만** 판단한다(2026-11-11) — 전에는 주소에 남은 예전 `?error=` 를 보고 성공한 저장까지 되돌렸다.
+  // 실패면 고른 언어를 저장된 값으로 되돌린다(안 그러면 3칸이 잠긴 채 엉뚱한 언어가 선택돼 보인다). 성공이면 서버가 새 언어로 다시 그려
+  // user.language 가 lang 과 같아져 그냥 풀린다.
+
   // 하단 탭 편집 — 셸(MobileShell)의 가운데 편집 버튼이 여는 시트를 그대로 연다. 폴드 · 태블릿에선 탭 바가 CSS 로만 숨어 있어
   // 버튼은 그대로 있다.
   function openBottomTabs() {
@@ -309,8 +313,22 @@ export function AccountMobile({ user, organization, bottomTabsLabel, blockedUser
         />
         <div className="acw-row acw-lang">
           <span className="acw-row__l">{copy.language}</span>
-          <form action={updateAccountProfile} ref={langFormRef}>
-            <HiddenProfile language={lang} user={user} />
+          <form
+            action={async () => {
+              try {
+                const result = await updateAccountLanguage(lang);
+                if (!result.ok) {
+                  haptic("error");
+                  setLang(user.language);
+                }
+              } catch {
+                /* 네트워크 실패 — 저장된 언어로 되돌린다 */
+                haptic("error");
+                setLang(user.language);
+              }
+            }}
+            ref={langFormRef}
+          >
             <div aria-label={copy.language} className="acw-seg" role="radiogroup" style={{ "--k": langIndex } as CSSProperties}>
               <span aria-hidden="true" className="acw-seg__thumb" />
               {LANGS.map((code) => (

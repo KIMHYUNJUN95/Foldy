@@ -4,6 +4,8 @@
 
 > 2026-10-25: 남은 일 전체(결정 대기 · 개발 순서 · 사용자 할 일 · 출시 일정)는 `docs/planning/19-open-tasks.md` 한곳에 모았다. 운영 마이그레이션은 `202610230008` 까지 전부 적용 확인.
 
+**2026-11-11 워드마크 글꼴 저장소 파일로** (문서 design/00) — f7a75a20 배포가 Vercel 빌드에서 두 번 실패(`Can't resolve '@vercel/turbopack-next/internal/font/google/font'`, Noto Serif 만, Vercel CLI 65.14). `Noto_Serif`(next/font/google) → `next/font/local` + `src/app/fonts/noto-serif-latin(-italic).woff2`(가변 600–700, OFL). 모양 · 변수 이름(`--font-wordmark`)은 그대로.
+
 **2026-11-11 근태 · 연차 · 교통비 점검 — 서버 · DB · 모바일 · PC** (문서 21 · 24 · 26 · 39 · 11 · 04 · 05 · 05-admin-web-ia · 16) — 마감된 달 정정 요청이 급여에서 빠지던 문제, 교통비 연결 항목 트리거가 항상 실패하던 문제, 연차 FIFO 가 만료분에 사용을 넣던 문제, 승인된 연차 전 칸 노출 정책을 고쳤다. 사람 · 달 단위 잠금(`attendance_sessions_month_guard`) · 확인 함수 RPC · 연차 원자 승인 · 기준 잔여 「확인 전」 · 원래 쉬는 날 빼기(`excluded_dates`) · 본인 승인 금지 · 잔여 초과 사유 · QR 정확도 100m · 교통비 받는 달 공용 함수(`transport-month.ts`). 마이그레이션 `202611110001`(근태) · `202611110002`(연차 · 교통비) — 운영 적용 순서: 0001 → 코드 배포 → 0002. 남김: ja/en 화면 직접 확인 못 함, 리마인더 cron 은 알림 일괄 때, QR 위치 속임은 설계 한계.
 
 **2026-11-11 차단 — Beds24 에서 지워진 유닛 건너뛰기** (문서 33 「모든 유닛에 건다」) — 오쿠보C 의 496532 가 Beds24 에서 지워져 `invalid roomid` 로 거절돼 차단이 매번 실패하던 문제. 거절이 전부 `invalid roomid` 이고 받아들여진 유닛이 있으면 그 유닛만 빼고 계속(걸기 · 풀기 · 되돌리기 공통). 다른 거절이 섞이면 예전대로 실패. 테스트: `ops-calendar-write-integrity` · `beds24-block-write-payload`.

@@ -30,7 +30,7 @@ Current status:
 - Required for app polish.
 - Final logo is not designed yet.
 - Use a temporary `Foldy` wordmark or placeholder mark until the official logo is created.
-- The interim wordmark renders as `Foldy` (with a space) in a serif italic typeface (Noto Serif, weight 600). It is shared across all shells/entry screens via the `.wordmark` class in `src/app/globals.css` (font loaded in `src/app/layout.tsx` as `--font-wordmark`). Applied in the mobile shell header + side menu, admin shell, dev entry, and the login/onboarding headers (`dictionary.app.name`).
+- The interim wordmark renders as `Foldy` (with a space) in a serif italic typeface (Noto Serif, weight 600). It is shared across all shells/entry screens via the `.wordmark` class in `src/app/globals.css` (font loaded in `src/app/layout.tsx` as `--font-wordmark` — since 2026-11-11 via `next/font/local` from `src/app/fonts/noto-serif-latin*.woff2`, variable 600–700 latin, because Vercel builds failed to fetch Noto Serif from Google). Applied in the mobile shell header + side menu, admin shell, dev entry, and the login/onboarding headers (`dictionary.app.name`).
 - The mobile top chrome is flat and borderless: no capsule outline/ring/glass/shadow — the centered wordmark sits between the 38px menu control and the notification/profile control group over the shared warm-ivory chrome.
 
 ## Product Feeling

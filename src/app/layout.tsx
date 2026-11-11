@@ -4,8 +4,8 @@ import {
   Geist_Mono,
   Noto_Sans_JP,
   Noto_Sans_KR,
-  Noto_Serif,
 } from "next/font/google";
+import localFont from "next/font/local";
 import { cookies, headers } from "next/headers";
 import Script from "next/script";
 import { SessionProvider } from "@/components/providers/session-provider";
@@ -53,11 +53,15 @@ const notoSansJp = Noto_Sans_JP({
 
 // 세리프 — 관리자 콘솔 워드마크 · 채용 KPI 숫자만 쓴다(admin-console.css `--serif`). 모바일은 안 쓰므로 미리 받지 않는다 —
 // 전엔 모든 화면 첫 로드에 4벌을 미리 받았다(2026-10-22 첫 실행 속도: 글꼴 154KB → 48KB).
-const notoSerif = Noto_Serif({
+// 2026-11-11: Google 에서 받지 않고 저장소 파일(가변 굵기 latin, OFL)을 쓴다 — Vercel 빌드가 Noto Serif 만 못 받아
+// 배포가 두 번 실패했다(`Can't resolve '@vercel/turbopack-next/internal/font/google/font'`). 굵기 · 모양은 예전과 같다.
+const notoSerif = localFont({
   variable: "--font-wordmark",
-  subsets: ["latin"],
-  weight: ["600", "700"],
-  style: ["italic", "normal"],
+  src: [
+    { path: "./fonts/noto-serif-latin.woff2", weight: "600 700", style: "normal" },
+    { path: "./fonts/noto-serif-latin-italic.woff2", weight: "600 700", style: "italic" },
+  ],
+  display: "swap",
   preload: false,
 });
 

@@ -19,6 +19,8 @@ import { attendanceCan } from "@/lib/attendance-review";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { getPayrollPrep } from "@/lib/payroll-prep-server";
 import { isValidYm } from "@/lib/attendance-clock";
+import { LiveRefresh } from "@/components/shared/live-refresh";
+import { attendancePayrollLiveSources } from "@/lib/live-sources";
 
 // 관리자 · 근태 · 급여 (Slice 4).
 // 기존 `getMonthlyPayView` + finalize/reopen/export 서버 액션에 연결한 월별 사용자 급여 검토 화면.
@@ -96,6 +98,8 @@ export default async function AdminAttendancePayrollPage({
       {showPrep && prep && stage !== "close" ? (
         <PayrollRoundClient key={payroll.ym} data={prep} locale={locale} localeTag={localeTag} stage={stage} canViewBank={canViewBank} />
       ) : payroll.isPrivileged ? (
+        <>
+        <LiveRefresh sources={attendancePayrollLiveSources(session.organization.id)} />
         <AttendancePayrollClient
           key={payroll.ym}
           ym={payroll.ym}
@@ -106,6 +110,7 @@ export default async function AdminAttendancePayrollPage({
           localeTag={localeTag}
           weeklyLimit={weeklyLimit}
         />
+        </>
       ) : (
         <AdminNoAccess title={dictionary.admin.shared.noAccessTitle} body={dictionary.admin.shared.noAccessBody} />
       )}

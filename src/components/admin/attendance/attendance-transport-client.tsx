@@ -1,6 +1,9 @@
 "use client";
 
+import { rowActivateProps } from "@/components/admin/shared/row-activate";
+import { settleAction } from "@/lib/settle-action";
 import { LiveWash } from "@/components/shared/live-wash";
+import { transportReviewErrorText } from "@/lib/transport-review-copy";
 import Image from "next/image";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import {
@@ -70,6 +73,14 @@ function fmtSubmittedDay(iso: string | null, localeTag: string): string | null {
   return new Intl.DateTimeFormat(localeTag, { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric" }).format(new Date(iso));
 }
 
+/** 처리 호출이 던져도(오프라인 등) 화면이 멈추지 않게 일반 실패로 바꾼다(2026-11-11, 공용 `settleAction`). */
+async function safeTransportReview(
+  input: Parameters<typeof setTransportReportReview>[0],
+): Promise<Awaited<ReturnType<typeof setTransportReportReview>>> {
+  const settled = await settleAction(() => setTransportReportReview(input));
+  return settled.thrown ? { ok: false, reason: "error" } : settled.value;
+}
+
 export function AttendanceTransportClient({
   ym,
   monthLabel,
@@ -89,6 +100,12 @@ export function AttendanceTransportClient({
   const c = dictionary.admin.attendanceConsole;
   const shared = dictionary.admin.shared;
   const [rows, setRows] = useState(initialRows);
+  // 서버가 새로 읽어 오면(실시간 갱신 · router.refresh) 목록을 바꿔 끼운다 — 예전에는 처음 값에 머물렀다(2026-11-11).
+  const [seenInitialRows, setSeenInitialRows] = useState(initialRows);
+  if (seenInitialRows !== initialRows) {
+    setSeenInitialRows(initialRows);
+    setRows(initialRows);
+  }
   const [panelUserId, setPanelUserId] = useState<string | null>(
     initialUserId && initialRows.some((r) => r.userId === initialUserId) ? initialUserId : null,
   );
@@ -152,7 +169,7 @@ export function AttendanceTransportClient({
     startUndo(async () => {
       let failed = false;
       for (const it of items) {
-        const res = await setTransportReportReview({ reportId: it.reportId, action: "reopen", note: c.trUndoReason });
+        const res = await safeTransportReview({ reportId: it.reportId, action: "reopen", note: c.trUndoReason });
         if (res.ok) applyStatus(it.userId, "submitted");
         else failed = true;
       }
@@ -233,7 +250,14 @@ export function AttendanceTransportClient({
               const noReport = r.status === "none";
               const submitted = fmtSubmittedDay(r.submittedAt, localeTag);
               return (
-                <tr key={r.userId} data-live={r.userId} className={sel ? "sel" : ""} onClick={() => openPanel(r.userId)}>
+                <tr
+                  key={r.userId}
+                  data-live={r.userId}
+                  className={sel ? "sel" : ""}
+                  aria-selected={sel}
+                  onClick={() => openPanel(r.userId)}
+                  {...rowActivateProps(() => openPanel(r.userId))}
+                >
                   <td style={{ paddingLeft: 16 }}>
                     <div className="who">
                       <span className="uhead__av" style={{ width: 32, height: 32 }}>
@@ -384,14 +408,14 @@ function TransportPanel({
     setErr(null);
     const reportId = report.id;
     startTransition(async () => {
-      const res = await setTransportReportReview({ reportId, action: "approved", note: null });
+      const res = await safeTransportReview({ reportId, action: "approved", note: null });
       if (res.ok) {
         setDoneFor(row.userId);
         setTimeout(() => onApproved(row, reportId), 650);
       } else if (res.reason === "forbidden") {
         setErr(c.actionForbidden);
       } else {
-        setErr(res.reason === "finalized" ? c.trFinalizedLocked : c.actionFailed);
+        setErr(transportReviewErrorText(res.reason, c));
       }
     });
   }
@@ -403,7 +427,7 @@ function TransportPanel({
     }
     setErr(null);
     startTransition(async () => {
-      const res = await setTransportReportReview({
+      const res = await safeTransportReview({
         reportId: report.id,
         action: "rejected",
         note: note.trim(),
@@ -417,7 +441,7 @@ function TransportPanel({
       } else if (res.reason === "comment_required") {
         setErr(c.actionReasonRequired);
       } else {
-        setErr(res.reason === "finalized" ? c.trFinalizedLocked : c.actionFailed);
+        setErr(transportReviewErrorText(res.reason, c));
       }
     });
   }
@@ -429,7 +453,7 @@ function TransportPanel({
     }
     setErr(null);
     startTransition(async () => {
-      const res = await setTransportReportReview({
+      const res = await safeTransportReview({
         reportId: report.id,
         action: "changes_requested",
         note: note.trim(),
@@ -443,7 +467,7 @@ function TransportPanel({
       } else if (res.reason === "comment_required") {
         setErr(c.actionReasonRequired);
       } else {
-        setErr(res.reason === "finalized" ? c.trFinalizedLocked : c.actionFailed);
+        setErr(transportReviewErrorText(res.reason, c));
       }
     });
   }
@@ -451,7 +475,7 @@ function TransportPanel({
     if (!report) return;
     setErr(null);
     startTransition(async () => {
-      const res = await setTransportReportReview({
+      const res = await safeTransportReview({
         reportId: report.id,
         action: "reopen",
         note: reason.trim() ? reason.trim() : null,
@@ -464,7 +488,7 @@ function TransportPanel({
       } else if (res.reason === "forbidden") {
         setErr(c.actionForbidden);
       } else {
-        setErr(res.reason === "finalized" ? c.trFinalizedLocked : c.actionFailed);
+        setErr(transportReviewErrorText(res.reason, c));
       }
     });
   }

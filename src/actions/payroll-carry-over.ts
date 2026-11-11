@@ -9,7 +9,7 @@ import { payrollPrepAvailable, type PrepManual } from "@/lib/payroll-prep";
 import { paydayFor, shiftYm } from "@/lib/payroll-settings-rules";
 import { loadOrgPayrollSettings } from "@/lib/payroll-settings-server";
 import { loadPrepRows, PAYROLL_MONTH_INPUT_SELECT, rowToPrepManual } from "@/lib/payroll-prep-server";
-import { isPayrollMonthLocked, readApprovalRow } from "@/lib/payroll-approval-server";
+import { payrollMonthLockState, readApprovalRow } from "@/lib/payroll-approval-server";
 import { parseRoundStatus, parseSnapshot } from "@/lib/payroll-approval";
 import {
   CARRY_FIELDS,
@@ -44,7 +44,8 @@ async function guard(ym: unknown): Promise<Ctx | CarryFail> {
   if (!(await attendanceCan(service, organizationId, session.user.id, "payroll.manage"))) return { ok: false, reason: "forbidden" };
   if (typeof ym !== "string" || !YM_RE.test(ym)) return { ok: false, reason: "invalid" };
   if (!payrollPrepAvailable(ym)) return { ok: false, reason: "closed" };
-  if (await isPayrollMonthLocked(service, organizationId, ym)) return { ok: false, reason: "locked" };
+  const lock = await payrollMonthLockState(service, organizationId, ym);
+  if (lock !== "open") return { ok: false, reason: lock === "locked" ? "locked" : "error" };
   return { service, organizationId, viewerId: session.user.id };
 }
 
@@ -81,7 +82,15 @@ async function targetUsers(ctx: Ctx, ym: string): Promise<string[]> {
 
 async function plan(ctx: Ctx, ym: string, fields: readonly CarryField[]) {
   const fromYm = shiftYm(ym, -1);
-  const [source, target, users] = await Promise.all([readSource(ctx, fromYm), readInputs(ctx, ym), targetUsers(ctx, ym)]);
+  // 급여 준비 읽기가 실패하면(requireRead 가 던짐) 던지지 않고 null → 화면은 오류 문구, 단추가 잠기지 않는다(2026-11-11).
+  let read: [Map<string, PrepManual> | null, Map<string, PrepManual> | null, string[]];
+  try {
+    read = await Promise.all([readSource(ctx, fromYm), readInputs(ctx, ym), targetUsers(ctx, ym)]);
+  } catch (error) {
+    console.error("[payroll-carry] read failed", error instanceof Error ? error.message : error);
+    return null;
+  }
+  const [source, target, users] = read;
   if (!source || !target) return null;
   return { fromYm, target, result: planCarryOver(source, target, users, fields) };
 }

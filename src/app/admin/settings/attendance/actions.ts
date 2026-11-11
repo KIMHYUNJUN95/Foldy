@@ -5,15 +5,18 @@ import {
   createAttendanceSite,
   deleteAttendanceSite,
   getActiveQrToken,
+  AttendanceSitePropertyError,
   getAttendanceSite,
   issueAttendanceQr,
   setAttendanceSiteActive,
   updateAttendanceSite,
 } from "@/lib/attendance-sites";
 import { revokeTrustedDevice } from "@/lib/attendance-trusted-device";
+import { isValidSiteRadius } from "@/lib/attendance";
 import { requireAdminSession } from "@/lib/admin-session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { hasOrganizationContext } from "@/lib/session";
+import { siteFormErrorHref } from "@/lib/attendance-site-form";
 
 function parseText(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
@@ -43,17 +46,30 @@ export async function saveAttendanceSiteSettings(formData: FormData) {
   const printName = parseText(formData, "printName");
   // 빈 값은 「건물 아님」(사무실 등)이다 — null 로 저장해 연결을 끊는다.
   const propertyId = parseText(formData, "propertyId") || null;
+  // 실패하면 새 근무지 폼으로 돌아가며 친 값을 되살린다(2026-11-11, `siteFormErrorHref`).
+  function fail(code: string): never {
+    redirect(
+      siteFormErrorHref(siteId, code, {
+        name,
+        printName,
+        latitude: parseText(formData, "latitude"),
+        longitude: parseText(formData, "longitude"),
+        radius: parseText(formData, "radius"),
+        propertyId: propertyId ?? "",
+      }),
+    );
+  }
 
   if (!name || latitude == null || longitude == null) {
-    redirect(`/admin/settings/attendance?site=${encodeURIComponent(siteId)}&error=invalid_coordinates`);
+    fail("invalid_coordinates");
   }
   if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
-    redirect(`/admin/settings/attendance?site=${encodeURIComponent(siteId)}&error=invalid_coordinates`);
+    fail("invalid_coordinates");
   }
-  if (radius == null || !Number.isInteger(radius) || radius <= 0) {
-    redirect(`/admin/settings/attendance?site=${encodeURIComponent(siteId)}&error=invalid_radius`);
+  // 반경은 1 ~ 500m 정수(2026-11-11, `ATTENDANCE_MAX_SITE_RADIUS_METERS`) — 넓게 잡으면 현장 밖 打刻이 통과한다.
+  if (!isValidSiteRadius(radius)) {
+    fail("invalid_radius");
   }
-
   let savedSiteId: string;
   try {
     const site = siteId
@@ -68,6 +84,7 @@ export async function saveAttendanceSiteSettings(formData: FormData) {
       : await createAttendanceSite({
           organizationId,
           name,
+          printName,
           latitude,
           longitude,
           allowedRadiusMeters: radius,
@@ -75,8 +92,10 @@ export async function saveAttendanceSiteSettings(formData: FormData) {
           isActive: true,
         });
     savedSiteId = site.id;
-  } catch {
-    redirect(`/admin/settings/attendance?site=${encodeURIComponent(siteId)}&error=site_save_failed`);
+  } catch (error) {
+    // 연결할 건물이 이 조직 것이 아니면 따로 알린다(2026-11-11).
+    const code = error instanceof AttendanceSitePropertyError ? "invalid_property" : "site_save_failed";
+    fail(code);
   }
   redirect(`/admin/settings/attendance?site=${savedSiteId}&saved=1`);
 }

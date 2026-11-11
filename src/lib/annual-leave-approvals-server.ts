@@ -10,8 +10,23 @@ import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { memberCapabilities } from "@/lib/capabilities-server";
 import { displayRoleKey, fetchPlatformDeveloperIds } from "@/lib/platform-developers";
 import type { AppSession } from "@/lib/session";
-import { leaveSpansOverlap, tokyoToday, type LeaveSpan } from "@/lib/annual-leave";
-import { getMyAnnualLeaveSummary } from "@/lib/annual-leave-server";
+import {
+  computeAnnualLeaveSummary,
+  leaveSpansOverlap,
+  tokyoToday,
+  type LeaveSpan,
+  type LeaveUsage,
+  leaveUsagesFromRows,
+} from "@/lib/annual-leave";
+import {
+  getAnnualLeaveBaseline,
+  isLeaveHourlyRole,
+  isMissingFunctionError,
+  selectAllPages,
+  sumApprovedLeaveUsage,
+  getAnnualLeaveBaselinesForUsers,
+  listApprovedLeaveRowsForUsers,
+} from "@/lib/annual-leave-server";
 
 type Service = ReturnType<typeof getSupabaseServiceClient>;
 
@@ -55,10 +70,25 @@ export type LeaveApprovalDetail = LeaveQueueItem & {
   emergencyContact: string;
   imageUrls: string[];
   balancePool: "paid" | "special" | "none";
+  /** 이 신청을 뺀, 같은 사람의 다른 승인된 휴가만 반영한 잔여(2026-11-11 — 승인된 신청은 두 번 빠지지 않는다). */
   balanceBefore: number | null;
+  /** 이 신청까지 반영한 잔여. 사용일 기준이라 `balanceBefore - daysCount` 와 다를 수 있다(그날 소멸 · 새 부여). */
   balanceAfter: number | null;
+  /** 승인하면 잔여를 넘는다(사용일에 쓸 수 있는 묶음이 모자람). 이때 승인에는 사유가 필요하다(M7). */
+  overBalance: boolean;
+  /** 승인하면 잔여를 넘는 일수(0 = 안 넘침). 화면 경고는 이 값만 그린다(2026-11-11). */
+  overflowDays: number;
+  /** 같은 풀에서 아직 대기 중인 이 사람의 다른 신청 일수 — 잔여에서 빼지 않고 따로 보여 준다. */
+  otherPendingDays: number;
+  /** 기준 잔여가 아직 결재자 확인 전(M11). */
+  baselineProvisional: boolean;
+  /** 승인 때 남긴 잔여 초과 사유(승인된 신청만). */
+  balanceOverrideReason: string | null;
+  /** 원래 휴무라 뺀 날짜(안 A, 2026-11-11). 결재자가 확인한다 — 화면 표시는 2차. */
+  excludedDates: string[];
   overlaps: LeaveOverlap[];
-  submittedVia: string;
+  /** 'mobile' | 'admin' | 'admin_proxy' — 이 칸이 생기기 전 신청은 null. */
+  submittedVia: string | null;
 };
 
 type RequestRow = {
@@ -109,7 +139,8 @@ async function getLeaveApproverRole(
     .eq("user_id", userId)
     .eq("is_active", true)
     .maybeSingle();
-  if (pa.data) return { isApprover: true, approverRole: null };
+  // 플랫폼 관리자도 휴가계 도장 칸을 채운다(2026-11-11) — 예전에는 null 이라 승인된 휴가계 도장이 비었다.
+  if (pa.data) return { isApprover: true, approverRole: LEAVE_STAMP_ROLE };
 
   // 결재 권한은 권한 키 `leave.approve` 로 판정한다(2026-10-21 — 역할 기본 대표 · 전무, 사람마다 켜고 끔). 예전 표시
   // `memberships.leave_approver_role` 은 더 이상 권한을 주지 않는다. 휴가계 도장 칸은 예전 기본값(전무)을 그대로 쓴다.
@@ -184,27 +215,73 @@ function tokyoWeekRange(today: string): { weekStart: string; weekEnd: string } {
 }
 
 /**
- * `userId` 의 한 잔여 풀에서 남은 일수, **이미 승인된 사용 분을 차감한** 값.
+ * 한 신청의 잔여 영향 — **모바일 잔여 화면과 같은 계산**(`getMyAnnualLeaveSummary` 와 같은 기준 · 사용 읽기 +
+ * `computeAnnualLeaveSummary`)으로, 이 신청을 뺀 잔여(before)와
+ * 넣은 잔여(after), 그리고 넘는지(over)를 낸다(2026-11-11, M7). 넘는지는 사용일 기준이다 — 그날 이미 소멸한 묶음은
+ * 못 쓰고, 그날 들어온 새 부여는 쓴다. 기준 잔여가 없으면 null(입사 6개월 미도달 / 미설정).
  *
- * `getMyAnnualLeaveSummary` 에 위임한다 — 모바일 잔여 화면
- * (`/mobile/attendance/leave`)과 admin 잔여 표가 읽는 것과 같은 함수. 예전에는
- * `computeAnnualLeaveSummary` 를 `usedDays`/`specialUsedDays` 없이 직접 호출해서 승인
- * 화면은 총 부여량(예: "12일")을 보고했고 신청자 본인 화면은 순
- * 잔여("2일")를 보여줬다. 잔여 초과 경고는 이 숫자에서 도출되므로 사실상 한 번도 발동하지 않았고
- * 잔여를 넘는 신청이 조용히 승인됐다. 계산을 여기에 다시 인라인하지 말 것: 두 화면이
- * 같은 숫자를 보여주려면 하나의 코드 경로를 공유해야 한다.
- *
- * 직원에게 아직 연차 기준이 없으면 null(입사 6개월 미도달 / 미설정).
+ * 계산을 여기에 다시 인라인하지 말 것: 승인 화면 · 승인 판정 · 신청자 화면이 같은 숫자를 보여 주려면
+ * 하나의 코드 경로를 공유해야 한다(2026-08-03 에 승인 화면만 총 부여량을 보여 잔여 초과가 조용히 승인됐다).
  */
-async function poolRemainingFor(
+async function poolImpactFor(
   service: Service,
   organizationId: string,
   userId: string,
   pool: "paid" | "special",
-): Promise<number | null> {
-  const summary = await getMyAnnualLeaveSummary(service, organizationId, userId);
-  if (!summary) return null;
-  return pool === "paid" ? summary.baseRemaining : summary.bonusRemaining;
+  request: { id: string; startDate: string; daysCount: number },
+  /** 이미 읽은 기준 잔여(승인 경로) — 주면 다시 읽지 않는다. 빼면 여기서 읽는다. */
+  preloadedBaseline?: Awaited<ReturnType<typeof getAnnualLeaveBaseline>>,
+): Promise<{
+  before: number;
+  after: number;
+  over: boolean;
+  overflowDays: number;
+  provisional: boolean;
+  approvedUsedDays: number;
+} | null> {
+  const [baseline, approved] = await Promise.all([
+    preloadedBaseline !== undefined ? preloadedBaseline : getAnnualLeaveBaseline(service, organizationId, userId),
+    sumApprovedLeaveUsage(service, organizationId, userId, { excludeRequestId: request.id }),
+  ]);
+  return impactFromData(baseline, approved, pool, request);
+}
+
+/** `poolImpactFor` 의 계산 부분(읽기 없음) — 결재 큐 요약이 한 번에 읽은 값으로 같은 계산을 한다. */
+function impactFromData(
+  baseline: Awaited<ReturnType<typeof getAnnualLeaveBaseline>>,
+  approved: { base: number; bonus: number; usages: LeaveUsage[] },
+  pool: "paid" | "special",
+  request: { id: string; startDate: string; daysCount: number },
+): {
+  before: number;
+  after: number;
+  over: boolean;
+  overflowDays: number;
+  provisional: boolean;
+  approvedUsedDays: number;
+} | null {
+  if (!baseline) return null;
+  const common = {
+    hireDate: baseline.hireDate,
+    baselineDate: baseline.baselineDate,
+    baselineAmount: baseline.baseAmount,
+    bonusBaselineAmount: baseline.bonusAmount,
+    asOf: tokyoToday(),
+  };
+  const usage: LeaveUsage = { date: request.startDate, days: request.daysCount, pool: pool === "paid" ? "base" : "bonus" };
+  const before = computeAnnualLeaveSummary({ ...common, usages: approved.usages });
+  const after = computeAnnualLeaveSummary({ ...common, usages: [...approved.usages, usage] });
+  const isPaid = pool === "paid";
+  // 이 신청 때문에 새로 넘치는 일수 — 승인 판정(over)과 결재 화면 경고가 같은 값을 쓴다.
+  const overflowDays = isPaid ? after.baseOverflow - before.baseOverflow : after.bonusOverflow - before.bonusOverflow;
+  return {
+    before: isPaid ? before.baseRemaining : before.bonusRemaining,
+    after: isPaid ? after.baseRemaining : after.bonusRemaining,
+    over: overflowDays > 0,
+    overflowDays: Math.max(0, overflowDays),
+    provisional: baseline.provisional,
+    approvedUsedDays: approved.base + approved.bonus,
+  };
 }
 
 function poolForType(leaveType: LeaveType): "paid" | "special" | "none" {
@@ -220,46 +297,63 @@ async function buildSummary(
   const today = tokyoToday();
   const { weekStart, weekEnd } = tokyoWeekRange(today);
 
-  const [{ data: pendingData }, { data: approvedData }] = await Promise.all([
-    service
-      .from("annual_leave_requests")
-      .select("id, user_id, applicant_name, leave_type, days_count")
-      .eq("organization_id", organizationId)
-      .eq("status", "requested"),
-    service
-      .from("annual_leave_requests")
-      .select("user_id")
-      .eq("organization_id", organizationId)
-      .eq("status", "approved")
-      .lte("start_date", weekEnd)
-      .gte("end_date", weekStart),
+  const [pending, approvedData] = await Promise.all([
+    selectAllPages<{
+      id: string;
+      user_id: string;
+      applicant_name: string;
+      leave_type: string;
+      days_count: number;
+      start_date: string;
+    }>("annual_leave_requests.pending", (from, to) =>
+      service
+        .from("annual_leave_requests")
+        .select("id, user_id, applicant_name, leave_type, days_count, start_date")
+        .eq("organization_id", organizationId)
+        .eq("status", "requested")
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
+    selectAllPages<{ user_id: string }>("annual_leave_requests.week", (from, to) =>
+      service
+        .from("annual_leave_requests")
+        .select("id, user_id")
+        .eq("organization_id", organizationId)
+        .eq("status", "approved")
+        .lte("start_date", weekEnd)
+        .gte("end_date", weekStart)
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
   ]);
-
-  const pending = (pendingData ?? []) as {
-    id: string;
-    user_id: string;
-    applicant_name: string;
-    leave_type: string;
-    days_count: number;
-  }[];
   const pendingCount = pending.length;
   const pendingDays = pending.reduce((sum, r) => sum + Number(r.days_count), 0);
 
-  const approvedThisWeekCount = new Set(
-    ((approvedData ?? []) as { user_id: string }[]).map((r) => r.user_id),
-  ).size;
+  const approvedThisWeekCount = new Set(approvedData.map((r) => r.user_id)).size;
 
+  // 잔여가 걸린 대기 건의 사람들 기준 잔여 · 승인 기록을 한 번에 읽고 메모리에서 계산한다(2026-11-11 — 예전엔 건마다 두 번씩 읽었다).
+  const poolRows = pending.filter((r) => poolForType(r.leave_type as LeaveType) !== "none");
+  const poolUserIds = poolRows.map((r) => r.user_id);
+  const [baselines, approvedRows] = await Promise.all([
+    getAnnualLeaveBaselinesForUsers(service, organizationId, poolUserIds),
+    listApprovedLeaveRowsForUsers(service, organizationId, poolUserIds),
+  ]);
   let balanceWarningName: string | null = null;
-  for (const r of pending) {
-    const pool = poolForType(r.leave_type as LeaveType);
-    if (pool === "none") continue;
-    const remaining = await poolRemainingFor(service, organizationId, r.user_id, pool);
-    if (remaining === null) {
-      // 기준 없음: 입사 6개월 미도달 / 미설정 — 최선 노력으로 "미도래" 표시
-      balanceWarningName = r.applicant_name;
-      break;
-    }
-    if (remaining - Number(r.days_count) < 0) {
+  for (const r of poolRows) {
+    const pool = poolForType(r.leave_type as LeaveType) as "paid" | "special";
+    const usages = leaveUsagesFromRows(approvedRows.filter((a) => a.user_id === r.user_id && a.id !== r.id));
+    const approved = {
+      base: usages.filter((u) => u.pool === "base").reduce((sum, u) => sum + u.days, 0),
+      bonus: usages.filter((u) => u.pool === "bonus").reduce((sum, u) => sum + u.days, 0),
+      usages,
+    };
+    const impact = impactFromData(baselines.get(r.user_id) ?? null, approved, pool, {
+      id: r.id,
+      startDate: r.start_date,
+      daysCount: Number(r.days_count),
+    });
+    // 기준 없음(입사 6개월 미도달 / 미설정) 또는 승인하면 잔여를 넘는 신청.
+    if (!impact || impact.over) {
       balanceWarningName = r.applicant_name;
       break;
     }
@@ -284,25 +378,26 @@ export async function getAdminLeaveQueue(
     };
   }
 
-  let query = service
-    .from("annual_leave_requests")
-    .select(QUEUE_COLUMNS)
-    .eq("organization_id", organizationId)
-    .in("status", statusesForGroup(opts.statusGroup));
-
-  if (opts.type && opts.type !== "all") {
-    query = query.eq("leave_type", opts.type);
-  }
-  if (opts.search && opts.search.trim().length > 0) {
-    const term = `%${opts.search.trim()}%`;
-    query = query.or(`applicant_name.ilike.${term},reason.ilike.${term}`);
-  }
-
-  const { data } = await query
-    .order("submitted_at", { ascending: false, nullsFirst: false })
-    .order("created_at", { ascending: false });
-
-  const rows = (data ?? []) as unknown as RequestRow[];
+  // 1,000행 상한을 넘겨 끝까지 읽는다(2026-11-11, M14) — 정렬 끝에 id 를 붙여 쪽이 흔들리지 않게.
+  const rows = await selectAllPages<RequestRow>("annual_leave_requests.queue", (from, to) => {
+    let query = service
+      .from("annual_leave_requests")
+      .select(QUEUE_COLUMNS)
+      .eq("organization_id", organizationId)
+      .in("status", statusesForGroup(opts.statusGroup));
+    if (opts.type && opts.type !== "all") {
+      query = query.eq("leave_type", opts.type);
+    }
+    if (opts.search && opts.search.trim().length > 0) {
+      const term = `%${opts.search.trim()}%`;
+      query = query.or(`applicant_name.ilike.${term},reason.ilike.${term}`);
+    }
+    return query
+      .order("submitted_at", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: true })
+      .range(from, to);
+  });
   const roleByUser = await rolesByUser(service, organizationId, rows.map((r) => r.user_id));
   const items = rows.map((r) => toQueueItem(r, roleByUser));
 
@@ -321,14 +416,22 @@ export async function getAdminLeaveApprovalDetail(
   const { isApprover } = await getLeaveApproverRole(service, organizationId, session.user.id);
   if (!isApprover) return null;
 
-  const { data } = await service
+  const { data, error: rowError } = await service
     .from("annual_leave_requests")
-    .select(QUEUE_COLUMNS)
+    // `*` — 새 칸(submitted_via · excluded_dates)이 아직 없는 DB 에서도 읽힌다(코드 먼저 배포).
+    .select("*")
     .eq("id", requestId)
     .eq("organization_id", organizationId)
     .not("status", "eq", "draft")
     .maybeSingle();
-  const row = data as unknown as RequestRow | null;
+  if (rowError) throw new Error(`annual leave detail read failed: ${rowError.message}`);
+  const row = data as unknown as
+    | (RequestRow & {
+        submitted_via?: string | null;
+        balance_override_reason?: string | null;
+        excluded_dates?: string[] | null;
+      })
+    | null;
   if (!row) return null;
 
   const roleByUser = await rolesByUser(service, organizationId, [row.user_id]);
@@ -337,9 +440,38 @@ export async function getAdminLeaveApprovalDetail(
   const balancePool = poolForType(item.leaveType);
   let balanceBefore: number | null = null;
   let balanceAfter: number | null = null;
+  let overBalance = false;
+  let overflowDays = 0;
+  let baselineProvisional = false;
+  let otherPendingDays = 0;
   if (balancePool !== "none") {
-    balanceBefore = await poolRemainingFor(service, organizationId, row.user_id, balancePool);
-    balanceAfter = balanceBefore === null ? null : balanceBefore - item.daysCount;
+    // 이 신청을 빼고 계산한다 — 이미 승인된 신청을 열면 예전에는 잔여에서 두 번 빠졌다(2026-11-11).
+    const impact = await poolImpactFor(service, organizationId, row.user_id, balancePool, {
+      id: row.id,
+      startDate: row.start_date,
+      daysCount: item.daysCount,
+    });
+    if (impact) {
+      balanceBefore = impact.before;
+      balanceAfter = impact.after;
+      overBalance = impact.over;
+      overflowDays = impact.overflowDays;
+      baselineProvisional = impact.provisional;
+    }
+    const pendingRows = await selectAllPages<{ id: string; days_count: number }>(
+      "annual_leave_requests.pending_same_user",
+      (from, to) =>
+        service
+          .from("annual_leave_requests")
+          .select("id, days_count")
+          .eq("organization_id", organizationId)
+          .eq("user_id", row.user_id)
+          .eq("status", "requested")
+          .eq("leave_type", item.leaveType)
+          .order("id", { ascending: true })
+          .range(from, to),
+    );
+    otherPendingDays = pendingRows.filter((r) => r.id !== row.id).reduce((sum, r) => sum + Number(r.days_count), 0);
   }
 
   const { data: overlapData } = await service
@@ -377,54 +509,117 @@ export async function getAdminLeaveApprovalDetail(
     balancePool,
     balanceBefore,
     balanceAfter,
+    overBalance,
+    overflowDays,
+    otherPendingDays,
+    baselineProvisional,
+    balanceOverrideReason: row.balance_override_reason ?? null,
+    excludedDates: row.excluded_dates ?? [],
     overlaps,
-    submittedVia: "mobile",
+    submittedVia: row.submitted_via ?? null,
   };
 }
 
 /**
- * 승인 후 休暇届 문서 번호(AL-YYYY-MM-NNN)를 최선 노력으로 부여한다.
- * 승인을 절대 실패시키지 않는다: 컬럼이 아직 마이그레이션되지 않았거나 충돌 외 오류가 나면
- * 그냥 반환한다. 동시 승인과 unique 위반 경합이 나면 다시 계산해 재시도한다.
+ * 승인 함수(`approve_annual_leave_request_atomic`)가 아직 없는 DB 용 예전 승인 경로 — 코드가 마이그레이션보다 먼저
+ * 배포돼도 승인이 멈추지 않게(2026-11-11 배포 순서). 같은 사람 잠금이 없어 동시 승인 경합은 막지 못한다
+ * (마이그레이션 뒤에는 이 경로를 타지 않는다). 겹침 · 상태 조건 · 문서 번호(숫자 기준 최대 + 1)는 지킨다.
  */
-async function assignLeaveDocumentNumber(
+async function legacyApproveWithoutRpc(
   service: Service,
   organizationId: string,
   requestId: string,
-): Promise<void> {
-  const ym = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Tokyo",
-    year: "numeric",
-    month: "2-digit",
-  }).format(new Date());
+  row: { user_id: string; start_date: string; end_date: string; duration_unit: string },
+  actor: { userId: string; approverRole: string | null },
+  overrideReason: string | null,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const span: LeaveSpan = {
+    startDate: row.start_date,
+    endDate: row.end_date,
+    durationUnit: row.duration_unit as LeaveSpan["durationUnit"],
+  };
+  const { data: sameUserApproved, error: overlapError } = await service
+    .from("annual_leave_requests")
+    .select("id, start_date, end_date, duration_unit")
+    .eq("organization_id", organizationId)
+    .eq("user_id", row.user_id)
+    .eq("status", "approved")
+    .lte("start_date", row.end_date)
+    .gte("end_date", row.start_date);
+  if (overlapError) return { ok: false, error: "approve_failed" };
+  const clash = ((sameUserApproved ?? []) as { id: string; start_date: string; end_date: string; duration_unit: string }[])
+    .filter((o) => o.id !== requestId)
+    .some((o) =>
+      leaveSpansOverlap(span, {
+        startDate: o.start_date,
+        endDate: o.end_date,
+        durationUnit: o.duration_unit as LeaveSpan["durationUnit"],
+      }),
+    );
+  if (clash) return { ok: false, error: "overlap" };
+
+  const { data: updated, error } = await service
+    .from("annual_leave_requests")
+    .update({
+      status: "approved",
+      approved_by_user_id: actor.userId,
+      approved_role: actor.approverRole,
+      approved_at: new Date().toISOString(),
+      balance_override_reason: overrideReason,
+    })
+    .eq("id", requestId)
+    .eq("organization_id", organizationId)
+    .eq("status", "requested")
+    .select("id");
+  if (error) return { ok: false, error: "approve_failed" };
+  if (!updated || updated.length === 0) return { ok: false, error: "not_requested" };
+
+  const ym = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit" }).format(
+    new Date(),
+  );
   const prefix = `AL-${ym}-`;
   for (let attempt = 0; attempt < 6; attempt += 1) {
-    const { data: last } = await service
+    const { data: numbered } = await service
       .from("annual_leave_requests")
       .select("document_number")
       .eq("organization_id", organizationId)
-      .like("document_number", `${prefix}%`)
-      .order("document_number", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    const lastNo = (last as { document_number: string | null } | null)?.document_number ?? null;
-    const lastNnn = lastNo ? parseInt(lastNo.slice(prefix.length), 10) || 0 : 0;
-    const candidate = `${prefix}${String(lastNnn + 1).padStart(3, "0")}`;
-    const { error } = await service
+      .like("document_number", `${prefix}%`);
+    // 숫자로 최대값 — 글자 정렬은 999 다음 1000 을 못 찾는다.
+    const maxNo = ((numbered ?? []) as { document_number: string | null }[]).reduce((max, r) => {
+      const n = parseInt((r.document_number ?? "").slice(prefix.length), 10);
+      return Number.isFinite(n) && n > max ? n : max;
+    }, 0);
+    const next = maxNo + 1;
+    const candidate = `${prefix}${next < 1000 ? String(next).padStart(3, "0") : String(next)}`;
+    const { error: numError } = await service
       .from("annual_leave_requests")
       .update({ document_number: candidate })
       .eq("id", requestId)
       .eq("organization_id", organizationId)
       .is("document_number", null);
-    if (!error) return;
-    // unique 위반 경합만 재시도할 가치가 있다. 그 밖의 것(예: 컬럼 미마이그레이션)은 → 포기.
-    if ((error as { code?: string }).code !== "23505") return;
+    if (!numError || (numError as { code?: string }).code !== "23505") break;
   }
+  return { ok: true };
 }
 
+/** 잔여 초과 사유 최대 글자 수. */
+const MAX_OVERRIDE_REASON = 500;
+
+/**
+ * 휴가 승인(2026-11-11 점검 수정).
+ *
+ *  - 자기 신청은 승인하지 않는다(`self_approval`, M6).
+ *  - 유급 · 특별휴가는 승인 때 자격을 다시 본다 — 시급직(`hourly_excluded`) · 기준 잔여 없음(`baseline_required`).
+ *  - 승인하면 잔여를 넘으면(사용일 기준) 사유가 있어야 한다 — 없으면 `over_balance`, 있으면
+ *    `balance_override_reason` 에 남긴다(M7).
+ *  - 상태 바꾸기 · 같은 사람 겹침 · 잔여 경합 · 문서 번호는 DB 함수 `approve_annual_leave_request_atomic` 이
+ *    같은 사람 잠금 안에서 한 번에 한다(M8). 서버가 잔여를 계산한 뒤 다른 승인이 먼저 들어가면 `stale` →
+ *    한 번 다시 계산한다.
+ */
 export async function approveLeaveRequestForApprover(
   session: AppSession,
   requestId: string,
+  opts: { overrideReason?: string } = {},
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const service = getSupabaseServiceClient();
   const organizationId = session.organization.id;
@@ -436,65 +631,99 @@ export async function approveLeaveRequestForApprover(
   );
   if (!isApprover) return { ok: false, error: "forbidden" };
 
-  const { data: existing } = await service
+  const { data: existing, error: readError } = await service
     .from("annual_leave_requests")
-    .select("status, user_id, start_date, end_date, duration_unit")
+    .select("id, status, user_id, leave_type, start_date, end_date, duration_unit, days_count")
     .eq("id", requestId)
     .eq("organization_id", organizationId)
     .maybeSingle();
+  if (readError) return { ok: false, error: "approve_failed" };
   const row = existing as
-    | { status: string; user_id: string; start_date: string; end_date: string; duration_unit: string }
+    | {
+        id: string;
+        status: string;
+        user_id: string;
+        leave_type: string;
+        start_date: string;
+        end_date: string;
+        duration_unit: string;
+        days_count: number;
+      }
     | null;
   if (!row) return { ok: false, error: "not_found" };
   if (row.status !== "requested") return { ok: false, error: "not_requested" };
+  if (row.user_id === session.user.id) return { ok: false, error: "self_approval" };
 
-  // 같은 사람의 이미 승인된 휴가와 겹치면 승인하지 않는다 — 잔여가 두 번 빠진다(2026-10-26).
-  // 잔여 초과 승인은 막지 않는다(경고만 — 정책 결정 대기).
-  const span: LeaveSpan = {
-    startDate: row.start_date,
-    endDate: row.end_date,
-    durationUnit: row.duration_unit as LeaveSpan["durationUnit"],
-  };
-  const { data: sameUserApproved, error: overlapError } = await service
-    .from("annual_leave_requests")
-    .select("start_date, end_date, duration_unit")
-    .eq("organization_id", organizationId)
-    .eq("user_id", row.user_id)
-    .eq("status", "approved")
-    .neq("id", requestId)
-    .lte("start_date", row.end_date)
-    .gte("end_date", row.start_date);
-  if (overlapError) return { ok: false, error: "approve_failed" };
-  const clash = ((sameUserApproved ?? []) as { start_date: string; end_date: string; duration_unit: string }[]).some(
-    (o) =>
-      leaveSpansOverlap(span, {
-        startDate: o.start_date,
-        endDate: o.end_date,
-        durationUnit: o.duration_unit as LeaveSpan["durationUnit"],
-      }),
-  );
-  if (clash) return { ok: false, error: "overlap" };
+  const pool = poolForType(row.leave_type as LeaveType);
+  const overrideReason = (opts.overrideReason ?? "").trim().slice(0, MAX_OVERRIDE_REASON);
 
-  const { data: updated, error } = await service
-    .from("annual_leave_requests")
-    .update({
-      status: "approved",
-      approved_by_user_id: session.user.id,
-      approved_role: approverRole,
-      approved_at: new Date().toISOString(),
-    })
-    .eq("id", requestId)
-    .eq("organization_id", organizationId)
-    .eq("status", "requested")
-    .select("id");
-  if (error) return { ok: false, error: "approve_failed" };
-  // 0행 = 그 사이 다른 사람이 먼저 처리했다(승인 · 반려 · 취소). 성공으로 보이면 안 된다.
-  if (!updated || updated.length === 0) return { ok: false, error: "not_requested" };
+  try {
+    // 기준 잔여는 한 번만 읽어 자격 확인 · 잔여 계산에 같이 쓴다(2026-11-11).
+    let baseline: Awaited<ReturnType<typeof getAnnualLeaveBaseline>> = null;
+    if (pool !== "none") {
+      const { data: memData, error: memError } = await service
+        .from("memberships")
+        .select("status, role")
+        .eq("organization_id", organizationId)
+        .eq("user_id", row.user_id)
+        .maybeSingle();
+      if (memError) return { ok: false, error: "approve_failed" };
+      const membership = memData as { status: string; role: string } | null;
+      if (!membership || membership.status !== "active") return { ok: false, error: "not_found" };
+      if (isLeaveHourlyRole(membership.role)) return { ok: false, error: "hourly_excluded" };
+      baseline = await getAnnualLeaveBaseline(service, organizationId, row.user_id);
+      if (!baseline) return { ok: false, error: "baseline_required" };
+    }
 
-  // 休暇届 문서 번호를 부여한다(최선 노력 — 승인을 막지 않음).
-  await assignLeaveDocumentNumber(service, organizationId, requestId);
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      let over = false;
+      // 잔여와 무관한 종류(경조 · 기타)는 null — 함수가 「그 사이 다른 승인」 확인을 건너뛴다. 예전엔 같은 사람 유급 승인과
+      // 동시에 들어오면 stale 이 두 번 나서 승인이 실패했다(2026-11-11).
+      let expectedUsed: number | null = null;
+      if (pool !== "none") {
+        const impact = await poolImpactFor(
+          service,
+          organizationId,
+          row.user_id,
+          pool,
+          { id: row.id, startDate: row.start_date, daysCount: Number(row.days_count) },
+          baseline,
+        );
+        if (!impact) return { ok: false, error: "baseline_required" };
+        over = impact.over;
+        expectedUsed = impact.approvedUsedDays;
+        if (over && !overrideReason) return { ok: false, error: "over_balance" };
+      }
 
-  return { ok: true };
+      const { data: result, error } = await service.rpc("approve_annual_leave_request_atomic", {
+        p_organization_id: organizationId,
+        p_request_id: requestId,
+        p_actor_user_id: session.user.id,
+        p_approved_role: approverRole,
+        p_override_reason: over ? overrideReason : null,
+        p_expected_used_days: expectedUsed,
+      });
+      if (error && isMissingFunctionError(error)) {
+        return legacyApproveWithoutRpc(
+          service,
+          organizationId,
+          requestId,
+          row,
+          { userId: session.user.id, approverRole },
+          over ? overrideReason : null,
+        );
+      }
+      if (error) return { ok: false, error: "approve_failed" };
+      if (result === "ok") return { ok: true };
+      if (result === "stale" && attempt === 0) continue;
+      if (result === "stale") return { ok: false, error: "approve_failed" };
+      return { ok: false, error: String(result) };
+    }
+  } catch {
+    // 잔여 읽기 실패 — 0 으로 보고 승인하지 않는다(H5).
+    return { ok: false, error: "approve_failed" };
+  }
+  return { ok: false, error: "approve_failed" };
 }
 
 export async function rejectLeaveRequestForApprover(

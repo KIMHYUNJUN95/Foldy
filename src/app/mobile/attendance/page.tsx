@@ -16,14 +16,14 @@ import { getDictionary } from "@/lib/i18n";
 import { canViewRoster } from "@/config/roles";
 import { residenceCardNotice } from "@/lib/staff-documents/expiry";
 import { loadOwnResidenceCardDaysLeft } from "@/lib/staff-documents/server";
+import { resolveAttendancePreviewState } from "@/lib/attendance-preview-state";
 
 type PageProps = {
   searchParams: Promise<{ state?: string }>;
 };
 
-// `?state=` 는 디자인 미리보기용 덮어쓰기다 (휴게/로딩은 여전히 정적 디자인 미리보기로 렌더됨).
+// `?state=` 는 디자인 미리보기용 덮어쓰기다 — 개발 환경에서만(`resolveAttendancePreviewState`, 운영에서는 무시).
 // 이 값이 없으면 홈은 실제 세션 데이터(대기 vs 근무 중)로 렌더된다.
-const PREVIEW_STATES = ["idle", "open", "break", "loading"] as const;
 
 // 근태 — 홈 (링 히어로 시계). 3단계: 실제 열린 세션 상태에 연결됨.
 // 참고: docs/product/24-attendance-workflow.md, docs/product/21-attendance-payroll-workflow.md.
@@ -48,9 +48,7 @@ export default async function MobileAttendancePage({ searchParams }: PageProps) 
   const navBadges = await navBadgesPromise;
 
   // 명시적 `?state=` 는 디자인 미리보기 전환기를 계속 동작하게 한다 (정적 화면, 실제 데이터 없음).
-  const previewState = PREVIEW_STATES.includes((params.state ?? "") as (typeof PREVIEW_STATES)[number])
-    ? (params.state as (typeof PREVIEW_STATES)[number])
-    : null;
+  const previewState = resolveAttendancePreviewState(params.state);
 
   // 월간 급여 미리보기용 도쿄 연월
   const tokyoYM = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo" })

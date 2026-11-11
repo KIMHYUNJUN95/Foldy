@@ -15,8 +15,11 @@ import {
   getOrCreateTransportReport,
   getTransportReport,
   syncReportTotalAmount,
+  syncReportTotalAmountQuietly,
   type TransportEntryMode,
 } from "@/lib/transport-reimbursement";
+import { tokyoToday } from "@/lib/tokyo-date";
+import { transportMonthAllowed } from "@/lib/transport-month";
 
 const TRANSPORT_PATH = "/mobile/attendance/transport";
 const IMAGE_BUCKET = "request-images";
@@ -43,11 +46,14 @@ function untyped(service: Service) {
 // 보고서는 소유자가 draft/rejected 상태일 때 수정할 수 있고, `changes_requested` 상태에서도 수정할 수 있다 —
 // 이 상태는 근무자가 표시된 항목을 고쳐 다시 제출하게 하려고 있는 것이다.
 const EDITABLE_STATUSES = new Set(["draft", "rejected", "changes_requested"]);
+const EDITABLE_STATUS_LIST = Array.from(EDITABLE_STATUSES);
 
 /** 'YYYY-MM' 월 키를 target_month 에 쓰는 'YYYY-MM-01' 첫날 형식으로 바꾼다. */
 function monthKeyToFirstDay(targetMonth: string): string | null {
   // 실제 달(01~12)만 — 「2026-13」 같은 키로 보고서 행이 생기지 않게(2026-10-26).
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(targetMonth)) return null;
+  // 받는 달은 화면과 같은 규칙(3년 전 ~ 다음 달, `transportMonthAllowed`) — 다다음 달 · 너무 먼 달로 정산서가 생기지 않게(2026-11-11).
+  if (!transportMonthAllowed(targetMonth, tokyoToday().slice(0, 7))) return null;
   return `${targetMonth}-01`;
 }
 
@@ -90,6 +96,8 @@ export type CreateTransportItemInput = {
   amountYen: number;
   entryMode: TransportEntryMode;
   attendanceSessionId?: string | null;
+  /** 청소 기록에서 온 후보의 청소 세션 id(2026-11-11 H2). */
+  cleaningSessionId?: string | null;
   propertyId?: string | null;
   /** 안 흔들리는 출근지 키. 건물이면 `property_id` 와 같고, 사무실·기타는 고정값. */
   destinationKey?: string;
@@ -123,11 +131,12 @@ export async function createTransportItemAction(
   if (input.entryMode !== "linked" && input.entryMode !== "manual") {
     return { ok: false, error: "invalid_entry_mode" };
   }
-  // `linked` 는 **실제로 무언가에 이어져 있어야** 한다. 예전에는 입력 방식 버튼만 눌러도
-  // `entry_mode: 'linked'` 로 찍혀서, 연결된 것이 없는데 연결됐다고 적힌 행이 남았다
-  // (기존 29건 전부 `attendance_session_id` 가 null 이었다). 근태 세션이나 건물 중 하나는 있어야
-  // 한다 — 청소 기록에서 온 후보는 세션 id 가 없고 건물만 있다.
-  if (input.entryMode === "linked" && !input.attendanceSessionId && !input.propertyId) {
+  // `linked` 는 **근태 기록이나 청소 기록 하나에 실제로 이어져 있어야** 한다(2026-11-11 H2). 예전에는 건물만 있어도
+  // 통과했는데, DB 검사 트리거(validate_transport_reimbursement_item)는 연결 출처(linkedSourceType · linkedSourceId)를
+  // 요구해서 자동 후보 저장이 늘 실패했다. 출처는 아래에서 서버가 확인한 뒤 work_context 에 적는다.
+  const attendanceSessionId = input.attendanceSessionId?.trim() || null;
+  const cleaningSessionId = input.cleaningSessionId?.trim() || null;
+  if (input.entryMode === "linked" && !attendanceSessionId && !cleaningSessionId) {
     return { ok: false, error: "link_target_required" };
   }
   // 기타는 메모가 있어야 한다. 화면에서도 막지만 여기서 한 번 더 본다 —
@@ -140,19 +149,33 @@ export async function createTransportItemAction(
     return { ok: false, error: "memo_required" };
   }
 
-  // 연결 대상은 **내 것 · 우리 조직 것**만(2026-10-26). 화면이 보낸 id 를 그대로 저장하면 남의 근태 기록이나
-  // 다른 조직 건물에 이어진 행이 생긴다.
-  const attendanceSessionId = input.attendanceSessionId?.trim() || null;
+  // 연결 대상은 **내 것 · 우리 조직 것 · 그날 것**만(2026-10-26, 날짜는 2026-11-11). 화면이 보낸 id 를 그대로
+  // 저장하면 남의 근태 기록이나 다른 조직 건물에 이어진 행이 생긴다. DB 트리거와 같은 조건이다.
   const propertyId = input.propertyId?.trim() || null;
-  if (attendanceSessionId) {
+  let linkedSource: { type: "attendance" | "cleaning"; id: string } | null = null;
+  if (input.entryMode === "linked" && attendanceSessionId) {
     const sessionRes = await service
       .from("attendance_sessions")
       .select("id")
       .eq("id", attendanceSessionId)
       .eq("organization_id", organizationId)
       .eq("user_id", userId)
+      .eq("operating_date", input.usageDate)
+      .neq("status", "invalid")
       .maybeSingle();
     if (sessionRes.error || !sessionRes.data) return { ok: false, error: "invalid_link" };
+    linkedSource = { type: "attendance", id: attendanceSessionId };
+  } else if (input.entryMode === "linked" && cleaningSessionId) {
+    const cleaningRes = await service
+      .from("cleaning_sessions")
+      .select("id")
+      .eq("id", cleaningSessionId)
+      .eq("organization_id", organizationId)
+      .eq("staff_user_id", userId)
+      .eq("cleaning_date", input.usageDate)
+      .maybeSingle();
+    if (cleaningRes.error || !cleaningRes.data) return { ok: false, error: "invalid_link" };
+    linkedSource = { type: "cleaning", id: cleaningSessionId };
   }
   if (propertyId) {
     const propertyRes = await service
@@ -173,6 +196,10 @@ export async function createTransportItemAction(
   if (input.destinationKey?.trim()) workContext.destinationKey = input.destinationKey.trim();
   if (input.buildingLabel?.trim()) workContext.buildingLabel = input.buildingLabel.trim();
   if (input.contextSummary?.trim()) workContext.contextSummary = input.contextSummary.trim();
+  if (linkedSource) {
+    workContext.linkedSourceType = linkedSource.type;
+    workContext.linkedSourceId = linkedSource.id;
+  }
 
   const ins = await untyped(service)
     .from("transport_reimbursement_items")
@@ -183,7 +210,8 @@ export async function createTransportItemAction(
       usage_date: input.usageDate,
       amount_yen: input.amountYen,
       entry_mode: input.entryMode,
-      attendance_session_id: attendanceSessionId,
+      // 직접 입력은 근태 기록에 잇지 않는다(트리거도 manual 이면 비운다). 청소 연결도 근태 칸은 비운다.
+      attendance_session_id: linkedSource?.type === "attendance" ? attendanceSessionId : null,
       property_id: propertyId,
       work_context: workContext,
       memo: input.memo?.trim() ? input.memo.trim() : null,
@@ -192,7 +220,7 @@ export async function createTransportItemAction(
     .maybeSingle();
   if (ins.error || !ins.data) return { ok: false, error: "insert_failed" };
 
-  await syncReportTotalAmount(service, report.id);
+  await syncReportTotalAmountQuietly(service, report.id);
   revalidatePath(TRANSPORT_PATH);
   return { ok: true, itemId: (ins.data as { id: string }).id, reportId: report.id };
 }
@@ -302,7 +330,7 @@ export async function updateTransportItemAction(
     .eq("user_id", userId);
   if (upd.error) return { ok: false, error: "update_failed" };
 
-  await syncReportTotalAmount(service, loaded.item.report_id);
+  await syncReportTotalAmountQuietly(service, loaded.item.report_id);
   revalidatePath(TRANSPORT_PATH);
   return { ok: true };
 }
@@ -346,7 +374,7 @@ export async function deleteTransportItemAction(itemId: string): Promise<Transpo
     .eq("user_id", userId);
   if (del.error) return { ok: false, error: "delete_failed" };
 
-  await syncReportTotalAmount(service, reportId);
+  await syncReportTotalAmountQuietly(service, reportId);
   revalidatePath(TRANSPORT_PATH);
   return { ok: true };
 }
@@ -472,6 +500,7 @@ export async function submitTransportReportAction(
     .select("id")
     .eq("report_id", report.id)
     .eq("organization_id", organizationId);
+  if (itemsRes.error) return { ok: false, error: "submit_failed" };
   const itemIds = ((itemsRes.data ?? []) as { id: string }[]).map((r) => r.id);
   if (itemIds.length === 0) return { ok: false, error: "no_items" };
 
@@ -481,19 +510,32 @@ export async function submitTransportReportAction(
     .select("item_id")
     .in("item_id", itemIds)
     .eq("organization_id", organizationId);
+  if (imgRes.error) return { ok: false, error: "submit_failed" };
   const withImage = new Set(
     ((imgRes.data ?? []) as { item_id: string }[]).map((r) => r.item_id),
   );
   const missing = itemIds.some((id) => !withImage.has(id));
   if (missing) return { ok: false, error: "missing_evidence" };
 
+  // 제출 직전에 합계를 항목에서 다시 맞춘다(2026-11-11 M12) — 관리자가 보는 금액이 항목 합과 어긋나지 않게.
+  try {
+    await syncReportTotalAmount(service, report.id);
+  } catch (error) {
+    console.error("[submitTransportReportAction] total sync failed:", error instanceof Error ? error.message : error);
+    return { ok: false, error: "submit_failed" };
+  }
+
+  // 고칠 수 있는 상태일 때만 넘긴다 — 위에서 읽은 뒤 관리자가 처리했으면 0행이 바뀌고 실패로 돌려준다.
   const upd = await untyped(service)
     .from("transport_reimbursement_reports")
     .update({ status: "submitted", submitted_at: new Date().toISOString() })
     .eq("id", report.id)
     .eq("organization_id", organizationId)
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .in("status", EDITABLE_STATUS_LIST)
+    .select("id");
   if (upd.error) return { ok: false, error: "submit_failed" };
+  if (((upd.data ?? []) as unknown[]).length === 0) return { ok: false, error: "report_not_editable" };
 
   revalidatePath(TRANSPORT_PATH);
   return { ok: true };

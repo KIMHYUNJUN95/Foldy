@@ -20,7 +20,7 @@ by the current status above and the later as-built sections.
 > `attendance_activity` type): admin alerts on **correction created** + **abnormal/midnight session**
 > (owner / `attendance_payroll_admin` only), and the worker **18:30 open-session reminder** -> a
 > once-per-Tokyo-day home prompt ("Still working?" suppresses; "Already left work" routes to correction, **no
-> auto clock-out**) + a CRON_SECRET-gated scan (`/api/attendance/reminders`). In-app only (Web Push
+> auto clock-out**) + a CRON_SECRET-gated scan (`/api/attendance/reminders`; header-only secret, **not scheduled** — 2026-11-11, see doc 24 「근태 점검 1차」). In-app only (Web Push
 > deferred); no admin dashboard. See `docs/engineering/11-attendance-payroll-technical-design.md` -> "As-built - Step 14" and `docs/product/14-notification-design.md`.
 
 > **Step 13 (2026-06-18):** finalized-only payroll **export** is live (`exportMonthlyPayroll` /
@@ -29,10 +29,10 @@ by the current status above and the later as-built sections.
 > each. **Superseded (2026-07-03):** the operator's final **Excel workbook + PDF** export now ships from
 > the admin 급여 검토 page (`/admin/attendance/payroll`) — see the "Export" section below. The original
 > CSV path (`runPayrollExport` / `exportMonthlyPayroll` / `exportUserPayroll` + the dev test route)
-> remains only as a legacy/back-compat foundation and is not wired into the dashboard UI. See
+> remained as a legacy foundation; **the two server actions were deleted on 2026-11-11** — only the dev route still uses `runPayrollExport`. See
 > `docs/engineering/11-attendance-payroll-technical-design.md` → "As-built — Step 13".
 
-> **Step 12 (2026-06-18):** the privileged **org-wide payroll-totals data layer** is ready
+> **Step 12 (2026-06-18, removed 2026-11-11 — `getPayrollTotals` was never called):** the privileged **org-wide payroll-totals data layer** is ready
 > (`getPayrollTotals(org, ym)`): finalized labor total (from finalized snapshots), expected labor total
 > (sum of relevant hourly workers' current expected pay), unfinalized worker count, and site-based
 > totals (by clock-in site). Expected vs finalized are kept explicitly separate. **Query-only, no
@@ -740,6 +740,27 @@ Important:
 - receipt images should not be embedded into every sheet cell by default
 - the workbook is a reimbursement ledger; the images remain the evidence source in the app/storage
 - if later needed, evidence download should be handled separately from the main workbook
+
+### 점검 수정 1차 (2026-11-11)
+
+마이그레이션 `202611110002_leave_transport_hardening.sql`(코드 먼저 배포해도 된다).
+
+- **자동 연결 저장(H2).** 자동 연결 후보를 고르면 DB 검사 트리거가 요구하는 출처(`work_context.linkedSourceType` · `linkedSourceId`)가 없어 저장이
+  늘 실패했다. 이제 근태 기록(`attendanceSessionId`) 또는 청소 기록(`cleaningSessionId`) 중 하나가 있어야 하고, 서버가 **내 것 · 그날 것**
+  (근태: `operating_date` = 사용일, 무효 아님 / 청소: `staff_user_id` · `cleaning_date`)인지 확인한 뒤 출처를 적는다. 건물만으로는 자동 연결이 아니다.
+  기존 linked 행은 근태 기록이 확인되면 출처를 채우고 나머지는 직접 입력으로 돌린다(운영 2026-11-11 기준 0건).
+- **받는 달 한 규칙.** 화면 `?ym` 과 서버 액션이 같은 함수(`src/lib/transport-month.ts`, 도쿄 지금 달 기준 3년 전 ~ 다음 달 — 문서 24)를 쓴다. 그 밖의 달은 항목 추가 · 제출 거절(`invalid_month`).
+- **합계(M12).** DB 트리거 `sync_transport_report_total` 이 항목이 바뀔 때마다 `total_amount_cached` 를 다시 센다(한 번 전체 다시 계산 포함).
+  앱의 `syncReportTotalAmount` 는 오류를 던진다(예전엔 읽기 실패 시 0엔 저장 가능) — 항목 저장 뒤에는 기록만, **제출 · 승인 직전**에는 실패로 돌린다.
+- **잠긴 정산서.** 제출 · 검토 중 · 승인 상태의 항목은 DB 가 추가와 금액 · 날짜 · 소속 정산서 · 입력 방식 변경을 막는다
+  (`guard_transport_item_report_editable`). 표시용 칸(work_context · memo) 변경과 연결 칸 비우기(set null)는 막지 않는다 — 건물 이름 맞바꾸기 스크립트 · 삭제 연쇄. 제출은 고칠 수 있는
+  상태일 때만 넘어간다(그 사이 처리됐으면 `report_not_editable`).
+- **자기 정산서 처리 금지.** 관리자가 자기 정산서를 승인 · 반려하면 `self_review` → 화면 문구 `trSelfReviewBlocked`(`transportReviewErrorText`).
+- **관리자 목록(M14).** 항목 · 사진 · 이름 읽기를 200개씩 나눠 읽고, 읽기 실패는 오류로 올린다.
+- 교통비 사진 Storage 삭제는 본인 또는 `transport.manage` 만.
+- **화면(2차).** PC 교통비 화면은 정산서가 바뀌면 새로 읽는다(실시간 — 마이그레이션 6d 가 `transport_reimbursement_reports` 를 발행에 넣음,
+  화면은 서버가 새로 준 목록으로 바꿔 끼움) · 처리 호출이 던지면 일반 실패 문구 · 표 줄은 키보드로도 연다. 모바일 명세 항목 삭제는
+  바로 접히고 실패하면 다시 펴며 토스트(`toastDeleteFailed`).
 
 ## Monthly Finalization
 

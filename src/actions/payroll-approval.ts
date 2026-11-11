@@ -148,7 +148,14 @@ export async function requestPayrollApproval(ym: string): Promise<PayrollRoundAc
   if (!org.presidentApproverId) return { ok: false, reason: "no_approver" };
 
   const payday = paydayFor(ym, org.payDay);
-  const live = await loadPrepRows(ctx.service, ctx.organizationId, ym, payday, org.employmentInsuranceRates);
+  // 근태 · 급여 입력을 읽다 실패하면 계산하지 않고 오류(2026-11-11) — 빈 휴게 · 잘린 근무로 결재 숫자를 굳히지 않는다.
+  let live: Awaited<ReturnType<typeof loadPrepRows>>;
+  try {
+    live = await loadPrepRows(ctx.service, ctx.organizationId, ym, payday, org.employmentInsuranceRates);
+  } catch (error) {
+    console.error("[payroll-approval] prep read failed", error instanceof Error ? error.message : error);
+    return { ok: false, reason: "error" };
+  }
   if (!canRequestApproval(live.rows, live.totals)) return { ok: false, reason: "not_ready" };
 
   const now = new Date().toISOString();

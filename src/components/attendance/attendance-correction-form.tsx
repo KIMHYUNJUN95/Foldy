@@ -35,6 +35,7 @@ import { getDictionary, type Dictionary } from "@/lib/i18n";
 import { tokyoToday } from "@/lib/annual-leave";
 import { HireDatePicker } from "./hire-date-picker";
 import { haptic } from "@/lib/haptics";
+import { settleAction } from "@/lib/settle-action";
 
 type AttendanceCopy = Dictionary["attendance"];
 
@@ -200,7 +201,14 @@ export function AttendanceCorrectionForm({
         targetDate: sessionId ? null : workDate,
         imageUrls,
       };
-      const res = await createAttendanceCorrectionRequest(input);
+      // 네트워크가 끊기면 액션이 던진다 — 결과로 바꿔 실패 문구를 보인다(2026-11-11).
+      const settled = await settleAction(() => createAttendanceCorrectionRequest(input));
+      if (settled.thrown) {
+        haptic("error");
+        setError(copy.actionNetworkError);
+        return;
+      }
+      const res = settled.value;
       if (res.ok) {
         haptic("success");
         router.push(`/mobile/attendance/correction/status?id=${res.id}`);
@@ -210,7 +218,13 @@ export function AttendanceCorrectionForm({
       setError(
         res.reason === "out_of_range"
           ? copy.corrErrOutOfRange
-          : res.reason === "forbidden"
+          : res.reason === "month_locked"
+            ? copy.corrErrMonthLocked
+            : res.reason === "clock_order"
+              ? copy.corrErrClockOrder
+              : res.reason === "too_long"
+                ? copy.corrErrTooLong
+                : res.reason === "forbidden"
             ? copy.corrErrForbidden
             : res.reason === "invalid"
               ? copy.corrErrInvalid

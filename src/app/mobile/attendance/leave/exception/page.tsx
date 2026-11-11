@@ -32,7 +32,8 @@ export default async function MobileLeaveExceptionPage({
 
   const navBadges = await navBadgesPromise;
   const copy = getDictionary(session.user.preferredLanguage).leave;
-  const variant = params.state === "waiting" ? "waiting" : "missing";
+  // waiting 은 가짜 날짜(WAIT_MOCK)로 그리는 디자인 미리보기 — 개발 환경에서만 연다(2026-11-11). 운영은 언제나 missing.
+  const variant = params.state === "waiting" && process.env.NODE_ENV !== "production" ? "waiting" : "missing";
 
   return (
     <MobileShell activeItem="attendance" badges={navBadges} title={copy.appTitle} hideBottomNav>

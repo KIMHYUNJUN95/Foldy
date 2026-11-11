@@ -373,6 +373,7 @@ function AddItemSheet({
         amountYen: amountNum,
         entryMode: inputMode,
         attendanceSessionId: linked?.attendanceSessionId ?? null,
+        cleaningSessionId: linked?.cleaningSessionId ?? null,
         propertyId: linked?.propertyId ?? destination?.propertyId ?? null,
         destinationKey: linked?.propertyId ?? (destinationKey || undefined),
         buildingLabel: linked?.buildingLabel || destination?.label || undefined,
@@ -1127,6 +1128,8 @@ export function TransportStatement({
   const [showDelete, setShowDelete] = useState(false);
   const intentRef = useRef<"edit" | "delete" | null>(null);
   const [toast, setToast] = useState<{ message: string; tone: "ok" | "del" } | null>(null);
+  /** 지우는 중인 줄 — 서버 응답 전에 접혀 있다. */
+  const [leavingId, setLeavingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   // 첫 항목을 넣으면서 서버가 만든 보고서 id. 화면을 열 때 보고서가 없으면 report.id 는 빈 값이다(page.tsx).
   const [createdReportId, setCreatedReportId] = useState<string | null>(null);
@@ -1177,19 +1180,30 @@ export function TransportStatement({
 
   const handleDelete = useCallback(() => {
     const id = selectedId;
-    // 확인 모달 슬라이드아웃(320ms) 후 실제 삭제 + 토스트
+    // 확인 모달 슬라이드아웃(320ms) 후 — 줄을 **먼저 접고** 서버를 기다린다(줄 접힘 공용 `.row-collapse`, 2026-11-11).
+    // 실패하면 다시 펴고 토스트로 알린다(예전: 실패해도 아무 말이 없었다).
     setTimeout(async () => {
       if (!id) return;
-      const result = await deleteTransportItemAction(id);
       setShowDelete(false);
       setSelectedId(null);
-      haptic(result.ok ? "light" : "error");
-      if (result.ok) {
+      setLeavingId(id);
+      haptic("light");
+      let ok = false;
+      try {
+        ok = (await deleteTransportItemAction(id)).ok;
+      } catch {
+        ok = false;
+      }
+      if (ok) {
         setItems((prev) => prev.filter((it) => it.id !== id));
         setToast({ message: t.toastDeleted, tone: "del" });
+      } else {
+        haptic("error");
+        setToast({ message: t.toastDeleteFailed, tone: "del" });
       }
+      setLeavingId((cur) => (cur === id ? null : cur));
     }, 340);
-  }, [selectedId, t.toastDeleted]);
+  }, [selectedId, t.toastDeleted, t.toastDeleteFailed]);
 
   async function handleSubmit() {
     setSubmitting(true);
@@ -1298,9 +1312,9 @@ export function TransportStatement({
         {items.map((item) => {
           const missing = item.missingReceipt || item.receiptCount === 0;
           return (
+            <div className="row-collapse" key={item.id} data-leaving={leavingId === item.id ? "" : undefined}>
             <button
               type="button"
-              key={item.id}
               className="trnw-line"
               onClick={() => {
                 setSelectedId(item.id);
@@ -1318,6 +1332,7 @@ export function TransportStatement({
               </span>
               <b className="trnw-line__v">{fmtYen(item.amount)}</b>
             </button>
+            </div>
           );
         })}
       </div>

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import "./leave.css";
-import { tokyoToday, type AnnualLeaveSummary } from "@/lib/annual-leave";
+import { baseLeaveBarTotals, tokyoToday, type AnnualLeaveSummary } from "@/lib/annual-leave";
 import type { LeaveRequestView } from "@/lib/annual-leave-requests-server";
 import { getDictionary, type Dictionary } from "@/lib/i18n";
 
@@ -51,9 +51,8 @@ export function LeaveHome({
 
   // 메인 카드는 "유급 휴가" 풀만 추적한다 — 특별휴가(4년 보너스) 풀은
   // 별개의 병렬 부여분이며 이 진행 막대/합계에 포함되지 않는다.
-  const basePool = summary.buckets.filter((b) => b.kind !== "bonus");
-  const totalPool = basePool.reduce((sum, b) => sum + b.amount, 0);
-  const used = Math.max(0, totalPool - summary.baseRemaining);
+  // 소멸된 묶음은 빼고 센다(2026-11-11) — `baseLeaveBarTotals`.
+  const { granted: totalPool, used } = baseLeaveBarTotals(summary);
   const usedPct = totalPool > 0 ? Math.round((used / totalPool) * 100) : 0;
 
   const bonusOn = summary.nextBonusGrant;

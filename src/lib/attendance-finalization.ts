@@ -7,7 +7,8 @@
 
 import "server-only";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
-import type { AttendanceMonthSnapshotRow } from "@/lib/attendance";
+import { isPayableReviewState, type AttendanceMonthSnapshotRow } from "@/lib/attendance";
+import { requireRead } from "@/lib/attendance-read";
 
 type Service = ReturnType<typeof getSupabaseServiceClient>;
 
@@ -30,7 +31,53 @@ export type FinalizationBlockers = {
   /** 고용형태 · 시급이 없어 0원이 된 근무 수(`PayCalcMonth.unpricedCount`, 2026-10-21). 0원이 마감 금액으로 굳지 않게 막는다. */
   missingPayInfo: number;
   alreadyFinalized: boolean;
+  /**
+   * 마감을 막는 근무 하나하나(2026-11-11) — 날짜 · 이유 코드. `rejected_correction` · `pending_correction` 근무는 「검토 필요」 탭에
+   * 보이지 않아, 숫자만으로는 어느 날을 고쳐야 하는지 알 수 없었다. 화면은 이 코드를 ko/ja/en 문구로 바꿔 보여 준다.
+   */
+  sessions?: BlockingSession[];
 };
+
+export type BlockingSessionReason = "review_required" | "pending_correction" | "rejected_correction" | "open";
+
+export type BlockingSession = {
+  sessionId: string;
+  userId: string;
+  /** 운영일 YYYY-MM-DD(도쿄). */
+  date: string;
+  reason: BlockingSessionReason;
+};
+
+/**
+ * 마감을 막는 근무 목록 — `countBlockingSessions` 와 같은 판정(무효 제외 · 지급 안 되는 검토 상태 · 열린 근무), 근무마다 이유 하나,
+ * 날짜 순. 검토 상태가 이유면 그것을, 아니면 `open`.
+ */
+export function listBlockingSessions(
+  sessions: readonly {
+    id: string;
+    user_id: string;
+    operating_date: string;
+    status: string;
+    review_state: string;
+    clock_out_at: string | null;
+  }[],
+): BlockingSession[] {
+  const out: BlockingSession[] = [];
+  for (const s of sessions) {
+    if (s.status === "invalid") continue;
+    let reason: BlockingSessionReason | null = null;
+    if (!isPayableReviewState(s.review_state)) {
+      reason =
+        s.review_state === "pending_correction" || s.review_state === "rejected_correction"
+          ? s.review_state
+          : "review_required";
+    } else if (s.status === "open" || s.status === "reopened" || s.status === "abandoned" || !s.clock_out_at) {
+      reason = "open";
+    }
+    if (reason) out.push({ sessionId: s.id, userId: s.user_id, date: s.operating_date, reason });
+  }
+  return out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+}
 
 export type FinalizationEligibility = {
   eligible: boolean;
@@ -49,7 +96,8 @@ export function countBlockingSessions(
   let openSessions = 0;
   for (const s of sessions) {
     if (s.status === "invalid") continue;
-    if (s.review_state === "review_required") reviewRequired += 1;
+    // 급여에서 빠지는 검토 상태는 전부 막는다 — 급여 제외(`payExcludeReason`)와 같은 판정 하나(2026-11-11).
+    if (!isPayableReviewState(s.review_state)) reviewRequired += 1;
     // `abandoned`(퇴근 미기록 후 운영일 경과)도 미해소로 센다 — 출근은 막지 않되 **마감은 막아야**
     // 누군가 반드시 정리하게 된다. 정리 경로는 정정 요청 승인 / 관리자 직접 수정 / 무효 처리.
     if (s.status === "open" || s.status === "reopened" || s.status === "abandoned" || !s.clock_out_at) {
@@ -68,6 +116,8 @@ export async function getCurrentFinalizedSnapshot(
   organizationId: string,
   userId: string,
   ym: string,
+  /** `strict` = 읽기 실패면 던진다 — 마감 여부를 「안 됨」으로 잘못 보고 쓰기를 허락하지 않게(2026-11-11). */
+  options: { strict?: boolean } = {},
 ): Promise<AttendanceMonthSnapshotRow | null> {
   const res = await service
     .from("attendance_month_snapshots")
@@ -77,6 +127,7 @@ export async function getCurrentFinalizedSnapshot(
     .eq("target_month", monthFirstDay(ym))
     .eq("status", "finalized")
     .maybeSingle();
+  if (options.strict) return requireRead("attendance_month_snapshots", res, null) as AttendanceMonthSnapshotRow | null;
   return (res.data as AttendanceMonthSnapshotRow | null) ?? null;
 }
 
@@ -98,13 +149,16 @@ export async function getFinalizationEligibility(
 
   const sessRes = await service
     .from("attendance_sessions")
-    .select("id, status, review_state, clock_out_at")
+    .select("id, user_id, operating_date, status, review_state, clock_out_at")
     .eq("organization_id", organizationId)
     .eq("user_id", userId)
     .gte("operating_date", firstDay)
     .lte("operating_date", lastDay);
-  const sessions = (sessRes.data ?? []) as {
+  // 읽기 실패는 던진다(2026-11-11) — 「막는 것 0건」으로 보고 마감을 통과시키지 않는다.
+  const sessions = requireRead("attendance_sessions", sessRes, []) as {
     id: string;
+    user_id: string;
+    operating_date: string;
     status: string;
     review_state: string;
     clock_out_at: string | null;
@@ -123,7 +177,7 @@ export async function getFinalizationEligibility(
       .eq("requested_by_user_id", userId)
       .in("status", ["requested", "in_review"])
       .in("session_id", sessionIds);
-    pendingCorrections += (cr.data ?? []).length;
+    pendingCorrections += requireRead("attendance_correction_requests", cr, []).length;
   }
   // 세션 없는 정정: 어느 세션에도 걸리지 않고 이 달을 대상으로 한 예외 요청.
   const crNull = await service
@@ -134,10 +188,10 @@ export async function getFinalizationEligibility(
     .in("status", ["requested", "in_review"])
     .is("session_id", null)
     .eq("target_month", firstDay);
-  pendingCorrections += (crNull.data ?? []).length;
+  pendingCorrections += requireRead("attendance_correction_requests", crNull, []).length;
 
   const alreadyFinalized =
-    (await getCurrentFinalizedSnapshot(service, organizationId, userId, ym)) != null;
+    (await getCurrentFinalizedSnapshot(service, organizationId, userId, ym, { strict: true })) != null;
 
   const blockers: FinalizationBlockers = {
     reviewRequired,
@@ -145,6 +199,7 @@ export async function getFinalizationEligibility(
     openSessions,
     missingPayInfo: unpricedCount,
     alreadyFinalized,
+    sessions: listBlockingSessions(sessions),
   };
   const eligible =
     reviewRequired === 0 &&

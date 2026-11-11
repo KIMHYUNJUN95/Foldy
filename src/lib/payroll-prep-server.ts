@@ -20,6 +20,7 @@ import { loadPayrollRound } from "@/lib/payroll-approval-server";
 import type { PayrollRound } from "@/lib/payroll-approval";
 import { tokyoToday } from "@/lib/tokyo-date";
 import { readAllPages } from "@/lib/supabase/read-all-pages";
+import { requireRead } from "@/lib/attendance-read";
 import { breakSecondsBySession } from "@/lib/attendance-pay-calculation";
 import { computePayrollKintai, type KintaiAudit } from "@/lib/payroll-kintai";
 import { loadMemberBanks } from "@/lib/payroll-bank-server";
@@ -204,7 +205,10 @@ export async function loadPrepRows(
       .eq("organization_id", organizationId)
       .eq("target_month", firstDay),
   ]);
-  if (inputsRes.error) console.warn("[payroll-prep] month inputs read failed:", inputsRes.error.message);
+  // 읽기 실패는 던진다(2026-11-11) — 사람 · 교통비 · 직접 입력(잔업 · 원천세 등)이 빠진 숫자를 결재 요청이 굳히지 않게.
+  requireRead("memberships", membersRes, []);
+  requireRead("transport_reimbursement_reports", transportRes, []);
+  requireRead("payroll_month_inputs", inputsRes, []);
 
   const candidates = new Set<string>();
   for (const m of (membersRes.data ?? []) as { user_id: string; status: string }[]) {

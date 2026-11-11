@@ -25,7 +25,7 @@ import { useRouter } from "next/navigation";
 import { ManualSessionModal } from "./manual-session-modal";
 import type { ReviewQueueItem } from "@/lib/attendance-review";
 import type { AdminCorrectionRow, AdminCorrectionField } from "@/lib/admin-attendance";
-import type { AttendanceCorrectionStatus } from "@/lib/attendance";
+import { needsReviewRow, type AttendanceCorrectionStatus } from "@/lib/attendance";
 import { getDictionary, type Dictionary, type Locale } from "@/lib/i18n";
 import {
   approveCorrectionRequest,
@@ -42,6 +42,7 @@ import { AdminReasonModal } from "../shared/admin-reason-modal";
 import { AdmDropdown } from "../shared/adm-dropdown";
 import { AdminTimePicker } from "../shared/admin-time-picker";
 import { useAdminPanelA11y } from "../shared/use-admin-panel-a11y";
+import { rowActivateProps } from "@/components/admin/shared/row-activate";
 
 type Att = Dictionary["admin"]["attendanceConsole"];
 /** 「정정 대기」 탭은 「정정 요청」과 같은 일을 두 번 보여 줘서 없앴다(2026-10-29) — 옛 `?filter=pending` 은 page 에서 `corr` 로. */
@@ -120,17 +121,13 @@ function statusPill(item: ReviewQueueItem, c: Att): { label: string; cls: string
   if (item.correctionStatus === "requested" || item.correctionStatus === "in_review")
     return { label: c.statusPending, cls: "pill--info" };
   if (item.reviewState === "review_required") return { label: c.statusReview, cls: "pill--warn" };
+  // 지급 안 되는 정정 상태 — 마감을 막는데 「검토 필요」 탭엔 없어서 줄에서라도 이유를 보인다(2026-11-11).
+  // 요청은 닫혔는데 근무만 「정정 대기」로 남은 것 — 마감을 막는다(위에서 열린 요청은 이미 걸렀다).
+  if (item.reviewState === "pending_correction") return { label: c.statusPendingOrphan, cls: "pill--warn" };
+  if (item.reviewState === "rejected_correction") return { label: c.statusRejectedCorrection, cls: "pill--warn" };
   if (item.status === "open") return { label: c.statusOpen, cls: "pill--open" };
   if (item.status === "completed") return { label: c.statusCompleted, cls: "pill--done" };
   return { label: c.statusNormal, cls: "pill--muted" };
-}
-
-function isPending(item: ReviewQueueItem): boolean {
-  return (
-    item.correctionStatus === "requested" ||
-    item.correctionStatus === "in_review" ||
-    item.reviewState === "pending_correction"
-  );
 }
 
 /** 접힌 전체 세션 묶음 헤더에 쓰는, 직원 묶음별 상태 요약. */
@@ -145,8 +142,8 @@ function groupSummary(
   let open = 0;
   for (const s of sessions) {
     if (s.status === "invalid") invalid += 1;
-    else if (isPending(s)) pending += 1;
-    else if (s.reviewState === "review_required") review += 1;
+    else if (hasOpenCorrection(s)) pending += 1;
+    else if (isReviewRow(s)) review += 1;
     else if (s.status === "open") open += 1;
     else done += 1;
   }
@@ -180,6 +177,7 @@ function SessionRow({
     <tr
       className={`${on ? "sel" : ""} ${urgent && !on ? "urgent" : ""}`.trim()}
       onClick={() => onOpen(item.sessionId)}
+      {...rowActivateProps(() => onOpen(item.sessionId))}
     >
       <td className="colchk" onClick={(e) => e.stopPropagation()}>
         <span
@@ -260,8 +258,14 @@ function SessionRow({
   );
 }
 
+/** 열린 정정 요청이 걸렸는지(그 근무는 「정정 요청」 탭에서 센다). */
+function hasOpenCorrection(item: ReviewQueueItem): boolean {
+  return item.correctionStatus === "requested" || item.correctionStatus === "in_review";
+}
+
+/** 「검토 필요」 줄 — 마감을 막는 근무와 같은 기준(`needsReviewRow`, 2026-11-11). 반려된 정정 · 요청 없이 남은 정정 대기도 들어온다. */
 function isReviewRow(item: ReviewQueueItem): boolean {
-  return item.reviewState === "review_required" && item.status !== "invalid" && !isPending(item);
+  return needsReviewRow({ reviewState: item.reviewState, status: item.status, hasOpenCorrection: hasOpenCorrection(item) });
 }
 
 function filterRows(items: ReviewQueueItem[], f: Filter): ReviewQueueItem[] {
@@ -794,6 +798,7 @@ export function AttendanceQueueClient({
                       data-live={r.id}
                       className={sel ? "sel" : ""}
                       onClick={() => setPanel({ kind: "corr", id: r.id })}
+                      {...rowActivateProps(() => setPanel({ kind: "corr", id: r.id }))}
                     >
                       <td style={{ paddingLeft: 16 }}>
                         <div className="who">
@@ -927,6 +932,8 @@ export function AttendanceQueueClient({
                         <tr
                           className={`grouphdr${gOpen ? " on" : ""}`}
                           onClick={() => toggleGroup(g.userId)}
+                          aria-expanded={gOpen}
+                          {...rowActivateProps(() => toggleGroup(g.userId))}
                         >
                           <td colSpan={10}>
                             <div className="grp">
@@ -1224,6 +1231,10 @@ function SessionPanel({
         setErr(c.actionForbidden);
       } else if (res.reason === "reason_required") {
         setErr(c.actionReasonRequired);
+      } else if (res.reason === "stale") {
+        // 그 사이 바뀐 근무 — 무효 처리하지 않았다고 알리고 목록을 새로 불러온다(2026-11-11).
+        setErr(c.actionStaleInvalidate);
+        onStale();
       } else {
         setErr(c.actionFailed);
       }

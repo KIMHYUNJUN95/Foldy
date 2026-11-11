@@ -16,6 +16,7 @@ import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { getDictionary, type Dictionary } from "@/lib/i18n";
 import { usePersistentToggle } from "@/lib/use-persistent-toggle";
 import { haptic } from "@/lib/haptics";
+import { settleAction } from "@/lib/settle-action";
 import { formatWeeklyMinutes } from "@/lib/staff-documents/weekly-limit";
 import type { ResidenceCardNotice } from "@/lib/staff-documents/expiry";
 
@@ -202,24 +203,32 @@ function ReminderPrompt({ sessionId, copy }: { sessionId: string; copy: Attendan
   const router = useRouter();
   const [open, setOpen] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
 
+  // 결과를 본다(2026-11-11) — 전에는 실패해도 시트를 닫아 「저장됨」처럼 보였고, 던지면 「바쁨」이 풀리지 않았다.
   const onStillWorking = useCallback(async () => {
     if (busy) return;
     setBusy(true);
-    await respondOpenSessionReminder("still_working"); // 액션이 revalidatePath 한다 — router.refresh() 중복 금지
+    setFailed(false);
+    const settled = await settleAction(() => respondOpenSessionReminder("still_working")); // 액션이 revalidatePath 한다 — router.refresh() 중복 금지
     setBusy(false);
+    if (settled.thrown || !settled.value.ok) {
+      haptic("error");
+      setFailed(true);
+      return;
+    }
+    haptic("success");
     setOpen(false);
   }, [busy]);
 
   const onLeftWork = useCallback(async () => {
     if (busy) return;
     setBusy(true);
-    try {
-      await respondOpenSessionReminder("left_work");
-      router.push(`/mobile/attendance/correction?sessionId=${sessionId}`);
-    } finally {
-      setBusy(false);
-    }
+    setFailed(false);
+    // 답 저장이 실패해도 정정 요청으로는 보낸다 — 퇴근 시각을 고치는 길이 막히면 안 된다.
+    await settleAction(() => respondOpenSessionReminder("left_work"));
+    setBusy(false);
+    router.push(`/mobile/attendance/correction?sessionId=${sessionId}`);
   }, [busy, router, sessionId]);
 
   if (!open) return null;
@@ -240,6 +249,11 @@ function ReminderPrompt({ sessionId, copy }: { sessionId: string; copy: Attendan
         <p className="mx-auto mt-1.5 max-w-[300px] text-[13.5px] leading-relaxed text-muted-foreground">
           {copy.reminderBody}
         </p>
+        {failed ? (
+          <p role="alert" className="mx-auto mt-3 max-w-[300px] text-[13px] font-semibold leading-snug text-[#c4364b]">
+            {copy.actionNetworkError}
+          </p>
+        ) : null}
         <div className="mt-6 flex flex-col gap-2.5">
           <button
             type="button"

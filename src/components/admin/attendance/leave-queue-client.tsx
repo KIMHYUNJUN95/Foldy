@@ -1,5 +1,8 @@
 "use client";
 
+import { leaveApproveNeedsReason } from "@/lib/annual-leave";
+import { AdminLoadError } from "@/components/admin/shared/admin-no-access";
+import { rowActivateProps } from "@/components/admin/shared/row-activate";
 import { LiveWash } from "@/components/shared/live-wash";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import {
@@ -51,6 +54,7 @@ import { LeaveBalanceView } from "./leave-balance-view";
 import { LeaveDocumentsView } from "./leave-documents-view";
 import { LeaveLedgerView } from "./leave-ledger-view";
 import { tokyoToday } from "@/lib/tokyo-date";
+import { formatExcludedDates } from "@/lib/annual-leave-copy";
 
 type Lc = Dictionary["admin"]["leaveConsole"];
 
@@ -176,6 +180,14 @@ function errLabel(reason: string | undefined, lc: Lc): string {
       return lc.errNotRequested;
     case "overlap":
       return lc.errOverlap;
+    case "self_approval":
+      return lc.errSelfApproval;
+    case "over_balance":
+      return lc.errOverBalance;
+    case "baseline_required":
+      return lc.errBaselineRequired;
+    case "hourly_excluded":
+      return lc.errHourlyExcluded;
     case "reject_failed":
       return lc.errRejectFailed;
     case "cancel_failed":
@@ -267,9 +279,10 @@ export function LeaveQueueClient({
   initialBalanceUserId?: string | null;
   locale: Locale;
   applicants: LeaveApplicantOption[];
-  balances: AdminLeaveBalanceRow[];
-  documents: LeaveDocument[];
-  ledger: LeaveLedgerEntry[];
+  /** null = 그 구역 읽기 실패(2026-11-11) — 그 탭만 오류 화면, 결재 큐는 그대로. */
+  balances: AdminLeaveBalanceRow[] | null;
+  documents: LeaveDocument[] | null;
+  ledger: LeaveLedgerEntry[] | null;
   currentUserId: string;
   currentUserName: string;
 }) {
@@ -365,6 +378,7 @@ export function LeaveQueueClient({
       <div style={{ position: "relative" }}>
         <LeaveSubTabs view={view} onChange={setView} lc={lc} onRequest={(mode) => setRequestModal({ mode })} />
         <LeaveTeamCalendar
+          todayDate={today}
           lc={lc}
           locale={locale}
           items={items.filter((i) => i.status === "approved")}
@@ -407,14 +421,18 @@ export function LeaveQueueClient({
     return (
       <div style={{ position: "relative" }}>
         <LeaveSubTabs view={view} onChange={setView} lc={lc} onRequest={(mode) => setRequestModal({ mode })} />
-        <LeaveBalanceView
-          lc={lc}
-          shared={dictionary.admin.shared}
-          locale={locale}
-          employees={balances}
-          initialSelectedUserId={initialBalanceUserId ?? null}
-          onToast={(msg) => showToast(msg)}
-        />
+        {balances ? (
+          <LeaveBalanceView
+            lc={lc}
+            shared={dictionary.admin.shared}
+            locale={locale}
+            employees={balances}
+            initialSelectedUserId={initialBalanceUserId ?? null}
+            onToast={(msg) => showToast(msg)}
+          />
+        ) : (
+          <AdminLoadError title={dictionary.admin.shared.loadErrorTitle} body={dictionary.admin.shared.loadErrorBody} />
+        )}
         {toast ? (
           <div key={toast.id} role="status" className="adm-toast" onClick={() => setToast(null)}>
             {toast.msg}
@@ -428,7 +446,11 @@ export function LeaveQueueClient({
     return (
       <div style={{ position: "relative" }}>
         <LeaveSubTabs view={view} onChange={setView} lc={lc} onRequest={(mode) => setRequestModal({ mode })} />
-        <LeaveDocumentsView lc={lc} locale={locale} documents={documents} />
+        {documents ? (
+          <LeaveDocumentsView lc={lc} locale={locale} documents={documents} />
+        ) : (
+          <AdminLoadError title={dictionary.admin.shared.loadErrorTitle} body={dictionary.admin.shared.loadErrorBody} />
+        )}
       </div>
     );
   }
@@ -437,13 +459,17 @@ export function LeaveQueueClient({
     return (
       <div style={{ position: "relative" }}>
         <LeaveSubTabs view={view} onChange={setView} lc={lc} onRequest={(mode) => setRequestModal({ mode })} />
-        <LeaveLedgerView
-          lc={lc}
-          shared={dictionary.admin.shared}
-          locale={locale}
-          entries={ledger}
-          onToast={(msg) => showToast(msg)}
-        />
+        {ledger ? (
+          <LeaveLedgerView
+            lc={lc}
+            shared={dictionary.admin.shared}
+            locale={locale}
+            entries={ledger}
+            onToast={(msg) => showToast(msg)}
+          />
+        ) : (
+          <AdminLoadError title={dictionary.admin.shared.loadErrorTitle} body={dictionary.admin.shared.loadErrorBody} />
+        )}
         {toast ? (
           <div key={toast.id} role="status" className="adm-toast" onClick={() => setToast(null)}>
             {toast.msg}
@@ -591,7 +617,14 @@ export function LeaveQueueClient({
                   .filter(Boolean)
                   .join(" ");
                 return (
-                  <tr key={item.id} data-live={item.id} className={rowClass} onClick={() => setSelectedId(item.id)}>
+                  <tr
+                    key={item.id}
+                    data-live={item.id}
+                    className={rowClass}
+                    aria-selected={selectedId === item.id}
+                    onClick={() => setSelectedId(item.id)}
+                    {...rowActivateProps(() => setSelectedId(item.id))}
+                  >
                     <td style={{ paddingLeft: 16 }}>
                       <div className="who">
                         <span className="avatar" style={{ background: "var(--adm-primary)", color: "#fff" }}>
@@ -707,24 +740,46 @@ function LeavePanel({
   const [modal, setModal] = useState<"reject" | "cancel" | null>(null);
   const [detail, setDetail] = useState<LeaveApprovalDetail | null>(null);
   const [status, setStatus] = useState<LeaveQueueItem["status"]>(item.status);
+  // 잔여를 넘는 승인은 사유가 있어야 한다(M7, 2026-11-11). 서버도 같은 판정을 다시 한다.
+  const [overrideReason, setOverrideReason] = useState("");
   const panelRef = useAdminPanelA11y<HTMLElement>(onClose, { disabled: modal !== null });
 
+  // 상세 읽기가 실패하면(서버가 읽기 오류를 던진다, 2026-11-11) 승인 단추가 영영 잠기지 않게 오류 + 다시 시도.
+  const [detailFailed, setDetailFailed] = useState(false);
+  const [detailAttempt, setDetailAttempt] = useState(0);
+  const [serverSaidOver, setServerSaidOver] = useState(false);
   useEffect(() => {
     let alive = true;
-    loadLeaveApprovalDetail(item.id).then((res) => {
-      if (alive) setDetail(res);
-    });
+    loadLeaveApprovalDetail(item.id)
+      .then((res) => {
+        if (!alive) return;
+        setDetail(res);
+        setDetailFailed(res === null);
+      })
+      .catch(() => {
+        if (alive) setDetailFailed(true);
+      });
     return () => {
       alive = false;
     };
-  }, [item.id]);
+  }, [item.id, detailAttempt]);
 
   const pill = statusPill(status, lc);
 
   function submitApprove() {
     setErr(null);
     startTransition(async () => {
-      const res = await approveLeaveRequestAction(item.id);
+      let res: Awaited<ReturnType<typeof approveLeaveRequestAction>>;
+      try {
+        res = await approveLeaveRequestAction(
+          item.id,
+          detail?.overBalance || serverSaidOver ? overrideReason.trim() : undefined,
+        );
+      } catch {
+        // 호출 자체가 실패해도(오프라인 등) 패널이 멈추지 않게 — 오류 문구만(2026-11-11).
+        setErr(lc.errNetwork);
+        return;
+      }
       if (res.ok) {
         setStamped(true);
         setTimeout(() => {
@@ -734,6 +789,12 @@ function LeavePanel({
         }, 850);
       } else {
         setErr(errLabel(res.error, lc));
+        // 패널을 연 뒤 다른 승인이 들어와 잔여를 넘게 됐다 — 상세를 다시 읽어 사유 칸을 띄운다(2026-11-11).
+        if (res.error === "over_balance") {
+          // 사유 칸은 이 결과만으로도 띄운다 — 다시 읽기가 실패해 옛 상세가 남아도 막히지 않게.
+          setServerSaidOver(true);
+          setDetailAttempt((n) => n + 1);
+        }
       }
     });
   }
@@ -741,7 +802,13 @@ function LeavePanel({
   function submitReject(reason: string) {
     setErr(null);
     startTransition(async () => {
-      const res = await rejectLeaveRequestAction(item.id, reason.trim() || undefined);
+      let res: Awaited<ReturnType<typeof rejectLeaveRequestAction>>;
+      try {
+        res = await rejectLeaveRequestAction(item.id, reason.trim() || undefined);
+      } catch {
+        setErr(lc.errNetwork);
+        return;
+      }
       if (res.ok) {
         setModal(null);
         setStatus("rejected");
@@ -756,7 +823,13 @@ function LeavePanel({
   function submitCancel(reason: string) {
     setErr(null);
     startTransition(async () => {
-      const res = await cancelApprovedLeaveAction(item.id, reason.trim() || undefined);
+      let res: Awaited<ReturnType<typeof cancelApprovedLeaveAction>>;
+      try {
+        res = await cancelApprovedLeaveAction(item.id, reason.trim() || undefined);
+      } catch {
+        setErr(lc.errNetwork);
+        return;
+      }
       if (res.ok) {
         setModal(null);
         setStatus("cancelled");
@@ -769,6 +842,19 @@ function LeavePanel({
   }
 
   const canAct = status === "requested";
+  const needsOverrideReason = leaveApproveNeedsReason({
+    status,
+    detailOverBalance: Boolean(detail?.overBalance),
+    serverSaidOverBalance: serverSaidOver,
+  });
+  const submittedViaLabel =
+    detail?.submittedVia === "admin"
+      ? lc.flowSubmittedViaAdmin
+      : detail?.submittedVia === "admin_proxy"
+        ? lc.flowSubmittedViaProxy
+        : detail?.submittedVia === "mobile"
+          ? lc.flowSubmittedViaMobile
+          : lc.flowSubmittedByNote;
 
   return (
     <>
@@ -830,6 +916,18 @@ function LeavePanel({
                 {durationLabel(item.durationUnit, lc)} · {lc.daysUnit(item.daysCount)}
               </span>
             </div>
+            {detail && detail.excludedDates.length > 0 ? (
+              <div className="kv">
+                <span className="kv__k">{lc.excludedLabel}</span>
+                <span className="kv__v mono">{formatExcludedDates(detail.excludedDates, localeTag)}</span>
+              </div>
+            ) : null}
+            {detail && detail.otherPendingDays > 0 ? (
+              <div className="kv">
+                <span className="kv__k">{lc.otherPendingLabel}</span>
+                <span className="kv__v">{lc.daysUnit(detail.otherPendingDays)}</span>
+              </div>
+            ) : null}
             <div className="kv">
               <span className="kv__k">{lc.panelKvSubmitted}</span>
               <span className="kv__v mono">{fmtSubmitted(item.submittedAt, localeTag)}</span>
@@ -858,7 +956,14 @@ function LeavePanel({
               <div className="pblock__t">{lc.panelSecBalance}</div>
               <div className="limpact">
                 <div className="limpact__row">
-                  <span>{detail.balancePool === "paid" ? lc.poolPaid : lc.poolSpecial}</span>
+                  <span>
+                    {detail.balancePool === "paid" ? lc.poolPaid : lc.poolSpecial}
+                    {detail.baselineProvisional ? (
+                      <span className="lv-prov" title={lc.baselineProvisionalHint}>
+                        {lc.baselineProvisional}
+                      </span>
+                    ) : null}
+                  </span>
                   <b className="mono">
                     {detail.balanceBefore}
                     {lc.unitDays} → {detail.balanceAfter}
@@ -875,12 +980,12 @@ function LeavePanel({
                 {/* 잔여 초과 경고는 큐 상단 요약 카드에만 있었다. 정작 승인 버튼을 누르는 이
                     모달에는 없어서, 승인자가 음수(`2일 → -1일`)만 보고 초과인 줄 모른 채 승인할
                     수 있었다. 결정하는 화면에 경고를 둔다(2026-08-03). */}
-                {detail.balanceAfter < 0 ? (
+                {detail.overBalance ? (
                   <div className="limpact__note limpact__note--warn">
                     <Ic>
                       <TriangleAlert />
                     </Ic>
-                    {lc.balanceOverWarning(String(Math.abs(detail.balanceAfter)))}
+                    {lc.balanceOverWarning(String(detail.overflowDays))}
                   </div>
                 ) : (
                   <div className="limpact__note">
@@ -898,6 +1003,13 @@ function LeavePanel({
             <div className="pblock">
               <div className="pblock__t">{lc.panelSecBalance}</div>
               <div className="who__sub">{lc.balanceNoneNote}</div>
+            </div>
+          ) : null}
+
+          {detail?.balanceOverrideReason ? (
+            <div className="pblock">
+              <div className="pblock__t">{lc.overrideReasonShown}</div>
+              <div className="reason">{detail.balanceOverrideReason}</div>
             </div>
           ) : null}
 
@@ -958,7 +1070,7 @@ function LeavePanel({
                 <span className="tlrow__dot done" />
                 <div className="tlrow__b">
                   <div className="tlrow__t">{lc.flowSubmittedBy}</div>
-                  <div className="tlrow__s">{detail?.submittedVia ?? lc.flowSubmittedByNote}</div>
+                  <div className="tlrow__s">{submittedViaLabel}</div>
                 </div>
               </div>
               {status === "requested" ? (
@@ -981,6 +1093,48 @@ function LeavePanel({
               )}
             </div>
           </div>
+
+          {detailFailed ? (
+            <div className="pblock">
+              <div className="errbar" role="alert">
+                <span className="errbar__ic">
+                  <Ic>
+                    <LogOut />
+                  </Ic>
+                </span>
+                <div>
+                  <div className="errbar__t">{lc.errDetailLoadFailed}</div>
+                  <button
+                    type="button"
+                    className="chipbtn"
+                    style={{ marginTop: 6 }}
+                    onClick={() => {
+                      setDetailFailed(false);
+                      setDetailAttempt((n) => n + 1);
+                    }}
+                  >
+                    {lc.detailRetry}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {needsOverrideReason ? (
+            <div className="pblock">
+              <label className="fld">
+                <span className="fld__l">{lc.overrideReasonLabel}</span>
+                <textarea
+                  className="ltext"
+                  value={overrideReason}
+                  maxLength={500}
+                  onChange={(e) => setOverrideReason(e.target.value)}
+                  placeholder={lc.overrideReasonPlaceholder}
+                  aria-required="true"
+                />
+              </label>
+            </div>
+          ) : null}
 
           {err ? (
             <div className="pblock">
@@ -1023,7 +1177,12 @@ function LeavePanel({
               </Ic>
               {pending ? lc.actionRejecting : lc.panelBtnReject}
             </button>
-            <AdminHoldButton className="btn" style={{ flex: 1.4 }} onConfirm={submitApprove} disabled={pending}>
+            <AdminHoldButton
+              className="btn"
+              style={{ flex: 1.4 }}
+              onConfirm={submitApprove}
+              disabled={pending || !detail || (needsOverrideReason && overrideReason.trim().length === 0)}
+            >
               <Ic>
                 <Check />
               </Ic>

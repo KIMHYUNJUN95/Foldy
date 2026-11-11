@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { resolveYmParam } from "@/lib/iso-date-param";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { LeaveCalendar } from "@/components/attendance/leave-calendar";
 import { getMobileNavBadges } from "@/lib/nav-badges";
@@ -36,7 +37,8 @@ export default async function MobileLeaveCalendarPage({
   const navBadges = await navBadgesPromise;
   const copy = getDictionary(session.user.preferredLanguage).leave;
   const today = tokyoToday();
-  const ym = params.ym && /^\d{4}-\d{2}$/.test(params.ym) ? params.ym : today.slice(0, 7);
+  // 실제 달만(`2026-13` 은 달 이름을 그리다 RangeError) — 공용 `resolveYmParam`(2026-11-11). 휴가는 미리 잡으니 앞으로 2년까지.
+  const ym = resolveYmParam(params.ym, today.slice(0, 7), { maxMonthsAhead: 24, maxMonthsBack: 60 });
   const entries = await listApprovedLeaveForMonth(getSupabaseServiceClient(), session.organization.id, ym);
 
   return (

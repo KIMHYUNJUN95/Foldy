@@ -811,6 +811,8 @@ export type Database = {
           base_amount: number
           baseline_date: string
           bonus_amount: number
+          confirmed_at: string | null
+          confirmed_by_user_id: string | null
           created_at: string
           id: string
           organization_id: string
@@ -821,6 +823,8 @@ export type Database = {
           base_amount?: number
           baseline_date: string
           bonus_amount?: number
+          confirmed_at?: string | null
+          confirmed_by_user_id?: string | null
           created_at?: string
           id?: string
           organization_id: string
@@ -831,6 +835,8 @@ export type Database = {
           base_amount?: number
           baseline_date?: string
           bonus_amount?: number
+          confirmed_at?: string | null
+          confirmed_by_user_id?: string | null
           created_at?: string
           id?: string
           organization_id?: string
@@ -868,6 +874,7 @@ export type Database = {
           days_count: number
           document_number: string | null
           duration_unit: string
+          excluded_dates: string[]
           emergency_contact: string
           end_date: string
           id: string
@@ -881,6 +888,7 @@ export type Database = {
           start_date: string
           status: string
           submitted_at: string | null
+          submitted_via: string | null
           updated_at: string
           user_id: string
         }
@@ -897,6 +905,7 @@ export type Database = {
           days_count: number
           document_number?: string | null
           duration_unit?: string
+          excluded_dates?: string[]
           emergency_contact: string
           end_date: string
           id?: string
@@ -910,6 +919,7 @@ export type Database = {
           start_date: string
           status?: string
           submitted_at?: string | null
+          submitted_via?: string | null
           updated_at?: string
           user_id: string
         }
@@ -926,6 +936,7 @@ export type Database = {
           days_count?: number
           document_number?: string | null
           duration_unit?: string
+          excluded_dates?: string[]
           emergency_contact?: string
           end_date?: string
           id?: string
@@ -939,6 +950,7 @@ export type Database = {
           start_date?: string
           status?: string
           submitted_at?: string | null
+          submitted_via?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -7304,6 +7316,21 @@ export type Database = {
         }
         Returns: boolean
       }
+      annual_leave_half_day_span: {
+        Args: { p_end: string; p_start: string; p_unit: string }
+        Returns: unknown
+      }
+      approve_annual_leave_request_atomic: {
+        Args: {
+          p_actor_user_id: string
+          p_approved_role: string | null
+          p_expected_used_days: number | null
+          p_organization_id: string
+          p_override_reason: string | null
+          p_request_id: string
+        }
+        Returns: string
+      }
       approve_attendance_correction_atomic: {
         Args: {
           p_action_type: string
@@ -7388,6 +7415,64 @@ export type Database = {
           p_user_id: string
         }
         Returns: string
+      }
+      finalize_attendance_month_checked: {
+        Args: {
+          p_actor_user_id: string
+          p_allowance_breakdown: Json
+          p_expected_fingerprint: string
+          p_gross_amount: number
+          p_organization_id: string
+          p_rate_breakdown: Json
+          p_target_month: string
+          p_total_paid_minutes: number
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      attendance_month_fingerprint: {
+        Args: { p_organization_id: string; p_target_month: string; p_user_id: string }
+        Returns: string
+      }
+      attendance_approve_request_in_tx: {
+        Args: { p_approve: Json; p_organization_id: string }
+        Returns: boolean
+      }
+      attendance_insert_session_checked: {
+        Args: { p_approve_request?: Json | null; p_values: Json }
+        Returns: Json
+      }
+      attendance_lock_org_month: {
+        Args: { p_day: string; p_organization_id: string; p_shared: boolean }
+        Returns: undefined
+      }
+      attendance_update_session_checked: {
+        Args: {
+          p_approve_request?: Json | null
+          p_changes: Json
+          p_expected_updated_at: string | null
+          p_organization_id: string
+          p_session_id: string
+        }
+        Returns: Json
+      }
+      attendance_session_overlaps: {
+        Args: {
+          p_clock_in_at: string
+          p_clock_out_at: string | null
+          p_exclude_session_id: string | null
+          p_organization_id: string
+          p_user_id: string
+        }
+        Returns: boolean
+      }
+      attendance_lock_user_month: {
+        Args: { p_day: string; p_organization_id: string; p_user_id: string }
+        Returns: undefined
+      }
+      attendance_user_month_finalized: {
+        Args: { p_day: string; p_organization_id: string; p_user_id: string }
+        Returns: boolean
       }
       has_active_membership: {
         Args: { target_organization_id: string }

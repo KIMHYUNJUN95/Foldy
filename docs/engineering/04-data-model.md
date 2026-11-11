@@ -1554,6 +1554,7 @@ Tables (12):
 | `attendance_export_logs` | export audit trail; `export_scope` (monthly_bulk/single_user), `target_month`, `snapshot_ids uuid[]`, `exported_by_user_id`. |
 | `transport_reimbursement_reports` | per-user-month transport-cost ledger (migration `202606260001`), **separate from payroll** (`attendance_month_snapshots`). `target_month` (1st of Tokyo month), `status` (draft/submitted/reviewing/approved/rejected/**changes_requested** — the last added in migration `202607030001`; worker-editable like draft/rejected, i.e. "sent back for fixes, please resubmit"), `submitted_at`/`reviewed_at`/`reviewed_by_user_id`/`review_note`, `total_amount_cached` (convenience; items are source of truth). Unique `(organization_id, user_id, target_month)`. Admin review transitions: submitted/reviewing/changes_requested → approved \| rejected \| changes_requested; approved/rejected → **reopen** (back to submitted, drops out of the payroll total until re-approved). |
 | `transport_reimbursement_items` | reimbursable transport entries (many per report); `usage_date`, `amount_yen` (>0), `entry_mode` (linked/manual), optional `attendance_session_id`/`property_id`/`room_id`, `work_context jsonb` (building/room/cleaning summary), `memo`, `sort_order`. FKs to session/property/room are `on delete set null`. |
+| (2026-11-11, `202611110002`) | 트리거 `sync_transport_report_total`(항목 변경 → 보고서 합계 다시 계산) · `guard_transport_item_report_editable`(제출 · 검토 중 · 승인 보고서의 항목 추가와 amount_yen · usage_date · report_id · entry_mode 변경 금지, 표시 칸 · set null · 삭제는 막지 않음). `entry_mode='linked'` 는 `work_context.linkedSourceType`(attendance · cleaning) + `linkedSourceId` 필수(기존 검사 트리거), 앱이 확인 뒤 적는다. |
 | `transport_reimbursement_item_images` | receipt/proof images per item; `storage_path`, `sort_order`. Image count enforced in app. Storage: `request-images/{org}/transport-reimbursements/{report_id}/{item_id}/{file}` (5-part path). |
 
 Attendance/payroll integrity hardening (2026-07-03):
@@ -1645,7 +1646,7 @@ Reopen flips `finalized` → `reopened` (expected pay resumes). Finalize/reopen 
 schema change. The worker self pay view reflects the finalized snapshot; the admin payroll console
 exposes finalize/reopen.
 
-**Step 12 (2026-06-18):** **payroll-totals data layer** (`src/lib/attendance-payroll-totals.ts`,
+**Step 12 (2026-06-18, file deleted 2026-11-11 — unused):** **payroll-totals data layer** (`src/lib/attendance-payroll-totals.ts`,
 `getPayrollTotals(org, ym)`) reads `attendance_month_snapshots` (finalized total) + recomputed expected
 pay per hourly worker + `attendance_sessions`/`attendance_sites` (site rollup by clock-in site). Returns
 finalized vs expected labor totals, unfinalized worker count, and per-site totals. The query is read-only
@@ -1663,7 +1664,7 @@ enum value (migration `202606180001`). New table `attendance_open_session_remind
 `202606180002`, unique per `(organization_id, user_id, operating_date)` — org-scoped per migration
 `202606180003`) holds the once-per-Tokyo-day 18:30 reminder response (`still_working` / `left_work`).
 Admin alerts (correction_created, abnormal_session) target owner / `attendance_payroll_admin`; the worker
-reminder targets the worker. Scheduled scan `GET /api/attendance/reminders` (CRON_SECRET). In-app only.
+reminder targets the worker. Scan `GET /api/attendance/reminders` (CRON_SECRET header only; not scheduled as of 2026-11-11). In-app only.
 
 **Bug-fix pass (2026-06-18)** — migration `202606180003_attendance_session_fixes.sql`:
 - Added `target_month date` column to `attendance_correction_requests` (enables per-month export and
@@ -1712,6 +1713,9 @@ Implemented follow-up: approved usage is deducted from the correct leave pools; 
 editing is available in the leave balance view; and current workflow gates exclude hourly/part-time
 membership paths according to the documented salary-based rule.
 
+**2026-11-11 (`202611110002`):** `confirmed_at timestamptz` · `confirmed_by_user_id uuid` — 본인 첫 설정은 null(「확인 전」),
+결재자 확인(`confirmEmployeeLeaveBaselineAction`) · 관리자 저장(본인 아닌 사람)이 채운다. 마이그레이션 뒤 기존 행은 전부 null.
+
 ## annual_leave_requests
 
 **Phase 2 backend. Stage 1 (request submission/cancellation, implemented 2026-07-06) and stage 2
@@ -1758,6 +1762,11 @@ document_number text                  -- 休暇届 no. AL-YYYY-MM-NNN, assigned 
 created_at timestamptz not null default now()
 updated_at timestamptz not null default now()  -- set_updated_at() trigger
 ```
+
+**2026-11-11 (`202611110002`):** `excluded_dates date[] not null default '{}'`(안 A — 원래 휴무라 뺀 날, 일수 = 기간 − 이 수,
+기간 60일 이하 check) · `submitted_via text`(mobile · admin · admin_proxy, check). 승인은 `approve_annual_leave_request_atomic`
+(service_role 전용 — 행 · 사람 잠금, 반차 겹침(`annual_leave_half_day_span`), `stale` 확인, `balance_override_reason`, 문서 번호 숫자 최대 + 1).
+설계: `docs/product/26-annual-leave-workflow.md` → 「점검 수정 1차」.
 
 **Stage 3 — 休暇届 document (implemented 2026-07-08):** `document_number` (migration
 `202607080001_annual_leave_document_number.sql`) holds the printable form number `AL-YYYY-MM-NNN`
@@ -2403,6 +2412,30 @@ RLS 켜짐 · 정책 없음 — service_role 만(GRANT `all to service_role`).
   `finalize_attendance_month_atomic` · `reopen_attendance_month_atomic` · `mutate_attendance_session_with_audit` ·
   `create_attendance_session_with_audit` · `approve_attendance_correction_atomic` · `set_attendance_history_atomic`.
 - 운영 확인(2026-10-23): 이력 등록 · 컬럼 · 트리거 · 제약 · 함수 7개 존재, `authenticated` 실행 권한 없음.
+- 2026-11-11: 앱은 이 `*_atomic` 함수들을 여전히 쓰지 않는다 — 대신 아래 `202611110001` 함수를 쓴다.
+
+## 근태 점검 1차 — `202611110001_attendance_hardening.sql` (2026-11-11)
+
+모두 `security invoker`, `public` · `anon` · `authenticated` 실행 권한 회수, `service_role` 만 실행. 설명: `docs/product/24-attendance-workflow.md` 「근태 점검 1차」.
+
+- `attendance_lock_user_month(org, user, day)` — 한 사람 · 한 달 advisory xact lock(키는 20260811012820 함수들과 같다).
+- `attendance_user_month_finalized(org, user, day)` — 그 달 `finalized` 스냅샷이 있는지.
+- 트리거 `attendance_sessions_month_guard` (BEFORE INSERT OR UPDATE on `attendance_sessions`) — 잠금 후 옛 달 · 새 달이 마감이면
+  `attendance_month_finalized`(P0001). DELETE 는 막지 않음.
+- `attendance_month_fingerprint(org, user, month)` → text(md5) — 근무 · 휴게 · 정정 · 수당 · 시급 이력 · 고용 형태 이력.
+- `finalize_attendance_month_checked(...)` → jsonb `ok{id}` · `already_finalized` · `stale` — 스냅샷 넣기 · 옛 행 `superseded` · `audit_logs`.
+- `attendance_session_overlaps(...)` — 앱 `findOverlappingSession` 과 같은 규칙.
+- `attendance_insert_session_checked(p_values jsonb)` → `ok{id}` · `finalized` · `overlap` · `open_conflict`.
+- `attendance_update_session_checked(org, session, expected_updated_at, changes jsonb)` → `ok{updated_at}` · `not_found` · `stale` · `finalized` · `overlap`.
+- 근무 가드 트리거는 급여 칸(사람 · 운영일 · 상태 · 검토 상태 · 출퇴근 시각 · 근무지 · 수기 여부)이 그대로인 UPDATE 는 통과(FK set null 허용).
+- `attendance_insert_session_checked` · `attendance_update_session_checked` 의 마지막 인자 `p_approve_request jsonb`(기본 null) — 정정 승인 시
+  요청을 같은 트랜잭션에서 `approved` 로(`attendance_approve_request_in_tx`, 내가 잡은 `in_review` 일 때만), 못 바꾸면 `request_changed`.
+- 바꾸기 함수의 잠금 순서: 행 FOR UPDATE → 사람 · 달 잠금.
+- `attendance_lock_org_month(org, day, shared)` — 조직 · 달 잠금. 마감은 공유, 조직 전체 수당은 독점.
+- 트리거 `attendance_pay_allowances_month_guard`(BEFORE INSERT OR UPDATE on `attendance_pay_allowances`) — 급여 칸(대상 · 날짜 · 상태 · 금액 · 종류)이
+  바뀌면 잠금 후 마감 확인, 마감이면 `attendance_month_finalized`.
+- `attendance_qr_tokens` SELECT 정책을 「attendance settings can read qr tokens」(`is_platform_admin()` 또는 `has_capability(org, uid, 'attendance.settings')`)로 바꿈.
+- `attendance_attempt_logs.failure_reason` 의 `gps_inaccurate` 는 20260811012820 부터 허용 — 2026-11-11 부터 실제로 기록한다(GPS 오차 > 100m).
 
 
 ## Realtime publication — 운영 화면 (2026-10-29)

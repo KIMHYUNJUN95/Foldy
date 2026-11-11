@@ -1,4 +1,4 @@
-import { LockKeyhole } from "lucide-react";
+import { AlertTriangle, LockKeyhole } from "lucide-react";
 
 /**
  * 대시보드 안 한 화면의 「권한 없음」 — 관리자 웹은 들어왔지만 이 메뉴의 권한 키가 없을 때(2026-10-21).
@@ -11,6 +11,22 @@ export function AdminNoAccess({ title, body }: { title: string; body: string }) 
     <div className="flex min-h-[420px] flex-col items-center justify-center px-6 pb-16 pt-12 text-center">
       <span className="flex size-[52px] items-center justify-center rounded-full bg-[#f2f2f7] text-[#8e8e93]">
         <LockKeyhole aria-hidden="true" size={24} strokeWidth={1.8} />
+      </span>
+      <p className="mt-[18px] text-[17px] font-semibold leading-[22px] tracking-[-0.01em] text-[#1d1d1f]">{title}</p>
+      <p className="mt-1.5 text-[13px] leading-[18px] text-[#6e6e73]">{body}</p>
+    </div>
+  );
+}
+
+/**
+ * 대시보드 안 한 화면의 「불러오지 못함」(2026-11-11) — 읽기 실패를 빈 목록 · 「데이터 없음」으로 숨기지 않을 때. 모양은 `AdminNoAccess` 와 같다.
+ * 문구는 `dictionary.admin.shared.loadErrorTitle` · `loadErrorBody`.
+ */
+export function AdminLoadError({ title, body }: { title: string; body: string }) {
+  return (
+    <div role="alert" className="flex min-h-[420px] flex-col items-center justify-center px-6 pb-16 pt-12 text-center">
+      <span className="flex size-[52px] items-center justify-center rounded-full bg-[#f2f2f7] text-[#8e8e93]">
+        <AlertTriangle aria-hidden="true" size={24} strokeWidth={1.8} />
       </span>
       <p className="mt-[18px] text-[17px] font-semibold leading-[22px] tracking-[-0.01em] text-[#1d1d1f]">{title}</p>
       <p className="mt-1.5 text-[13px] leading-[18px] text-[#6e6e73]">{body}</p>

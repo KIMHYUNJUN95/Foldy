@@ -11,6 +11,7 @@ import {
 } from "@/lib/attendance-review";
 import {
   countBlockingSessions,
+  listBlockingSessions,
   type FinalizationBlockers,
   type FinalizationEligibility,
 } from "@/lib/attendance-finalization";
@@ -32,13 +33,17 @@ import {
   type AttendanceCorrectionRequestRow,
   type AttendanceCorrectionStatus,
   type AttendanceSessionRow,
+  ATTENDANCE_NEEDS_REVIEW_STATES,
+  needsReviewRow,
 } from "@/lib/attendance";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import {
   breakSecondsBySession,
   calculateMonthlyPay,
+  correctionStatusForPay,
   type BreakInterval,
 } from "@/lib/attendance-pay-calculation";
+import { requireRead } from "@/lib/attendance-read";
 import { resolveLocale } from "@/lib/i18n";
 import { readAllPages } from "@/lib/supabase/read-all-pages";
 import { chunk } from "@/lib/utils";
@@ -180,7 +185,8 @@ export async function getAdminAttendanceBadgeStats(
         .from("attendance_sessions")
         .select("id, clock_out_at, status")
         .eq("organization_id", session.organization.id)
-        .eq("review_state", "review_required")
+        // 「검토 필요」 = 지급 안 되는 검토 상태 전부(2026-11-11, `needsReviewRow` 와 같은 기준).
+        .in("review_state", [...ATTENDANCE_NEEDS_REVIEW_STATES])
         // 무효 처리한 세션은 해소된 것으로 본다 — 검토 큐 · 마감 판정과 같다(2026-10-19).
         .neq("status", "invalid")
         .gte("operating_date", monthFrom)
@@ -368,8 +374,8 @@ export async function getAdminAttendanceOverview(
   // 표시됐고 열린 정정 요청이 걸리지 않은 것(그건 「정정 요청」 탭에서 센다). `getAttendanceReviewQueue` 를
   // 필터 없이 부르면 최근 세션 전부(상태 무관)를 돌려주므로, 예전에는 여기서 `review.length` 가 실제로 검토가 필요한 것만이 아니라
   // 가져온 세션 전체를 보고했다.
-  const reviewRequiredRows = review.filter(
-    (r) => r.reviewState === "review_required" && !isPendingCorrection(r),
+  const reviewRequiredRows = review.filter((r) =>
+    needsReviewRow({ reviewState: r.reviewState, status: r.status, hasOpenCorrection: isPendingCorrection(r) }),
   );
   const urgent = reviewRequiredRows.filter((r) => r.isAbnormal || !r.clockOutLabel).length;
   const correctionOpenRows = corrections.filter(isOpenCorrection);
@@ -873,13 +879,14 @@ export async function loadPayrollMonthBase(
     sessionlessQuery,
   ]);
 
+  // 읽기 실패는 던진다(2026-11-11) — 잘린 세션 · 빈 수당으로 급여 · 결재 요청 숫자를 만들지 않는다.
   return {
-    sessions: sessRes.data,
-    rates: (rateRes.data ?? []) as PayrollRateRow[],
-    employment: (empRes.data ?? []) as PayrollEmploymentRow[],
-    allowances: (allowRes.data ?? []) as PayrollAllowanceRow[],
-    snapshots: (snapRes.data ?? []) as PayrollSnapshotRow[],
-    sessionlessPending: (sessionlessRes.data ?? []) as { requested_by_user_id: string }[],
+    sessions: requireRead("attendance_sessions", sessRes, [] as PayrollSessionRow[]),
+    rates: requireRead("hourly_rate_history", rateRes, []) as PayrollRateRow[],
+    employment: requireRead("employment_type_history", empRes, []) as PayrollEmploymentRow[],
+    allowances: requireRead("attendance_pay_allowances", allowRes, []) as PayrollAllowanceRow[],
+    snapshots: requireRead("attendance_month_snapshots", snapRes, []) as PayrollSnapshotRow[],
+    sessionlessPending: requireRead("attendance_correction_requests", sessionlessRes, []) as { requested_by_user_id: string }[],
   };
 }
 
@@ -909,11 +916,12 @@ export async function loadPayrollMonthLinks(
       ),
     ),
   ]);
+  // 휴게 읽기 실패를 빈 목록으로 보면 휴게가 안 빠져 과지급이 된다 — 던진다(2026-11-11).
   const corrections = correctionPages
-    .flatMap((res) => (res.data ?? []) as PayrollCorrectionRow[])
+    .flatMap((res) => requireRead("attendance_correction_requests", res, []) as PayrollCorrectionRow[])
     .sort((a, b) => b.created_at.localeCompare(a.created_at));
   return {
-    breaks: breakPages.flatMap((res) => (res.data ?? []) as BreakInterval[]),
+    breaks: breakPages.flatMap((res) => requireRead("attendance_breaks", res, []) as BreakInterval[]),
     corrections,
   };
 }
@@ -989,6 +997,13 @@ export function computePayrollMonth(
   const sessionOwner = new Map(inputs.sessions.map((s) => [s.id, s.user_id]));
   const breakSecs = breakSecondsBySession(inputs.breaks, inputs.sessions);
 
+  const finalizedByUser = new Map<string, PayrollSnapshotRow>();
+  for (const snap of inputs.snapshots) {
+    if (snap.status === "finalized" && !finalizedByUser.has(snap.user_id)) {
+      finalizedByUser.set(snap.user_id, snap);
+    }
+  }
+
   // 급여 쪽 정정 상태 — 세션 주인이 낸 요청 중 가장 최근 것(`getMonthlyPayView` 의 requested_by 필터).
   const ownCorrectionStatus = new Map<string, string>();
   // 마감 차단 — 세션 주인이 낸 처리 대기 요청 수(행 단위).
@@ -1009,12 +1024,6 @@ export function computePayrollMonth(
       (pendingSessionlessByUser.get(c.requested_by_user_id) ?? 0) + 1,
     );
   }
-  const finalizedByUser = new Map<string, PayrollSnapshotRow>();
-  for (const snap of inputs.snapshots) {
-    if (snap.status === "finalized" && !finalizedByUser.has(snap.user_id)) {
-      finalizedByUser.set(snap.user_id, snap);
-    }
-  }
 
   const out = new Map<string, PayrollUserMonth>();
   for (const userId of userIds) {
@@ -1031,7 +1040,9 @@ export function computePayrollMonth(
       employment: empRows,
       allowances: inputs.allowances,
       breakSecondsBySession: breakSecs,
-      correctionStatusOf: (sessionId) => ownCorrectionStatus.get(sessionId) ?? null,
+      // 마감된 달은 대기 정정을 무시한다 — 마감 금액과 같은 계산(`correctionStatusForPay`, 2026-11-11).
+      correctionStatusOf: (sessionId) =>
+        correctionStatusForPay(ownCorrectionStatus.get(sessionId) ?? null, finalizedByUser.has(userId)),
     });
 
     const snap = finalizedByUser.get(userId) ?? null;
@@ -1090,7 +1101,14 @@ export function computePayrollMonth(
           openSessions === 0 &&
           calc.unpricedCount === 0 &&
           !alreadyFinalized,
-        blockers: { reviewRequired, pendingCorrections, openSessions, missingPayInfo: calc.unpricedCount, alreadyFinalized },
+        blockers: {
+          reviewRequired,
+          pendingCorrections,
+          openSessions,
+          missingPayInfo: calc.unpricedCount,
+          alreadyFinalized,
+          sessions: listBlockingSessions(sessions),
+        },
       },
       finalized: alreadyFinalized,
     });
@@ -1399,6 +1417,11 @@ export type AdminAttendanceTransportData = {
     missingEvidence: number;
   };
   rows: AdminTransportRow[];
+  /**
+   * 신청서 · 구성원 · 이름 중 하나라도 못 읽었다(2026-11-11, H5). 그때 `rows` 는 비어 있다 — 빈 목록이나 「미제출」로 보이면
+   * 안 되므로 화면은 「불러오지 못함」을 보인다.
+   */
+  loadError: boolean;
 };
 
 const EMPTY_TRANSPORT_KPI = {
@@ -1445,6 +1468,7 @@ export async function getAdminAttendanceTransport(
       nextYm,
       kpi: EMPTY_TRANSPORT_KPI,
       rows: [],
+      loadError: false,
     };
   }
   const service = getSupabaseServiceClient();
@@ -1458,11 +1482,17 @@ export async function getAdminAttendanceTransport(
       nextYm,
       kpi: EMPTY_TRANSPORT_KPI,
       rows: [],
+      loadError: false,
     };
   }
 
   const targetMonthDate = `${ym}-01`;
-  let summaries: TransportReportAdminSummary[] = [];
+  // 읽기 실패는 빈 목록으로 숨기지 않는다(2026-11-11, H5) — 「모두 미제출」로 보이면 검토를 빠뜨린다.
+  const failed = (error: unknown): AdminAttendanceTransportData => {
+    console.warn("[admin-attendance] transport load failed", error);
+    return { isPrivileged: true, ym, monthLabel, prevYm, nextYm, kpi: EMPTY_TRANSPORT_KPI, rows: [], loadError: true };
+  };
+  let summaries: TransportReportAdminSummary[];
   try {
     summaries = await getTransportReportSummaryForAdmin(
       service,
@@ -1470,7 +1500,7 @@ export async function getAdminAttendanceTransport(
       targetMonthDate,
     );
   } catch (error) {
-    console.warn("[admin-attendance] transport summary failed", error);
+    return failed(error);
   }
 
   // 보고서가 없는 활성 구성원과, 이 달에 보고서가 있는 비활성 구성원을 포함한다.
@@ -1478,11 +1508,12 @@ export async function getAdminAttendanceTransport(
     .from("memberships")
     .select("user_id, role, status")
     .eq("organization_id", session.organization.id);
-  const membershipRows = (membersRes.data ?? []) as {
-    user_id: string;
-    role: string;
-    status: string;
-  }[];
+  let membershipRows: { user_id: string; role: string; status: string }[];
+  try {
+    membershipRows = requireRead("memberships", membersRes, []) as typeof membershipRows;
+  } catch (error) {
+    return failed(error);
+  }
   const byUser = new Map<string, TransportReportAdminSummary>();
   for (const s of summaries) byUser.set(s.userId, s);
 
@@ -1492,6 +1523,7 @@ export async function getAdminAttendanceTransport(
     .select("id, user_id")
     .eq("organization_id", session.organization.id)
     .eq("target_month", targetMonthDate);
+  if (reportIdsRes.error) return failed(reportIdsRes.error);
   const reportIdByUser = new Map<string, string>();
   for (const r of (reportIdsRes.data ?? []) as { id: string; user_id: string }[]) {
     reportIdByUser.set(r.user_id, r.id);
@@ -1516,7 +1548,8 @@ export async function getAdminAttendanceTransport(
             "id",
             members.map((m) => m.user_id),
           )
-      : { data: [] };
+      : { data: [], error: null };
+  if (profilesRes.error) return failed(profilesRes.error);
   const nameById = new Map<string, string>();
   for (const row of (profilesRes.data ?? []) as { id: string; name: string }[]) {
     nameById.set(row.id, row.name);
@@ -1537,7 +1570,7 @@ export async function getAdminAttendanceTransport(
   });
   rows.sort((a, b) => a.userName.localeCompare(b.userName));
 
-  return { isPrivileged: true, ym, monthLabel, prevYm, nextYm, kpi: transportKpiOf(summaries), rows };
+  return { isPrivileged: true, ym, monthLabel, prevYm, nextYm, kpi: transportKpiOf(summaries), rows, loadError: false };
 }
 
 // ── 직원별 월 영수증 검토 (데스크톱 마스터-디테일 뷰어) ──────────

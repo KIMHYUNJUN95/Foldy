@@ -6,6 +6,7 @@ import { getOnboardingState } from "@/lib/onboarding";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getAttendanceHistory, getAttendanceTodaySummary } from "@/lib/attendance-history";
 import { getDictionary } from "@/lib/i18n";
+import { resolveYmParam } from "@/lib/iso-date-param";
 
 type PageProps = {
   searchParams: Promise<{ ym?: string }>;
@@ -45,9 +46,8 @@ export default async function MobileAttendanceHistoryPage({ searchParams }: Page
 
   const dict = getDictionary(session.user.preferredLanguage);
   const currentYm = currentTokyoYm();
-  const rawYm = /^\d{4}-\d{2}$/.test(params.ym ?? "") ? (params.ym as string) : currentYm;
-  // 미래 월 직접 입력 차단: 현재 Tokyo 월보다 큰 경우 현재 월로 clamp
-  const ym = rawYm > currentYm ? currentYm : rawYm;
+  // 실제 달(01~12)만, 미래 달은 지금 달로(2026-11-11 — `?ym=2025-00` 이 RangeError 로 화면을 깨뜨렸다).
+  const ym = resolveYmParam(params.ym, currentYm);
 
   const localeMap: Record<string, string> = { ko: "ko-KR", ja: "ja-JP", en: "en-US" };
   const bcp47Locale = localeMap[session.user.preferredLanguage] ?? "ko-KR";

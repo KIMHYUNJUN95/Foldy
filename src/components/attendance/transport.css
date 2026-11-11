@@ -1264,7 +1264,7 @@
 .trnw .trnw-note p { font-size: 15px; }
 .trnw .trnw-total span { font-size: 15px; }
 .trnw .trnw-line { border-top: 0; }
-.trnw .trnw-line + .trnw-line { border-top: 0.5px solid var(--separator); }
+.trnw .row-collapse + .row-collapse .trnw-line { border-top: 0.5px solid var(--separator); }
 .trnw .trnw-line__t { font-size: 16px; }
 .trnw .trnw-line__s { font-size: 13px; }
 .trnw .trnw-line__v { font-size: 16px; }

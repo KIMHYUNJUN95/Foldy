@@ -19,6 +19,7 @@ import { getAttendanceRoster } from "@/lib/attendance-roster";
 import { canViewRoster } from "@/config/roles";
 import { getDictionary } from "@/lib/i18n";
 import { dayWeeklyRange, loadWeeklyLimitChips } from "@/lib/staff-documents/weekly-limit-server";
+import { resolveDayParam } from "@/lib/iso-date-param";
 
 type PageProps = {
   searchParams: Promise<{ date?: string }>;
@@ -50,15 +51,8 @@ export default async function AttendanceRosterPage({ searchParams }: PageProps) 
   const todayDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo" }).format(new Date());
 
   // searchParams에서 날짜 파싱 — 미래/과거 90일 초과는 오늘로 clamp
-  let operatingDate = todayDate;
-  if (params.date && /^\d{4}-\d{2}-\d{2}$/.test(params.date)) {
-    if (params.date <= todayDate) {
-      const ninetyDaysAgo = new Date();
-      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-      const minDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo" }).format(ninetyDaysAgo);
-      operatingDate = params.date >= minDate ? params.date : todayDate;
-    }
-  }
+  // 실제 날짜만(2026-02-30 거절), 규칙은 iso-date-param 하나(2026-11-11).
+  const operatingDate = resolveDayParam(params.date, todayDate, 90);
 
   const locale = session.user.preferredLanguage;
   const localeMap: Record<string, string> = { ko: "ko-KR", ja: "ja-JP", en: "en-US" };

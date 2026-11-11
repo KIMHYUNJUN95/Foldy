@@ -2566,6 +2566,17 @@
 .adm .segb { flex:1 1 0; height:38px; padding:0 14px; border-radius:9px; border:none; background:none; font-size:13px; font-weight:800; color:var(--adm-muted); cursor:pointer; }
 .adm .segb:not(.on):hover { color:var(--ink-soft); }
 .adm .segb.on { background:var(--card); color:var(--ink); box-shadow:0 2px 6px rgba(20,32,43,.12); }
+/* 연차 「원래 휴무」 날짜 줄(안 A, 2026-11-11) — 날짜 칸은 늘지 않고 줄바꿈. 뺀 날은 옅게 + 취소선 + 이름표. */
+.adm .fld__hint { font-size:11.5px; color:var(--adm-muted); }
+.adm .lv-prov { display:inline-block; margin-left:6px; padding:1px 7px; border-radius:999px; background:var(--adm-surface); color:var(--ink-soft); font-size:11px; font-weight:800; vertical-align:middle; }
+.adm .lv-neg { color:var(--danger); font-weight:800; }
+/* 휴가 신청 모달 — 칸 이름표 바로 아래 붙는 나눔 단추(기본 .seg 의 위아래 22px · 20px 여백이 이름표와 40px 떼어 놓았다). */
+.adm .seg.seg--fld { margin:6px 0 0; }
+.adm .seg.lv-offdays { margin:6px 0 0; }
+.adm .lv-offdays .lv-offday { flex:0 0 auto; height:auto; min-height:38px; padding:4px 12px; display:inline-flex; flex-direction:column; align-items:center; gap:1px; color:var(--ink-soft); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.adm .lv-offdays .lv-offday.is-off { color:var(--adm-muted); }
+.adm .lv-offdays .lv-offday.is-off .lv-offday__d { text-decoration:line-through; }
+.adm .lv-offday__tag { font-size:10.5px; font-weight:700; text-decoration:none; display:inline-block; }
 .adm .fpill { display:flex; align-items:center; gap:11px; padding:11px 13px; border:1px solid var(--line-soft); border-radius:12px; background:var(--card2); }
 .adm .fpill__nm { font-size:13.5px; font-weight:800; }
 .adm .fpill__s { font-size:11.5px; font-weight:600; color:var(--adm-muted); margin-top:2px; }
@@ -3372,3 +3383,6 @@
 .adm .panel .btn--text-danger:hover:not(:disabled) { background: #fdf0f0; }
 .adm .panel .btn--text { background: transparent; border-color: transparent; color: #4a4857; padding: 0 14px; }
 .adm .panel .btn--text:hover:not(:disabled) { background: #f4f4f7; }
+
+/* 줄 누르면 열기 — 키보드 초점(2026-11-11, `rowActivateProps`). 표 줄은 안쪽에 그려 옆 줄과 겹치지 않게. */
+.adm [data-row-activate]:focus-visible { outline: 2px solid var(--adm-primary); outline-offset: -2px; }

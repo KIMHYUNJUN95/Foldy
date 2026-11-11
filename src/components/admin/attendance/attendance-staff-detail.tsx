@@ -26,6 +26,7 @@ import { adminTransportStatusPill, formatAdminYen } from "../shared/admin-format
 import { useAdminPanelA11y } from "../shared/use-admin-panel-a11y";
 import type { WeeklyLimitChip } from "@/lib/staff-documents/weekly-limit";
 import { WeeklyLimitBadge, WeeklyLimitNote } from "@/components/shared/weekly-limit-badge";
+import { rowActivateProps } from "@/components/admin/shared/row-activate";
 
 type Att = Dictionary["admin"]["attendanceConsole"];
 
@@ -442,7 +443,7 @@ function DayRowItem({
   const hasOut = session.clockOutLabel != null;
 
   return (
-    <div className={`dayrow${selected ? " sel" : ""}`} onClick={onClick}>
+    <div className={`dayrow${selected ? " sel" : ""}`} onClick={onClick} {...rowActivateProps(onClick)}>
       <div className="dayrow__date" style={{ visibility: showDate ? "visible" : "hidden" }}>
         <div className="dayrow__d">{day.day}</div>
         <div className="dayrow__wd">

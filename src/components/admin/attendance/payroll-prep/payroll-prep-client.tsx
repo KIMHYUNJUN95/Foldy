@@ -199,7 +199,7 @@ export function PayrollPrepClient({
   async function openCarry() {
     if (carryBusy) return;
     setCarryBusy(true);
-    const res = await previewPayrollCarryOver({ ym });
+    const res = await previewPayrollCarryOver({ ym }).catch(() => ({ ok: false as const, reason: "error" as const }));
     setCarryBusy(false);
     if (!res.ok) return notice(failMessage(res.reason));
     setCarry({ fromYm: res.fromYm, counts: res.counts, picked: [...CARRY_DEFAULT_FIELDS] });
@@ -208,7 +208,7 @@ export function PayrollPrepClient({
   async function runCarry(fields: CarryField[]) {
     if (carryBusy) return;
     setCarryBusy(true);
-    const res = await runPayrollCarryOver({ ym, fields });
+    const res = await runPayrollCarryOver({ ym, fields }).catch(() => ({ ok: false as const, reason: "error" as const }));
     setCarryBusy(false);
     if (!res.ok) {
       setCarry(null);

@@ -739,6 +739,9 @@ FK 를 채우는 것이 정답이지만 그건 운영 데이터 정리다. 그 �
 
 ## 정정 요청 — 자정을 넘는 퇴근은 다음 날로 (2026-10-01)
 
+> **바뀜(2026-11-11):** 직원 정정 요청은 더 이상 다음 날로 넘기지 않는다 — 아래 「근태 점검 1차」 참고.
+> 관리자 수기 입력 · 직접 수정은 지금도 이 규칙(`resolveClockOutAfterClockIn`)을 쓴다.
+
 직원 정정 요청(`createAttendanceCorrectionRequest`)이 희망 퇴근 시각을 **항상 운영일과 같은 날**로 붙였다.
 22:00 출근 · 06:00 퇴근 같은 야간 근무를 요청하면 퇴근이 출근보다 앞선 값으로 저장됐고, 관리자가 승인하는
 순간 순서 검사(`validClockOrder`)에 걸려 `invalid` 로 떨어졌다. 관리자 수동 수정·수동 생성은 이미 다음 날로
@@ -1073,3 +1076,129 @@ FK 를 채우는 것이 정답이지만 그건 운영 데이터 정리다. 그 �
 - **숫자 맞춤.** 근태 탭 줄의 검토 큐 배지(`getAdminAttendanceBadgeStats().queueOpen`) = 「검토 필요」(열린 정정이 걸린 근무 뺌) + 「정정 요청」(목록 상한 200건과 같게).
   근태 개요의 「검토 필요」 · 정정 숫자도 같은 기준이다.
 - 일괄 처리(검토 완료 · 무효)는 원래 「검토 필요」 근무에만 쓰여서 탭을 지워도 잃는 기능이 없다.
+
+## 근태 점검 1차 (2026-11-11, 마이그레이션 `202611110001`)
+
+기능별 점검에서 찾은 근태 서버 문제를 고쳤다. **급여 계산 방식은 그대로다**(할증 없음 · 정액 수당 · 말일 마감 · 10일 지급 ·
+1엔 반올림) — 바뀐 것은 계산에 들어가는 근무 기록을 지키는 쪽이다.
+
+### 동시에 들어온 요청 — 잠금 안에서 확인하고 쓴다
+- 마감과 근무 수정 · 정정 승인이 동시에 오면 마감 금액은 옛 기록으로 굳고 기록만 바뀌었다. 세션 없는 정정 두 건을
+  동시에 승인하면 둘 다 겹침 검사를 통과해 같은 시간이 두 번 지급될 수 있었다.
+- 이제 한 사람 · 한 달마다 같은 잠금을 걸고 DB 함수 안에서 확인과 쓰기를 같이 한다(`src/lib/attendance-session-rpc.ts`).
+  - 근무 넣기(수기 입력 · 세션 없는 정정 승인): `attendance_insert_session_checked` — 마감 · 겹침 · 열린 근무 충돌 확인.
+  - 근무 바꾸기(직접 수정 · 무효 · 복구 · 정정 승인): `attendance_update_session_checked` — 읽은 `updated_at` 과 다르면
+    `stale`(「그 사이 바뀌었어요」), 시각이 바뀌거나 무효에서 되살릴 때 겹침 확인.
+  - 마감: 금액을 계산하기 **전에** 그 달 급여 입력의 지문(`attendance_month_fingerprint` — 근무 · 휴게 · 정정 · 수당 · 시급 ·
+    고용 형태)을 받아 두고, `finalize_attendance_month_checked` 가 잠금 안에서 다시 떠 같을 때만 스냅샷 · 옛 행 대체 ·
+    감사 기록을 한 번에 저장한다. 다르면 `stale`.
+- 근무 행에는 트리거 `attendance_sessions_month_guard` 가 걸려 있어, 이 함수를 거치지 않는 쓰기도 **마감된 달이면 거절**된다
+  (옛 달 · 새 달 모두 확인, 지우기는 막지 않음). 마감을 풀면 다시 쓸 수 있다.
+- 겹침 규칙은 앱의 `findOverlappingSession` 과 같다. 20260811012820 의 `*_atomic` 함수들은 동작이 달라 쓰지 않는다.
+
+### 마감된 달의 대기 정정 (H1)
+- 마감 뒤 들어온 정정(`requested` · `in_review`)이 급여 화면에서 그 날을 빼서, 직원 급여 · 관리자 급여 · 급여 준비가 스냅샷과
+  달라졌다. 이제 **마감된 달은 대기 정정을 무시하고 그 날을 그대로 센다**(`correctionStatusForPay`). 마감 전 규칙은 그대로
+  (대기 정정 근무는 승인 · 반려될 때까지 뺀다).
+- 직원은 마감됐거나 급여 결재가 시작된 달에는 정정 요청을 낼 수 없다(`month_locked` — 「관리자에게 마감을 풀어 달라고 하세요」).
+
+### 지급 대상 판정은 한 곳 (M3)
+- 「지급되는 근무」 = 검토 상태 `normal` · `approved_correction` 만(`isPayableReviewState`). 급여 계산과 마감 판정이 같은 함수를 쓴다.
+  그래서 `rejected_correction` · `pending_correction` 근무도 **마감을 막는다**(전에는 급여에선 빠지는데 마감은 통과했다).
+- 관리자 직접 수정으로 고를 수 있는 검토 상태는 `normal` · `review_required` 만이다. 정정 상태는 정정 승인 · 반려로만 바뀐다.
+
+### 읽기 실패는 0건이 아니다 (H5)
+- 급여 · 마감 · 급여 준비가 표 읽기에 실패하면 「0건」으로 보고 계산했다(휴게를 못 읽으면 과지급). 이제 던지고 저장하지 않는다
+  (`requireRead`, `src/lib/attendance-read.ts`). 마감 · 결재 요청은 「오류」로 끝난다. 직원 화면 보기는 지금처럼 넘어간다(`strict` 만 던짐).
+
+### 입력 검사
+| 항목 | 규칙 | 상수 |
+| --- | --- | --- |
+| 수기 입력 날짜 | 오늘(도쿄) 이후 거절 `future_date`, 날짜 선택에서도 막음 | — |
+| 한 근무 길이 | 16시간 넘으면 수기 입력 `too_long`, 승인 · 직접 수정은 `invalid` | `ATTENDANCE_MAX_SHIFT_MINUTES = 960` |
+| GPS 오차 | 100m 넘으면 출퇴근 거절, 시도 기록 `gps_inaccurate`(오차 값이 없으면 통과) | `ATTENDANCE_GPS_MAX_ACCURACY_METERS = 100` |
+| 근무지 반경 | 1~500m 정수 | `ATTENDANCE_MAX_SITE_RADIUS_METERS = 500` |
+| 근무지 숙소 | 다른 조직 숙소를 고르면 `invalid_property` | `AttendanceSitePropertyError` |
+| 정정 승인 | 무효 · 반려된 정정 근무에는 승인을 적용하지 않음 | — |
+
+### 직원 정정 요청 — 같은 날만
+- 희망 퇴근을 **다음 날로 넘기지 않는다**(2026-10-01 규칙을 직원 쪽은 바꿈). 현장 근무는 자정을 넘기지 않아서(가장 늦은 퇴근 23:30),
+  넘기면 「출근 9:00 · 퇴근 8:30」 오타가 23.5시간 근무가 됐다. 퇴근이 출근보다 뒤가 아니면 `clock_order`, 16시간 넘으면 `too_long`
+  (`staffCorrectionTimesProblem`). 관리자 수기 입력 · 직접 수정은 다음 날 넘김 그대로.
+
+### 그 밖에
+- QR 토큰 표 읽기는 근태 설정(`attendance.settings`) 권한만(전에는 급여 보기 권한으로도 읽혔다). 앱은 service role 로 읽어 동작은 그대로.
+- `/api/attendance/reminders` 비밀값은 헤더로만 받는다(주소 뒤 `?secret=` 은 로그에 남아서 뺐다).
+  **이 경로는 예약 실행에 등록돼 있지 않다**(`vercel.json` 예약은 Beds24 맞추기 · 할 일 알림뿐). 그래서 18:30 안내와 「방치」 표시는
+  다음 스캔 · 화면 열기 때만 생기고, 관리자 알림은 없다 — 알림 일괄 구현 때 다룬다.
+- 쓰이지 않던 CSV 내보내기 액션(`exportMonthlyPayroll` · `exportUserPayroll`)과 `getPayrollTotals`(`attendance-payroll-totals.ts`)를 지웠다.
+  개발용 `/api/dev/attendance/export` 는 `attendance-export.ts` 를 그대로 쓴다.
+
+### 이어서 고친 것 (같은 날)
+- **급여 결재 잠금 읽기 실패 = 잠김(fail-closed).** `isPayrollMonthLocked` 는 결재 행을 못 읽으면 던진다. 정정 요청 · 마감 풀기 ·
+  급여 준비 입력 · 지난달 값 가져오기 모두 그때 거절하고 「오류」로 끝낸다(`payrollMonthLockState` → `"error"`).
+- **마감을 막는 근무 목록.** 마감 판정 · 관리자 급여가 `blockers.sessions`(근무 · 사람 · 날짜 · 이유 코드 `review_required` ·
+  `pending_correction` · `rejected_correction` · `open`, `listBlockingSessions`)를 같이 돌려준다. 급여 패널의 「막힘 항목」 아래에
+  「마감을 막는 근무」로 날짜 · 이유를 보이고(마감 시도가 「막힘」이면 받은 목록으로 바꿈), 검토 큐 줄의 상태 표시는
+  `pending_correction` → 「정정 요청 중」, `rejected_correction` → 「정정 반려 · 마감 막음」. 탭 구성은 그대로(2차 화면 묶음에서).
+- **그 사이 바뀜 문구.** 검토 큐에서 무효 처리가 `stale` 이면 전용 문구(「무효 처리하지 않았어요 · 새로 불러왔으니…」) + 목록 새로 불러오기.
+  급여 패널 마감의 `stale` 은 새로 불러오지 않으므로 「화면을 새로 불러와 확인한 뒤 다시 마감해 주세요」(`payActionStale`).
+- **관리자 교통비 읽기 실패.** `getAdminAttendanceTransport` 가 신청서 · 구성원 · 신청서 id · 이름 중 하나라도 못 읽으면 `loadError`
+  (빈 목록 · 「모두 미제출」로 보이지 않게). 교통비 화면은 공용 `AdminLoadError`(「이 화면을 불러오지 못했어요」)를 보이고,
+  교통비 내보내기는 「내보낼 것 없음」 대신 「오류」로 끝난다.
+
+### 독립 리뷰 뒤 고친 것 (같은 날)
+- **근무 쓰기 가드가 계정 · QR 토큰 삭제를 막던 것.** 트리거는 급여가 읽는 칸(사람 · 운영일 · 상태 · 검토 상태 · 출퇴근 시각 ·
+  근무지 · 수기 여부)이 그대로인 바꾸기를 통과시킨다 — FK on delete set null(만든 사람 · 무효 처리한 사람 · QR 토큰 비우기)이
+  마감된 달에서도 된다. 급여 칸을 바꾸는 쓰기는 지금처럼 거절.
+- **잠금 순서.** `attendance_update_session_checked` 가 행(FOR UPDATE)을 먼저, 사람 · 달 잠금을 그다음에 잡는다 — 앱이 직접 하는
+  퇴근 · 미퇴근 처리(행 → 트리거의 사람 · 달)와 같은 순서라 서로 기다리는 교착이 없다. 진짜 동시 실행은 PGlite 로 못 돌려 순서로만 확인.
+- **정정 승인을 한 트랜잭션으로.** 요청을 「승인」으로 바꾸는 것도 근무 넣기 · 바꾸기 DB 함수 안에서 한다(`p_approve_request`,
+  `attendance_approve_request_in_tx`). 그 사이 요청이 바뀌었으면 아무것도 쓰지 않고 `request_changed` → 화면은 「다시 확인」.
+  앱의 「먼저 승인 → 실패하면 되돌리기」는 없앴다.
+- **수당 추가 · 취소도 잠금 안에서.** 트리거 `attendance_pay_allowances_month_guard` — 대상이 있으면 그 사람 · 달, 조직 전체면
+  조직 · 달(독점) 잠금 후 그 달 마감이 있으면 거절(앱 확인과 같은 규칙). 마감은 조직 · 달 잠금을 공유로 잡아 조직 전체 수당과 서로 기다린다.
+  메모만 바꾸는 것은 통과. 앱은 트리거 거절을 「마감됨」(`finalized`)으로 보인다.
+- PGlite 57개 통과(위 항목 추가분 포함).
+
+### 아직 남은 것
+- 퇴사(비활성) 직원에게 관리자 수기 입력이 서버에서는 막혀 있지 않다(화면 직원 목록은 활성만) — 그대로 둠.
+- 근태 개요의 교통비 숫자는 읽기 실패 때 지금처럼 0 으로 보인다(경고 로그만).
+
+### 운영 적용 순서
+마이그레이션 `202611110001` 을 먼저 적용하고 코드를 배포한다(새 코드는 새 함수를 부르고, 옛 코드는 적용 뒤에도 그대로 동작).
+시험: 임시 Postgres(PGlite) 40개 통과 — 겹침 · stale · 복구 겹침 · 지문 변화 · 마감 ok/중복 · 트리거 거절 · 지우기 허용 · 풀면 다시 허용 ·
+QR 정책 · `authenticated` 실행 불가. 진짜 동시 실행은 PGlite 로 못 돌려 직렬 재현(같은 승인 두 번째 → `overlap`)으로 확인했다.
+
+## 근태 점검 2차 — 화면 (2026-11-11)
+
+1차(서버) 뒤 근태 화면(모바일 · PC)을 고쳤다. 계산 방식은 그대로.
+
+- **1차 마무리(마이그레이션 `202611110001`):** 인자가 바뀐 `attendance_insert_session_checked` · `attendance_update_session_checked` 의
+  옛 인자 버전을 먼저 `drop function if exists` — 두 버전이 함께 있으면 호출이 애매해진다. 수당 가드의 급여 칸에 `category`
+  (추가수당 / 특별수당 열을 가른다) 추가. PC 급여 · 시급 화면 실시간 신호용으로 마감 스냅샷 · 수당 · 시급 · 고용 형태 표를
+  `supabase_realtime` publication 에 넣는다(publication 이 없는 DB 는 건너뜀). PGlite 59개 통과.
+- **주소 값 검사 한 곳(`src/lib/iso-date-param.ts`).** `isRealYm`(01~12) · `resolveYmParam`(범위) · `resolveDayParam`(실제 날짜 ·
+  오늘 ~ N일 전). 모바일 급여 · 근무 기록 `?ym`(모양만 봐서 `2025-00` 이 RangeError), 모바일 교통비 `?ym`(3년 전 ~ 다음 달),
+  PC · 모바일 출근자 명단 `?date`(오늘 ~ 90일 전, `2026-02-30` 거절)가 같이 쓴다. `isValidYm` 도 `isRealYm` 을 부른다.
+- **연결 실패 처리(`settleAction`, `src/lib/settle-action.ts`).** 정정 요청 제출이 던지면 error 햅틱 + 「저장하지 못했어요…」
+  (`actionNetworkError`). 18:30 안내 「아직 근무 중」은 결과를 보고 — 실패면 시트를 닫지 않고 같은 문구, 성공이면 success 햅틱.
+  던져도 「바쁨」이 풀린다. 「이미 퇴근했어요」는 답 저장이 실패해도 정정 요청으로 보낸다.
+- **PC 급여 · 시급 새로고침.** 두 화면이 서버가 새로 내려준 줄을 렌더 중 조정으로 받는다(큐 · 연차와 같은 방식). 페이지에
+  `LiveRefresh`(`attendancePayrollLiveSources` · `attendanceWagesLiveSources`).
+- **「검토 필요」 = 마감을 막는 근무.** 기준 하나 `needsReviewRow` · `ATTENDANCE_NEEDS_REVIEW_STATES`(`src/lib/attendance.ts`):
+  지급 안 되는 검토 상태(`review_required` · `pending_correction` · `rejected_correction`)이고, 무효가 아니고, 열린 정정 요청이 걸리지
+  않은 근무. 큐 「검토 필요」 탭 · 근태 탭 배지 · 개요 숫자가 같은 기준이다. 줄 상태: 반려 → 「정정 반려 · 마감 막음」, 요청 없이 남은
+  정정 대기 → 「정정 대기(요청 없음) · 마감 막음」. 탭 구성은 그대로.
+- **가짜 미리보기는 개발 환경만.** 근태 홈 `?state=open|break|idle|loading` 은 운영에서 무시(`resolveAttendancePreviewState`).
+- **설정 · 근태:** 신뢰 기기 해제는 공용 `SettingsConfirm` 으로 한 번 묻는다. 새 근무지 저장이 실패하면 `?site=new` 로 돌아가 친 값을
+  되살린다(`siteFormErrorHref` · `readSiteDraft`) — 전에는 첫 근무지 폼이 열리며 입력이 사라졌다. 새 근무지의 인쇄용 이름(`print_name`)이
+  저장되지 않던 것도 고쳤다.
+- **키보드 · 화면 읽기:** PC 표의 「줄 누르면 열기」(큐 근무 · 정정 · 직원 묶음, 급여 표, 직원 상세 날짜 줄)가 Tab · Enter · Space 로도
+  된다(공용 `rowActivateProps`, `src/components/admin/shared/row-activate.ts`, 초점 테두리 `[data-row-activate]:focus-visible`).
+  근태 하위 탭 줄은 주소가 바뀌는 링크라 `role="tablist"` 대신 `<nav>` + `aria-current`.
+- **수기 입력 창:** 친 내용이 있으면 Esc · 바깥 누르기로 바로 닫지 않고 아래 줄에서 「입력한 내용을 버릴까요?」를 묻는다
+  (「취소」 단추는 그대로 닫음).
+- 화면 확인: 로컬 DB(도커) 가 없어 실제 화면은 띄우지 못했다 — 통합 테스트 때 폰 · 폴드 · 태블릿 · PC 1280/1440 × ko/ja/en 으로 볼 것.
+
+- PC 근태 › 급여 검토: 「시급제만」 때문에 대상이 없으면 「시급 직원이 없어요」(`payEmptyHourly*`, ko/ja/en) — 멤버가 아예 없을 때의 「활성 멤버가 없습니다」와 구분.

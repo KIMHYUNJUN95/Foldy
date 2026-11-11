@@ -6,7 +6,7 @@ import { getOnboardingState } from "@/lib/onboarding";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { getMyLeaveRequest } from "@/lib/annual-leave-requests-server";
-import { getMyAnnualLeaveSummary } from "@/lib/annual-leave-server";
+import { getMyAnnualLeaveSummary, LeaveReadError } from "@/lib/annual-leave-server";
 import { getDictionary } from "@/lib/i18n";
 
 // L2 · 연차 신청서 작성. 스티키 하단 액션(임시 저장 · 신청 제출)을 쓰므로 hideBottomNav.
@@ -40,7 +40,12 @@ export default async function MobileLeaveNewPage({
   const service = getSupabaseServiceClient();
   const [draftRequest, summary] = await Promise.all([
     params.id ? getMyLeaveRequest(service, session.organization.id, session.user.id, params.id) : Promise.resolve(null),
-    getMyAnnualLeaveSummary(service, session.organization.id, session.user.id),
+    // 잔여는 신청 화면의 미리보기일 뿐 — 읽기 실패면 미리보기 없이 연다(서버가 신청 때 다시 확인한다, 2026-11-11).
+    getMyAnnualLeaveSummary(service, session.organization.id, session.user.id).catch((error: unknown) => {
+      if (!(error instanceof LeaveReadError)) throw error;
+      console.error("[mobile/attendance/leave/new]", error.message);
+      return null;
+    }),
   ]);
   const draft = draftRequest?.status === "draft" ? draftRequest : null;
 

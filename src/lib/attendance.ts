@@ -70,6 +70,37 @@ export const ATTENDANCE_REVIEW_STATES: readonly AttendanceReviewState[] = [
   "rejected_correction",
 ];
 
+/**
+ * 급여에 넣는 검토 상태 — 마감 판정(`countBlockingSessions`)과 급여 제외(`payExcludeReason`)가 **같이** 쓴다(2026-11-11).
+ * 이 둘이 따로 놀면 「급여에서는 빠지는데 마감은 안 막는」 근무가 생겨 0원이 마감 금액으로 굳는다.
+ */
+export function isPayableReviewState(reviewState: string): boolean {
+  return reviewState === "normal" || reviewState === "approved_correction";
+}
+
+/**
+ * 관리자 큐 「검토 필요」에 넣을 검토 상태 = 지급 안 되는 상태 전부(2026-11-11). 마감을 막는 근무(`countBlockingSessions`)가
+ * 이 탭에 다 보여야 관리자가 어느 날을 고칠지 안다 — 전에는 `review_required` 만 넣어 반려된 정정 · 요청 없이 남은 「정정 대기」
+ * 근무가 마감만 막고 어디에도 안 보였다. DB 로 거를 때(`.in("review_state", …)`) 쓴다.
+ */
+export const ATTENDANCE_NEEDS_REVIEW_STATES: readonly AttendanceReviewState[] = [
+  "review_required",
+  "pending_correction",
+  "rejected_correction",
+];
+
+/** 「검토 필요」 줄인지 — 무효는 해소된 것, 열린 정정 요청이 걸린 근무는 「정정 요청」 탭에서 센다(사용자 결정 2026-10-29). */
+export function needsReviewRow(row: { reviewState: string; status: string; hasOpenCorrection: boolean }): boolean {
+  if (row.status === "invalid" || row.hasOpenCorrection) return false;
+  return !isPayableReviewState(row.reviewState);
+}
+
+/**
+ * 관리자 직접 수정(`updateAttendanceSessionAdmin`)이 손으로 고를 수 있는 검토 상태(2026-11-11). 「검토 완료」(normal)와
+ * 「검토 필요」뿐 — 정정 관련 상태는 정정 승인 · 반려만 만든다.
+ */
+export const ATTENDANCE_ADMIN_EDITABLE_REVIEW_STATES: readonly AttendanceReviewState[] = ["normal", "review_required"];
+
 // ── 인증 방식 ──────────────────────────────────────────────────────
 /**
  * 근태 인증 방식. PWA 첫 출시는 `gps_qr` 만 쓴다 (관리자가 만든
@@ -99,6 +130,8 @@ export const ATTENDANCE_ACTION_TYPES: readonly AttendanceActionType[] = [
 export type AttendanceFailureReason =
   | "gps_denied"
   | "gps_unavailable"
+  /** 위치 오차가 `ATTENDANCE_GPS_MAX_ACCURACY_METERS` 보다 크다(2026-11-11, DB CHECK 는 20260811012820 부터 허용). */
+  | "gps_inaccurate"
   | "outside_radius"
   | "qr_invalid"
   | "qr_scan_failed"
@@ -111,6 +144,7 @@ export type AttendanceFailureReason =
 export const ATTENDANCE_FAILURE_REASONS: readonly AttendanceFailureReason[] = [
   "gps_denied",
   "gps_unavailable",
+  "gps_inaccurate",
   "outside_radius",
   "qr_invalid",
   "qr_scan_failed",
@@ -204,6 +238,36 @@ export const ATTENDANCE_EXPORT_SCOPES: readonly AttendanceExportScope[] = [
 // ── 스키마를 반영한 상수 ─────────────────────────────────────────────
 /** 현장의 기본 허용 GPS 반경 (미터, 현장별 덮어쓰기 가능). DB 기본값과 같다. */
 export const ATTENDANCE_DEFAULT_RADIUS_METERS = 100;
+
+/** 현장 허용 반경의 상한(미터, 2026-11-11). 설정 화면 · 서버가 같이 쓴다 — 넓게 잡으면 현장 밖 打刻이 통과한다. */
+export const ATTENDANCE_MAX_SITE_RADIUS_METERS = 500;
+
+/** 현장 반경으로 받을 수 있는 값인가 — 1 ~ 상한 사이 정수. */
+export function isValidSiteRadius(radius: number | null | undefined): radius is number {
+  return typeof radius === "number" && Number.isInteger(radius) && radius > 0 && radius <= ATTENDANCE_MAX_SITE_RADIUS_METERS;
+}
+
+/**
+ * 打刻 때 받는 위치 정확도의 상한(미터, 2026-11-11). 기기가 알려 준 오차 반경이 이보다 크면 위치를 믿지 않고
+ * `gps_inaccurate` 로 거절한다 — 오차 1km 짜리 위치는 반경 검사를 우연히 통과할 수 있다.
+ * 값이 없거나 숫자가 아니면(기기가 안 알려 줌) 막지 않는다 — 반경 검사가 그대로 걸린다.
+ */
+export const ATTENDANCE_GPS_MAX_ACCURACY_METERS = 100;
+
+export function isGpsAccuracyTooLow(accuracy: number | null | undefined): boolean {
+  return typeof accuracy === "number" && Number.isFinite(accuracy) && accuracy > ATTENDANCE_GPS_MAX_ACCURACY_METERS;
+}
+
+/**
+ * 한 근무의 최대 길이(분, 2026-11-11). 현장 근무는 길어도 8시 → 23시 30분이라 16시간을 넘는 값은 입력 실수다
+ * (예: 자정을 넘긴 것으로 해석된 23.5시간). 직원 정정 요청 · 관리자 수기 입력 · 직접 수정 · 정정 승인이 같이 쓴다.
+ */
+export const ATTENDANCE_MAX_SHIFT_MINUTES = 16 * 60;
+
+export function exceedsMaxShift(clockInAt: string | null, clockOutAt: string | null): boolean {
+  if (!clockInAt || !clockOutAt) return false;
+  return new Date(clockOutAt).getTime() - new Date(clockInAt).getTime() > ATTENDANCE_MAX_SHIFT_MINUTES * 60_000;
+}
 
 /** 정정 요청의 최대 사진 수 — DB CHECK 제약과 같다. */
 export const ATTENDANCE_CORRECTION_MAX_IMAGES = 5;

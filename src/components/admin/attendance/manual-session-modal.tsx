@@ -13,6 +13,7 @@ import { createManualAttendanceSession } from "@/app/admin/attendance/actions";
 import { AdminDatePicker } from "../shared/admin-date-picker";
 import { AdminTimePicker } from "../shared/admin-time-picker";
 import { AdmDropdown } from "../shared/adm-dropdown";
+import { isManualDraftDirty, pickerPopoverOpen } from "@/components/admin/attendance/manual-session-draft";
 
 type Att = Dictionary["admin"]["attendanceConsole"];
 
@@ -42,14 +43,29 @@ export function ManualSessionModal({
   const [location, setLocation] = useState("");
   const [reason, setReason] = useState("");
   const [err, setErr] = useState<string | null>(null);
+  // 친 내용이 있으면 Esc · 바깥 누르기로 바로 닫지 않고 한 번 묻는다(2026-11-11). 「취소」 단추는 분명한 뜻이라 묻지 않는다.
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const dirty = isManualDraftDirty({ userId, date, clockIn, clockOut, location, reason }, defaultDate);
+  const requestClose = () => {
+    if (pending) return;
+    if (dirty) setConfirmDiscard(true);
+    else onClose();
+  };
+  const requestCloseRef = useRef(requestClose);
+  useEffect(() => {
+    requestCloseRef.current = requestClose;
+  });
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      // 날짜 · 시각 고르기 창이 열려 있으면 Esc 는 그 창만 닫는다(공용 피커는 preventDefault 를 하지 않음).
+      if (pickerPopoverOpen(cardRef.current)) return;
+      requestCloseRef.current();
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, []);
 
   function errText(reason: string): string {
     switch (reason) {
@@ -65,6 +81,10 @@ export function ManualSessionModal({
         return c.actionOverlap;
       case "finalized_locked":
         return c.manualErrFinalized;
+      case "future_date":
+        return c.manualErrFutureDate;
+      case "too_long":
+        return c.manualErrTooLong;
       default:
         return c.manualErrGeneric;
     }
@@ -106,7 +126,7 @@ export function ManualSessionModal({
       aria-modal="true"
       aria-label={c.manualTitle}
       className="msmodal__scrim"
-      onClick={onClose}
+      onClick={requestClose}
     >
       <div className="admodal msmodal" ref={cardRef} onClick={(e) => e.stopPropagation()}>
         <div className="msmodal__head">
@@ -140,6 +160,8 @@ export function ManualSessionModal({
                 value={date}
                 onChange={setDate}
                 localeTag={localeTag}
+                // 오늘(도쿄)까지만 — 아직 일하지 않은 날은 서버도 거절한다(2026-11-11).
+                max={defaultDate}
                 ariaLabel={c.manualFieldDate}
                 labels={{
                   prevMonth: c.datePickerPrevMonth,
@@ -205,14 +227,27 @@ export function ManualSessionModal({
           ) : null}
         </div>
 
-        <div className="msmodal__foot">
-          <button type="button" className="btn btn--subtle" onClick={onClose} disabled={pending}>
-            {c.dialogCancel}
-          </button>
-          <button type="button" className="btn btn--pri" onClick={submit} disabled={pending}>
-            {c.manualSave}
-          </button>
-        </div>
+        {confirmDiscard ? (
+          <div className="msmodal__foot" role="alertdialog" aria-label={c.manualDiscardBody} style={{ flexWrap: "wrap" }}>
+            {/* ja · en 문구가 길면 문구가 한 줄을 차지하고 단추는 아래로 — 자르지 않는다. */}
+            <span style={{ flex: "1 1 180px", fontSize: 13, fontWeight: 600, lineHeight: 1.4 }}>{c.manualDiscardBody}</span>
+            <button type="button" className="btn btn--subtle" onClick={() => setConfirmDiscard(false)} autoFocus>
+              {c.manualDiscardKeep}
+            </button>
+            <button type="button" className="btn btn--danger-ghost" onClick={onClose}>
+              {c.manualDiscardOk}
+            </button>
+          </div>
+        ) : (
+          <div className="msmodal__foot">
+            <button type="button" className="btn btn--subtle" onClick={onClose} disabled={pending}>
+              {c.dialogCancel}
+            </button>
+            <button type="button" className="btn btn--pri" onClick={submit} disabled={pending}>
+              {c.manualSave}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -22,7 +22,9 @@ import { getMemberIdsWithCapability } from "@/lib/attendance-review";
 import { notifyAttendanceAdmins } from "@/lib/notifications/create";
 import { bestEffortWrite } from "@/lib/db-write-guard";
 import { storagePathFromPublicUrl } from "@/lib/storage-url-guard";
-import { resolveClockOutAfterClockIn, tokyoWallClockInstant } from "@/lib/attendance-clock";
+import { staffCorrectionTimesProblem, tokyoWallClockInstant } from "@/lib/attendance-clock";
+import { getCurrentFinalizedSnapshot } from "@/lib/attendance-finalization";
+import { isPayrollMonthLocked } from "@/lib/payroll-approval-server";
 import {
   ATTENDANCE_CORRECTION_PENDING_STATUSES,
   ATTENDANCE_CORRECTION_REASONS,
@@ -33,6 +35,7 @@ import {
   type AttendanceQrTokenRow,
   type AttendanceSiteRow,
   type AttendanceSessionRow,
+  isGpsAccuracyTooLow,
   isStaleOpenSession,
 } from "@/lib/attendance";
 
@@ -307,6 +310,13 @@ export async function submitAttendanceScan(
     return { ok: false, reason: "gps", siteName: localizedSiteName(site, locale) };
   }
 
+  // 4-1) 위치 오차가 너무 크면 믿지 않는다(2026-11-11, 상한 `ATTENDANCE_GPS_MAX_ACCURACY_METERS`). 오차 1km 짜리 위치는
+  // 반경 검사를 우연히 통과할 수 있다. 화면은 GPS 실패와 같은 안내(다시 시도)를 보여 준다.
+  if (isGpsAccuracyTooLow(input.accuracy)) {
+    await logAttempt({ success: false, failureReason: "gps_inaccurate", resolvedSiteId: site.id });
+    return { ok: false, reason: "gps", siteName: localizedSiteName(site, locale) };
+  }
+
   // 5) GPS 가 사업장의 허용 반경 안이어야 한다.
   const dist = distanceMeters(site.latitude, site.longitude, input.latitude, input.longitude);
   if (dist > site.allowed_radius_meters) {
@@ -546,7 +556,14 @@ export type CreateCorrectionInput = {
 
 export type CreateCorrectionResult =
   | { ok: true; id: string }
-  | { ok: false; reason: "forbidden" | "out_of_range" | "invalid" | "error" };
+  | {
+      ok: false;
+      /**
+       * `month_locked` = 그 달 근태가 마감됐거나 급여 결재가 시작됐다(2026-11-11) — 관리자가 마감을 풀어야 한다.
+       * `clock_order` = 퇴근이 출근보다 뒤가 아니다(근무는 자정을 넘기지 않는다). `too_long` = 16시간 초과.
+       */
+      reason: "forbidden" | "out_of_range" | "invalid" | "month_locked" | "clock_order" | "too_long" | "error";
+    };
 
 /** 지금의 도쿄 YYYY-MM. */
 function tokyoYearMonthNow(): string {
@@ -643,10 +660,11 @@ export async function createAttendanceCorrectionRequest(
   let baseDate: string;
   let sessionId: string | null = null;
   let sessionClockInAt: string | null = null;
+  let sessionClockOutAt: string | null = null;
   if (input.sessionId) {
     const res = await service
       .from("attendance_sessions")
-      .select("id, user_id, operating_date, clock_in_at")
+      .select("id, user_id, operating_date, clock_in_at, clock_out_at")
       .eq("organization_id", organizationId)
       .eq("id", input.sessionId)
       .maybeSingle();
@@ -655,11 +673,13 @@ export async function createAttendanceCorrectionRequest(
       user_id: string;
       operating_date: string;
       clock_in_at: string | null;
+      clock_out_at: string | null;
     } | null;
     if (res.error || !row || row.user_id !== userId) return { ok: false, reason: "forbidden" };
     baseDate = row.operating_date;
     sessionId = row.id;
     sessionClockInAt = row.clock_in_at;
+    sessionClockOutAt = row.clock_out_at;
   } else {
     const today = tokyoDate(new Date().toISOString());
     const picked = input.targetDate?.trim() || null;
@@ -676,6 +696,18 @@ export async function createAttendanceCorrectionRequest(
     return { ok: false, reason: "out_of_range" };
   }
 
+  // 마감된 달 · 급여 결재가 시작된 달에는 정정 요청을 받지 않는다(2026-11-11). 받으면 관리자는 마감을 풀기 전엔 처리할 수
+  // 없고, 그 사이 급여 계산이 그 날을 「정정 대기」로 빼 버렸다. 읽기 실패면 받지 않는다(오류).
+  try {
+    const [finalized, payrollLocked] = await Promise.all([
+      getCurrentFinalizedSnapshot(service, organizationId, userId, ym, { strict: true }),
+      isPayrollMonthLocked(service, organizationId, ym),
+    ]);
+    if (finalized || payrollLocked) return { ok: false, reason: "month_locked" };
+  } catch {
+    return { ok: false, reason: "error" };
+  }
+
   // 선택한 희망 사업장이 이 조직 것인지 검증한다(못 찾으면 버린다).
   let desiredSiteId: string | null = null;
   if (input.desiredSiteId) {
@@ -689,16 +721,21 @@ export async function createAttendanceCorrectionRequest(
   }
 
   const desiredClockInAt = tokyoWallClockInstant(baseDate, input.desiredInTime);
+  // 퇴근은 **같은 날**에만 붙인다(2026-11-11) — 현장 근무는 자정을 넘기지 않는다(가장 늦은 퇴근 23:30). 예전에는 퇴근이
+  // 출근보다 앞서면 다음 날로 넘겨서 「출근 9:00 · 퇴근 8:30」 오타가 23.5시간 근무가 됐다. 이제는 거절한다.
+  const desiredClockOutAt = tokyoWallClockInstant(baseDate, input.desiredOutTime);
+  const timesProblem = staffCorrectionTimesProblem({
+    clockInAt: desiredClockInAt,
+    clockOutAt: desiredClockOutAt,
+    sessionClockInAt,
+    sessionClockOutAt,
+  });
+  if (timesProblem) return { ok: false, reason: timesProblem };
   const payload = {
     reason_type: input.reasonType,
     memo: input.memo?.trim() ? input.memo.trim() : null,
     desired_clock_in_at: desiredClockInAt,
-    // 퇴근이 출근보다 앞서면 다음 날(야간 근무) — 관리자 수동 수정과 같은 규칙(`attendance-clock.ts`).
-    desired_clock_out_at: resolveClockOutAfterClockIn(
-      baseDate,
-      input.desiredOutTime,
-      desiredClockInAt ?? sessionClockInAt,
-    ),
+    desired_clock_out_at: desiredClockOutAt,
     desired_clock_in_site_id: desiredSiteId,
     desired_clock_out_site_id: desiredSiteId,
     image_urls: imageUrls,

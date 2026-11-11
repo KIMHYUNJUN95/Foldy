@@ -17,6 +17,7 @@ import { getAdminAttendanceBadgeStats } from "@/lib/admin-attendance";
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { getDictionary } from "@/lib/i18n";
 import { AdminNoAccess } from "@/components/admin/shared/admin-no-access";
+import { settleAction } from "@/lib/settle-action";
 
 const STATUS_GROUPS: LeaveStatusGroup[] = ["pending", "approved", "rejectedCancelled", "all"];
 const LEAVE_TYPES: LeaveType[] = ["annual", "paid", "special", "other"];
@@ -53,12 +54,17 @@ export default async function AdminAttendanceLeavePage({
   // 클라이언트가 상태 그룹 / 유형 / 검색으로 로컬 필터링하고(탭은 링크가 아니라 버튼), 그룹별 건수를
   // 계산하려면 전체 데이터가 필요하므로 여기서는 항상 모든 그룹을 가져온다. URL 의
   // statusGroup/type/search 는 클라이언트의 초기 UI 상태로만 전달한다 (딥링크).
+  // 잔여 · 휴가계 · 이력은 읽기 실패 때 던진다(0 으로 숨기지 않음) — 그 구역만 오류로 두고 결재 큐는 살린다(2026-11-11).
+  const section = async <T,>(fn: () => Promise<T>): Promise<T | null> => {
+    const settled = await settleAction(fn);
+    return settled.thrown ? null : settled.value;
+  };
   const [queue, applicants, balances, documents, ledger, badgeStats] = await Promise.all([
     getAdminLeaveQueue(session, { statusGroup: "all" }),
     listLeaveApplicants(session),
-    listAdminLeaveBalances(session),
-    listLeaveDocuments(session),
-    listLeaveLedger(session),
+    section(() => listAdminLeaveBalances(session)),
+    section(() => listLeaveDocuments(session)),
+    section(() => listLeaveLedger(session)),
     // 다른 모든 근태 탭이 보여주는 것과 같은 배지 건수. 이게 없으면 검토 큐 / 급여 검토 /
     // 교통비 검토 칩이 이 탭에서만 사라지고, 탭 줄 전체가 왼쪽으로 밀린다.
     getAdminAttendanceBadgeStats(session),

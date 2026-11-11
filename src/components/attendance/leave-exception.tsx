@@ -6,13 +6,17 @@ import { useRouter } from "next/navigation";
 import "./leave.css";
 import { AIc, AttIcon } from "./att-icons";
 import { HireDatePicker } from "./hire-date-picker";
+import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { setAnnualLeaveBaselineAction } from "@/app/mobile/attendance/leave/actions";
 import { getDictionary, type Dictionary } from "@/lib/i18n";
 import { haptic } from "@/lib/haptics";
+import { leaveBaselineSetupErrorText } from "@/lib/annual-leave-copy";
+import { parseLeaveDayAmount } from "@/lib/annual-leave";
 
 // 섹션 S · 예외 상태 — 신청을 막고 이유·시점을 분명히 보여주는 전체 화면.
 //   missing: 입사일 미등록 — 본인이 입사일 + 현재 남은 연차를 직접 입력해 등록.
 //   waiting: 6개월 미만(아직 사용 대상 아님, 첫 부여 시점 안내)
+//   loadFailed: 잔여 읽기 실패(2026-11-11) — 「입사일 미등록」으로 잘못 보내지 않고 다시 시도를 안내한다.
 // missing 화면의 저장은 setAnnualLeaveBaselineAction(서버 액션, profiles.hire_date +
 // annual_leave_baselines 테이블에 기록)을 호출한다. 실제 신청/승인 백엔드는 아직 범위 밖.
 
@@ -20,35 +24,46 @@ type LeaveCopy = Dictionary["leave"];
 
 const WAIT_MOCK = { hireDate: "2026-04-20", availableFrom: "2026-10-20" };
 
-export function LeaveException({ locale, variant }: { locale: string; variant: "missing" | "waiting" }) {
+export function LeaveException({ locale, variant }: { locale: string; variant: "missing" | "waiting" | "loadFailed" }) {
   const c: LeaveCopy = getDictionary(locale).leave;
   const router = useRouter();
   const [hireDate, setHireDate] = useState("");
   const [baseline, setBaseline] = useState("");
   const [hireErr, setHireErr] = useState(false);
   const [baselineErr, setBaselineErr] = useState(false);
-  /** null = 오류 없음. "hourly" 는 파트타임 제외(정책)라 재시도해도 안 되므로 문구를 구분한다. */
-  const [saveErr, setSaveErr] = useState<null | "generic" | "hourly" | "already">(null);
+  /** 서버 오류 코드(문구는 `leaveBaselineSetupErrorText`). null = 오류 없음. */
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+  /** 한 번만 넣을 수 있어서 저장 전에 한 번 더 보여 준다(2026-11-11). */
+  const [confirming, setConfirming] = useState(false);
   const [saving, setSaving] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
 
-  async function submit() {
-    const amount = Number(baseline);
+  function askConfirm() {
+    const amount = parseLeaveDayAmount(baseline);
     const hasHire = hireDate.trim().length > 0;
-    const hasBaseline = baseline.trim().length > 0 && Number.isFinite(amount) && amount >= 0;
     setHireErr(!hasHire);
-    setBaselineErr(!hasBaseline);
+    setBaselineErr(amount === null);
     setSaveErr(null);
-    if (!hasHire || !hasBaseline) return;
+    if (!hasHire || amount === null) return;
+    haptic("light");
+    setConfirming(true);
+  }
 
+  async function submit() {
+    const amount = parseLeaveDayAmount(baseline);
+    if (amount === null) return;
     setSaving(true);
-    const result = await setAnnualLeaveBaselineAction({ hireDate, baseAmount: amount });
+    let result: Awaited<ReturnType<typeof setAnnualLeaveBaselineAction>>;
+    try {
+      result = await setAnnualLeaveBaselineAction({ hireDate, baseAmount: amount });
+    } catch {
+      result = { ok: false, error: "network" };
+    }
     setSaving(false);
+    setConfirming(false);
     if (!result.ok) {
       haptic("error");
-      setSaveErr(
-        result.error === "hourly_excluded" ? "hourly" : result.error === "already_set" ? "already" : "generic",
-      );
+      setSaveErr(result.error);
       return;
     }
     haptic("success");
@@ -62,7 +77,21 @@ export function LeaveException({ locale, variant }: { locale: string; variant: "
         <span className="pagehead__t">{c.appTitle}</span>
       </div>
 
-      {variant === "missing" ? (
+      {variant === "loadFailed" ? (
+        <div className="exwrap" role="alert">
+          <div className="exwrap__ic ic-danger">{AttIcon.warn}</div>
+          <h3 className="exwrap__t">{c.exLoadFailedT}</h3>
+          <p className="exwrap__s">{c.exLoadFailedS}</p>
+          <div className="exwrap__cta">
+            <button type="button" className="exbtn exbtn--pri" onClick={() => router.refresh()}>
+              {c.exLoadFailedRetry}
+            </button>
+            <Link className="exbtn exbtn--ghost" href="/mobile/attendance">
+              {c.exMissAlt}
+            </Link>
+          </div>
+        </div>
+      ) : variant === "missing" ? (
         <div className="exwrap">
           <div className="exwrap__ic ic-danger">{AttIcon.warn}</div>
           <p className="exwrap__ey">{c.exMissEy}</p>
@@ -108,18 +137,14 @@ export function LeaveException({ locale, variant }: { locale: string; variant: "
               {baselineErr ? <div className="ferr">{c.exSetupBaselineErr}</div> : null}
             </div>
             {saveErr ? (
-              <div className="ferr">
-                {saveErr === "hourly"
-                  ? c.exSetupHourlyErr
-                  : saveErr === "already"
-                    ? c.exSetupAlreadySet
-                    : c.exSetupSaveErr}
+              <div className="ferr" role="alert">
+                {leaveBaselineSetupErrorText(saveErr, c)}
               </div>
             ) : null}
           </div>
 
           <div className="exwrap__cta">
-            <button type="button" className="exbtn exbtn--pri" disabled={saving} onClick={submit}>
+            <button type="button" className="exbtn exbtn--pri" disabled={saving} onClick={askConfirm}>
               <AIc>{AttIcon.check}</AIc>
               {c.exMissCta}
             </button>
@@ -159,6 +184,30 @@ export function LeaveException({ locale, variant }: { locale: string; variant: "
           </div>
         </div>
       )}
+
+      {confirming ? (
+        <BottomSheet onClose={() => setConfirming(false)}>
+          {({ close }) => (
+            <div className="lv-sheet">
+              <div className="lsheet__h">
+                <span className="lsheet__t">{c.exSetupConfirmT}</span>
+              </div>
+              <p className="exwrap__s" style={{ textAlign: "left" }}>
+                {c.exSetupConfirmS.replace("{date}", hireDate).replace("{days}", baseline.trim())}
+              </p>
+              <div className="exwrap__cta">
+                <button type="button" className="exbtn exbtn--pri" disabled={saving} onClick={submit}>
+                  <AIc>{AttIcon.check}</AIc>
+                  {c.exSetupConfirmOk}
+                </button>
+                <button type="button" className="exbtn exbtn--ghost" disabled={saving} onClick={close}>
+                  {c.exSetupConfirmBack}
+                </button>
+              </div>
+            </div>
+          )}
+        </BottomSheet>
+      ) : null}
 
       {pickerOpen ? (
         <HireDatePicker

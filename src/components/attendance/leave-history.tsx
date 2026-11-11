@@ -9,6 +9,8 @@ import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { haptic } from "@/lib/haptics";
 import { cancelLeaveRequestAction, deleteLeaveRequestDraftAction } from "@/app/mobile/attendance/leave/actions";
 import type { LeaveRequestView } from "@/lib/annual-leave-requests-server";
+import { countLeaveRequestsInYear, tokyoToday } from "@/lib/annual-leave";
+import { formatExcludedDates } from "@/lib/annual-leave-copy";
 import { getDictionary, type Dictionary } from "@/lib/i18n";
 
 // L4 · 신청 내역 — 상태 필터 세그 + 이력 리스트. 행 탭 → 상세 시트(C1) → 취소 확인 시트(C2) →
@@ -229,13 +231,14 @@ export function LeaveHistory({ locale, requests }: { locale: string; requests: L
 
   // 화이트 리디자인(2026-10-13, 시안 AttLeaveHistM): 제목 · 「올해 · n건」 · + 신청 → 글자 탭(건수) → 줄(종류 · 일수 / 기간 · 신청일 / 상태).
   // 카드 · 종류 아이콘 · LV 코드 · 아래 고정 버튼은 뺐다. 상세 · 취소 시트와 임시 저장 줄의 밀어서 삭제는 그대로.
-  const year = new Date().getFullYear();
+  // 기기 시계가 아니라 도쿄 올해, 전체가 아니라 올해 건수(2026-11-11).
+  const year = tokyoToday().slice(0, 4);
   return (
     <div className="lv lvw lvw--hist">
       <div className="lvw-title lvw-title--row">
         <div>
           <h1>{c.histTitle}</h1>
-          <span>{c.histSub.replace("{y}", String(year)).replace("{n}", String(requests.length))}</span>
+          <span>{c.histSub.replace("{y}", year).replace("{n}", String(countLeaveRequestsInYear(requests, year)))}</span>
         </div>
         <Link className="lvw-addlink" href="/mobile/attendance/leave/new">
           {c.histAdd}
@@ -319,6 +322,14 @@ export function LeaveHistory({ locale, requests }: { locale: string; requests: L
                     {selected.startDate} – {selected.endDate}
                   </span>
                 </div>
+                {selected.excludedDates.length > 0 ? (
+                  <div className="reqrow">
+                    <span className="reqrow__k">{c.fOffDayTag}</span>
+                    <span className="reqrow__v mono">
+                      {formatExcludedDates(selected.excludedDates, locale === "ja" ? "ja-JP" : locale === "en" ? "en-US" : "ko-KR")}
+                    </span>
+                  </div>
+                ) : null}
                 <div className="reqrow">
                   <span className="reqrow__k">{c.rDays}</span>
                   <span className="reqrow__v mono">
@@ -404,7 +415,7 @@ export function LeaveHistory({ locale, requests }: { locale: string; requests: L
                       return;
                     }
                     router.push(
-                      `/mobile/attendance/leave/cancel-done?start=${result.startDate}&end=${result.endDate}&days=${result.daysCount}`,
+                      `/mobile/attendance/leave/cancel-done?id=${encodeURIComponent(selected.id)}`,
                     );
                   }}
                 >

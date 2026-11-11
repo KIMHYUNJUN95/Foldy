@@ -24,6 +24,7 @@ import {
   type LeaveType,
 } from "@/lib/annual-leave-approvals-server";
 import {
+  confirmEmployeeLeaveBaseline,
   createAdminLeaveRequest,
   listAdminLeaveBalances,
   listLeaveLedger,
@@ -36,11 +37,18 @@ import { filterLeaveLedger, type LeaveLedgerFilter } from "@/lib/annual-leave";
 
 const LEAVE_PATH = "/admin/attendance/leave";
 
+/**
+ * 승인. 승인하면 잔여를 넘는 신청은 `overrideReason`(초과 승인 사유)이 있어야 한다 — 없으면 `over_balance`(M7).
+ * 자기 신청은 `self_approval`(M6).
+ */
 export async function approveLeaveRequestAction(
   requestId: string,
+  overrideReason?: string,
 ): Promise<{ ok: boolean; error?: string }> {
   const session = await requireAdminPageSession({ nextPath: LEAVE_PATH });
-  const result = await approveLeaveRequestForApprover(session, requestId);
+  const result = await approveLeaveRequestForApprover(session, requestId, {
+    overrideReason: typeof overrideReason === "string" ? overrideReason : undefined,
+  });
   if (result.ok) revalidatePath(LEAVE_PATH);
   return result.ok ? { ok: true } : { ok: false, error: result.error };
 }
@@ -88,6 +96,15 @@ export async function saveEmployeeLeaveBaselineAction(input: {
   const session = await requireAdminPageSession({ nextPath: LEAVE_PATH });
   if (!(await isSessionLeaveApprover(session))) return { ok: false, error: "not_approver" };
   const result = await saveEmployeeLeaveBaseline(session, input);
+  if (result.ok) revalidatePath(LEAVE_PATH);
+  return result.ok ? { ok: true } : { ok: false, error: result.error };
+}
+
+/** 본인이 입력한 기준 잔여를 확인한다(M11, 2026-11-11). 승인권자만, 자기 것은 안 됨. 화면: 잔여 패널 「확인」 단추. */
+export async function confirmEmployeeLeaveBaselineAction(userId: string): Promise<{ ok: boolean; error?: string }> {
+  const session = await requireAdminPageSession({ nextPath: LEAVE_PATH });
+  if (!(await isSessionLeaveApprover(session))) return { ok: false, error: "not_approver" };
+  const result = await confirmEmployeeLeaveBaseline(session, typeof userId === "string" ? userId : "");
   if (result.ok) revalidatePath(LEAVE_PATH);
   return result.ok ? { ok: true } : { ok: false, error: result.error };
 }
@@ -273,7 +290,8 @@ async function balanceSheet(
       hire: e.hireDate ?? "",
       paid: e.ineligible ? lc.balanceIneligiblePill : `${e.grant - e.usedBase} / ${e.grant}`,
       special: e.bonus ? `${e.bonus - e.usedBonus} / ${e.bonus}` : "",
-      used: String(e.usedBase + e.usedBonus),
+      // 「이번 달 사용」 — 예전에는 전체 기간 합이 들어갔다(2026-11-11). 이번 도쿄 달에 시작한 승인분만.
+      used: String(e.usedThisMonth),
       expiring:
         e.expiringDate && e.expiringAmount
           ? `${e.expiringDate} (${lc.daysUnit(e.expiringAmount)})`

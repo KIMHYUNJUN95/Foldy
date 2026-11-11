@@ -1296,6 +1296,15 @@
 .lvw .lvw-days b { min-width: 0; text-align: right; font-size: 18px; font-weight: 700; color: var(--ink); }
 .lvw .lvw-err { margin: 6px 0 0; font-size: 12px; color: #c5282e; }
 .lvw .lvw-hint { margin: 12px 0 0; font-size: 12px; line-height: 1.5; color: var(--text-3); }
+/* 안 A(2026-11-11) — 기간 날짜 줄. 원래 휴무로 뺀 날은 옅게 + 「원래 휴무」 이름표. 칸이 좁으면 줄바꿈. */
+.lvw .lvw-hint--tight { margin: 2px 0 8px; }
+.lvw .lvw-offdays { display: flex; flex-wrap: wrap; gap: 6px; }
+.lvw .lvw-offday { min-width: 64px; min-height: 44px; padding: 4px 10px; border: 0; border-radius: 12px; background: #f4f4f7; font: inherit; color: #3a3746; cursor: pointer; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; transition: transform 120ms ease, background-color 160ms ease; }
+.lvw .lvw-offday:active { transform: scale(0.97); }
+.lvw .lvw-offday__d { font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lvw .lvw-offday.is-off { background: #fff; box-shadow: inset 0 0 0 1px #e4e3e9; color: var(--text-3); }
+.lvw .lvw-offday.is-off .lvw-offday__d { text-decoration: line-through; }
+.lvw .lvw-offday__tag { font-size: 11px; color: #6b6878; white-space: nowrap; }
 .lvw .lvw-acts { display: grid; grid-template-columns: 1fr 2fr; gap: 8px; margin-top: 20px; }
 .lvw .lvw-btn { height: 50px; border: 0; border-radius: 14px; background: #7a52e6; color: #fff; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; transition: transform 120ms ease, background 150ms ease; }
 .lvw .lvw-btn:hover { background: #6b40e0; }

@@ -74,7 +74,10 @@ export function LeaveTeamCalendar({
   items,
   onSelect,
   onCreateRequest,
+  todayDate,
 }: {
+  /** 도쿄 오늘 YYYY-MM-DD — 기기 시계 · 시간대가 아니라 부모가 넘긴 값(2026-11-11). */
+  todayDate: string;
   lc: Lc;
   locale: Locale;
   /** 조직 전체의 승인된 휴가 신청(캘린더는 승인된 것만 보여 준다). */
@@ -84,9 +87,11 @@ export function LeaveTeamCalendar({
   /** 빈 날짜 칸의 팝오버 액션을 고르면 호출된다 → 그 날짜로 신청 모달을 연다. */
   onCreateRequest: (mode: "proxy" | "self", date: string) => void;
 }) {
-  const today = new Date();
-  const [y, setY] = useState(today.getFullYear());
-  const [m, setM] = useState(today.getMonth() + 1); // 1-12
+  const todayY = Number(todayDate.slice(0, 4));
+  const todayM = Number(todayDate.slice(5, 7));
+  const todayD = Number(todayDate.slice(8, 10));
+  const [y, setY] = useState(todayY);
+  const [m, setM] = useState(todayM); // 1-12
   // 빈 날짜 칸을 클릭하면 그 위치(뷰포트 좌표)에 붙는 팝오버.
   const [dayMenu, setDayMenu] = useState<{ iso: string; x: number; y: number } | null>(null);
 
@@ -170,8 +175,8 @@ export function LeaveTeamCalendar({
     return { weeks };
   }, [y, m, items]);
 
-  const isThisMonth = y === today.getFullYear() && m === today.getMonth() + 1;
-  const todayDay = isThisMonth ? today.getDate() : 0;
+  const isThisMonth = y === todayY && m === todayM;
+  const todayDay = isThisMonth ? todayD : 0;
 
   // Escape 로 날짜 칸 팝오버를 닫는다.
   useEffect(() => {
@@ -206,8 +211,8 @@ export function LeaveTeamCalendar({
 
   function nav(delta: "y-1" | "m-1" | "m+1" | "y+1" | "today") {
     if (delta === "today") {
-      setY(today.getFullYear());
-      setM(today.getMonth() + 1);
+      setY(todayY);
+      setM(todayM);
       return;
     }
     if (delta === "y-1") setY((v) => v - 1);
@@ -223,24 +228,25 @@ export function LeaveTeamCalendar({
   const monthLabel = new Intl.DateTimeFormat(locale === "ko" ? "ko-KR" : locale === "ja" ? "ja-JP" : "en-US", {
     year: "numeric",
     month: "long",
-  }).format(new Date(y, m - 1, 1));
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(y, m - 1, 1)));
 
   return (
     <div className="card calcard">
       <div className="calcard__head">
         <span className="card__t">{lc.calendarTitle}</span>
         <div className="calnav">
-          <button type="button" className="calnav__b" title={lc.calendarPrevYear} onClick={() => nav("y-1")}>
+          <button type="button" className="calnav__b" title={lc.calendarPrevYear} aria-label={lc.calendarPrevYear} onClick={() => nav("y-1")}>
             <ChevronsLeft className="ic" />
           </button>
-          <button type="button" className="calnav__b" title={lc.calendarPrevMonth} onClick={() => nav("m-1")}>
+          <button type="button" className="calnav__b" title={lc.calendarPrevMonth} aria-label={lc.calendarPrevMonth} onClick={() => nav("m-1")}>
             <ChevronLeft className="ic" />
           </button>
           <span className="calnav__label">{monthLabel}</span>
-          <button type="button" className="calnav__b" title={lc.calendarNextMonth} onClick={() => nav("m+1")}>
+          <button type="button" className="calnav__b" title={lc.calendarNextMonth} aria-label={lc.calendarNextMonth} onClick={() => nav("m+1")}>
             <ChevronRight className="ic" />
           </button>
-          <button type="button" className="calnav__b" title={lc.calendarNextYear} onClick={() => nav("y+1")}>
+          <button type="button" className="calnav__b" title={lc.calendarNextYear} aria-label={lc.calendarNextYear} onClick={() => nav("y+1")}>
             <ChevronsRight className="ic" />
           </button>
           {isThisMonth ? null : (

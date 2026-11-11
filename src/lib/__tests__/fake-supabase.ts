@@ -68,6 +68,10 @@ export function createFakeSupabase(tables: Record<string, Row[]>) {
         filters.push((row) => String(row[column]) === String(value));
         return api;
       },
+      neq(column: string, value: unknown) {
+        filters.push((row) => String(row[column]) !== String(value));
+        return api;
+      },
       gte(column: string, value: unknown) {
         filters.push((row) => String(row[column]) >= String(value));
         return api;

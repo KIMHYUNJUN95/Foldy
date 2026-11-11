@@ -110,6 +110,12 @@ function LeaveFormSheet({ doc }: { doc: LeaveDocument }) {
               <span className="jp__sub">
                 　（{JP_DUR_LABEL[doc.durationUnit]} ・ {doc.daysCount}日）
               </span>
+              {/* 안 A(2026-11-11) — 원래 휴무로 뺀 날. 용지 문구라 일본어 고정. */}
+              {doc.excludedDates.length > 0 ? (
+                <span className="jp__sub" style={{ display: "block" }}>
+                  公休日除く：{[...doc.excludedDates].sort().map((d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`).join("・")}
+                </span>
+              ) : null}
             </td>
           </tr>
           <tr className="r-type">
@@ -173,7 +179,9 @@ export function LeaveDocumentsView({
 }) {
   const dictionary = getDictionary(locale);
   const userIds = Array.from(new Set(documents.map((d) => d.userId)));
-  const [userId, setUserId] = useState(userIds[0]);
+  const [pickedUserId, setUserId] = useState(userIds[0]);
+  // 처음 0건이었다가 문서가 들어와도(새로 읽기) 첫 직원으로 — 예전에는 빈 화면에 머물렀다(2026-11-11).
+  const userId = pickedUserId && userIds.includes(pickedUserId) ? pickedUserId : userIds[0];
   const empDocs = documents
     .filter((d) => d.userId === userId)
     .sort((a, b) => (a.startDate < b.startDate ? -1 : 1));

@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import "./leave.css";
 import { AIc, AttIcon } from "./att-icons";
 import { LeaveDatePicker } from "./leave-date-picker";
-import { tokyoToday } from "@/lib/annual-leave";
+import { effectiveExcludedDates, leaveRangeDates, pruneExcludedDates, toggleExcludedDate, tokyoToday } from "@/lib/annual-leave";
+import { leaveSubmitErrorText } from "@/lib/annual-leave-copy";
 import { submitLeaveRequestAction } from "@/app/mobile/attendance/leave/actions";
 import type { LeaveRequestView } from "@/lib/annual-leave-requests-server";
 import { getDictionary, type Dictionary } from "@/lib/i18n";
@@ -65,14 +66,34 @@ export function LeaveForm({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [reasonErr, setReasonErr] = useState(false);
   const [emergencyErr, setEmergencyErr] = useState(false);
-  /** 서버가 거절한 이유 — 시급직 · 기준 잔여 없음 · 이미 제출됨은 다시 눌러도 안 되므로 문구를 나눈다. */
-  const [submitErr, setSubmitErr] = useState<null | "generic" | "hourly" | "baseline" | "not_editable">(null);
+  /** 서버가 거절한 이유 코드 — 코드마다 전용 문구(`leaveSubmitErrorText`). "network" = 호출 자체 실패. */
+  const [submitErr, setSubmitErr] = useState<string | null>(null);
+  /** 안 A(2026-11-11) — 원래 휴무라 뺀 날. 종일 · 경조 아닌 종류에서만. */
+  const [excluded, setExcluded] = useState<readonly string[]>(draft?.excludedDates ?? []);
+  const [keepOneHint, setKeepOneHint] = useState(false);
   const [busy, setBusy] = useState<"draft" | "submit" | null>(null);
 
   const isBereavement = selType === "annual";
   const isUnpaid = selType === "other";
   const half = dur !== "full" && !isBereavement;
-  const rangeDays = diffDaysISO(startDate, endDate);
+  const allowExclude = !isBereavement && !half;
+  const rangeList = allowExclude ? leaveRangeDates(startDate, endDate) : [];
+  // 보여 주기 · 보내기 · 일수가 모두 이 값 하나를 쓴다(2026-11-11) — 단위 · 종류가 바뀌어 기간이 줄어도 어긋난 날이 남지 않게.
+  const activeExcluded = effectiveExcludedDates(excluded, allowExclude, startDate, endDate);
+  const rangeDays = diffDaysISO(startDate, endDate) - activeExcluded.length;
+
+  function toggleOffDay(date: string) {
+    const next = toggleExcludedDate(activeExcluded, date, startDate, endDate);
+    if (next === activeExcluded) {
+      // 마지막 하루는 뺄 수 없다(0일 금지).
+      haptic("error");
+      setKeepOneHint(true);
+      return;
+    }
+    haptic("light");
+    setKeepOneHint(false);
+    setExcluded(next);
+  }
 
   async function submit(asDraft: boolean) {
     const hasReason = reason.trim().length > 0;
@@ -83,29 +104,28 @@ export function LeaveForm({
     if (!asDraft && (!hasReason || !hasEmergency)) return;
 
     setBusy(asDraft ? "draft" : "submit");
-    const result = await submitLeaveRequestAction({
-      requestId: draft?.id,
-      leaveType: selType,
-      startDate,
-      endDate,
-      durationUnit: half ? dur : "full",
-      reason,
-      emergencyContact: emergency,
-      asDraft,
-    });
+    let result: Awaited<ReturnType<typeof submitLeaveRequestAction>>;
+    try {
+      result = await submitLeaveRequestAction({
+        requestId: draft?.id,
+        leaveType: selType,
+        startDate,
+        endDate,
+        durationUnit: half ? dur : "full",
+        reason,
+        emergencyContact: emergency,
+        asDraft,
+        excludedDates: [...activeExcluded],
+      });
+    } catch {
+      // 오프라인 등으로 호출 자체가 실패해도 단추가 잠긴 채 남지 않게(2026-11-11).
+      result = { ok: false, error: "network" };
+    }
     setBusy(null);
 
     if (!result.ok) {
       haptic("error");
-      setSubmitErr(
-        result.error === "hourly_excluded"
-          ? "hourly"
-          : result.error === "baseline_required"
-            ? "baseline"
-            : result.error === "not_editable"
-              ? "not_editable"
-              : "generic",
-      );
+      setSubmitErr(result.error);
       return;
     }
     haptic("success");
@@ -117,6 +137,14 @@ export function LeaveForm({
     new Intl.DateTimeFormat(locale === "ja" ? "ja-JP" : locale === "en" ? "en-US" : "ko-KR", {
       // en 은 「Sun, October 25」가 반 칸에서 두 줄이 돼 짧은 달 이름(「Sun, Oct 25」). ko · ja 는 그대로.
       month: locale === "en" ? "short" : "long",
+      day: "numeric",
+      weekday: "short",
+      timeZone: "UTC",
+    }).format(new Date(`${iso}T00:00:00Z`));
+  // 날짜 줄 한 칸 — 「22 (일)」 · 「Sun 22」 처럼 짧게.
+  const fmtShort = (iso: string) =>
+    new Intl.DateTimeFormat(locale === "ja" ? "ja-JP" : locale === "en" ? "en-US" : "ko-KR", {
+      month: "numeric",
       day: "numeric",
       weekday: "short",
       timeZone: "UTC",
@@ -194,6 +222,31 @@ export function LeaveForm({
           </>
         )}
 
+        {allowExclude && rangeList.length > 1 ? (
+          <>
+            <div className="lvw-q">{c.fOffDaysQ}</div>
+            <p className="lvw-hint lvw-hint--tight">{c.fOffDaysHint}</p>
+            <div className="lvw-offdays" data-swipe-back="off">
+              {rangeList.map((d) => {
+                const off = activeExcluded.includes(d);
+                return (
+                  <button
+                    key={d}
+                    type="button"
+                    aria-pressed={off}
+                    className={`lvw-offday${off ? " is-off" : ""}`}
+                    onClick={() => toggleOffDay(d)}
+                  >
+                    <span className="lvw-offday__d">{fmtShort(d)}</span>
+                    {off ? <span className="lvw-offday__tag">{c.fOffDayTag}</span> : null}
+                  </button>
+                );
+              })}
+            </div>
+            {keepOneHint ? <p className="lvw-err">{c.fOffDayKeepOne}</p> : null}
+          </>
+        ) : null}
+
         <div className="lvw-days">
           <span>{c.fDaysLabel}</span>
           <b>{isBereavement ? c.fBereaveDays : half ? c.fHalf : c.fDays(rangeDays)}</b>
@@ -232,17 +285,7 @@ export function LeaveForm({
 
         {isBereavement ? <p className="lvw-hint">{c.fBereaveHint}</p> : null}
         {isUnpaid ? <p className="lvw-hint">{c.fOtherUnpaidHint}</p> : null}
-        {submitErr ? (
-          <p className="lvw-err">
-            {submitErr === "hourly"
-              ? c.fHourlyPaidErr
-              : submitErr === "baseline"
-                ? c.fBaselineRequiredErr
-                : submitErr === "not_editable"
-                  ? c.fNotEditableErr
-                  : c.exSetupSaveErr}
-          </p>
-        ) : null}
+        {submitErr ? <p className="lvw-err" role="alert">{leaveSubmitErrorText(submitErr, c)}</p> : null}
 
         <div className="lvw-acts">
           <button type="button" className="lvw-btn lvw-btn--ghost" disabled={busy !== null} onClick={() => submit(true)}>
@@ -285,6 +328,8 @@ export function LeaveForm({
           onApply={(s, e) => {
             setStartDate(s);
             setEndDate(e);
+            setExcluded((prev) => pruneExcludedDates(prev, s, e));
+            setKeepOneHint(false);
           }}
           onClose={() => setPickerOpen(false)}
         />

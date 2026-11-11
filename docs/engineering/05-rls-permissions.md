@@ -816,8 +816,9 @@ Read (SELECT) policies — "own rows, or org-wide for privileged admins" unless 
 
 - `attendance_sites`: any **active member** may read (the clock UI needs site name/coords/radius;
   coordinates aren't secret).
-- `attendance_qr_tokens`: **privileged admins only** (tokens authorize attendance; clock-in resolves the
-  token server-side via service role).
+- `attendance_qr_tokens`: **attendance settings only** — 2026-11-11 (`202611110001`) policy 「attendance settings can read qr tokens」:
+  `is_platform_admin()` or `has_capability(org, auth.uid(), 'attendance.settings')`; payroll viewers no longer read tokens
+  (tokens authorize attendance; clock-in resolves the token server-side via service role).
 - `attendance_trusted_devices` (2026-07-31): own rows, or `owner`/`senior_managing_director`/
   `office_admin` (분실·퇴사 시 해지해야 하므로). UPDATE 정책은 **해지(revoke) 용도로만** 열려 있고,
   발급/갱신은 쿠키 원문을 다루므로 service-role 서버 액션에서만 수행한다(INSERT 정책 없음).
@@ -876,6 +877,13 @@ rows where `status = 'approved'`, org-wide — confirmed policy: the mobile leav
 employee's approved leave (including the viewer's own), but pending/rejected/draft/cancelled stay
 private (visible only via the existing self-or-approver policy). Combined with that policy, the net
 effect is: own rows (any status) + approver/admin rows (any status) + everyone's approved rows.
+
+**2026-11-11 (`202611110002`) — 위 정책을 뺐다.** 조직 전원이 승인된 휴가의 사유 · 긴급 연락처까지 읽을 수 있었다. 팀 캘린더는
+`listApprovedLeaveForMonth`(service_role, 필요한 칸만)로 읽으므로 영향 없다. 남는 읽기: 본인 행 + 결재자/관리자 행.
+`approve_annual_leave_request_atomic` · `annual_leave_half_day_span` 실행은 service_role 만(authenticated · anon 회수).
+Storage `request-images` 삭제: 교통비 경로는 본인 또는 `transport.manage`, 휴가 사진 경로는 본인 또는 `leave.approve` 만
+(예전엔 같은 조직 구성원 누구나 지울 수 있었다). 서버 규칙: 연차 자기 승인 금지(`self_approval`), 교통비 자기 정산서 처리 금지(`self_review`),
+기준 잔여 본인 확인 금지(`self_confirm`).
 
 **Membership permission overrides — implemented (schema 2026-07-09; UI/actions/enforcement 2026-07-13).**
 `membership_permission_overrides` is **read-only RLS, no write policies** (same service-role write
@@ -977,7 +985,7 @@ the authenticated user). `attendance_month_snapshots` RLS stays read-only (own p
 admin, from Step 1); writes go through the privileged actions only. The admin payroll UI exposes
 finalize/reopen with these same gates.
 
-**Step 12 (2026-06-18) — org-wide payroll totals.** `getPayrollTotals(org, ym)`
+**Step 12 (2026-06-18) — org-wide payroll totals (deleted 2026-11-11, unused).** `getPayrollTotals(org, ym)`
 (`src/lib/attendance-payroll-totals.ts`) reads ORG-WIDE compensation (finalized snapshots + every hourly
 worker's expected pay + site rollup). It is **caller-agnostic and the caller MUST gate it with
 `isAttendancePayrollAdmin`** (owner / `attendance_payroll_admin`) — same pattern as the review queue; the
@@ -988,7 +996,7 @@ the totals are surfaced in the privileged admin attendance/payroll console.
 **Step 13 (2026-06-18) — finalized-only export.** `runPayrollExport` (`src/lib/attendance-export.ts`,
 service-role) **enforces `isAttendancePayrollAdmin` itself** before reading any finalized snapshot, then
 writes an `attendance_export_logs` audit row. Export is **finalized data only**; regular users / hourly
-workers can never export. The server actions (`exportMonthlyPayroll` / `exportUserPayroll`) and the
+workers can never export. The server actions (`exportMonthlyPayroll` / `exportUserPayroll`, deleted 2026-11-11) and the
 dev-only route (`/api/dev/attendance/export`, dev-gated AND privilege-gated) both go through it. The
 admin console additionally exposes localized Excel and print-to-PDF exports.
 
@@ -999,8 +1007,11 @@ attendance/payroll alerts. The 18:30 reminder targets the worker themselves. `at
 RLS is **own read** (owner of the row or platform admin); writes go through the self-only
 `respondOpenSessionReminder` action (service-role). Unique constraint is
 `(organization_id, user_id, operating_date)` — org-scoped (migration `202606180003`; prior constraint
-was missing `organization_id`). The scheduled scan `/api/attendance/reminders` is
-CRON_SECRET-gated (no anonymous trigger). In-app delivery only.
+was missing `organization_id`). The scan `/api/attendance/reminders` is
+CRON_SECRET-gated (header only since 2026-11-11; no anonymous trigger; not registered as a cron). In-app delivery only.
+
+**근태 쓰기 함수 (2026-11-11, `202611110001`).** 근무 넣기 · 바꾸기 · 마감 DB 함수와 마감 가드 트리거는 service_role 만 실행한다 —
+권한 확인(`attendanceCan`)은 부르는 서버 액션이 먼저 한다. `authenticated` 는 실행할 수 없다(PGlite 로 확인).
 
 Business rules already enforced (Step 3) / to enforce later in server actions: one open session per user
 (done); sites required (done); GPS mandatory + within radius (done); PWA active method `gps_qr` (done;

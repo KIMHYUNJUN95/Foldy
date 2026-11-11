@@ -358,7 +358,7 @@ admin ids via `getAttendancePayrollAdminUserIds`. Approval / rejection fan-out i
 interactive **18:30 prompt** (still working / already left — the latter routes to the correction flow,
 never auto clock-out) is a once-per-Tokyo-day **home prompt** backed by
 `attendance_open_session_reminders` (migration `202606180002`). Scheduled scan:
-`GET /api/attendance/reminders` (CRON_SECRET). In-app only; **Web Push deferred**. Admin alerts
+`GET /api/attendance/reminders` (CRON_SECRET, header only; **not registered as a cron** as of 2026-11-11). In-app only; **Web Push deferred**. Admin alerts
 deep-link to `/mobile/attendance` (the privileged review UI is the deferred web dashboard).
 
 ## Staff Suggestions — notifications (implemented 2026-06-16)

@@ -6,7 +6,7 @@
 // 경조사 / 반차 규칙은 모바일 휴가 폼과 같고, 잔여 미리보기는 선택된
 // 신청자의 실시간 잔여를 읽는다. docs/product/26-annual-leave-workflow.md 참고.
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Info, Sun, TriangleAlert, X } from "lucide-react";
 import { createAdminLeaveRequestAction } from "@/app/admin/attendance/leave/actions";
@@ -23,6 +23,8 @@ import type {
 import type { LeaveType, LeaveDurationUnit } from "@/lib/annual-leave-approvals-server";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import { tokyoToday } from "@/lib/tokyo-date";
+import { effectiveExcludedDates, leaveRangeDates, pruneExcludedDates, toggleExcludedDate } from "@/lib/annual-leave";
+import { adminLeaveFormErrorText } from "@/lib/annual-leave-copy";
 
 type Lc = Dictionary["admin"]["leaveConsole"];
 
@@ -66,27 +68,16 @@ function calcDays(start: string, end: string, dur: LeaveDurationUnit): number {
   return (dur === "am" || dur === "pm") && n === 1 ? 0.5 : n;
 }
 
+function roleLabelOf(role: string | null, dictionary: Dictionary): string {
+  if (!role) return "";
+  const map = dictionary.roles as Record<string, string>;
+  return map[role] ?? "";
+}
+
 function initialOf(name: string): string {
   return Array.from(name.trim())[0] ?? "·";
 }
 
-function errLabel(reason: string | undefined, lc: Lc): string {
-  switch (reason) {
-    case "forbidden":
-      return lc.formErrForbidden;
-    case "target_not_found":
-      return lc.formErrTargetNotFound;
-    case "invalid_reason":
-      return lc.formErrInvalidReason;
-    case "invalid_dates":
-      return lc.formErrInvalidDates;
-    case "hourly_excluded":
-      return lc.formErrHourlyExcluded;
-    case "create_failed":
-    default:
-      return lc.formErrCreateFailed;
-  }
-}
 
 export function LeaveRequestModal({
   mode,
@@ -133,10 +124,51 @@ export function LeaveRequestModal({
   const [submitErr, setSubmitErr] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [shown, setShown] = useState(false);
+  /** 안 A(2026-11-11) — 원래 휴무로 뺀 날. 종일 · 경조 아닌 종류에서만. */
+  const [excluded, setExcluded] = useState<readonly string[]>([]);
+  const [keepOneHint, setKeepOneHint] = useState(false);
 
   const isBereavement = leaveType === "annual";
   const half = (durationUnit === "am" || durationUnit === "pm") && !isBereavement;
-  const days = useMemo(() => calcDays(startDate, endDate, durationUnit), [startDate, endDate, durationUnit]);
+  const allowExclude = !isBereavement && !half;
+  const rangeList = useMemo(
+    () => (allowExclude ? leaveRangeDates(startDate, endDate) : []),
+    [allowExclude, startDate, endDate],
+  );
+  // 보여 주기 · 보내기 · 일수가 모두 이 값 하나를 쓴다(2026-11-11) — 단위 · 종류가 바뀌어 기간이 줄어도 어긋난 날이 남지 않게.
+  const activeExcluded = effectiveExcludedDates(excluded, allowExclude, startDate, endDate);
+  const days = useMemo(
+    () => Math.max(0, calcDays(startDate, endDate, durationUnit) - activeExcluded.length),
+    [startDate, endDate, durationUnit, activeExcluded.length],
+  );
+  // 입력 중이면 Esc · 바깥 누르기 · 닫기 단추가 바로 닫지 않고 확인한다(2026-11-11).
+  const dirty = reason.trim().length > 0 || emergencyContact.trim().length > 0 || excluded.length > 0;
+  // 확인은 브라우저 창이 아니라 모달 아래 줄에서(근무 직접 입력 모달과 같다, 2026-11-11).
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const modalRef = useRef<HTMLDivElement>(null);
+  function requestClose() {
+    if (pending) return;
+    if (dirty) {
+      setConfirmDiscard(true);
+      return;
+    }
+    onClose();
+  }
+
+  function toggleOffDay(date: string) {
+    const next = toggleExcludedDate(activeExcluded, date, startDate, endDate);
+    if (next === activeExcluded) {
+      setKeepOneHint(true);
+      return;
+    }
+    setKeepOneHint(false);
+    setExcluded(next);
+  }
+
+  function setRange(nextStart: string, nextEnd: string) {
+    setExcluded((prev) => pruneExcludedDates(prev, nextStart, nextEnd));
+    setKeepOneHint(false);
+  }
 
   // 진입 전환 (스크림 + 모달 스케일 인) — 마운트 뒤에 `.on` 을 붙인다.
   useEffect(() => {
@@ -144,13 +176,32 @@ export function LeaveRequestModal({
     return () => cancelAnimationFrame(t);
   }, []);
 
+  // 날짜 창이 열리면 창 안에서 보이게 스크롤한다 — 모달 몸통이 스크롤 칸이라 아래쪽이 잘렸다(2026-11-11). 공용 피커는 그대로.
+  useEffect(() => {
+    const root = modalRef.current;
+    if (!root) return;
+    const observer = new MutationObserver(() => {
+      const pop = root.querySelector(".adp__pop");
+      if (pop) pop.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
+    observer.observe(root, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, []);
+
+  const requestCloseRef = useRef(requestClose);
+  useEffect(() => {
+    requestCloseRef.current = requestClose;
+  });
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key !== "Escape") return;
+      // 날짜 창이 열려 있으면 Esc 는 그 창만 닫는다(공용 피커가 처리) — 모달은 그대로.
+      if (modalRef.current?.querySelector(".adp__pop")) return;
+      requestCloseRef.current();
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, []);
 
   // 선택된 신청자의 실시간 잔여 (본인이면 마운트 때 직접 불러온다).
   useEffect(() => {
@@ -169,19 +220,31 @@ export function LeaveRequestModal({
     if (type === "annual") {
       setDurationUnit("full");
       setEndDate(addDaysISO(startDate, BEREAVEMENT_DAYS - 1));
+      setExcluded([]);
     }
   }
 
   function chooseStart(next: string) {
     setStartDate(next);
-    if (leaveType === "annual") setEndDate(addDaysISO(next, BEREAVEMENT_DAYS - 1));
-    else if (durationUnit === "am" || durationUnit === "pm") setEndDate(next);
-    else if (next > endDate) setEndDate(next);
+    let nextEnd = endDate;
+    if (leaveType === "annual") nextEnd = addDaysISO(next, BEREAVEMENT_DAYS - 1);
+    else if (durationUnit === "am" || durationUnit === "pm") nextEnd = next;
+    else if (next > endDate) nextEnd = next;
+    setEndDate(nextEnd);
+    setRange(next, nextEnd);
+  }
+
+  function chooseEnd(next: string) {
+    setEndDate(next);
+    setRange(startDate, next);
   }
 
   function chooseDuration(unit: LeaveDurationUnit) {
     setDurationUnit(unit);
-    if (unit !== "full") setEndDate(startDate);
+    if (unit !== "full") {
+      setEndDate(startDate);
+      setExcluded([]);
+    }
   }
 
   const valid = Boolean(targetUserId) && Boolean(startDate) && Boolean(endDate) && startDate <= endDate;
@@ -201,15 +264,20 @@ export function LeaveRequestModal({
       durationUnit,
       reason,
       emergencyContact,
+      excludedDates: [...activeExcluded],
     };
     startTransition(async () => {
-      const res = await createAdminLeaveRequestAction(input);
-      if (res.ok) {
-        onCreated(lc.formDone);
-        onClose();
-        router.refresh();
-      } else {
-        setSubmitErr(errLabel(res.error, lc));
+      try {
+        const res = await createAdminLeaveRequestAction(input);
+        if (res.ok) {
+          onCreated(lc.formDone);
+          onClose();
+          router.refresh();
+        } else {
+          setSubmitErr(adminLeaveFormErrorText(res.error, lc));
+        }
+      } catch {
+        setSubmitErr(adminLeaveFormErrorText("network", lc));
       }
     });
   }
@@ -261,16 +329,16 @@ export function LeaveRequestModal({
     <>
       <div
         className={`modal-scrim${shown ? " on" : ""}`}
-        onClick={onClose}
+        onClick={requestClose}
         aria-hidden="true"
       />
-      <div className={`modal${shown ? " on" : ""}`} role="dialog" aria-modal="true" aria-label={title}>
+      <div ref={modalRef} className={`modal${shown ? " on" : ""}`} role="dialog" aria-modal="true" aria-label={title}>
         <div className="modal__h">
           <div>
             <div className="modal__kicker">{kicker}</div>
             <div className="modal__t">{title}</div>
           </div>
-          <button type="button" className="panel__x" onClick={onClose} aria-label={dictionary.common.close} disabled={pending}>
+          <button type="button" className="panel__x" onClick={requestClose} aria-label={dictionary.common.close} disabled={pending}>
             <span className="ic">
               <X />
             </span>
@@ -304,7 +372,7 @@ export function LeaveRequestModal({
               <div>
                 <div className="fpill__nm">{summary.name || currentUserName}</div>
                 <div className="fpill__s">
-                  {summary.role ? `${summary.role} · ` : ""}
+                  {roleLabelOf(summary.role, dictionary) ? `${roleLabelOf(summary.role, dictionary)} · ` : ""}
                   {summary.hireDate ? `${lc.fpillHirePrefix} ${summary.hireDate.replace(/-/g, "/")}` : ""}
                 </div>
               </div>
@@ -319,7 +387,7 @@ export function LeaveRequestModal({
             <span className="fld__l">
               {lc.formType} <b className="req">*</b>
             </span>
-            <div className="seg seg--wrap">
+            <div className="seg seg--wrap seg--fld">
               {TYPES.map((t) => (
                 <button
                   key={t}
@@ -353,7 +421,7 @@ export function LeaveRequestModal({
               {/* 경조사와 반차는 종료일을 시작일에서 정하므로 — 읽기 전용이며 편집할 수 없다. */}
               <AdminDatePicker
                 value={endDate}
-                onChange={setEndDate}
+                onChange={chooseEnd}
                 min={startDate}
                 disabled={isBereavement || half}
                 localeTag={localeTag}
@@ -365,7 +433,7 @@ export function LeaveRequestModal({
 
           <div className="fld">
             <span className="fld__l">{lc.formDuration}</span>
-            <div className="seg">
+            <div className="seg seg--fld">
               {(
                 [
                   ["full", lc.formDurationFull],
@@ -384,6 +452,40 @@ export function LeaveRequestModal({
               ))}
             </div>
           </div>
+
+          {allowExclude && rangeList.length > 1 ? (
+            <div className="fld">
+              <span className="fld__l">{lc.formOffDays}</span>
+              <span className="fld__hint">{lc.formOffDaysHint}</span>
+              <div className="seg seg--wrap lv-offdays">
+                {rangeList.map((d) => {
+                  const off = activeExcluded.includes(d);
+                  return (
+                    <button
+                      key={d}
+                      type="button"
+                      aria-pressed={off}
+                      className={`segb lv-offday ${off ? "is-off" : "on"}`}
+                      onClick={() => toggleOffDay(d)}
+                    >
+                      <span className="lv-offday__d">
+                        {new Intl.DateTimeFormat(localeTag, {
+                          month: "numeric",
+                          day: "numeric",
+                          weekday: "short",
+                          timeZone: "UTC",
+                        }).format(new Date(`${d}T00:00:00Z`))}
+                      </span>
+                      {off ? <small className="lv-offday__tag">{lc.formOffDayTag}</small> : null}
+                    </button>
+                  );
+                })}
+              </div>
+              {keepOneHint ? (
+                <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--danger)" }}>{lc.formOffDayKeepOne}</span>
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="fdays">
             <span className="ic">
@@ -425,6 +527,20 @@ export function LeaveRequestModal({
           ) : null}
         </div>
 
+        {confirmDiscard ? (
+          <div className="modal__foot" role="alertdialog" aria-label={lc.formDiscardConfirm} style={{ flexWrap: "wrap" }}>
+            {/* ja · en 문구가 길면 문구가 한 줄을 차지하고 단추는 아래로 — 자르지 않는다. */}
+            <span style={{ flex: "1 1 180px", fontSize: 13, fontWeight: 600, lineHeight: 1.4 }}>{lc.formDiscardConfirm}</span>
+            <div style={{ display: "flex", gap: 9 }}>
+              <button type="button" className="btn btn--ghost" onClick={() => setConfirmDiscard(false)} autoFocus>
+                {lc.formDiscardKeep}
+              </button>
+              <button type="button" className="btn btn--danger-ghost" onClick={onClose}>
+                {lc.formDiscardOk}
+              </button>
+            </div>
+          </div>
+        ) : (
         <div className="modal__foot">
           <span className="modal__foot-note">
             <span className="ic">
@@ -433,7 +549,7 @@ export function LeaveRequestModal({
             {footNote}
           </span>
           <div style={{ display: "flex", gap: 9 }}>
-            <button type="button" className="btn btn--ghost" onClick={onClose} disabled={pending}>
+            <button type="button" className="btn btn--ghost" onClick={requestClose} disabled={pending}>
               {lc.formCancel}
             </button>
             <button
@@ -449,6 +565,7 @@ export function LeaveRequestModal({
             </button>
           </div>
         </div>
+        )}
       </div>
     </>
   );

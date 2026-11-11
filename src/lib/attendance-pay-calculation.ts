@@ -1,3 +1,5 @@
+import { isPayableReviewState } from "@/lib/attendance";
+
 /** 유효일 행 결정: [effective_from, effective_to] 가 `date` 를 포함하는 행 중 가장 최근 것. */
 export function resolveEffective<T extends { effective_from: string; effective_to: string | null }>(
   rows: readonly T[],
@@ -217,8 +219,18 @@ export function payExcludeReason(s: PayCalcSession, correctionStatus: string | n
   if (s.status === "open" || s.status === "reopened") return "open";
   if (!s.clock_in_at || !s.clock_out_at) return "open";
   if (correctionStatus === "requested" || correctionStatus === "in_review") return "pending_correction";
-  if (s.review_state !== "normal" && s.review_state !== "approved_correction") return "review_required";
+  if (!isPayableReviewState(s.review_state)) return "review_required";
   return null;
+}
+
+/**
+ * 급여 계산에 넘길 정정 상태(2026-11-11). **마감된 달은 대기 정정을 무시한다** — 마감은 대기 정정이 없을 때만 되고,
+ * 마감 뒤에는 기록을 고칠 수 없다(마감을 풀어야 승인 · 반영된다). 그래서 마감 뒤에 들어온 대기 정정 때문에 그 날을
+ * 급여에서 빼면, 급여 준비 · 직원 화면이 마감 금액보다 적게 나온다. 마감된 달의 계산이 마감 때와 같게 한다.
+ */
+export function correctionStatusForPay(status: string | null, monthFinalized: boolean): string | null {
+  if (monthFinalized && (status === "requested" || status === "in_review")) return null;
+  return status;
 }
 
 function appliedAllowances(

@@ -494,3 +494,84 @@ hourly-staff exclusion by real
 - **이력 내보내기.** `exportLeaveLedgerWorkbook/Report` 가 화면이 보낸 줄 대신 **조건**(상태 · 검색어 · 처리일 범위)만 받아 서버에서
   `listLeaveLedger` 로 다시 읽고 같은 규칙(`filterLeaveLedger`)으로 거른다 — 화면과 결과가 같고, 클라이언트가 만든 줄은 파일에 들어가지 않는다.
 - **남은 것(이번엔 안 고침).** 연차 소멸 순서(FIFO) 문제는 별도로 다룬다.
+
+## 점검 수정 1차 — 잔여 계산 · 승인 · 일수 (2026-11-11)
+
+기능별 점검(2026-11-11)에서 나온 연차 문제를 사용자 승인(추천안)대로 고쳤다. 마이그레이션 `202611110002_leave_transport_hardening.sql`.
+**코드 먼저 배포해도 된다** — 새 칸 · 함수가 없으면 예전 방식으로 동작하고, 마이그레이션 뒤 새 방식으로 바뀐다.
+
+**잔여 계산 (`src/lib/annual-leave.ts` → `computeAnnualLeaveSummary`)**
+- **H3 · 사용 순서.** 승인된 휴가를 **날짜 순서대로**, 그날 살아 있는 부여분 중 **소멸이 가장 빠른 것부터** 뺀다(이전: 날짜와 상관없이 합만
+  뺐다 — 기준일 전 · 소멸된 부여분에서 빠지는 일이 있었다. 예: 2020-01-01 입사 → 26일이 아니라 15일). 기준일 뒤 · 앞으로 쓸 휴가도 그날 기준.
+- **넘침(`baseOverflow` · `bonusOverflow`).** 쓸 수 있는 부여분이 없는 날의 사용은 넘침으로 남고 잔여는 **음수가 될 수 있다**(숨기지 않는다).
+- **M9 · 기준 잔여 나누기.** 관리자가 넣은 기준 잔여는 기준일에 살아 있는 부여분들에 **새것부터** 나눠 넣고 각 부여분의 소멸일을 따른다.
+  넘는 몫은 가장 새 부여분, 살아 있는 부여분이 없으면 소멸 없음. 기준 잔여는 기준일 전 휴가에도 쓸 수 있다.
+- **달 끝.** 8/31 + 6개월 = 2/28(굴려서 3/3 이 되지 않는다).
+- **읽기 오류.** 잔여 · 큐 · 휴가계 · 이력 읽기가 실패하면 빈 값(=0일)을 보여 주지 않고 오류로 던진다(`LeaveReadError`). 1,000행 넘는 목록은 나눠 읽는다.
+
+**일수 — 안 A (사용자 결정 2026-11-11)**
+- 일수 = 기간 일수 − **뺀 날짜**(`excluded_dates`, 원래 휴무라 신청자가 뺀 날). 주말 자동 제외는 하지 않는다.
+- 뺀 날짜는 하루 단위(종일) · 연차 아닌 종류에서만, 기간 안 · 실제 날짜 · 중복 없음 · 전부 빼기 금지(`invalid_excluded_dates`). 결재자가 확인한다.
+- 기간은 최대 60일(`too_long`, `MAX_LEAVE_REQUEST_DAYS`). 겹침 판정에는 뺀 날짜도 기간 안으로 본다(단순 · 안전).
+- 화면에 뺀 날짜를 고르는 칸은 **2차(화면)** 에서 붙인다. 지금은 서버만 받는다.
+
+**승인 (`approveLeaveRequestForApprover`)**
+- **M6 · 자기 승인 금지** → `self_approval`(`errSelfApproval`).
+- **M7 · 잔여 초과는 사유 필수.** 승인하면 잔여가 넘치는 신청은 사유(500자 이내) 없이는 `over_balance`. 사유는 `balance_override_reason` 에 남는다.
+  결재 패널(`leave-queue-client.tsx`)은 경고 + 사유 칸을 보여 주고, 사유를 쓰기 전에는 0.6초 꾹 승인 단추가 잠긴다.
+- **M8 · 한 거래 승인.** DB 함수 `approve_annual_leave_request_atomic`(service_role 전용) — 행 잠금 · 같은 사람 잠금 · 반차까지 본 겹침 ·
+  계산 뒤 다른 승인이 들어왔는지(`stale`, 한 번 다시 계산해 재시도) · 문서 번호(숫자 최대 + 1, 1000번 넘어도 잘리지 않음)를 한 번에 한다.
+  함수가 아직 없으면 예전 순서(겹침 확인 → 상태 조건 갱신)로 승인한다.
+- **승인 때 자격 다시 확인** — 시급직(`hourly_excluded`) · 기준 잔여 없음(`baseline_required`). 플랫폼 관리자가 승인해도 도장 칸이 비지 않는다.
+- 결재 상세에 `overBalance` · `otherPendingDays`(같은 사람 대기 중 일수) · `baselineProvisional` · `submittedVia` 가 온다.
+
+**기준 잔여 확인 (M11)**
+- 본인이 처음 넣은 기준 잔여는 **「확인 전」**(`confirmed_at` 없음)으로 남고, 결재자가 확인(`confirmEmployeeLeaveBaselineAction`, 본인 것은 `self_confirm`)
+  하거나 관리자가 저장하면 확인됨. 미래 입사일 · 없는 날짜는 거절(`future_hire_date` · `invalid_dates`).
+- **기존 행은 「확인됨」(사용자 결정 2026-11-11).** 마이그레이션이 칸을 처음 만들 때 한 번만 기존 행을 확인됨으로 채운다(`confirmed_at` = 기존 `updated_at`,
+  확인자 null, 수정 시각은 그대로). 다시 돌려도 그 뒤 본인이 넣은 「확인 전」 행은 바뀌지 않는다.
+
+**기타**
+- 신청 경로 `submitted_via`(mobile · admin · admin_proxy)를 남기고 결재 흐름에 표시한다.
+- 승인된 휴가를 조직 전원이 읽던 RLS 정책(`annual_leave_requests_org_approved_select`)을 뺐다 — 사유 · 긴급 연락처까지 보였다.
+  팀 캘린더는 서버(service_role)가 필요한 칸만 읽으므로 그대로 동작한다.
+- 휴가 사진 Storage 삭제는 본인 또는 `leave.approve` 만.
+- 잔여 내보내기의 「이번 달 사용」 칸은 그 달 사용만(`usedThisMonth`).
+
+**리뷰 뒤 고친 것 (2026-11-11)**
+- **배포 순간 주의:** 새 계산은 기준 잔여도 소멸일을 따르므로, 배포 시점에 기준 잔여가 이미 소멸된 직원은 잔여가 줄어든다.
+- 모바일 연차 홈의 「부여 · 사용」 막대는 살아 있는 묶음만 센다(`baseLeaveBarTotals`) — 소멸된 묶음까지 더해 「사용」이 부풀어 보였다.
+  **의도한 동작이다** — 카드의 「부여 · 사용」은 지금 살아 있는 묶음 기준이고, 소멸된 묶음에서 쓴 일수는 세지 않는다(전체 사용 이력은 신청 내역에서 본다).
+- 결재 패널 상세 읽기가 실패하면 오류 문구 + 「다시 시도」(`errDetailLoadFailed` · `detailRetry`). 예전에는 승인 단추가 영영 잠겼다.
+- 기준 잔여 읽기 실패는 서버 액션 결과 `read_failed` 로 돌려준다(던지지 않음). 연차 홈은 「입사일 미등록」 대신 「불러오지 못함」 +
+  다시 시도(`exLoadFailedT` · `exLoadFailedS` · `exLoadFailedRetry`), 신청 화면은 잔여 미리보기 없이 연다.
+
+## 점검 수정 2차 — 화면 (2026-11-11)
+
+- **뺀 날짜(안 A) 고르기.** 모바일 신청(`leave-form.tsx`) · PC 대리/본인 신청 모달(`leave-request-modal.tsx`): 종일 · 경조 아닌 종류에서 기간이
+  이틀 이상이면 「원래 휴무인 날」 날짜 줄이 나온다. 누르면 그날이 빠지고(취소선 + 「원래 휴무」) 일수가 바로 줄어든다. 마지막 하루는 뺄 수
+  없다(진동 `error` + 「하루는 남겨야…」). 기간을 바꾸면 기간 밖 날짜는 버린다. 도우미: `leaveRangeDates` · `toggleExcludedDate` ·
+  `pruneExcludedDates`(`src/lib/annual-leave.ts`).
+- **뺀 날짜 보기.** 결재 패널(「원래 휴무로 뺀 날」 줄) · 휴가계 용지(期間 칸 아래 「公休日除く：11/22・11/23」, 용지 문구라 일본어 고정) ·
+  모바일 신청 내역 상세 시트. 줄 만들기: `formatExcludedDates`(`src/lib/annual-leave-copy.ts`).
+- **결재 패널.** 대기 중인 다른 신청 일수 · 기준 잔여 「확인 전」 이름표 · 잔여 초과 승인 사유를 보여 준다. 승인 · 반려 · 승인 취소 호출이
+  던지면 오류 문구(`errNetwork`).
+- **잔여 화면(PC).** 「확인 전」 이름표 + 패널의 「확인」 단추(`confirmEmployeeLeaveBaselineAction`, 본인 것은 `errSelfConfirm`) ·
+  음수 잔여는 빨강 + 「n일 초과」 · 「이번 달 사용」 열은 `usedThisMonth` · 편집 칸이 비면 0 으로 저장하지 않는다(`parseLeaveDayAmount`).
+- **오류 문구.** 서버 코드마다 전용 문구 — 모바일 신청 `leaveSubmitErrorText`(too_long · invalid_excluded_dates · invalid_dates ·
+  read_failed · network …), 기준 잔여 첫 입력 `leaveBaselineSetupErrorText`(future_hire_date · invalid_dates …), PC 모달
+  `adminLeaveFormErrorText`. 모바일 신청 · 첫 입력은 호출이 던져도(오프라인) 단추가 잠기지 않는다.
+- **첫 입력 확인.** 「입사일 + 남은 연차」는 한 번만 넣을 수 있어 저장 전에 확인 시트(공용 BottomSheet)를 한 번 보여 준다.
+- **PC 모달.** 역할은 번역된 이름으로(원시 키 금지), 입력 중이면 Esc · 바깥 누르기 · 닫기에서 확인.
+- **날짜 · 시간대.** 신청 내역 머리글은 도쿄 올해 · 올해 건수(`countLeaveRequestsInYear`), PC 팀 달력은 부모가 넘긴 도쿄 오늘, 모바일 달력
+  달 이름은 `timeZone: "UTC"`, `?ym` 은 공용 `resolveYmParam`(실제 달, 앞 2년 · 뒤 5년).
+- **리뷰 뒤(2026-11-11).** 뺀 날짜는 보여 주기 · 보내기 · 일수가 `effectiveExcludedDates` 하나를 쓴다(반차 · 경조로 기간이 줄어도
+  어긋난 날이 남지 않음, 모바일 · PC 같음). 승인이 `over_balance` 로 돌아오면 상세를 다시 읽어 사유 칸을 띄운다. 초과 경고 숫자는 서버가
+  내려주는 `overflowDays`(승인 판정과 같은 값). 경조 · 기타 승인은 「그 사이 다른 승인」 확인을 건너뛴다(`p_expected_used_days` null).
+  결재 큐 요약은 대기 건의 기준 잔여 · 승인 기록을 한 번에 읽고, 승인은 기준 잔여를 한 번만 읽는다. 연차 화면은 잔여 · 휴가계 · 이력
+  읽기가 실패해도 그 탭만 오류(`AdminLoadError`)이고 결재 큐는 그대로. PC 신청 모달의 닫기 확인은 모달 아래 줄(근무 직접 입력 모달과 같음),
+  날짜 창이 열려 있으면 Esc 는 날짜 창만, 날짜 창이 열리면 모달 안에서 보이게 스크롤, 칸 이름표와 나눔 단추 사이 여백을 붙였다.
+  표기: ko 는 「특별 휴가」로 통일(유급 휴가 · 경조 휴가와 같게). en 모바일 칩 「Special」은 좁은 칸 전용 짧은 이름이라 그대로, ja 는 이미 「特別休暇」 하나.
+- **기타.** 취소 완료 화면은 주소 값이 아니라 `?id` 로 본인 신청을 다시 읽는다(취소된 신청이 아니면 내역으로) · `?state=waiting`
+  미리보기는 개발 환경에서만 · 휴가계 탭이 처음 0건이어도 이후 문서가 오면 첫 직원으로 · 결재 · 잔여 표의 줄은 키보드(Enter · Space)로도 연다 ·
+  팀 달력 화살표에 `aria-label`.

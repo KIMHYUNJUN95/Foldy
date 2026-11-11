@@ -1509,6 +1509,8 @@ Management Console" → Current Implementation Note.
 - **대시보드 안 한 메뉴의 권한이 없으면** 공용 `AdminNoAccess`(`src/components/admin/shared/admin-no-access.tsx`) — 「이 화면을 볼 권한이 없어요」 ·
   「필요하면 개발자에게 요청해 주세요」. 콘솔 빈 상태(`.card .state`)와 같은 모양, 자물쇠 아이콘. 근태 처리 · 급여 · 시급 · 교통비 · 직원 상세 · 연차에 적용
   (예전엔 「데이터 없음」 문구를 빌려 써서 권한 문제인지 헷갈렸다). 새 메뉴도 권한 없음은 이 카드를 쓴다. 문구 `dictionary.admin.shared.noAccess*` (ko/ja/en).
+- **읽기 실패는 공용 `AdminLoadError`(같은 파일, 2026-11-11)** — 「이 화면을 불러오지 못했어요」 · `admin.shared.loadErrorTitle` · `loadErrorBody`(ko/ja/en). 빈 목록 · 「데이터 없음」으로 숨기지 않는다. 첫 사용: 교통비 화면.
+- **줄 누르면 열기는 키보드로도 — 공용 `rowActivateProps`(`src/components/admin/shared/row-activate.ts`, 2026-11-11).** `<tr onClick>` · 목록 줄에 붙이면 Tab 으로 닿고 Enter · Space 로 연다(줄 안 단추에서 누른 키는 제외), 초점 테두리는 `[data-row-activate]:focus-visible`. 첫 사용: 근태 큐 · 급여 · 직원 상세.
 - **모양 다듬기(2026-10-22, Apple 스타일 시안 승인):** 전체 화면 — 카드 없이 연회색(#F5F5F7) 바탕 가운데에 자물쇠 아이콘(회색 원) · 제목
   「관리자 화면 권한이 없어요」(28px) · 회색 설명 두 줄 · **회색 캡슐 로그아웃**(보조 동작) · 맨 아래 휴대폰 앱 한 줄(휴대폰 아이콘). 로고는 왼쪽 위에 작게.
   작은 영문 라벨 · 회색 안내 상자는 뺐다. 메뉴 권한 없음(`AdminNoAccess`) — 카드 · 그림자 없이 본문 가운데에 아이콘 · 제목(17px) · 설명만.

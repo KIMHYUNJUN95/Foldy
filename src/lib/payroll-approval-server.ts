@@ -220,8 +220,31 @@ export async function loadPayrollRound(
   };
 }
 
-/** 그 달 급여가 결재 요청 이후인지 — 급여 준비 입력 · 근태 마감 풀기를 막는다(P5 잠금). */
+/**
+ * 그 달 급여가 결재 요청 이후인지 — 급여 준비 입력 · 근태 마감 풀기 · 정정 요청을 막는다(P5 잠금).
+ * 읽기 실패는 **던진다**(2026-11-11, fail-closed) — 「잠기지 않음」으로 보고 통과시키지 않는다. 부르는 쪽은 잡아서 오류로 끝낸다.
+ */
 export async function isPayrollMonthLocked(service: Service, organizationId: string, ym: string): Promise<boolean> {
-  const row = await readApprovalRow(service, organizationId, ym);
-  return parseRoundStatus(row?.status) !== "preparing";
+  const { data, error } = await service
+    .from("payroll_month_approvals")
+    .select("status")
+    .eq("organization_id", organizationId)
+    .eq("target_month", `${ym}-01`)
+    .maybeSingle();
+  if (error) throw new Error(`[payroll-approval] payroll_month_approvals read failed: ${error.message}`);
+  return parseRoundStatus((data as { status?: string } | null)?.status) !== "preparing";
+}
+
+/** `isPayrollMonthLocked` 를 결과로 — 읽기 실패는 `"error"`. */
+export async function payrollMonthLockState(
+  service: Service,
+  organizationId: string,
+  ym: string,
+): Promise<"locked" | "open" | "error"> {
+  try {
+    return (await isPayrollMonthLocked(service, organizationId, ym)) ? "locked" : "open";
+  } catch (error) {
+    console.warn(error instanceof Error ? error.message : error);
+    return "error";
+  }
 }

@@ -27,6 +27,7 @@ import { getDictionary } from "@/lib/i18n";
 import { getPayrollSettingsCopy } from "@/lib/payroll-settings-i18n";
 import { hasOrganizationContext } from "@/lib/session";
 import type { AttendanceSiteRow } from "@/lib/attendance";
+import { readSiteDraft } from "@/lib/attendance-site-form";
 
 type PageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -81,6 +82,8 @@ export default async function AdminAttendanceSettingsPage({ searchParams }: Page
   const selectedRow =
     rows.find((row) => row.site.id === selectedSiteId) ?? (selectedSiteId ? null : rows[0] ?? null);
   const selectedSite = selectedRow?.site ?? null;
+  // 새 근무지 저장이 실패해 돌아왔으면 친 값을 되살린다(2026-11-11).
+  const draft = selectedSite ? null : readSiteDraft(params);
   const activeQr = selectedRow?.token ?? null;
   const showInactive = requestedInactive || (selectedSite ? !selectedSite.is_active : false);
   const visibleRows = showInactive ? rows : rows.filter((row) => row.site.is_active);
@@ -257,13 +260,20 @@ export default async function AdminAttendanceSettingsPage({ searchParams }: Page
                         </span>
                         <span className="num is-soft">{tokyoDate(device.lastUsedAt)}</span>
                         <span className="num is-soft">{tokyoDate(device.expiresAt)}</span>
-                        <form action={revokeAttendanceTrustedDevice} className="r">
-                          <input name="deviceId" type="hidden" value={device.id} />
-                          <input name="siteId" type="hidden" value={selectedSite?.id ?? ""} />
-                          <button className="stw-link is-red" type="submit">
-                            {settings.attendanceDeviceRevoke}
-                          </button>
-                        </form>
+                        {/* 해제는 되돌릴 수 없다 — 공용 확인 창으로 한 번 묻는다(2026-11-11). */}
+                        <span className="r">
+                          <SettingsConfirm
+                            action={revokeAttendanceTrustedDevice}
+                            fields={{ deviceId: device.id, siteId: selectedSite?.id ?? "" }}
+                            trigger={settings.attendanceDeviceRevoke}
+                            triggerClassName="stw-link is-red"
+                            title={w.revokeDeviceTitle}
+                            body={w.revokeDeviceBody.replace("{name}", device.userName)}
+                            keep={w.keep}
+                            ok={w.revokeDeviceOk}
+                            danger
+                          />
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -378,12 +388,12 @@ export default async function AdminAttendanceSettingsPage({ searchParams }: Page
               <input name="siteId" type="hidden" value={selectedSite?.id ?? ""} />
               <label className="stw-nf">
                 <span>{settings.attendanceSiteName}</span>
-                <input defaultValue={selectedSite?.name ?? ""} name="name" required autoComplete="off" />
+                <input defaultValue={selectedSite?.name ?? draft?.name ?? ""} name="name" required autoComplete="off" />
               </label>
               <div className="stw-f">
                 <label className="stw-nf">
                   <span>{settings.attendancePrintName}</span>
-                  <input defaultValue={selectedSite?.print_name ?? ""} name="printName" placeholder={selectedSite?.name ?? ""} autoComplete="off" />
+                  <input defaultValue={selectedSite?.print_name ?? draft?.printName ?? ""} name="printName" placeholder={selectedSite?.name ?? ""} autoComplete="off" />
                 </label>
                 <span className="stw-hint">{w.printNameHint}</span>
               </div>
@@ -398,7 +408,7 @@ export default async function AdminAttendanceSettingsPage({ searchParams }: Page
                   <span>{settings.attendanceSiteProperty}</span>
                   <DdFormSelect
                     name="propertyId"
-                    defaultValue={selectedSite?.property_id ?? ""}
+                    defaultValue={selectedSite?.property_id ?? draft?.propertyId ?? ""}
                     ariaLabel={settings.attendanceSiteProperty}
                     options={[
                       { value: "", label: settings.attendanceSitePropertyNone },
@@ -409,9 +419,9 @@ export default async function AdminAttendanceSettingsPage({ searchParams }: Page
                 <span className="stw-hint">{w.buildingHint}</span>
               </div>
               <SiteGeoFields
-                initialLat={formatField(selectedSite, "latitude")}
-                initialLng={formatField(selectedSite, "longitude")}
-                initialRadius={selectedSite?.allowed_radius_meters?.toString() ?? "100"}
+                initialLat={selectedSite ? formatField(selectedSite, "latitude") : (draft?.latitude ?? formatField(selectedSite, "latitude"))}
+                initialLng={selectedSite ? formatField(selectedSite, "longitude") : (draft?.longitude ?? formatField(selectedSite, "longitude"))}
+                initialRadius={selectedSite?.allowed_radius_meters?.toString() ?? (draft?.radius || "100")}
                 copy={{
                   latitude: settings.attendanceLatitude,
                   longitude: settings.attendanceLongitude,

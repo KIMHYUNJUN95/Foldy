@@ -52,3 +52,27 @@ export function attendanceQueueLiveSources(organizationId: string): LiveSource[]
     byOrg("annual_leave_requests", organizationId),
   ];
 }
+
+/**
+ * 근태 급여(PC) — 근무 · 정정 · 마감 스냅샷 · 수당 · 시급 · 고용 형태(2026-11-11). 마감 스냅샷 · 수당 · 시급 · 고용 형태는
+ * `202611110001_attendance_hardening.sql` 에서 publication 에 넣었다. RLS 가 급여 담당에게만 행을 보여 주므로 신호도 그만큼.
+ */
+export function attendancePayrollLiveSources(organizationId: string): LiveSource[] {
+  return [
+    byOrg("attendance_sessions", organizationId),
+    byOrg("attendance_correction_requests", organizationId),
+    byOrg("attendance_month_snapshots", organizationId),
+    byOrg("attendance_pay_allowances", organizationId),
+    byOrg("hourly_rate_history", organizationId),
+    byOrg("employment_type_history", organizationId),
+  ];
+}
+
+/** 근태 시급(PC) — 시급 · 고용 형태 · 수당(2026-11-11). */
+export function attendanceWagesLiveSources(organizationId: string): LiveSource[] {
+  return [
+    byOrg("hourly_rate_history", organizationId),
+    byOrg("employment_type_history", organizationId),
+    byOrg("attendance_pay_allowances", organizationId),
+  ];
+}

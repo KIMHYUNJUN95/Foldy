@@ -17,8 +17,10 @@
 import "server-only";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { resolveLocale, type Locale } from "@/lib/i18n";
+import { requireRead } from "@/lib/attendance-read";
 import {
   breakSecondsBySession,
+  correctionStatusForPay,
   calculateMonthlyPay,
   dailyGrossExact,
   paidSecondsForSession,
@@ -183,6 +185,7 @@ type Service = ReturnType<typeof getSupabaseServiceClient>;
 async function loadClosedBreakSeconds(
   service: Service,
   sessions: readonly SessionWindow[],
+  strict: boolean,
 ): Promise<Map<string, number>> {
   if (sessions.length === 0) return new Map();
   const res = await service
@@ -192,7 +195,8 @@ async function loadClosedBreakSeconds(
       "session_id",
       sessions.map((s) => s.id),
     );
-  return breakSecondsBySession((res.data ?? []) as BreakInterval[], sessions);
+  const rows = strict ? requireRead("attendance_breaks", res, []) : (res.data ?? []);
+  return breakSecondsBySession(rows as BreakInterval[], sessions);
 }
 
 async function loadCorrectionStatuses(
@@ -200,6 +204,7 @@ async function loadCorrectionStatuses(
   organizationId: string,
   userId: string,
   sessionIds: string[],
+  strict: boolean,
 ): Promise<Map<string, AttendanceCorrectionStatus>> {
   const map = new Map<string, AttendanceCorrectionStatus>();
   if (sessionIds.length === 0) return map;
@@ -210,7 +215,8 @@ async function loadCorrectionStatuses(
     .eq("requested_by_user_id", userId)
     .in("session_id", sessionIds)
     .order("created_at", { ascending: false });
-  for (const r of (res.data ?? []) as {
+  const rows = strict ? requireRead("attendance_correction_requests", res, []) : (res.data ?? []);
+  for (const r of rows as {
     session_id: string | null;
     status: string;
     created_at: string;
@@ -232,7 +238,13 @@ export async function getMonthlyPayView(
   userId: string,
   ym: string,
   locale: Locale | string = "ko",
+  /**
+   * `strict` = 읽기 실패면 던진다(2026-11-11). 마감 스냅샷 · 마감 판정처럼 이 숫자를 **굳히는** 길은 반드시 켠다 —
+   * 휴게 읽기 실패를 빈 목록으로 보면 휴게가 안 빠진 과지급이 마감 금액이 된다. 화면 표시는 예전처럼 읽은 만큼 그린다.
+   */
+  options: { strict?: boolean } = {},
 ): Promise<MonthlyPayView> {
+  const strict = options.strict === true;
   const service = getSupabaseServiceClient();
   const firstDay = `${ym}-01`;
   const lastDay = lastDayOfMonth(ym);
@@ -277,6 +289,13 @@ export async function getMonthlyPayView(
       .maybeSingle(),
   ]);
 
+  if (strict) {
+    requireRead("attendance_sessions", sessRes, []);
+    requireRead("hourly_rate_history", rateRes, []);
+    requireRead("employment_type_history", empRes, []);
+    requireRead("attendance_pay_allowances", allowRes, []);
+    requireRead("attendance_month_snapshots", finalizedRow, null);
+  }
   const sessions = (sessRes.data ?? []) as AttendanceSessionRow[];
   const rateRows = (rateRes.data ?? []) as {
     hourly_rate: number;
@@ -299,9 +318,10 @@ export async function getMonthlyPayView(
   }[];
   const sessionIds = sessions.map((s) => s.id);
   const [breakSecs, correctionStatuses] = await Promise.all([
-    loadClosedBreakSeconds(service, sessions),
-    loadCorrectionStatuses(service, organizationId, userId, sessionIds),
+    loadClosedBreakSeconds(service, sessions, strict),
+    loadCorrectionStatuses(service, organizationId, userId, sessionIds, strict),
   ]);
+  const monthFinalized = finalizedRow.data != null;
 
   // 계산 규칙은 `calculateMonthlyPay` 한 곳 — 관리자 급여(`computePayrollMonth`)도 같은 함수를 쓴다.
   const calc = calculateMonthlyPay({
@@ -313,7 +333,8 @@ export async function getMonthlyPayView(
     employment: empRows,
     allowances: allowanceRows,
     breakSecondsBySession: breakSecs,
-    correctionStatusOf: (sessionId) => correctionStatuses.get(sessionId) ?? null,
+    // 마감된 달은 대기 정정을 무시한다 — 마감 금액과 같은 계산(`correctionStatusForPay`, 2026-11-11).
+    correctionStatusOf: (sessionId) => correctionStatusForPay(correctionStatuses.get(sessionId) ?? null, monthFinalized),
   });
   const days: PayDayView[] = calc.days.map((d) => ({
     date: d.date,

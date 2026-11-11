@@ -8,7 +8,7 @@ import { bestEffortWrite } from "@/lib/db-write-guard";
 import { payrollPrepAvailable, type PrepManual } from "@/lib/payroll-prep";
 import { shiftYm } from "@/lib/payroll-settings-rules";
 import { PAYROLL_MONTH_INPUT_SELECT, rowToPrepManual } from "@/lib/payroll-prep-server";
-import { isPayrollMonthLocked } from "@/lib/payroll-approval-server";
+import { payrollMonthLockState } from "@/lib/payroll-approval-server";
 
 /**
  * 알바 급여 P3 — 급여 준비 손 입력 저장(PC 근태 › 급여 패널 · 모바일 급여 준비 시트가 같이 부른다 → src/actions).
@@ -130,7 +130,8 @@ export async function savePayrollMonthInput(input: {
   const update = toUpdate(input.patch);
   if (!update) return { ok: false, reason: "invalid" };
   // P5 — 결재 요청 이후엔 잠금(고치려면 돌려보내기 · 결재 되돌리기로 급여 준비에 돌아온 뒤).
-  if (await isPayrollMonthLocked(service, organizationId, input.ym)) return { ok: false, reason: "locked" };
+  const lock = await payrollMonthLockState(service, organizationId, input.ym);
+  if (lock !== "open") return { ok: false, reason: lock === "locked" ? "locked" : "error" };
 
   const memberRes = await service
     .from("memberships")

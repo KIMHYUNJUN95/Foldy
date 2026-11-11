@@ -1,3 +1,5 @@
+import { isRealYm } from "@/lib/iso-date-param";
+
 // Attendance — 출퇴근 시각 조합 규칙(순수). 직원 정정 요청과 관리자 수동 수정이 같은 규칙을 쓴다.
 //
 // 운영일(도쿄 YYYY-MM-DD) + 벽시계 "HH:mm" 을 실제 시각으로 바꾸고, 퇴근이 출근보다 앞서면 다음 날로
@@ -30,7 +32,8 @@ export function resolveClockOutAfterClockIn(
 
 /** "YYYY-MM" 이고 월이 01~12 인가. 관리자 근태 화면 · 마감 액션이 같이 쓴다(2026-10-26). */
 export function isValidYm(value: unknown): value is string {
-  return typeof value === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
+  // 규칙은 한 곳 — `src/lib/iso-date-param.ts` 의 `isRealYm`(2026-11-11).
+  return isRealYm(value);
 }
 
 /**
@@ -57,4 +60,28 @@ export function canCloseMonth(
   env: Record<string, string | undefined> = process.env,
 ): boolean {
   return isMonthEnded(ym, tokyoTodayYmd) || devAllowsOpenMonthClose(env);
+}
+
+/** 한 근무의 최대 길이(분) — `ATTENDANCE_MAX_SHIFT_MINUTES`(attendance.ts)와 같은 값. 이 파일은 순수 시각 규칙만 둔다. */
+const MAX_SHIFT_MS = 16 * 60 * 60_000;
+
+/**
+ * 직원 정정 요청의 희망 시각 검사(2026-11-11). 현장 근무는 자정을 넘기지 않으므로(가장 늦은 퇴근 23:30) 퇴근을 다음 날로
+ * 넘기지 않는다 — 넘기면 「출근 9:00 · 퇴근 8:30」 오타가 23.5시간 근무가 됐다. 비교 기준이 없으면 통과.
+ * - `clock_order`: 퇴근이 출근보다 뒤가 아니다(희망 출근, 없으면 세션의 실제 출근 / 희망 퇴근, 없으면 세션의 실제 퇴근).
+ * - `too_long`: 16시간을 넘는다.
+ */
+export function staffCorrectionTimesProblem(input: {
+  clockInAt: string | null;
+  clockOutAt: string | null;
+  sessionClockInAt?: string | null;
+  sessionClockOutAt?: string | null;
+}): "clock_order" | "too_long" | null {
+  const start = input.clockInAt ?? input.sessionClockInAt ?? null;
+  const end = input.clockOutAt ?? input.sessionClockOutAt ?? null;
+  if (!start || !end) return null;
+  const diff = new Date(end).getTime() - new Date(start).getTime();
+  if (!(diff > 0)) return "clock_order";
+  if (diff > MAX_SHIFT_MS) return "too_long";
+  return null;
 }

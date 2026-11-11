@@ -6,7 +6,7 @@ import { getMobileNavBadges } from "@/lib/nav-badges";
 import { getOnboardingState } from "@/lib/onboarding";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
-import { getMyAnnualLeaveSummary } from "@/lib/annual-leave-server";
+import { getMyAnnualLeaveSummary, LeaveReadError } from "@/lib/annual-leave-server";
 import { countMyPendingLeaveRequests, listMyLeaveRequests } from "@/lib/annual-leave-requests-server";
 import { getDictionary } from "@/lib/i18n";
 
@@ -30,7 +30,16 @@ export default async function MobileLeavePage() {
   const navBadges = await navBadgesPromise;
   const copy = getDictionary(session.user.preferredLanguage).leave;
   const service = getSupabaseServiceClient();
-  const summary = await getMyAnnualLeaveSummary(service, session.organization.id, session.user.id);
+  // 읽기 실패는 「입사일 미등록」이 아니라 「불러오지 못함」으로 보여 준다(2026-11-11) — 서버가 이제 오류를 던진다.
+  let summary: Awaited<ReturnType<typeof getMyAnnualLeaveSummary>> = null;
+  let loadFailed = false;
+  try {
+    summary = await getMyAnnualLeaveSummary(service, session.organization.id, session.user.id);
+  } catch (error) {
+    if (!(error instanceof LeaveReadError)) throw error;
+    console.error("[mobile/attendance/leave]", error.message);
+    loadFailed = true;
+  }
 
   let recentSection = null;
   if (summary) {
@@ -46,7 +55,9 @@ export default async function MobileLeavePage() {
 
   return (
     <MobileShell activeItem="attendance" badges={navBadges} title={copy.appTitle} wide>
-      {recentSection ?? <LeaveException locale={session.user.preferredLanguage} variant="missing" />}
+      {recentSection ?? (
+        <LeaveException locale={session.user.preferredLanguage} variant={loadFailed ? "loadFailed" : "missing"} />
+      )}
     </MobileShell>
   );
 }

@@ -9,6 +9,7 @@
 // 한다. 쓰기 액션(admin-actions)은 스스로 강제한다.
 
 import "server-only";
+import { ATTENDANCE_NEEDS_REVIEW_STATES } from "@/lib/attendance";
 import type { Capability } from "@/config/capabilities";
 import { memberCapabilities, memberIdsWithCapability } from "@/lib/capabilities-server";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
@@ -223,7 +224,8 @@ export async function getAttendanceReviewQueue(
     switch (params.filter) {
       case "review_required":
         // 무효 처리한 세션은 해소된 것으로 본다 — 마감 판정(`countBlockingSessions`)과 같다(2026-10-19).
-        query = query.eq("review_state", "review_required").neq("status", "invalid");
+        // 지급 안 되는 검토 상태 전부(반려된 정정 · 요청 없이 남은 정정 대기 포함, 2026-11-11) — 마감을 막는 근무와 같은 기준.
+        query = query.in("review_state", [...ATTENDANCE_NEEDS_REVIEW_STATES]).neq("status", "invalid");
         break;
       case "incomplete":
         query = query.is("clock_out_at", null).neq("status", "invalid");

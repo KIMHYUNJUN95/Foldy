@@ -10,9 +10,10 @@ import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import {
   hasAnnualLeaveBaselineRow,
   isLeaveHourlyRole,
+  LeaveReadError,
   setAnnualLeaveBaselineForUser,
 } from "@/lib/annual-leave-server";
-import { normalizeLeaveDays } from "@/lib/annual-leave";
+import { normalizeLeaveRequest } from "@/lib/annual-leave";
 import { getDictionary } from "@/lib/i18n";
 import {
   cancelLeaveRequest,
@@ -38,6 +39,8 @@ export async function setAnnualLeaveBaselineAction(input: {
   if (!session || !hasOrganizationContext(session)) return { ok: false, error: "auth" };
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.hireDate)) return { ok: false, error: "invalid_hire_date" };
+  // 미래 입사일 · 없는 날짜는 아래 lib(`setAnnualLeaveBaselineForUser`)가 막는다 — `future_hire_date` · `invalid_dates`.
+  // 본인 입력은 결재자가 확인할 때까지 「확인 전」으로 남는다(M11, 2026-11-11).
   if (!Number.isFinite(input.baseAmount) || input.baseAmount < 0) {
     return { ok: false, error: "invalid_base_amount" };
   }
@@ -78,6 +81,8 @@ export async function submitLeaveRequestAction(input: {
   reason: string;
   emergencyContact: string;
   asDraft?: boolean;
+  /** 원래 휴무라 뺀 날짜(안 A, 2026-11-11). 일수는 서버가 기간 − 이 날짜 수로 정한다. */
+  excludedDates?: string[];
 }): Promise<SubmitLeaveRequestResult> {
   const session = await getCurrentAppSession();
   if (!session || !hasOrganizationContext(session)) return { ok: false, error: "auth" };
@@ -90,13 +95,19 @@ export async function submitLeaveRequestAction(input: {
     return { ok: false, error: "invalid_dates" };
   }
   if (input.endDate < input.startDate) return { ok: false, error: "invalid_date_range" };
-  const normalized = normalizeLeaveDays({
+  if (input.excludedDates !== undefined && !Array.isArray(input.excludedDates)) {
+    return { ok: false, error: "invalid_excluded_dates" };
+  }
+  const normalizedRes = normalizeLeaveRequest({
     leaveType: input.leaveType as LeaveRequestType,
     startDate: input.startDate,
     endDate: input.endDate,
     durationUnit: input.durationUnit as LeaveDurationUnit,
+    excludedDates: input.excludedDates,
   });
-  if (!normalized) return { ok: false, error: "invalid_dates" };
+  // invalid_dates | invalid_excluded_dates | too_long(기간 60일 초과 — 예전에는 저장 칸이 넘쳐 알 수 없는 오류였다)
+  if (!normalizedRes.ok) return { ok: false, error: normalizedRes.error };
+  const normalized = normalizedRes.value;
   if (!input.asDraft && !input.reason.trim()) return { ok: false, error: "missing_reason" };
   if (!input.asDraft && !input.emergencyContact.trim()) return { ok: false, error: "missing_emergency_contact" };
 
@@ -105,9 +116,16 @@ export async function submitLeaveRequestAction(input: {
   // 기준 잔여가 없는 사람도 낼 수 없다(빠질 잔여가 없다). 경조 · 기타는 잔여와 무관해 그대로 둔다.
   if (input.leaveType === "paid" || input.leaveType === "special") {
     if (isLeaveHourlyRole(session.user.role)) return { ok: false, error: "hourly_excluded" };
-    if (!(await hasAnnualLeaveBaselineRow(service, session.organization.id, session.user.id))) {
-      return { ok: false, error: "baseline_required" };
+    let hasBaseline: boolean;
+    try {
+      hasBaseline = await hasAnnualLeaveBaselineRow(service, session.organization.id, session.user.id);
+    } catch (error) {
+      // 읽기 실패는 결과로 — 액션 밖으로 던지면 화면이 결과 대신 오류를 받는다(2026-11-11).
+      if (!(error instanceof LeaveReadError)) throw error;
+      console.error("[submitLeaveRequestAction]", error.message);
+      return { ok: false, error: "read_failed" };
     }
+    if (!hasBaseline) return { ok: false, error: "baseline_required" };
   }
 
   const requestInput = {
@@ -120,6 +138,8 @@ export async function submitLeaveRequestAction(input: {
     reason: input.reason,
     emergencyContact: input.emergencyContact,
     asDraft: input.asDraft,
+    excludedDates: normalized.excludedDates,
+    submittedVia: "mobile" as const,
   };
   const result = input.requestId
     ? await updateDraftLeaveRequest(service, session.organization.id, session.user.id, input.requestId, requestInput)

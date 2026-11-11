@@ -52,7 +52,7 @@ export function LeaveCalendar({
   const monthStart = `${ym}-01`;
   const monthEnd = `${ym}-${pad2(total)}`;
   const today = todayDate >= monthStart && todayDate <= monthEnd ? Number(todayDate.slice(8, 10)) : null;
-  const monthLabel = new Intl.DateTimeFormat(localeTag(locale), { year: "numeric", month: "long" }).format(
+  const monthLabel = new Intl.DateTimeFormat(localeTag(locale), { year: "numeric", month: "long", timeZone: "UTC" }).format(
     new Date(Date.UTC(year, month - 1, 1)),
   );
 

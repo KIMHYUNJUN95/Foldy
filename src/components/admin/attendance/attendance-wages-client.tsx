@@ -86,6 +86,12 @@ export function AttendanceWagesClient({
   const c = dictionary.admin.attendanceConsole;
   const shared = dictionary.admin.shared;
   const [rows, setRows] = useState(initialRows);
+  // 새로고침 · 실시간 신호로 서버가 새 줄을 내려주면 그걸로 맞춘다 — 렌더 중 조정(2026-11-11, 큐 · 연차와 같은 방식).
+  const [syncedRows, setSyncedRows] = useState(initialRows);
+  if (initialRows !== syncedRows) {
+    setSyncedRows(initialRows);
+    setRows(initialRows);
+  }
   const [filter, setFilter] = useState<Filter>("all");
   const [panelId, setPanelId] = useState<string | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);

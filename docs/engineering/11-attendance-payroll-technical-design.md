@@ -627,7 +627,7 @@ The org-wide payroll-totals **data layer** only -> **no dashboard UI, no pages, 
 web route** (explicit scope rule). No existing app screen expects org-wide totals, so this step is
 backend/query-only; the future web dashboard (and export) consume it.
 
-- `getPayrollTotals(org, ym)` (`src/lib/attendance-payroll-totals.ts`, server-only) returns the
+- *(Deleted 2026-11-11 — never called.)* `getPayrollTotals(org, ym)` (`src/lib/attendance-payroll-totals.ts`, server-only) returned the
   documented metrics for a Tokyo month:
   - **`finalizedLaborTotal`** / `finalizedPaidMinutes` / `finalizedWorkerCount` -> sum of `finalized`
     `attendance_month_snapshots` (Step 11) for the month. **Finalized data only**; never mixed with

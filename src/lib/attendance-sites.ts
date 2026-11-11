@@ -36,6 +36,8 @@ export type CreateAttendanceSiteInput = {
   latitude: number;
   longitude: number;
   allowedRadiusMeters?: number;
+  /** QR 인쇄용 이름(2026-11-11 — 새 근무지에서 빠져 있었다). 빈 값이면 근무지 이름을 쓴다. */
+  printName?: string | null;
   propertyId?: string | null;
   wifiSsids?: string[];
   isActive?: boolean;
@@ -127,14 +129,40 @@ export async function getQrTokenHistory(
 
 // ── 쓰기 (service-role, 호출자는 이미 소유자로 권한이 확인되어 있어야 함) ──
 
+/** 연결하려는 건물이 이 조직 것이 아니다(2026-11-11). */
+export class AttendanceSitePropertyError extends Error {
+  constructor() {
+    super("attendance site property is not in this organization");
+    this.name = "AttendanceSitePropertyError";
+  }
+}
+
+/**
+ * 현장에 연결할 건물이 이 조직 것인지(2026-11-11). service 클라이언트는 RLS 를 우회하므로 조직 경계는 여기서 지킨다 —
+ * 다른 조직 건물 id 를 붙이면 교통비 자동 연결이 남의 건물로 이어진다. 읽기 실패는 던진다.
+ */
+async function assertOrganizationProperty(organizationId: string, propertyId: string | null | undefined): Promise<void> {
+  if (!propertyId) return;
+  const { data, error } = await getSupabaseServiceClient()
+    .from("properties")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("id", propertyId)
+    .maybeSingle();
+  if (error) throw new Error(`Failed to check attendance site property: ${error.message}`);
+  if (!data) throw new AttendanceSitePropertyError();
+}
+
 export async function createAttendanceSite(
   input: CreateAttendanceSiteInput,
 ): Promise<AttendanceSiteRow> {
+  await assertOrganizationProperty(input.organizationId, input.propertyId);
   const { data, error } = await getSupabaseServiceClient()
     .from("attendance_sites")
     .insert({
       organization_id: input.organizationId,
       name: input.name,
+      print_name: input.printName || null,
       latitude: input.latitude,
       longitude: input.longitude,
       allowed_radius_meters: input.allowedRadiusMeters ?? ATTENDANCE_DEFAULT_RADIUS_METERS,
@@ -164,6 +192,7 @@ export async function updateAttendanceSite(
   if (patch.propertyId !== undefined) update.property_id = patch.propertyId;
   if (patch.wifiSsids !== undefined) update.wifi_ssids = patch.wifiSsids;
   if (patch.isActive !== undefined) update.is_active = patch.isActive;
+  if (patch.propertyId !== undefined) await assertOrganizationProperty(organizationId, patch.propertyId);
 
   const { data, error } = await getSupabaseServiceClient()
     .from("attendance_sites")

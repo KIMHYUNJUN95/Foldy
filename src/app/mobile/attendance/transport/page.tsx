@@ -16,6 +16,7 @@ import {
   getRecentTransportAmounts,
   listTransportDestinations,
 } from "@/lib/transport-destinations-server";
+import { resolveTransportMonth } from "@/lib/transport-month";
 
 // Tokyo 현재 월을 'YYYY-MM' 형식으로 반환.
 function getCurrentTokyoMonth(): string {
@@ -24,20 +25,14 @@ function getCurrentTokyoMonth(): string {
   return tokyoStr.substring(0, 7);
 }
 
-/** 'YYYY-MM' 를 달 수(년×12+월)로 — 범위 비교용. */
-function monthIndex(ym: string): number {
-  const [y, m] = ym.split("-").map(Number);
-  return y * 12 + (m - 1);
-}
 
 /**
  * `?ym` 검사(2026-10-26). 실제 달(01~12)이고 지금 달 기준 3년 전 ~ 다음 달 사이일 때만 받는다 — 아니면 지금 달.
  * 예전에는 모양만 봐서 `?ym=2026-13` · `?ym=9999-01` 로 열면 그 달 보고서 행이 DB 에 생겼다.
  */
 function resolveMonthKey(ym: string | undefined, current: string): string {
-  if (!ym || !/^\d{4}-(0[1-9]|1[0-2])$/.test(ym)) return current;
-  const diff = monthIndex(ym) - monthIndex(current);
-  return diff >= -36 && diff <= 1 ? ym : current;
+  // 서버 액션과 같은 규칙(`src/lib/transport-month.ts`).
+  return resolveTransportMonth(ym, current);
 }
 
 // Mobile — 교통비 정산서 (Transport Expense Statement).

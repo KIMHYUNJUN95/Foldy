@@ -95,7 +95,9 @@ export async function AttendanceSubnav({
     ) : null;
 
   return (
-    <div className="subnav" role="tablist" aria-label={c.crumb}>
+    // 주소가 바뀌는 링크 묶음이라 탭(tablist)이 아니라 내비게이션 — 지금 화면은 aria-current(2026-11-11).
+    // 예전 role="tablist" 는 자식에 role="tab" 이 없어 화면 읽기 프로그램이 빈 탭 목록으로 읽었다.
+    <nav className="subnav" aria-label={c.crumb}>
       {tabs.map((t) => {
         const badge = badges?.[t.id];
         const label = c[t.labelKey] as string;
@@ -120,6 +122,6 @@ export async function AttendanceSubnav({
           {picker}
         </div>
       ) : null}
-    </div>
+    </nav>
   );
 }

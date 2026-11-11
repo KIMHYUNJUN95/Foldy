@@ -1,5 +1,6 @@
 "use client";
 
+import { rowActivateProps } from "@/components/admin/shared/row-activate";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronRight, Edit3, Info, TriangleAlert, X } from "lucide-react";
@@ -8,9 +9,11 @@ import { AdminExportButtons } from "@/components/admin/shared/admin-export-butto
 import { adminLocaleTag } from "@/lib/admin-export-meta";
 import { getDictionary, type Dictionary, type Locale } from "@/lib/i18n";
 import type { AdminLeaveBalanceRow } from "@/lib/annual-leave-admin-server";
+import { parseLeaveDayAmount } from "@/lib/annual-leave";
 import {
   exportLeaveBalanceReport,
   exportLeaveBalanceWorkbook,
+  confirmEmployeeLeaveBaselineAction,
   saveEmployeeLeaveBaselineAction,
 } from "@/app/admin/attendance/leave/actions";
 import { useAdminPanelA11y } from "../shared/use-admin-panel-a11y";
@@ -116,12 +119,14 @@ export function LeaveBalanceView({
             <tbody>
               {employees.map((e) => {
                 const baseRem = e.grant - e.usedBase;
-                const pct = e.grant ? Math.round((baseRem / e.grant) * 100) : 0;
+                const pct = e.grant ? Math.max(0, Math.round((baseRem / e.grant) * 100)) : 0;
                 return (
                   <tr
                     key={e.userId}
                     className={selected === e.userId ? "sel" : ""}
+                    aria-selected={selected === e.userId}
                     onClick={() => setSelected(e.userId)}
+                    {...rowActivateProps(() => setSelected(e.userId))}
                   >
                     <td style={{ paddingLeft: 16 }}>
                       <div className="who">
@@ -129,7 +134,14 @@ export function LeaveBalanceView({
                           {e.initial}
                         </span>
                         <div>
-                          <div className="who__nm">{e.name}</div>
+                          <div className="who__nm">
+                            {e.name}
+                            {e.provisional ? (
+                              <span className="lv-prov" title={lc.baselineProvisionalHint}>
+                                {lc.baselineProvisional}
+                              </span>
+                            ) : null}
+                          </div>
                           <div className="who__sub">{roleLabel(e.role, dictionary)}</div>
                         </div>
                       </div>
@@ -143,10 +155,15 @@ export function LeaveBalanceView({
                           <span className={`pbar${baseRem <= 3 ? " warn" : ""}`} style={{ width: 64 }}>
                             <i style={{ width: `${pct}%` }} />
                           </span>
-                          <span className="mono" style={{ fontWeight: 800 }}>
+                          <span className={`mono${baseRem < 0 ? " lv-neg" : ""}`} style={{ fontWeight: 800 }}>
                             {baseRem}
                             <span style={{ color: "var(--faint)", fontWeight: 600 }}> / {e.grant}</span>
                           </span>
+                          {baseRem < 0 ? (
+                            <span className="lv-neg" style={{ fontSize: 11.5 }}>
+                              {lc.negativeBalance.replace("{n}", String(-baseRem))}
+                            </span>
+                          ) : null}
                         </div>
                       )}
                     </td>
@@ -161,7 +178,7 @@ export function LeaveBalanceView({
                       )}
                     </td>
                     <td className="mono" style={{ textAlign: "right" }}>
-                      {lc.daysUnit(e.usedBase + e.usedBonus)}
+                      {lc.daysUnit(e.usedThisMonth)}
                     </td>
                     <td>
                       {e.expiringDate && e.expiringAmount ? (
@@ -260,19 +277,41 @@ function EmployeeDrawer({
     .replace("-", "/");
 
   function saveEdit() {
+    // 빈 칸이 0 으로 저장되지 않게(2026-11-11).
+    const grant = parseLeaveDayAmount(grantInput);
+    const bonus = parseLeaveDayAmount(bonusInput);
+    if (grant === null || bonus === null) {
+      onToast(lc.balanceEditInvalid);
+      return;
+    }
     startTransition(async () => {
-      const res = await saveEmployeeLeaveBaselineAction({
-        userId: emp.userId,
-        hireDate: hireInput,
-        grant: Number(grantInput),
-        bonus: Number(bonusInput),
-      });
-      if (res.ok) {
-        setEditing(false);
-        onToast(lc.balanceEditSavedToast);
-        router.refresh();
-      } else {
-        onToast(lc.balanceEditErrorToast);
+      try {
+        const res = await saveEmployeeLeaveBaselineAction({ userId: emp.userId, hireDate: hireInput, grant, bonus });
+        if (res.ok) {
+          setEditing(false);
+          onToast(lc.balanceEditSavedToast);
+          router.refresh();
+        } else {
+          onToast(lc.balanceEditErrorToast);
+        }
+      } catch {
+        onToast(lc.errNetwork);
+      }
+    });
+  }
+
+  function confirmBaseline() {
+    startTransition(async () => {
+      try {
+        const res = await confirmEmployeeLeaveBaselineAction(emp.userId);
+        if (res.ok) {
+          onToast(lc.baselineConfirmed);
+          router.refresh();
+        } else {
+          onToast(res.error === "self_confirm" ? lc.errSelfConfirm : lc.baselineConfirmFailed);
+        }
+      } catch {
+        onToast(lc.errNetwork);
       }
     });
   }
@@ -300,6 +339,17 @@ function EmployeeDrawer({
                 {roleLabel(emp.role, dictionary)} · {lc.balanceHiredPrefix} {emp.hireDate ?? "—"}
               </div>
             </div>
+            {!editing && emp.provisional ? (
+              <button
+                type="button"
+                className="btn btn--pri btn--sm"
+                onClick={confirmBaseline}
+                disabled={pending}
+                title={lc.baselineProvisionalHint}
+              >
+                {lc.baselineConfirm}
+              </button>
+            ) : null}
             {!editing ? (
               <button type="button" className="btn btn--ghost btn--sm" onClick={() => setEditing(true)}>
                 <span className="ic">
@@ -387,7 +437,7 @@ function EmployeeDrawer({
 
           <div className="balrow">
             <div className="balrow__cell">
-              <div className="balrow__v" style={{ color: "var(--info)" }}>
+              <div className="balrow__v" style={{ color: baseRem < 0 ? "var(--danger)" : "var(--info)" }}>
                 {emp.ineligible ? "—" : baseRem}
               </div>
               <div className="balrow__k">{lc.balanceCellPaid}</div>

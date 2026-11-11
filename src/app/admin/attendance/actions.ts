@@ -13,7 +13,7 @@
 // 과거 Step 7 경계: 이 파일의 뒷부분 섹션은 이제 수동 세션, 급여,
 // 마감, 대시보드 액션, 내보내기도 구현한다.
 
-import { isPayrollMonthLocked } from "@/lib/payroll-approval-server";
+import { payrollMonthLockState } from "@/lib/payroll-approval-server";
 import { revalidatePath } from "next/cache";
 import { correctionMatchesFix } from "@/lib/attendance-correction-close";
 import {
@@ -22,7 +22,6 @@ import {
 import { getCurrentAppSession, hasOrganizationContext, type AppSession } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { attendanceCan } from "@/lib/attendance-review";
-import { runPayrollExport, type PayrollExportResult } from "@/lib/attendance-export";
 import {
   getFinalizationEligibility,
   getCurrentFinalizedSnapshot,
@@ -33,12 +32,14 @@ import { getMonthlyPayView } from "@/lib/attendance-pay";
 import {
   getTransportItems,
   getTransportReport,
+  syncReportTotalAmount,
   type TransportItemRow,
   type TransportReportRow,
   type TransportReportStatus,
 } from "@/lib/transport-reimbursement";
 import {
-  ATTENDANCE_REVIEW_STATES,
+  ATTENDANCE_ADMIN_EDITABLE_REVIEW_STATES,
+  exceedsMaxShift,
   gapFillMinFrom,
   type AttendanceCorrectionRequestRow,
   type AttendanceMonthSnapshotRow,
@@ -95,7 +96,14 @@ import type { Database } from "@/types/database";
 import { bestEffortWrite } from "@/lib/db-write-guard";
 import { canCloseMonth, isValidYm, resolveClockOutAfterClockIn } from "@/lib/attendance-clock";
 import { tokyoToday } from "@/lib/tokyo-date";
-import { hasOverlappingSession } from "@/lib/attendance-overlap";
+import {
+  attendanceMonthFingerprint,
+  finalizeAttendanceMonthChecked,
+  insertAttendanceSessionChecked,
+  isMonthFinalizedWriteError,
+  updateAttendanceSessionChecked,
+  type UpdateSessionCheckedResult,
+} from "@/lib/attendance-session-rpc";
 import { isPlatformDeveloper } from "@/config/roles";
 
 export type ReviewActionResult =
@@ -171,6 +179,15 @@ async function loadRequest(
   return (res.data as AttendanceCorrectionRequestRow | null) ?? null;
 }
 
+/** 근무 반영 결과 → 승인 결과. 마감 · 동시 수정은 「다시 확인」(invalid), 겹침은 겹침. */
+function sessionApplyOutcome(res: UpdateSessionCheckedResult): "ok" | "overlap" | "invalid" | "error" {
+  // request_changed(그 사이 요청이 다른 처리로 바뀜)도 「다시 확인」 → invalid.
+  if (res.result === "ok") return "ok";
+  if (res.result === "overlap") return "overlap";
+  if (res.result === "error") return "error";
+  return "invalid";
+}
+
 /**
  * 정정 요청을 승인하고, 관리자가 확정한 최종 값을 연결된 세션에 적용한다. 감사
  * 행도 남긴다. 세션이 없는(예외) 요청은 승인된 최종 출퇴근/근무지 값으로
@@ -225,7 +242,16 @@ export async function approveCorrectionRequest(
   const finalClockOutSiteId =
     input.finalClockOutSiteId ?? input.finalSiteId ?? request.desired_clock_out_site_id;
   const nowIso = new Date().toISOString();
-  let applySession: () => Promise<boolean> = async () => false;
+  // 요청을 「승인」으로 바꾸는 것도 근무 반영과 같은 DB 함수 · 같은 트랜잭션에서 한다(리뷰 6, 2026-11-11) — 따로 하면 그 틈에
+  // 마감이 끼어 요청만 승인되거나 되돌리기가 필요했다. 내가 잡은 in_review 일 때만 바뀐다(두 번째 승인은 request_changed).
+  const approveInTx = {
+    id: request.id,
+    actor_user_id: actorId,
+    comment: input.comment?.trim() ? input.comment.trim() : null,
+    reviewed_at: nowIso,
+  };
+  // 반영 결과 — 겹침 · 마감 · 동시 수정은 DB 함수가 한 사람 · 한 달 잠금 안에서 확인한다(2026-11-11).
+  let applySession: () => Promise<"ok" | "overlap" | "invalid" | "error"> = async () => "error";
   let auditApplied: () => Promise<void> = async () => {};
 
   if (request.session_id) {
@@ -250,6 +276,9 @@ export async function approveCorrectionRequest(
       .maybeSingle();
     const s = sRes.data as AttendanceSessionRow | null;
     if (!s) return { ok: false, reason: "not_found" };
+    // 무효 처리된 근무에는 정정을 반영하지 않는다 — 반영하면 무효 근무가 「정정 승인」 상태로 남는다(2026-11-11).
+    // 반려된 정정 상태의 근무도 예전처럼 막는다(예전 조건 `review_state in (...)`).
+    if (s.status === "invalid" || s.review_state === "rejected_correction") return { ok: false, reason: "invalid" };
 
     const update: Database["public"]["Tables"]["attendance_sessions"]["Update"] = { review_state: "approved_correction" };
     if (finalInAt != null) update.clock_in_at = finalInAt;
@@ -259,7 +288,7 @@ export async function approveCorrectionRequest(
     // 이제 완결된 세션이 아직 열려 있었다면 completed 로 바뀐다.
     const resultingOut = finalOutAt ?? s.clock_out_at;
     const resultingIn = finalInAt ?? s.clock_in_at;
-    if (!validClockOrder(resultingIn, resultingOut)) {
+    if (!validClockOrder(resultingIn, resultingOut) || exceedsMaxShift(resultingIn, resultingOut)) {
       return { ok: false, reason: "invalid" };
     }
     // 출근 시각은 그 근무의 운영일 안이어야 한다 — 다른 날로 옮기면 급여 달 · 마감 확인이 옛 날짜 기준으로 남는다(2026-10-22 검토).
@@ -269,17 +298,6 @@ export async function approveCorrectionRequest(
     if (await isFinalizedUserMonth(service, organizationId, s.user_id, ymdToYm(s.operating_date))) {
       return { ok: false, reason: "invalid" };
     }
-    if (s.status !== "invalid" && resultingIn) {
-      const overlap = await hasOverlappingSession(
-        service,
-        organizationId,
-        s.user_id,
-        { clockInAt: resultingIn, clockOutAt: resultingOut },
-        s.id,
-      );
-      if (overlap === null) return { ok: false, reason: "error" };
-      if (overlap) return { ok: false, reason: "overlap" };
-    }
     // `abandoned`(퇴근 미기록 후 운영일 경과)도 여기서 닫힌다 — 관리자가 실제 퇴근 시각을 넣으면
     // completed 로 올라가고 급여에 포함된다. 이 전이를 빼면 방치 세션을 정리할 방법이 없다.
     if ((s.status === "open" || s.status === "abandoned") && resultingIn && resultingOut) {
@@ -288,18 +306,10 @@ export async function approveCorrectionRequest(
     }
     if (crossesTokyoMidnight(resultingIn, resultingOut)) update.review_state = "review_required";
 
-    // 반영은 요청을 「승인」으로 확정한 뒤에 한다(아래). 0행이면 실패다 — 전에는 review_state 조건에 걸려
-    // 세션이 그대로인데도 성공으로 보고, 요청만 「승인」이 됐다.
-    applySession = async () => {
-      const updRes = await service
-        .from("attendance_sessions")
-        .update(update)
-        .eq("id", s.id)
-        .eq("organization_id", organizationId)
-        .in("review_state", ["normal", "review_required", "pending_correction", "approved_correction"])
-        .select("id");
-      return !updRes.error && (updRes.data ?? []).length > 0;
-    };
+    // 읽은 행 그대로일 때만(`updated_at`) — 그 사이 무효 처리 · 다른 수정이 끼면 실패.
+    applySession = async () => sessionApplyOutcome(
+      await updateAttendanceSessionChecked(service, organizationId, s.id, s.updated_at, update, approveInTx),
+    );
 
     // 권위 있는 변경을 감사 기록한다.
     const before = {
@@ -328,7 +338,7 @@ export async function approveCorrectionRequest(
     if (!finalInAt || !finalOutAt || !finalClockInSiteId) {
       return { ok: false, reason: "invalid" };
     }
-    if (!validClockOrder(finalInAt, finalOutAt)) {
+    if (!validClockOrder(finalInAt, finalOutAt) || exceedsMaxShift(finalInAt, finalOutAt)) {
       return { ok: false, reason: "invalid" };
     }
     const siteIdsToValidate = Array.from(
@@ -347,12 +357,7 @@ export async function approveCorrectionRequest(
     if (await isFinalizedUserMonth(service, organizationId, request.requested_by_user_id, ymdToYm(operatingDate))) {
       return { ok: false, reason: "invalid" };
     }
-    const overlap = await hasOverlappingSession(service, organizationId, request.requested_by_user_id, {
-      clockInAt: finalInAt,
-      clockOutAt: finalOutAt,
-    });
-    if (overlap === null) return { ok: false, reason: "error" };
-    if (overlap) return { ok: false, reason: "overlap" };
+    // 겹침은 넣을 때 DB 가 잠금 안에서 본다 — 세션 없는 정정 두 건을 동시에 승인해도 둘째는 겹침으로 떨어진다(2026-11-11).
     const insertFields = {
       organization_id: organizationId,
       user_id: request.requested_by_user_id,
@@ -373,13 +378,13 @@ export async function approveCorrectionRequest(
     };
     let createdId: string | null = null;
     applySession = async () => {
-      const ins = (await service
-        .from("attendance_sessions")
-        .insert(insertFields)
-        .select("id")
-        .single()) as { data: { id: string } | null; error: { message: string } | null };
-      createdId = ins.data?.id ?? null;
-      return !ins.error && Boolean(createdId);
+      const ins = await insertAttendanceSessionChecked(service, insertFields, approveInTx);
+      if (ins.result === "ok") {
+        createdId = ins.id;
+        return "ok";
+      }
+      if (ins.result === "overlap") return "overlap";
+      return ins.result === "error" ? "error" : "invalid";
     };
     auditApplied = async () => {
       if (!createdId) return;
@@ -400,39 +405,9 @@ export async function approveCorrectionRequest(
     };
   }
 
-  // 요청을 먼저 「승인」으로 확정한다(내가 잡은 in_review 일 때만 — 동시에 누른 두 번째 승인은 여기서 떨어진다).
-  // 그다음 세션에 반영하고, 반영이 실패하면 요청을 in_review 로 되돌린다. 두 쓰기가 한 트랜잭션은 아니지만
-  // 「세션은 그대로인데 요청만 승인」으로 끝나는 길은 없다.
-  const upd = await service
-    .from("attendance_correction_requests")
-    .update({
-      status: "approved",
-      review_comment: input.comment?.trim() ? input.comment.trim() : null,
-      reviewed_by_user_id: actorId,
-      reviewed_at: nowIso,
-    })
-    .eq("id", request.id)
-    .eq("organization_id", organizationId)
-    .eq("status", "in_review")
-    .eq("reviewed_by_user_id", actorId)
-    .select("id")
-    .maybeSingle();
-  if (upd.error) return { ok: false, reason: "error" };
-  if (!upd.data) return { ok: false, reason: "invalid" };
-
-  if (!(await applySession())) {
-    await bestEffortWrite(
-      "attendance_correction_requests: rollback approval",
-      service
-        .from("attendance_correction_requests")
-        .update({ status: "in_review", reviewed_at: null, review_comment: null })
-        .eq("id", request.id)
-        .eq("organization_id", organizationId)
-        .eq("status", "approved")
-        .eq("reviewed_by_user_id", actorId),
-    );
-    return { ok: false, reason: "invalid" };
-  }
+  // 근무 반영 + 요청 승인 — 한 트랜잭션. 실패하면 둘 다 그대로라 되돌리기가 없다.
+  const applied = await applySession();
+  if (applied !== "ok") return { ok: false, reason: applied };
   await auditApplied();
 
   await createNotification(service, {
@@ -562,6 +537,10 @@ export type ManualSessionResult =
         | "overlap"
         | "not_found"
         | "finalized_locked"
+        /** 도쿄 오늘보다 뒤의 날짜(2026-11-11) — 아직 일하지 않은 날의 근무는 넣지 않는다. */
+        | "future_date"
+        /** 16시간(`ATTENDANCE_MAX_SHIFT_MINUTES`)을 넘는 근무(2026-11-11). */
+        | "too_long"
         | "error";
     };
 
@@ -752,6 +731,16 @@ async function isOrgSite(
   return !!res.data;
 }
 
+/** 근무 바꾸기 실패 → 화면 결과. */
+function simpleWriteFailure(
+  result: Exclude<UpdateSessionCheckedResult["result"], "ok">,
+): "stale" | "finalized_locked" | "overlap" | "not_found" | "error" {
+  if (result === "finalized") return "finalized_locked";
+  // 승인 정보 없이 부르는 곳이라 오지 않지만, 오면 「그 사이 바뀜」으로.
+  if (result === "request_changed") return "stale";
+  return result;
+}
+
 /** 근무자의 출퇴근 세션을 수동으로 만든다 (권한 필요). */
 export async function createManualAttendanceSession(
   input: CreateManualSessionInput,
@@ -768,6 +757,8 @@ export async function createManualAttendanceSession(
   if (!input.reason.trim()) return { ok: false, reason: "reason_required" };
   if (!isYmd(input.operatingDate) || !isHhmm(input.clockInTime)) return { ok: false, reason: "invalid" };
   if (input.clockOutTime && !isHhmm(input.clockOutTime)) return { ok: false, reason: "invalid" };
+  // 오늘(도쿄) 이후 날짜는 받지 않는다 — 날짜 칸도 오늘까지만 고를 수 있다(2026-11-11).
+  if (input.operatingDate > tokyoToday()) return { ok: false, reason: "future_date" };
 
   // 대상은 이 조직의 활성 멤버여야 한다.
   const member = await service
@@ -802,12 +793,7 @@ export async function createManualAttendanceSession(
     : null;
   if (input.clockOutTime && !clockOutAt) return { ok: false, reason: "invalid" };
   if (!validClockOrder(clockInAt, clockOutAt)) return { ok: false, reason: "invalid" };
-  const overlap = await hasOverlappingSession(service, organizationId, input.userId, {
-    clockInAt,
-    clockOutAt,
-  });
-  if (overlap === null) return { ok: false, reason: "error" };
-  if (overlap) return { ok: false, reason: "overlap" };
+  if (exceedsMaxShift(clockInAt, clockOutAt)) return { ok: false, reason: "too_long" };
 
   const status = clockOutAt ? "completed" : "open";
   // 열린 수동 세션은 근무자의 기존 열린 세션과 충돌한다 (부분 유니크).
@@ -840,13 +826,13 @@ export async function createManualAttendanceSession(
     manual_created_reason: input.reason.trim(),
   };
 
-  const ins = (await service
-    .from("attendance_sessions")
-    .insert(insertFields)
-    .select("id")
-    .single()) as { data: { id: string } | null; error: { message: string } | null };
-  if (ins.error || !ins.data) return { ok: false, reason: "error" };
-  const sessionId = ins.data.id;
+  // 마감 · 겹침 · 열린 근무 충돌은 DB 가 한 사람 · 한 달 잠금 안에서 확인하고 넣는다(2026-11-11).
+  const ins = await insertAttendanceSessionChecked(service, insertFields);
+  if (ins.result === "finalized") return { ok: false, reason: "finalized_locked" };
+  if (ins.result === "overlap") return { ok: false, reason: "overlap" };
+  if (ins.result === "open_conflict") return { ok: false, reason: "open_conflict" };
+  if (ins.result !== "ok") return { ok: false, reason: "error" };
+  const sessionId = ins.id;
 
   await bestEffortWrite(
     "attendance_session_audits: insert",
@@ -945,7 +931,8 @@ export async function updateAttendanceSessionAdmin(
     update.clock_out_site_id = input.clockOutSiteId;
   }
   if (input.reviewState !== undefined) {
-    if (!ATTENDANCE_REVIEW_STATES.includes(input.reviewState)) return { ok: false, reason: "invalid" };
+    // 손으로 고를 수 있는 건 「검토 완료」 · 「검토 필요」뿐 — 정정 상태는 정정 승인 · 반려만 만든다(2026-11-11).
+    if (!ATTENDANCE_ADMIN_EDITABLE_REVIEW_STATES.includes(input.reviewState)) return { ok: false, reason: "invalid" };
     update.review_state = input.reviewState;
   }
 
@@ -962,17 +949,8 @@ export async function updateAttendanceSessionAdmin(
     const resultingIn = clockInChanged ? (update.clock_in_at as string | null) : s.clock_in_at;
     const resultingOut = clockOutChanged ? (update.clock_out_at as string | null) : s.clock_out_at;
     if (!validClockOrder(resultingIn, resultingOut)) return { ok: false, reason: "invalid" };
-    if (resultingIn) {
-      const overlap = await hasOverlappingSession(
-        service,
-        organizationId,
-        s.user_id,
-        { clockInAt: resultingIn, clockOutAt: resultingOut },
-        s.id,
-      );
-      if (overlap === null) return { ok: false, reason: "error" };
-      if (overlap) return { ok: false, reason: "overlap" };
-    }
+    // 16시간을 넘는 근무는 입력 실수다(2026-11-11). 겹침은 쓸 때 DB 가 잠금 안에서 본다.
+    if (exceedsMaxShift(resultingIn, resultingOut)) return { ok: false, reason: "invalid" };
     if (resultingIn && resultingOut) {
       update.status = "completed";
       // 방치(abandoned)였던 세션을 닫으면 방치 표시도 지운다 — 정정 승인 경로와 같다(2026-10-01).
@@ -990,17 +968,10 @@ export async function updateAttendanceSessionAdmin(
     review_state: s.review_state,
   };
 
-  // 읽은 행 그대로일 때만 쓴다 — 읽고 쓰는 사이 정정 승인 등이 끼어들면 0행 → `stale`.
-  const updRes = await service
-    .from("attendance_sessions")
-    .update(update)
-    .eq("id", s.id)
-    .eq("organization_id", organizationId)
-    .eq("updated_at", s.updated_at)
-    .select("updated_at");
-  if (updRes.error) return { ok: false, reason: "error" };
-  const updatedRow = (updRes.data ?? [])[0] as { updated_at: string } | undefined;
-  if (!updatedRow) return { ok: false, reason: "stale" };
+  // 읽은 행 그대로일 때만 쓴다 — 읽고 쓰는 사이 정정 승인 등이 끼어들면 `stale`. 마감 · 겹침도 같은 잠금 안에서(2026-11-11).
+  const written = await updateAttendanceSessionChecked(service, organizationId, s.id, s.updated_at, update);
+  if (written.result !== "ok") return { ok: false, reason: simpleWriteFailure(written.result) };
+  const updatedRow = { updated_at: written.updatedAt };
 
   await bestEffortWrite(
     "attendance_session_audits: insert",
@@ -1071,12 +1042,9 @@ export async function invalidateAttendanceSession(
     invalidated_reason: reason.trim(),
   };
 
-  const updRes = await service
-    .from("attendance_sessions")
-    .update(after)
-    .eq("id", s.id)
-    .eq("organization_id", organizationId);
-  if (updRes.error) return { ok: false, reason: "error" };
+  // 읽은 행 그대로일 때만(상태 · updated_at) — 그 사이 정정 승인 · 다른 수정이 끼면 `stale`(2026-11-11).
+  const written = await updateAttendanceSessionChecked(service, organizationId, s.id, s.updated_at, after);
+  if (written.result !== "ok") return { ok: false, reason: simpleWriteFailure(written.result) };
 
   await bestEffortWrite(
     "attendance_session_audits: insert",
@@ -1134,16 +1102,7 @@ export async function restoreAttendanceSession(
   // 급여에 절대 반영되지 않는 불완전한 세션이 조용히 남지 않게 한다.
   if (!s.clock_in_at || !s.clock_out_at) return { ok: false, reason: "incomplete" };
   if (!validClockOrder(s.clock_in_at, s.clock_out_at)) return { ok: false, reason: "invalid" };
-  // 무효 처리 뒤 같은 시간대에 대신 넣은 세션이 있으면 복구하면 두 번 지급된다.
-  const overlap = await hasOverlappingSession(
-    service,
-    organizationId,
-    s.user_id,
-    { clockInAt: s.clock_in_at, clockOutAt: s.clock_out_at },
-    s.id,
-  );
-  if (overlap === null) return { ok: false, reason: "error" };
-  if (overlap) return { ok: false, reason: "overlap" };
+  // 무효 처리 뒤 같은 시간대에 대신 넣은 세션이 있으면 복구하면 두 번 지급된다 — 겹침은 쓸 때 DB 가 잠금 안에서 본다.
 
   const before = {
     status: s.status,
@@ -1158,12 +1117,9 @@ export async function restoreAttendanceSession(
     invalidated_reason: null,
   };
 
-  const updRes = await service
-    .from("attendance_sessions")
-    .update(after)
-    .eq("id", s.id)
-    .eq("organization_id", organizationId);
-  if (updRes.error) return { ok: false, reason: "error" };
+  // 읽은 행 그대로일 때만(무효 상태 · updated_at), 겹침 · 마감은 같은 잠금 안에서(2026-11-11).
+  const written = await updateAttendanceSessionChecked(service, organizationId, s.id, s.updated_at, after);
+  if (written.result !== "ok") return { ok: false, reason: simpleWriteFailure(written.result) };
 
   await bestEffortWrite(
     "attendance_session_audits: insert",
@@ -1194,7 +1150,8 @@ export type FinalizeResult =
   | { ok: true; id: string }
   | {
       ok: false;
-      reason: "forbidden" | "invalid" | "not_ended" | "target_invalid" | "blocked" | "not_hourly" | "error";
+      /** `stale` = 계산하는 사이 그 달 기록이 바뀌었다(2026-11-11) — 새로 보고 다시. */
+      reason: "forbidden" | "invalid" | "not_ended" | "target_invalid" | "blocked" | "not_hourly" | "stale" | "error";
       blockers?: FinalizationBlockers;
     };
 
@@ -1233,96 +1190,48 @@ export async function finalizeAttendanceMonth(input: {
     .maybeSingle();
   if (!member.data) return { ok: false, reason: "target_invalid" };
 
-  const pay = await getMonthlyPayView(organizationId, input.userId, input.ym);
-  const elig = await getFinalizationEligibility(organizationId, input.userId, input.ym, pay.unpricedCount);
+  // 마감 경합(2026-11-11): 계산 **전에** 그 달 급여 입력의 지문을 받고, 저장할 때 DB 가 한 사람 · 한 달 잠금 안에서 다시 떠
+  // 비교한다(`finalize_attendance_month_checked`). 그 사이 근무 수정 · 정정 승인 · 휴게 · 수당이 바뀌면 `stale` —
+  // 옛 기록으로 계산한 금액이 마감 금액으로 굳지 않는다. 저장 뒤의 쓰기는 근무 행 트리거가 마감된 달이라 거절한다.
+  // 읽기 실패는 계산하지 않고 오류로 돌려준다(strict).
+  let fingerprint: string;
+  let pay: Awaited<ReturnType<typeof getMonthlyPayView>>;
+  let elig: Awaited<ReturnType<typeof getFinalizationEligibility>>;
+  try {
+    fingerprint = await attendanceMonthFingerprint(service, organizationId, input.userId, input.ym);
+    pay = await getMonthlyPayView(organizationId, input.userId, input.ym, "ko", { strict: true });
+    elig = await getFinalizationEligibility(organizationId, input.userId, input.ym, pay.unpricedCount);
+  } catch (error) {
+    console.error("[attendance] finalize read failed", error instanceof Error ? error.message : error);
+    return { ok: false, reason: "error" };
+  }
   if (!elig.eligible) return { ok: false, reason: "blocked", blockers: elig.blockers };
   if (!pay.hourlyEligible) return { ok: false, reason: "not_hourly" };
 
-  const firstDay = monthFirstDay(input.ym);
-
-  // 이력 보존: 대체 연결을 잡으려고 이전 행을 먼저 읽고,
-  // 새 스냅샷을 INSERT 한 뒤에 옛 행을 대체됨으로 표시한다.
-  // 이 순서면 "현재 마감본"이 사라지지 않는다. insert 가
-  // 실패해도 옛 스냅샷은 그대로 남고, 대체 처리는 insert 가
-  // 성공한 뒤에만 실행된다.
-  const priorRes = await service
-    .from("attendance_month_snapshots")
-    .select("id, status")
-    .eq("organization_id", organizationId)
-    .eq("user_id", input.userId)
-    .eq("target_month", firstDay)
-    .neq("status", "superseded")
-    .order("created_at", { ascending: false });
-  const priorRows = (priorRes.data ?? []) as { id: string; status: string }[];
-  const supersedesId = priorRows[0]?.id ?? null;
-
-  const nowIso = new Date().toISOString();
-  const ins = (await service
-    .from("attendance_month_snapshots")
-    .insert({
-      organization_id: organizationId,
-      user_id: input.userId,
-      target_month: firstDay,
-      status: "finalized",
-      total_paid_minutes: pay.totalPaidMinutes,
-      gross_amount: pay.expectedGross,
-      rate_breakdown: pay.rateSegments,
-      allowance_breakdown: pay.allowances,
-      finalized_by_user_id: actorId,
-      finalized_at: nowIso,
-      supersedes_snapshot_id: supersedesId,
-    })
-    .select("id")
-    .single()) as { data: { id: string } | null; error: { code?: string; message: string } | null };
-  // 두 사람이 동시에 마감하면 두 번째 insert 는 DB 유일 인덱스(사람 · 달마다 finalized 하나 —
-  // `202610050001`)에 걸린다 → 「이미 마감됨」으로 돌려준다. 전에는 둘 다 들어간 뒤 서로를 superseded 로 바꿔
-  // 마감본이 하나도 안 남을 수 있었다.
-  if (ins.error?.code === "23505") {
+  // 스냅샷 저장 · 이전 행 대체(supersedes) · 감사 기록이 한 트랜잭션이다.
+  const saved = await finalizeAttendanceMonthChecked(service, {
+    organizationId,
+    userId: input.userId,
+    ym: input.ym,
+    actorId,
+    fingerprint,
+    totalPaidMinutes: pay.totalPaidMinutes,
+    grossAmount: pay.expectedGross,
+    rateBreakdown: pay.rateSegments,
+    allowanceBreakdown: pay.allowances,
+  });
+  if (saved.result === "already_finalized") {
     return {
       ok: false,
       reason: "blocked",
       blockers: { alreadyFinalized: true, openSessions: 0, pendingCorrections: 0, reviewRequired: 0, missingPayInfo: 0 },
     };
   }
-  if (ins.error || !ins.data) return { ok: false, reason: "error" };
-
-  // 확인된 insert 성공 뒤에만 옛 행을 대체 처리한다 — **읽어 둔 이전 행만**. 「내 것 빼고 전부」로
-  // 바꾸면 동시에 들어온 다른 마감본까지 지운다.
-  if (priorRows.length > 0) {
-    const sup = await service
-      .from("attendance_month_snapshots")
-      .update({ status: "superseded" })
-      .eq("organization_id", organizationId)
-      .eq("user_id", input.userId)
-      .eq("target_month", firstDay)
-      .in(
-        "id",
-        priorRows.map((row) => row.id),
-      )
-      .neq("status", "superseded");
-    if (sup.error) console.error("[attendance] supersede prior snapshots failed", sup.error.message);
-  }
-
-  await bestEffortWrite(
-    "audit_logs: insert",
-    service.from("audit_logs").insert({
-        organization_id: organizationId,
-        actor_user_id: actorId,
-        action: "attendance_month_finalize",
-        target_type: "attendance_month_snapshot",
-        target_id: ins.data.id,
-        metadata: {
-          user_id: input.userId,
-          target_month: firstDay,
-          gross_amount: pay.expectedGross,
-          total_paid_minutes: pay.totalPaidMinutes,
-          supersedes_snapshot_id: supersedesId,
-        },
-      })
-  );
+  if (saved.result === "stale") return { ok: false, reason: "stale" };
+  if (saved.result !== "ok") return { ok: false, reason: "error" };
 
   revalidatePay();
-  return { ok: true, id: ins.data.id };
+  return { ok: true, id: saved.id };
 }
 
 /** 마감된 사용자-월을 재개한다 (권한 필요). 사유 필수; 이전 이력은 보존된다. */
@@ -1342,7 +1251,10 @@ export async function reopenAttendanceMonth(input: {
   if (!isValidYm(input.ym)) return { ok: false, reason: "invalid" };
   if (!input.reason.trim()) return { ok: false, reason: "reason_required" };
   // 알바 급여 P5 — 그 달 급여 결재가 시작됐으면 근태 마감을 풀 수 없다(먼저 돌려보내기 · 결재 되돌리기, 문서 40 §4-1).
-  if (await isPayrollMonthLocked(service, organizationId, input.ym)) return { ok: false, reason: "payroll_locked" };
+  // 읽기 실패면 풀지 않는다(fail-closed, 2026-11-11).
+  const lock = await payrollMonthLockState(service, organizationId, input.ym);
+  if (lock === "error") return { ok: false, reason: "error" };
+  if (lock === "locked") return { ok: false, reason: "payroll_locked" };
 
   const snap = await getCurrentFinalizedSnapshot(service, organizationId, input.userId, input.ym);
   if (!snap) return { ok: false, reason: "not_finalized" };
@@ -1380,34 +1292,6 @@ export async function reopenAttendanceMonth(input: {
 
   revalidatePay();
   return { ok: true };
-}
-
-// ── 마감분 전용 급여 내보내기 (Step 13) ──────────────────────────────────
-// 마감된 데이터만 내보내는 권한 있는(owner / attendance_payroll_admin) 기능 — 월 일괄 또는
-// 사람별. 권한 + 마감분 필터링 + `attendance_export_logs` 감사 행은 모두
-// `runPayrollExport` 에 있고, 이 얇은 액션들은 세션을 확인해 호출자(보류된
-// 웹 대시보드)가 내려받을 CSV 를 돌려준다. 최종 엑셀 양식이 정해질 때까지
-// 임시 형식은 구조화된 CSV 다. 관리자 내보내기 UI 는 여기서 만들지 않는다.
-
-export async function exportMonthlyPayroll(ym: string): Promise<PayrollExportResult> {
-  const session = await getCurrentAppSession();
-  if (!session || !hasOrganizationContext(session)) return { ok: false, reason: "error" };
-  const service = getSupabaseServiceClient();
-  return runPayrollExport(service, session.organization.id, session.user.id, {
-    scope: "monthly_bulk",
-    ym,
-  });
-}
-
-export async function exportUserPayroll(userId: string, ym: string): Promise<PayrollExportResult> {
-  const session = await getCurrentAppSession();
-  if (!session || !hasOrganizationContext(session)) return { ok: false, reason: "error" };
-  const service = getSupabaseServiceClient();
-  return runPayrollExport(service, session.organization.id, session.user.id, {
-    scope: "single_user",
-    ym,
-    userId,
-  });
 }
 
 // ── 현지화된 서식 급여 통합 문서 (Excel 호환 .xlsx) ────────────────
@@ -1820,6 +1704,7 @@ export type TransportReviewResult =
         | "invalid"
         | "comment_required"
         | "finalized"
+        | "self_review"
         | "error";
     };
 
@@ -1879,6 +1764,8 @@ export async function setTransportReportReview(input: {
     .maybeSingle();
   const row = rRes.data as { status: string; organization_id: string; user_id: string; target_month: string } | null;
   if (!row || row.organization_id !== organizationId) return { ok: false, reason: "not_found" };
+  // 자기 정산서는 처리할 수 없다(2026-11-11) — 연차 자기 승인 금지와 같은 원칙. 다른 담당자가 처리한다.
+  if (row.user_id === actorId) return { ok: false, reason: "self_review" };
 
   if (!TRANSPORT_ACTION_VALID_FROM[input.action].includes(row.status)) {
     return { ok: false, reason: "invalid" };
@@ -1889,6 +1776,16 @@ export async function setTransportReportReview(input: {
     (await isUserMonthFinalized(service, organizationId, row.user_id, row.target_month.slice(0, 10)))
   ) {
     return { ok: false, reason: "finalized" };
+  }
+
+  // 승인 직전에 합계를 항목에서 다시 맞춘다(2026-11-11 M12) — 급여 총액에 들어가는 금액이 항목 합과 같게.
+  if (input.action === "approved") {
+    try {
+      await syncReportTotalAmount(service, input.reportId);
+    } catch (error) {
+      console.error("[setTransportReportReview] total sync failed:", error instanceof Error ? error.message : error);
+      return { ok: false, reason: "error" };
+    }
   }
 
   const targetStatus = TRANSPORT_ACTION_TARGET[input.action];
@@ -2440,6 +2337,8 @@ export async function createAttendanceAllowance(input: {
     })
     .select("id")
     .single()) as { data: { id: string } | null; error: { message: string } | null };
+  // 위 확인과 쓰기 사이에 마감이 끼면 DB 트리거(attendance_pay_allowances_month_guard)가 잠금 안에서 다시 보고 거절한다(리뷰 7).
+  if (isMonthFinalizedWriteError(ins.error)) return { ok: false, reason: "finalized" };
   if (ins.error || !ins.data) return { ok: false, reason: "error" };
 
   await bestEffortWrite(
@@ -2511,6 +2410,8 @@ export async function cancelAttendanceAllowance(input: {
     .eq("organization_id", organizationId)
     .eq("id", input.id)
     .eq("status", "active");
+  // 잠금 안 마감 확인(트리거, 리뷰 7).
+  if (isMonthFinalizedWriteError(upd.error)) return { ok: false, reason: "finalized" };
   if (upd.error) return { ok: false, reason: "error" };
 
   await bestEffortWrite(
@@ -2637,6 +2538,8 @@ async function buildTransportExportItems(
 > {
   const transport = await getAdminAttendanceTransport(session, ym, localeTag);
   if (!transport.isPrivileged) return { ok: false, reason: "forbidden" };
+  // 읽기 실패를 「내보낼 것 없음」으로 보이지 않게(2026-11-11, H5).
+  if (transport.loadError) return { ok: false, reason: "error" };
 
   const candidateRows = transport.rows.filter(
     // 승인된 청구만 내보낸다 — 합계가 급여에 들어가는 금액과 같아야 한다(2026-10-26).

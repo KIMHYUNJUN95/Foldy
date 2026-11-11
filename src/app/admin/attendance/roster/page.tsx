@@ -7,6 +7,7 @@ import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { getDictionary } from "@/lib/i18n";
 import { dayWeeklyRange, loadWeeklyLimitChips } from "@/lib/staff-documents/weekly-limit-server";
 import { loadExpiredResidenceCardUserIds } from "@/lib/staff-documents/server";
+import { resolveDayParam } from "@/lib/iso-date-param";
 
 function tokyoDateKey(date = new Date()): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -21,14 +22,9 @@ function tokyoDateKey(date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
+/** 실제 날짜이고 오늘 ~ 90일 전 안일 때만(2026-11-11 — 모양만 보던 것을 실제 날짜로, 규칙은 iso-date-param 하나). */
 function clampRosterDate(input: string | undefined, todayDate: string): string {
-  if (!input || !/^\d{4}-\d{2}-\d{2}$/.test(input)) return todayDate;
-  if (input > todayDate) return todayDate;
-
-  const ninetyDaysAgo = new Date(`${todayDate}T00:00:00+09:00`);
-  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-  const minDate = tokyoDateKey(ninetyDaysAgo);
-  return input >= minDate ? input : todayDate;
+  return resolveDayParam(input, todayDate, 90);
 }
 
 function dateLabel(dateKey: string, localeTag: string): string {

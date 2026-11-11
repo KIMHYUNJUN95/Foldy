@@ -31,6 +31,9 @@ import { formatAdminYen } from "../shared/admin-format";
 import type { WeeklyLimitChip } from "@/lib/staff-documents/weekly-limit";
 import { WeeklyLimitBadge, WeeklyLimitNote } from "@/components/shared/weekly-limit-badge";
 
+import type { BlockingSession } from "@/lib/attendance-finalization";
+import { rowActivateProps } from "@/components/admin/shared/row-activate";
+
 type Att = Dictionary["admin"]["attendanceConsole"];
 
 function Ic({ children }: { children: React.ReactNode }) {
@@ -84,6 +87,13 @@ export function AttendancePayrollClient({
   const c = dictionary.admin.attendanceConsole;
   const shared = dictionary.admin.shared;
   const [rows, setRows] = useState(initialRows);
+  // 새로고침 · 실시간 신호(LiveRefresh → router.refresh)로 서버가 새 줄을 내려주면 그걸로 맞춘다 — 렌더 중 조정
+  // (effect 없이, 큐 · 연차와 같은 방식, 2026-11-11). 전에는 처음 받은 줄만 써서 다른 사람의 마감 · 수정이 안 보였다.
+  const [syncedRows, setSyncedRows] = useState(initialRows);
+  if (initialRows !== syncedRows) {
+    setSyncedRows(initialRows);
+    setRows(initialRows);
+  }
   const [panelId, setPanelId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ id: number; msg: string } | null>(null);
   const showToast = (msg: string) => setToast((prev) => ({ id: (prev?.id ?? 0) + 1, msg }));
@@ -238,8 +248,9 @@ export function AttendancePayrollClient({
               <Wallet />
             </Ic>
           </span>
-          <div className="state__t">{c.payEmptyTitle}</div>
-          <div className="state__s">{c.payEmptyBody}</div>
+          {/* 「시급제만」 때문에 빈 경우는 따로 — 멤버가 없는 것처럼 보이지 않게(2026-11-11). */}
+          <div className="state__t">{rows.length > 0 ? c.payEmptyHourlyTitle : c.payEmptyTitle}</div>
+          <div className="state__s">{rows.length > 0 ? c.payEmptyHourlyBody : c.payEmptyBody}</div>
         </div>
       ) : (
         <table className="qtbl pay-tbl">
@@ -265,6 +276,7 @@ export function AttendancePayrollClient({
                   key={r.userId}
                   className={[sel ? "sel" : "", fresh === r.userId ? "cfm-fresh" : ""].join(" ").trim()}
                   onClick={() => openPanel(r.userId)}
+                  {...rowActivateProps(() => openPanel(r.userId))}
                 >
                   <td style={{ paddingLeft: 16 }}>
                     <div className="who">
@@ -419,6 +431,8 @@ function PayrollPanel({
   const [modal, setModal] = useState<"reopen" | null>(null);
   // 마감 직후 0.65초 — 버튼이 초록 「마감됨」 · 자물쇠 딸깍을 보여 준 뒤 다음 직원으로 넘어간다.
   const [doneFor, setDoneFor] = useState<string | null>(null);
+  // 마감 시도가 「막힘」으로 돌려준 근무 목록 — 화면을 연 뒤 바뀌었을 수 있어 받은 것을 우선한다.
+  const [blockedList, setBlockedList] = useState<{ for: string; list: BlockingSession[] } | null>(null);
   const done = doneFor === row.userId;
   const panelRef = useAdminPanelA11y<HTMLElement>(onClose, { disabled: modal !== null });
   const pill = payStatusPill(row, c);
@@ -429,6 +443,14 @@ function PayrollPanel({
     b.openSessions > 0 ||
     b.missingPayInfo > 0 ||
     b.alreadyFinalized;
+  const blockingSessions =
+    (blockedList?.for === row.userId ? blockedList.list : null) ?? b.sessions ?? [];
+  const blockDayFmt = new Intl.DateTimeFormat(localeTag, {
+    timeZone: "Asia/Tokyo",
+    month: "short",
+    day: "numeric",
+    weekday: "short",
+  });
   const blockerHref = (f: "review" | "corr") =>
     `/admin/attendance/queue?ym=${ym}&filter=${f}&q=${encodeURIComponent(row.userName)}`;
 
@@ -444,10 +466,14 @@ function PayrollPanel({
         setErr(c.actionForbidden);
       } else if (res.reason === "blocked") {
         setErr(c.payActionBlocked);
+        if (res.blockers?.sessions) setBlockedList({ for: row.userId, list: res.blockers.sessions });
       } else if (res.reason === "not_hourly") {
         setErr(c.payActionNotHourly);
       } else if (res.reason === "not_ended") {
         setErr(c.payActionNotEnded);
+      } else if (res.reason === "stale") {
+        // 이 패널은 새로 불러오지 않는다 — 문구도 「새로 불러와 주세요」(2026-11-11).
+        setErr(c.payActionStale);
       } else {
         setErr(c.actionFailed);
       }
@@ -755,6 +781,22 @@ function PayrollPanel({
                       </Ic>
                     </span>
                   </Link>
+                ) : null}
+                {blockingSessions.length > 0 ? (
+                  <div>
+                    <div className="pblock__t" style={{ marginTop: 4 }}>{c.payPanelBlockerListTitle}</div>
+                    <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 4 }}>
+                      {blockingSessions.map((s) => (
+                        <li key={s.sessionId} style={{ fontSize: 13, lineHeight: 1.45 }}>
+                          <span style={{ fontVariantNumeric: "tabular-nums" }}>
+                            {blockDayFmt.format(new Date(`${s.date}T12:00:00+09:00`))}
+                          </span>
+                          {" · "}
+                          {c.payBlockReasons[s.reason]}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 ) : null}
                 {b.alreadyFinalized ? (
                   <div className="locknote">

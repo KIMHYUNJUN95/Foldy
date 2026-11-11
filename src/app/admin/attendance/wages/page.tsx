@@ -15,6 +15,8 @@ import { hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { AdminNoAccess } from "@/components/admin/shared/admin-no-access";
 import { isValidYm } from "@/lib/attendance-clock";
+import { LiveRefresh } from "@/components/shared/live-refresh";
+import { attendanceWagesLiveSources } from "@/lib/live-sources";
 
 // 관리자 · 근태 · 시급 관리 (Slice 7).
 // 구성원별 시급 관리: 인라인 실시간 편집기가
@@ -81,6 +83,9 @@ export default async function AdminAttendanceWagesPage({
 
       {wages.isPrivileged ? (
         <>
+          {hasOrganizationContext(session) ? (
+            <LiveRefresh sources={attendanceWagesLiveSources(session.organization.id)} />
+          ) : null}
           <AttendanceWagesClient
             initialRows={wages.rows}
             ym={carriedYm}

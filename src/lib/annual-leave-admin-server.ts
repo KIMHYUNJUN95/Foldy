@@ -19,10 +19,17 @@ import {
   isLeaveHourlyRole,
   MAX_LEAVE_BONUS,
   MAX_LEAVE_GRANT,
+  selectAllPages,
   setAnnualLeaveBaselineForUser,
   sumApprovedLeaveUsage,
 } from "@/lib/annual-leave-server";
-import { computeAnnualLeaveSummary, getScheduledGrants, normalizeLeaveDays, tokyoToday } from "@/lib/annual-leave";
+import {
+  computeAnnualLeaveSummary,
+  getScheduledGrants,
+  leaveUsagesFromRows,
+  normalizeLeaveRequest,
+  tokyoToday,
+} from "@/lib/annual-leave";
 
 // 시급제 역할(아르바이트 · 아르바이트 리더)은 연차 대상이 아니다(확정 정책). 판정은 `annual-leave-server.ts` 의
 // `isLeaveHourlyRole` 하나만 쓴다(유일한 baseline 쓰기 지점이 거기라 검증도 거기 있다) — 복사하면 두 정의가 갈라진다.
@@ -77,6 +84,8 @@ export type ApplicantLeaveSummary = {
   bonusRemaining: number;
   ineligible: boolean;
   nextGrantDate: string | null;
+  /** 기준 잔여가 결재자 확인 전(M11). 기준이 없으면 false. */
+  provisional: boolean;
 };
 
 export async function getApplicantLeaveSummary(
@@ -117,6 +126,7 @@ export async function getApplicantLeaveSummary(
       bonusRemaining: 0,
       ineligible: true,
       nextGrantDate: null,
+      provisional: false,
     };
   }
 
@@ -126,8 +136,7 @@ export async function getApplicantLeaveSummary(
     baselineDate: baseline.baselineDate,
     baselineAmount: baseline.baseAmount,
     bonusBaselineAmount: baseline.bonusAmount,
-    usedDays: usage.base,
-    specialUsedDays: usage.bonus,
+    usages: usage.usages,
     asOf: tokyoToday(),
   });
 
@@ -140,6 +149,7 @@ export async function getApplicantLeaveSummary(
     bonusRemaining: summary.bonusRemaining,
     ineligible: false,
     nextGrantDate: summary.nextBaseGrant?.date ?? null,
+    provisional: baseline.provisional,
   };
 }
 
@@ -151,6 +161,8 @@ export type AdminLeaveRequestInput = {
   durationUnit: LeaveDurationUnit;
   reason: string;
   emergencyContact: string;
+  /** 원래 휴무라 뺀 날짜(안 A, 2026-11-11). */
+  excludedDates?: string[];
 };
 
 /** 신청 대상이 될 수 있는 활성 조직 멤버(활성만 — 초대된 멤버는 아직
@@ -185,6 +197,10 @@ export type AdminLeaveBalanceRow = {
   usedBase: number;
   bonus: number; // 특별 풀 부여 합계 (= bonusRemaining + usedBonus)
   usedBonus: number;
+  /** 이번 도쿄 달에 시작하는 승인된 유급 + 특별 일수(내보내기 「이번 달 사용」 열). */
+  usedThisMonth: number;
+  /** 기준 잔여가 결재자 확인 전(M11). 기준이 없으면 false. */
+  provisional: boolean;
   nextGrantDate: string | null;
   nextGrantAmount: number | null;
   expiringDate: string | null;
@@ -215,20 +231,32 @@ export async function listAdminLeaveBalances(session: AppSession): Promise<Admin
   const roleByUser = new Map(members.map((m) => [m.user_id, m.role]));
   const devIds = await platformAdminIdSet(service, userIds);
 
-  const [{ data: profData }, { data: baseData }, { data: reqData }] = await Promise.all([
+  const [profRes, baseRes, reqData] = await Promise.all([
     service.from("profiles").select("id, name, hire_date").in("id", userIds),
     service
       .from("annual_leave_baselines")
-      .select("user_id, base_amount, bonus_amount, baseline_date")
+      // `*` — 확인 칸(confirmed_at)이 아직 없는 DB 에서도 읽힌다.
+      .select("*")
       .eq("organization_id", organizationId)
       .in("user_id", userIds),
-    service
-      .from("annual_leave_requests")
-      .select("user_id, leave_type, days_count")
-      .eq("organization_id", organizationId)
-      .eq("status", "approved")
-      .in("user_id", userIds),
+    // 승인된 신청은 조직 전체에서 1,000행을 넘는다 — 끝까지 읽는다(M14). 읽기 실패는 던진다(H5).
+    selectAllPages<{ id: string; user_id: string; leave_type: string; days_count: number; start_date: string }>(
+      "annual_leave_requests.approved_org",
+      (from, to) =>
+        service
+          .from("annual_leave_requests")
+          .select("id, user_id, leave_type, days_count, start_date")
+          .eq("organization_id", organizationId)
+          .eq("status", "approved")
+          .in("user_id", userIds)
+          .order("id", { ascending: true })
+          .range(from, to),
+    ),
   ]);
+  if (profRes.error) throw new Error(`leave balances: profiles read failed: ${profRes.error.message}`);
+  if (baseRes.error) throw new Error(`leave balances: baselines read failed: ${baseRes.error.message}`);
+  const profData = profRes.data;
+  const baseData = baseRes.data;
 
   const profiles = new Map(
     ((profData ?? []) as { id: string; name: string; hire_date: string | null }[]).map((p) => [p.id, p]),
@@ -240,17 +268,32 @@ export async function listAdminLeaveBalances(session: AppSession): Promise<Admin
         base_amount: number;
         bonus_amount: number;
         baseline_date: string;
+        confirmed_at?: string | null;
       }[]
     ).map((b) => [b.user_id, b]),
   );
 
-  // 사용자별 승인된 사용량을 풀로 나눈다: 유급(paid) → base, 특별(special) → bonus.
-  const usage = new Map<string, { base: number; bonus: number }>();
-  for (const r of (reqData ?? []) as { user_id: string; leave_type: string; days_count: number }[]) {
-    const u = usage.get(r.user_id) ?? { base: 0, bonus: 0 };
-    if (r.leave_type === "paid") u.base += Number(r.days_count);
-    else if (r.leave_type === "special") u.bonus += Number(r.days_count);
-    usage.set(r.user_id, u);
+  // 사용자별 승인된 사용량을 풀로 나눈다: 유급(paid) → base, 특별(special) → bonus. 잔여는 사용일 기준(H3).
+  const monthKey = today.slice(0, 7);
+  const rowsByUser = new Map<string, typeof reqData>();
+  for (const r of reqData) {
+    const list = rowsByUser.get(r.user_id) ?? [];
+    list.push(r);
+    rowsByUser.set(r.user_id, list);
+  }
+  const usage = new Map<
+    string,
+    { base: number; bonus: number; thisMonth: number; usages: ReturnType<typeof leaveUsagesFromRows> }
+  >();
+  for (const [uid, list] of rowsByUser) {
+    const usages = leaveUsagesFromRows(list);
+    const u = { base: 0, bonus: 0, thisMonth: 0, usages };
+    for (const x of usages) {
+      if (x.pool === "base") u.base += x.days;
+      else u.bonus += x.days;
+      if (x.date.slice(0, 7) === monthKey) u.thisMonth += x.days;
+    }
+    usage.set(uid, u);
   }
 
   const rows: AdminLeaveBalanceRow[] = userIds.map((userId) => {
@@ -258,7 +301,7 @@ export async function listAdminLeaveBalances(session: AppSession): Promise<Admin
     const name = profile?.name ?? "";
     const hireDate = profile?.hire_date ?? null;
     const baseline = baselines.get(userId);
-    const used = usage.get(userId) ?? { base: 0, bonus: 0 };
+    const used = usage.get(userId) ?? { base: 0, bonus: 0, thisMonth: 0, usages: [] };
     const common = {
       userId,
       name,
@@ -268,6 +311,8 @@ export async function listAdminLeaveBalances(session: AppSession): Promise<Admin
       hireDate,
       usedBase: used.base,
       usedBonus: used.bonus,
+      usedThisMonth: used.thisMonth,
+      provisional: baseline ? !baseline.confirmed_at : false,
     };
 
     if (hireDate && baseline) {
@@ -276,8 +321,7 @@ export async function listAdminLeaveBalances(session: AppSession): Promise<Admin
         baselineDate: baseline.baseline_date,
         baselineAmount: Number(baseline.base_amount),
         bonusBaselineAmount: Number(baseline.bonus_amount),
-        usedDays: used.base,
-        specialUsedDays: used.bonus,
+        usages: used.usages,
         asOf: today,
       });
       // 부여는 잔여 + 사용으로 맞추므로 UI 의 "잔여 / 부여"가 항상 맞아떨어진다.
@@ -353,11 +397,37 @@ export async function saveEmployeeLeaveBaseline(
   if (!membership || membership.status !== "active") return { ok: false, error: "target_not_found" };
   if (isLeaveHourlyRole(membership.role)) return { ok: false, error: "hourly_excluded" };
 
-  return setAnnualLeaveBaselineForUser(service, organizationId, input.userId, {
-    hireDate: input.hireDate,
-    baseAmount: input.grant,
-    bonusAmount: input.bonus,
-  });
+  // 다른 결재자가 저장하면 「확인됨」, 자기 잔여를 자기가 저장하면 「확인 전」(M6 · M11).
+  return setAnnualLeaveBaselineForUser(
+    service,
+    organizationId,
+    input.userId,
+    { hireDate: input.hireDate, baseAmount: input.grant, bonusAmount: input.bonus },
+    "admin_upsert",
+    session.user.id,
+  );
+}
+
+/**
+ * 본인이 입력한 기준 잔여(입사일 + 잔여)를 결재자가 확인한다(2026-11-11, M11). 확인 전에는 잔여가 「확인 전」으로
+ * 보인다(화면은 2차). 결재자 확인은 액션이 한다(`leave.approve`). 자기 잔여는 확인할 수 없다(`self_confirm`).
+ */
+export async function confirmEmployeeLeaveBaseline(
+  session: AppSession,
+  userId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!userId) return { ok: false, error: "target_not_found" };
+  if (userId === session.user.id) return { ok: false, error: "self_confirm" };
+  const service = getSupabaseServiceClient();
+  const { data, error } = await service
+    .from("annual_leave_baselines")
+    .update({ confirmed_at: new Date().toISOString(), confirmed_by_user_id: session.user.id })
+    .eq("organization_id", session.organization.id)
+    .eq("user_id", userId)
+    .select("id");
+  if (error) return { ok: false, error: "confirm_failed" };
+  if (!data || data.length === 0) return { ok: false, error: "target_not_found" };
+  return { ok: true };
 }
 
 // 결재자 관리(예전 `leave_approver_role` 표시 + 승인자 목록 · 토글)는 권한 키 `leave.approve` 로 옮겨 지웠다(2026-10-21).
@@ -384,6 +454,8 @@ export type LeaveDocument = {
   approverInitial: string | null;
   approverRole: string | null; // 'department_head' | 'senior_managing_director'
   decidedAt: string; // "MM/DD HH:mm" (도쿄) — 기록이 없으면 빈 문자열
+  /** 원래 휴무라 뺀 날짜(안 A). 휴가계 표시는 2차. */
+  excludedDates: string[];
 };
 
 function tokyoYmdSlash(iso: string | null): string {
@@ -419,16 +491,18 @@ export async function listLeaveDocuments(session: AppSession): Promise<LeaveDocu
   const service = getSupabaseServiceClient();
   const organizationId = session.organization.id;
 
-  const { data, error } = await service
-    .from("annual_leave_requests")
-    .select(
-      "id, user_id, applicant_name, leave_type, start_date, end_date, duration_unit, days_count, reason, emergency_contact, submitted_at, created_at, document_number, approved_by_user_id, approved_role, approved_at",
-    )
-    .eq("organization_id", organizationId)
-    .eq("status", "approved")
-    .not("document_number", "is", null)
-    .order("start_date", { ascending: true });
-  if (error) return [];
+  // 1,000행 넘게 끝까지(M14). `*` — 뺀 날짜 칸이 아직 없는 DB 에서도 읽힌다. 읽기 실패는 던진다(빈 목록으로 숨기지 않음).
+  const data = await selectAllPages<Record<string, unknown>>("annual_leave_requests.documents", (from, to) =>
+    service
+      .from("annual_leave_requests")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .eq("status", "approved")
+      .not("document_number", "is", null)
+      .order("start_date", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
 
   type Row = {
     id: string;
@@ -447,8 +521,9 @@ export async function listLeaveDocuments(session: AppSession): Promise<LeaveDocu
     approved_by_user_id: string | null;
     approved_role: string | null;
     approved_at: string | null;
+    excluded_dates?: string[] | null;
   };
-  const rows = (data ?? []) as Row[];
+  const rows = data as unknown as Row[];
   if (rows.length === 0) return [];
 
   const applicantIds = [...new Set(rows.map((r) => r.user_id))];
@@ -484,6 +559,7 @@ export async function listLeaveDocuments(session: AppSession): Promise<LeaveDocu
       approverInitial: approverName ? Array.from(approverName)[0] ?? null : null,
       approverRole: r.approved_role,
       decidedAt: tokyoMdHm(r.approved_at),
+      excludedDates: r.excluded_dates ?? [],
     };
   });
 }
@@ -532,14 +608,19 @@ export async function listLeaveLedger(session: AppSession): Promise<LeaveLedgerE
   const service = getSupabaseServiceClient();
   const organizationId = session.organization.id;
 
-  const { data } = await service
-    .from("annual_leave_requests")
-    .select(
-      "id, user_id, applicant_name, leave_type, start_date, end_date, duration_unit, days_count, reason, rejected_reason, status, submitted_at, created_at, document_number, approved_by_user_id, approved_at, rejected_by_user_id, rejected_at, cancelled_at, cancelled_by_user_id, cancelled_reason",
-    )
-    .eq("organization_id", organizationId)
-    .in("status", ["requested", "approved", "rejected", "cancelled"])
-    .order("created_at", { ascending: false });
+  // 1,000행 넘게 끝까지(M14). 읽기 실패는 던진다.
+  const data = await selectAllPages<Record<string, unknown>>("annual_leave_requests.ledger", (from, to) =>
+    service
+      .from("annual_leave_requests")
+      .select(
+        "id, user_id, applicant_name, leave_type, start_date, end_date, duration_unit, days_count, reason, rejected_reason, status, submitted_at, created_at, document_number, approved_by_user_id, approved_at, rejected_by_user_id, rejected_at, cancelled_at, cancelled_by_user_id, cancelled_reason",
+      )
+      .eq("organization_id", organizationId)
+      .in("status", ["requested", "approved", "rejected", "cancelled"])
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
 
   type Row = {
     id: string;
@@ -564,7 +645,7 @@ export async function listLeaveLedger(session: AppSession): Promise<LeaveLedgerE
     cancelled_by_user_id: string | null;
     cancelled_reason: string | null;
   };
-  const rows = (data ?? []) as Row[];
+  const rows = data as unknown as Row[];
   if (rows.length === 0) return [];
 
   const applicantIds = [...new Set(rows.map((r) => r.user_id))];
@@ -670,8 +751,17 @@ export async function createAdminLeaveRequest(
   const applicantName = (profile.data as { name: string } | null)?.name;
   if (!applicantName) return { ok: false, error: "target_not_found" };
 
-  const normalized = normalizeLeaveDays(input);
-  if (!normalized) return { ok: false, error: "invalid_dates" };
+  // 유급 · 특별휴가는 기준 잔여가 있어야 한다 — 모바일 신청과 같은 규칙(2026-11-11, 예전에는 대신 신청만 건너뛰었다).
+  if (
+    (input.leaveType === "paid" || input.leaveType === "special") &&
+    !(await getAnnualLeaveBaseline(service, organizationId, input.targetUserId))
+  ) {
+    return { ok: false, error: "baseline_required" };
+  }
+
+  const normalizedRes = normalizeLeaveRequest(input);
+  if (!normalizedRes.ok) return { ok: false, error: normalizedRes.error };
+  const normalized = normalizedRes.value;
 
   const result = await createLeaveRequest(service, organizationId, input.targetUserId, {
     applicantName,
@@ -683,6 +773,8 @@ export async function createAdminLeaveRequest(
     reason: input.reason,
     emergencyContact: input.emergencyContact,
     asDraft: false,
+    excludedDates: normalized.excludedDates,
+    submittedVia: input.targetUserId === session.user.id ? "admin" : "admin_proxy",
   });
   if (!result.ok) return { ok: false, error: "create_failed" };
   return { ok: true, id: result.id };

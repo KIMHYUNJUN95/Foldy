@@ -33,7 +33,7 @@ describe("annual-leave accrual schedule", () => {
 });
 
 describe("computeAnnualLeaveSummary", () => {
-  it("keeps the baseline untouched by the engine's expiry logic", () => {
+  it("lets the baseline lapse with the grant it stands in for (2026-11-11, M9)", () => {
     const summary = computeAnnualLeaveSummary({
       hireDate: "2020-01-15",
       baselineDate: "2026-01-01",
@@ -41,9 +41,10 @@ describe("computeAnnualLeaveSummary", () => {
       asOf: "2030-01-01",
     });
     const baseline = summary.buckets.find((b) => b.kind === "baseline");
-    expect(baseline?.expiresOn).toBeNull();
-    expect(baseline?.expired).toBe(false);
-    expect(baseline?.remaining).toBe(5);
+    // 예전에는 기준 잔여가 영원히 남았다(expiresOn null). 이제 2025-07-15 부여분의 소멸일을 이어받는다.
+    expect(baseline?.expiresOn).toBe("2027-07-15");
+    expect(baseline?.expired).toBe(true);
+    expect(baseline?.remaining).toBe(0);
   });
 
   it("adds grants that land after the baseline date, ignores ones before it", () => {

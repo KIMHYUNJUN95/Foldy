@@ -1,4 +1,5 @@
 import { AdminShell } from "@/components/shell/admin-shell";
+import { AdminLiveRefresh } from "@/components/admin/shared/admin-live-refresh";
 import { AttendanceSubnav } from "@/components/admin/attendance/attendance-subnav";
 import { AttendanceTransportClient } from "@/components/admin/attendance/attendance-transport-client";
 import {
@@ -8,7 +9,7 @@ import {
 } from "@/lib/admin-attendance";
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { getDictionary } from "@/lib/i18n";
-import { AdminNoAccess } from "@/components/admin/shared/admin-no-access";
+import { AdminLoadError, AdminNoAccess } from "@/components/admin/shared/admin-no-access";
 import { isValidYm } from "@/lib/attendance-clock";
 
 // 관리자 · 출퇴근 · 교통비 (Slice 5).
@@ -58,7 +59,12 @@ export default async function AdminAttendanceTransportPage({
         }}
       />
 
-      {transport.isPrivileged ? (
+      {transport.isPrivileged && transport.loadError ? (
+        <AdminLoadError title={dictionary.admin.shared.loadErrorTitle} body={dictionary.admin.shared.loadErrorBody} />
+      ) : transport.isPrivileged ? (
+        <>
+        {/* 정산서가 바뀌면(제출 · 처리 · 합계) 새로 읽는다(2026-11-11, 마이그레이션 202611110002 6d). */}
+        <AdminLiveRefresh table="transport_reimbursement_reports" organizationId={session.organization.id} />
         <AttendanceTransportClient
           key={transport.ym}
           ym={transport.ym}
@@ -68,6 +74,7 @@ export default async function AdminAttendanceTransportPage({
           locale={locale}
           localeTag={localeTag}
         />
+        </>
       ) : (
         <AdminNoAccess title={dictionary.admin.shared.noAccessTitle} body={dictionary.admin.shared.noAccessBody} />
       )}

@@ -96,6 +96,8 @@ export type LinkedTransportCandidate = {
   type: "attendance" | "cleaning";
   date: string; // 'YYYY-MM-DD'
   attendanceSessionId?: string;
+  /** 청소 후보의 청소 세션 id(2026-11-11 H2). 저장 때 서버가 그날 · 그 사람 청소인지 다시 확인한다. */
+  cleaningSessionId?: string;
   propertyId?: string;
   buildingLabel: string;
   contextSummary: string;
@@ -422,6 +424,7 @@ export async function getLinkedTransportCandidates(
       key: `cleaning:${row.id}`,
       type: "cleaning",
       date: row.cleaning_date,
+      cleaningSessionId: row.id,
       propertyId,
       buildingLabel,
       contextSummary,
@@ -434,8 +437,12 @@ export async function getLinkedTransportCandidates(
 }
 
 /**
- * 항목에서 캐시된 합계를 다시 계산하고(항목이 진실 공급원) 리포트에
- * 저장한다. 내부 헬퍼; 호출자는 항목 쓰기 뒤에 호출한다.
+ * 항목에서 캐시된 합계를 다시 계산하고(항목이 진실 공급원) 리포트에 저장한다.
+ *
+ * 읽기 · 쓰기 오류는 **던진다**(2026-11-11 M12). 예전에는 오류를 삼켜서 항목 읽기가 실패하면 합계가 0엔으로
+ * 저장될 수 있었다. 마이그레이션 202611110002 뒤에는 DB 트리거(`sync_transport_report_total`)가 합계를 늘 맞추므로
+ * 이 함수는 트리거가 아직 없는 동안의 보조다 — 항목 저장 뒤에는 호출자가 잡아서 기록만 하고, 제출 · 승인 직전에는
+ * 실패를 그대로 실패로 돌린다.
  */
 export async function syncReportTotalAmount(
   service: Service,
@@ -445,14 +452,41 @@ export async function syncReportTotalAmount(
     .from("transport_reimbursement_items")
     .select("amount_yen")
     .eq("report_id", reportId);
+  if (res.error) throw new Error(`transport total read failed: ${res.error.message}`);
   const rows = (res.data ?? []) as { amount_yen: number }[];
   const total = rows.reduce((sum, r) => sum + (r.amount_yen ?? 0), 0);
 
-  await untyped(service)
+  const upd = await untyped(service)
     .from("transport_reimbursement_reports")
     .update({ total_amount_cached: total })
     .eq("id", reportId);
+  if (upd.error) throw new Error(`transport total write failed: ${upd.error.message}`);
   return total;
+}
+
+/** 항목 저장 뒤 합계 맞추기 — 실패해도 저장은 끝났으니 기록만 한다(트리거가 있으면 이미 맞다). */
+export async function syncReportTotalAmountQuietly(service: Service, reportId: string): Promise<void> {
+  try {
+    await syncReportTotalAmount(service, reportId);
+  } catch (error) {
+    console.error("[transport] total sync failed:", error instanceof Error ? error.message : error);
+  }
+}
+
+/** `.in()` 목록을 나눠 읽는다(2026-11-11 M14) — id 수백 개를 한 번에 넣으면 요청 주소 길이 한도를 넘는다. */
+const IN_CHUNK = 200;
+async function selectInChunks<T>(
+  ids: string[],
+  read: (chunk: string[]) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
+  what: string,
+): Promise<T[]> {
+  const out: T[] = [];
+  for (let i = 0; i < ids.length; i += IN_CHUNK) {
+    const res = await read(ids.slice(i, i + IN_CHUNK));
+    if (res.error) throw new Error(`${what} read failed: ${res.error.message}`);
+    out.push(...((res.data ?? []) as T[]));
+  }
+  return out;
 }
 
 export type TransportReportAdminSummary = {
@@ -479,18 +513,24 @@ export async function getTransportReportSummaryForAdmin(
     .select("*")
     .eq("organization_id", organizationId)
     .eq("target_month", targetMonthDate);
+  if (reportsRes.error) throw new Error(`transport reports read failed: ${reportsRes.error.message}`);
   const reports = (reportsRes.data ?? []) as ReportDbRow[];
   if (reports.length === 0) return [];
 
   const reportIds = reports.map((r) => r.id);
   const userIds = Array.from(new Set(reports.map((r) => r.user_id)));
 
-  const itemsRes = await untyped(service)
-    .from("transport_reimbursement_items")
-    .select("id, report_id")
-    .in("report_id", reportIds);
+  const itemRows = await selectInChunks<{ id: string; report_id: string }>(
+    reportIds,
+    (chunk) =>
+      untyped(service)
+        .from("transport_reimbursement_items")
+        .select("id, report_id")
+        .eq("organization_id", organizationId)
+        .in("report_id", chunk),
+    "transport items",
+  );
   const itemCounts = new Map<string, number>();
-  const itemRows = (itemsRes.data ?? []) as { id: string; report_id: string }[];
   for (const r of itemRows) {
     itemCounts.set(r.report_id, (itemCounts.get(r.report_id) ?? 0) + 1);
   }
@@ -498,13 +538,17 @@ export async function getTransportReportSummaryForAdmin(
   const itemIds = itemRows.map((row) => row.id);
   const itemIdsWithImages = new Set<string>();
   if (itemIds.length > 0) {
-    const imagesRes = await untyped(service)
-      .from("transport_reimbursement_item_images")
-      .select("item_id")
-      .in("item_id", itemIds);
-    for (const row of (imagesRes.data ?? []) as { item_id: string }[]) {
-      itemIdsWithImages.add(row.item_id);
-    }
+    const imageRows = await selectInChunks<{ item_id: string }>(
+      itemIds,
+      (chunk) =>
+        untyped(service)
+          .from("transport_reimbursement_item_images")
+          .select("item_id")
+          .eq("organization_id", organizationId)
+          .in("item_id", chunk),
+      "transport images",
+    );
+    for (const row of imageRows) itemIdsWithImages.add(row.item_id);
   }
   const missingCounts = new Map<string, number>();
   for (const itemId of itemIds) {
@@ -515,8 +559,12 @@ export async function getTransportReportSummaryForAdmin(
   }
 
   const names = new Map<string, string>();
-  const profRes = await service.from("profiles").select("id, name").in("id", userIds);
-  for (const p of (profRes.data ?? []) as { id: string; name: string }[]) names.set(p.id, p.name);
+  const profRows = await selectInChunks<{ id: string; name: string }>(
+    userIds,
+    (chunk) => service.from("profiles").select("id, name").in("id", chunk),
+    "profiles",
+  );
+  for (const p of profRows) names.set(p.id, p.name);
 
   return reports.map((r) => ({
     userId: r.user_id,

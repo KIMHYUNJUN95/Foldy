@@ -46,3 +46,29 @@ describe("live sources", () => {
     ]);
   });
 });
+
+// 근태 급여 · 시급 화면(2026-11-11) — 다른 사람이 마감 · 근무 수정 · 시급을 바꾸면 열어 둔 PC 화면이 따라온다.
+import { attendancePayrollLiveSources, attendanceWagesLiveSources } from "@/lib/live-sources";
+
+describe("근태 급여 · 시급 실시간 묶음", () => {
+  it("급여 — 근무 · 정정 · 마감 스냅샷 · 수당 · 시급 · 고용 형태, 모두 조직으로 거른다", () => {
+    const s = attendancePayrollLiveSources("org-1");
+    expect(s.map((x) => x.table).sort()).toEqual([
+      "attendance_correction_requests",
+      "attendance_month_snapshots",
+      "attendance_pay_allowances",
+      "attendance_sessions",
+      "employment_type_history",
+      "hourly_rate_history",
+    ]);
+    expect(s.every((x) => x.filter === "organization_id=eq.org-1")).toBe(true);
+  });
+
+  it("시급 — 시급 · 고용 형태 · 수당", () => {
+    expect(attendanceWagesLiveSources("org-1").map((x) => x.table).sort()).toEqual([
+      "attendance_pay_allowances",
+      "employment_type_history",
+      "hourly_rate_history",
+    ]);
+  });
+});

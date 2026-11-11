@@ -5,6 +5,7 @@
 
 import "server-only";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { isMissingColumnError } from "@/lib/annual-leave-server";
 
 type Service = ReturnType<typeof getSupabaseServiceClient>;
 
@@ -25,6 +26,8 @@ export type LeaveRequestView = {
   status: LeaveRequestStatus;
   submittedAt: string | null;
   createdAt: string;
+  /** 원래 휴무라 뺀 날짜(안 A, 2026-11-11). 칸이 없던 DB 의 신청은 []. */
+  excludedDates: string[];
 };
 
 type LeaveRequestRow = {
@@ -40,6 +43,7 @@ type LeaveRequestRow = {
   status: string;
   submitted_at: string | null;
   created_at: string;
+  excluded_dates?: string[] | null;
 };
 
 function toView(row: LeaveRequestRow): LeaveRequestView {
@@ -56,11 +60,12 @@ function toView(row: LeaveRequestRow): LeaveRequestView {
     status: row.status as LeaveRequestStatus,
     submittedAt: row.submitted_at,
     createdAt: row.created_at,
+    excludedDates: row.excluded_dates ?? [],
   };
 }
 
-const SELECT_COLUMNS =
-  "id, leave_type, start_date, end_date, duration_unit, days_count, reason, emergency_contact, image_urls, status, submitted_at, created_at";
+// `*` — 뺀 날짜 칸(excluded_dates)이 아직 없는 DB 에서도 읽힌다(코드 먼저 배포, 2026-11-11).
+const SELECT_COLUMNS = "*";
 
 export type CreateLeaveRequestInput = {
   applicantName: string;
@@ -73,7 +78,30 @@ export type CreateLeaveRequestInput = {
   emergencyContact: string;
   imageUrls?: string[];
   asDraft?: boolean;
+  /** 원래 휴무라 뺀 날짜 — `normalizeLeaveRequest` 를 거친 값만 넘긴다. 일수(daysCount)는 이미 뺀 값. */
+  excludedDates?: string[];
+  /** 'mobile' | 'admin'(본인) | 'admin_proxy'(대신 신청). */
+  submittedVia?: "mobile" | "admin" | "admin_proxy";
 };
+
+/**
+ * 새 칸(excluded_dates · submitted_via)을 붙여 쓰고, 칸이 아직 없는 DB 면 빼고 다시 쓴다(코드 먼저 배포).
+ * 다만 뺀 날짜가 있는데 칸이 없으면 다시 쓰지 않는다 — 날짜 기록 없이 줄어든 일수만 남으면 확인할 수 없다.
+ */
+async function writeWithOptionalColumns<T>(
+  base: Record<string, unknown>,
+  input: CreateLeaveRequestInput,
+  write: (row: Record<string, unknown>) => PromiseLike<{ data: T | null; error: unknown }>,
+): Promise<{ data: T | null; error: unknown }> {
+  const excluded = input.excludedDates ?? [];
+  const extra: Record<string, unknown> = { excluded_dates: excluded };
+  if (input.submittedVia) extra.submitted_via = input.submittedVia;
+  const first = await write({ ...base, ...extra });
+  if (first.error && isMissingColumnError(first.error) && excluded.length === 0) {
+    return write(base);
+  }
+  return first;
+}
 
 export async function createLeaveRequest(
   service: Service,
@@ -82,9 +110,8 @@ export async function createLeaveRequest(
   input: CreateLeaveRequestInput,
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const status: LeaveRequestStatus = input.asDraft ? "draft" : "requested";
-  const { data, error } = await service
-    .from("annual_leave_requests")
-    .insert({
+  const { data, error } = await writeWithOptionalColumns<{ id: string }>(
+    {
       organization_id: organizationId,
       user_id: userId,
       applicant_name: input.applicantName,
@@ -98,9 +125,16 @@ export async function createLeaveRequest(
       image_urls: input.imageUrls ?? [],
       status,
       submitted_at: input.asDraft ? null : new Date().toISOString(),
-    })
-    .select("id")
-    .single();
+    },
+    input,
+    (row) =>
+      service
+        .from("annual_leave_requests")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .insert(row as any)
+        .select("id")
+        .single(),
+  );
 
   if (error || !data) return { ok: false, error: "insert_failed" };
   return { ok: true, id: (data as { id: string }).id };
@@ -130,9 +164,8 @@ export async function updateDraftLeaveRequest(
   }
 
   const status: LeaveRequestStatus = input.asDraft ? "draft" : "requested";
-  const { data, error } = await service
-    .from("annual_leave_requests")
-    .update({
+  const { data, error } = await writeWithOptionalColumns<{ id: string }[]>(
+    {
       applicant_name: input.applicantName,
       leave_type: input.leaveType,
       start_date: input.startDate,
@@ -144,13 +177,20 @@ export async function updateDraftLeaveRequest(
       image_urls: input.imageUrls ?? [],
       status,
       submitted_at: input.asDraft ? null : new Date().toISOString(),
-    })
-    .eq("id", requestId)
-    .eq("organization_id", organizationId)
-    .eq("user_id", userId)
-    // 읽은 뒤 쓰기 사이에 다른 탭이 제출했으면(이미 requested) 덮어쓰지 않는다 — 0행이면 not_editable.
-    .eq("status", "draft")
-    .select("id");
+    },
+    input,
+    (row) =>
+      service
+        .from("annual_leave_requests")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .update(row as any)
+        .eq("id", requestId)
+        .eq("organization_id", organizationId)
+        .eq("user_id", userId)
+        // 읽은 뒤 쓰기 사이에 다른 탭이 제출했으면(이미 requested) 덮어쓰지 않는다 — 0행이면 not_editable.
+        .eq("status", "draft")
+        .select("id"),
+  );
 
   if (error) return { ok: false, error: "update_failed" };
   if (!data || data.length === 0) return { ok: false, error: "not_editable" };
@@ -273,9 +313,9 @@ export type ApprovedLeaveEntry = {
 /**
  * 조직 전체에서, 주어진 도쿄 월과 겹치는 승인된 휴가만 — 모바일 팀 캘린더 (L5).
  * 2026-07-06 확정: 모든 직원이 (본인 것을 포함해) 모두의 승인된 휴가를 본다.
- * 대기/반려/초안/취소는 비공개로 남는다. 뒷받침은
- * `annual_leave_requests_org_approved_select` RLS 정책 (마이그레이션 202607060003) — 이 쿼리는
- * service-role 클라이언트를 쓰지만, 부여 범위는 그 정책이 직접 허용하는 것과도 같다.
+ * 대기/반려/초안/취소는 비공개로 남는다. service-role 로 **이름 · 종류 · 기간 · 일수만** 읽는다 —
+ * 예전 뒷받침이던 `annual_leave_requests_org_approved_select` 정책은 승인된 행의 모든 칸(비상 연락처 · 사유 ·
+ * 사진)을 조직 전원에게 열어서 2026-11-11 에 지웠다(마이그레이션 202611110002).
  */
 export async function listApprovedLeaveForMonth(
   service: Service,

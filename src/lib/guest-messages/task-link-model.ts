@@ -167,8 +167,8 @@ export function pickResolvedLink(
 export type LinkSurface = "admin" | "mobile";
 
 /**
- * 업무 상세 주소. PC: 수리 `?report=` · 분실물 `?item=` · 피드백 `?complaint=` 로 콘솔 오른쪽 패널을 바로 연다.
- * 할 일은 PC 콘솔에 주소로 여는 길이 없어 알림과 같은 모바일 상세(`/mobile/tasks/<id>`)로.
+ * 업무 상세 주소. PC: 수리 `?report=` · 분실물 `?item=` · 피드백 `?complaint=` · 할 일 `?task=` 로 콘솔 오른쪽 패널을 바로 연다.
+ * 모바일은 각 기능의 상세 화면.
  */
 export function linkTargetHref(type: LinkTargetType, id: string, surface: LinkSurface): string {
   const enc = encodeURIComponent(id);
@@ -181,7 +181,7 @@ export function linkTargetHref(type: LinkTargetType, id: string, surface: LinkSu
       case "complaint":
         return `/admin/complaints?complaint=${enc}`;
       case "task":
-        return `/mobile/tasks/${enc}`;
+        return `/admin/tasks?task=${enc}`;
     }
   }
   switch (type) {

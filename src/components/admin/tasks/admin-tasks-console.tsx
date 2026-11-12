@@ -308,11 +308,14 @@ export function AdminTasksConsole({
   locale,
   data,
   organizationId,
+  initialTaskId = null,
 }: {
   locale: Locale;
   data: AdminTasksData;
   /** 사진 Storage 경로(`${organizationId}/task-images/...`)에 필요. */
   organizationId: string;
+  /** `?task=<id>` 로 들어오면 그 작업의 상세 칸을 열고 시작한다(페이지가 볼 수 있는 작업인지 이미 확인). */
+  initialTaskId?: string | null;
 }) {
   const dict = getAdminTasksDictionary(locale);
   // 업로더는 i18n 모듈을 모르고 이미 번역된 문자열만 받는다(재사용 가능한 프리젠테이션 컴포넌트).
@@ -353,7 +356,7 @@ export function AdminTasksConsole({
   const [view, setView] = useState<View>("today");
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projectDetail, setProjectDetail] = useState<ProjectDetailData | null>(null);
-  const [sel, setSel] = useState<string | null>(null);
+  const [sel, setSel] = useState<string | null>(initialTaskId);
   /** 상세를 연 줄의 회차 날짜 — 반복 작업의 상태 · 완료는 이 회차가 대상이다(없으면 완료를 막는다). */
   const [selOcc, setSelOcc] = useState<string | null>(null);
   const [detail, setDetail] = useState<TaskDetail | null>(null);

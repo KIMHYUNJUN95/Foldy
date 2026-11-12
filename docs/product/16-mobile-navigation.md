@@ -1347,7 +1347,7 @@ Future navigation additions must also update the side-menu badge table and `getM
 
 ### 손님 메시지 — 셸 연결 (2026-11-13)
 
-- 메뉴: `mobileNavMessages`(`src/config/navigation.ts`, id `messages` · 아이콘 lucide `MessagesSquare` 말풍선 둘 · 짧은 이름 `messagesShort`) — 사이드 메뉴 줄이고 **하단 탭 후보**(탭 편집 시트에서 고를 수 있음, 기본 탭은 그대로 — Q1 임시). `capability: "guest_messages.view"` 라 권한 없는 사람에게는 메뉴 · 탭 후보 모두 안 보인다(서버도 다시 막음).
+- 메뉴: `mobileNavMessages`(`src/config/navigation.ts`, id `messages` · 아이콘 lucide `MessagesSquare` 말풍선 둘 · 짧은 이름 `messagesShort`) — 사이드 메뉴 줄이고 **하단 탭 후보**(탭 편집 시트에서 고를 수 있음, 기본 탭은 그대로. 폰 대화 화면도 아래 탭을 둔다 — 47 Q1 확정 2026-11-12). `capability: "guest_messages.view"` 라 권한 없는 사람에게는 메뉴 · 탭 후보 모두 안 보인다(서버도 다시 막음).
 - 배지: 위 「Side-menu operational badge counts」 표의 `messages`.
 - 뒤로가기: `/mobile/messages` · `/mobile/messages/[id]` 를 `src/lib/swipe-back/mobile-screens.ts` 에 등록 — 대화 화면은 화면 스와이프로 목록으로. 고르기 모드의 말풍선 누르기는 가로 제스처가 아니라 따로 끄지 않는다.
 - 넓은 화면: 목록 → 대화는 `SplitList` + `split`(태블릿 가로는 칸 안 대화, 폰 · 폴드는 화면 이동) — 「화면별 넓은 화면 대응 현황」 표의 손님 메시지 줄.

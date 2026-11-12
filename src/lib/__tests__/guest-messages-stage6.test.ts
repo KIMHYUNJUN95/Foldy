@@ -209,11 +209,12 @@ describe("업무 상태 → 대화 줄", () => {
     expect(linkTargetState("task", { status: "open", doneAt: null, deletedAt: "2026-11-12", title: "t" })).toMatchObject({ deleted: true });
     expect(linkTargetState("complaint", { status: "weird", doneAt: null, title: null }).status).toBe("unknown");
   });
-  it("상세 주소 — PC 는 콘솔 패널, 할 일은 모바일 상세", () => {
+  it("상세 주소 — PC 는 콘솔 패널(할 일도 ?task=), 모바일은 각 상세 화면", () => {
     expect(linkTargetHref("maintenance", "a", "admin")).toBe("/admin/maintenance?report=a");
     expect(linkTargetHref("lost_found", "a", "admin")).toBe("/admin/lost-found?item=a");
     expect(linkTargetHref("complaint", "a", "admin")).toBe("/admin/complaints?complaint=a");
-    expect(linkTargetHref("task", "a", "admin")).toBe("/mobile/tasks/a");
+    expect(linkTargetHref("task", "a", "admin")).toBe("/admin/tasks?task=a");
+    expect(linkTargetHref("task", "a", "mobile")).toBe("/mobile/tasks/a");
     expect(linkTargetHref("maintenance", "a", "mobile")).toBe("/mobile/requests/maintenance/a");
     expect(linkTargetHref("lost_found", "a", "mobile")).toBe("/mobile/requests/lost-found/a");
     expect(linkTargetHref("complaint", "a", "mobile")).toBe("/mobile/complaints/a");

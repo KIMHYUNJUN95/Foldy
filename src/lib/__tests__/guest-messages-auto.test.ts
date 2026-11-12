@@ -49,7 +49,7 @@ import {
   toAutoBooking,
   type ReservationRowForAuto,
 } from "@/lib/guest-messages/auto-scheduler";
-import { loadAutoRuleSummaries } from "@/lib/guest-messages/auto-rules-server";
+import { loadAutoRuleSummaries, setAutoRuleEnabled } from "@/lib/guest-messages/auto-rules-server";
 import { processOutboxBatch, type OutboxRow } from "@/lib/guest-messages/outbox";
 import { runGuestOutbox } from "@/lib/guest-messages/outbox-runner";
 import { emptyGuestInfo } from "@/lib/guest-messages/guest-info-model";
@@ -923,5 +923,36 @@ describe("자동 안내 — 6단계 점검 3차", () => {
     };
     await runGuestOutbox(fake.client as never, ORG, { enabled: true, adapter: adapter as never, now: NOW });
     expect(fake.tables.auto_message_runs[0].status).toBe("sent");
+  });
+});
+
+describe("자동 안내 — 규칙 끄기", () => {
+  const run = (id: string, status: string, ruleId = RULE_ID, org = ORG) => ({
+    id, organization_id: org, rule_id: ruleId, status, skip_reason: null, missing_variables: ["room"], scheduled_at: "2026-11-19T09:00:00.000Z",
+  });
+
+  it("끄면 그 규칙의 안 나간 줄(scheduled · skipped · paused)만 cancelled + rule_disabled — 큐 · 보냄 · 못 보냄 · 다른 규칙 · 다른 조직은 그대로", async () => {
+    const fake = makeDb({
+      auto_message_runs: [
+        run("r-sched", "scheduled"), run("r-skip", "skipped"), run("r-pause", "paused"),
+        run("r-queued", "queued"), run("r-sent", "sent"), run("r-failed", "failed"),
+        run("r-other-rule", "scheduled", "rule-other"), run("r-other-org", "scheduled", RULE_ID, "org-other"),
+      ],
+    });
+    const result = await setAutoRuleEnabled(fake.client as never, ORG, RULE_ID, false);
+    expect(result && result !== "failed" ? result.enabled : null).toBe(false);
+    const byId = Object.fromEntries(fake.tables.auto_message_runs.map((row) => [row.id, row]));
+    for (const id of ["r-sched", "r-skip", "r-pause"]) expect(byId[id]).toMatchObject({ status: "cancelled", skip_reason: "rule_disabled", missing_variables: [] });
+    expect(byId["r-queued"].status).toBe("queued");
+    expect(byId["r-sent"].status).toBe("sent");
+    expect(byId["r-failed"].status).toBe("failed");
+    expect(byId["r-other-rule"].status).toBe("scheduled");
+    expect(byId["r-other-org"].status).toBe("scheduled");
+  });
+
+  it("켜기는 실행 줄을 건드리지 않는다(다음 계획 바퀴가 다시 만든다)", async () => {
+    const fake = makeDb({ auto_message_rules: [ruleRow({ enabled: false })], auto_message_runs: [run("r-c", "cancelled")] });
+    await setAutoRuleEnabled(fake.client as never, ORG, RULE_ID, true);
+    expect(fake.tables.auto_message_runs[0].status).toBe("cancelled");
   });
 });

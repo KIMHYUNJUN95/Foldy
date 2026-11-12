@@ -166,7 +166,25 @@ export async function setAutoRuleEnabled(db: Client, organizationId: string, id:
     .select(RULE_COLUMNS)
     .maybeSingle();
   if (updated.error) return "failed";
-  return updated.data ? toAutoRule(updated.data as Parameters<typeof toAutoRule>[0]) : null;
+  if (!updated.data) return null;
+  if (!enabled) await cancelPlannedRunsOfRule(db, organizationId, id);
+  return toAutoRule(updated.data as Parameters<typeof toAutoRule>[0]);
+}
+
+/**
+ * 규칙을 끄면 그 규칙의 아직 안 나간 줄(scheduled · skipped · paused)을 바로 닫는다 — 계획 바퀴가 하는 것과 같은 꼴
+ * (`cancelled` + `rule_disabled`, auto-model `planAutoRun`). 켜 둔 규칙이 하나도 안 남으면 정기 실행(pg_cron)이 계획 바퀴를
+ * 부르지 않아 「보낼 예정」에 계속 남았다. queued · sent · failed 는 건드리지 않는다(큐 줄은 화면에서 취소). 실패는 로그만 —
+ * 다음 계획 바퀴가 같은 일을 한다.
+ */
+async function cancelPlannedRunsOfRule(db: Client, organizationId: string, ruleId: string): Promise<void> {
+  const closed = await untyped(db)
+    .from("auto_message_runs")
+    .update({ status: "cancelled", skip_reason: "rule_disabled", missing_variables: [], updated_at: new Date().toISOString() })
+    .eq("organization_id", organizationId)
+    .eq("rule_id", ruleId)
+    .in("status", ["scheduled", "skipped", "paused"]);
+  if (closed.error) console.error("[guest-messages/auto] cancel runs of disabled rule failed", closed.error.code ?? closed.error.message);
 }
 
 /** 하드 삭제(기본 삭제 정책). 실행 줄은 함께 지워지고, 이미 큐에 들어간 줄은 규칙 번호만 비운다(외래 키). */

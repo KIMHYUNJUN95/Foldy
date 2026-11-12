@@ -8231,6 +8231,8 @@ export type Database = {
       automation_tick_token_ok: { Args: { p_token: string }; Returns: boolean }
       beds24_tick_if_needed: { Args: never; Returns: string }
       beds24_tick_token_ok: { Args: { p_token: string }; Returns: boolean }
+      guest_messages_cron_token_ok: { Args: { p_token: string }; Returns: boolean }
+      guest_messages_cron_fire: { Args: { p_kind: string }; Returns: string }
       apply_membership_change: {
         Args: {
           p_actor_user_id: string

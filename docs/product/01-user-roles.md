@@ -236,7 +236,7 @@ Part-time staff should not see:
 Part-time staff also do **not** access the admin dashboard surface in the confirmed 2026-06-29
 dashboard direction.
 
-## 손님 메시지 권한 (2026-11-12 등록 — 기본 역할은 임시, Q2)
+## 손님 메시지 권한 (2026-11-12 등록 · 기본 역할 확정 2026-11-12 사용자, 47 Q2)
 
 | 권한 | 할 수 있는 것 | 기본으로 받는 역할 |
 | --- | --- | --- |
@@ -244,7 +244,7 @@ dashboard direction.
 | `guest_messages.reply` | 답장 · 내부 메모 · 처리 끝 · 나중에 | 대표 · 전무 · CS 직원 |
 | `guest_messages.manage` | 자동 안내 규칙 · 정해 둔 문구 · 건물 손님용 정보 · 응답 목표 · 사용량 · 과거 가져오기 | 대표 · 전무 |
 
-- 알바(아르바이트 · 리더)는 역할로 받지 않는다 — 필요하면 개인 부여. 서버 액션과 RLS 가 다시 본다. 상세: `docs/product/47-guest-messaging.md` §8 · `docs/engineering/05-rls-permissions.md` 「손님 메시지」.
+- 알바(아르바이트 · 리더)는 역할로 받지 않는다 — 필요하면 나중에 개인 부여. 서버 액션과 RLS 가 다시 본다. 상세: `docs/product/47-guest-messaging.md` §8 · `docs/engineering/05-rls-permissions.md` 「손님 메시지」.
 
 ## Post-MVP Feature Batch Permissions (confirmed 2026-06-09)
 

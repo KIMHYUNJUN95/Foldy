@@ -801,7 +801,7 @@ async function loadOrgsWithEnabledRules(db: Client): Promise<Set<string>> {
 
 /**
  * 예약 웹훅 직후(`after()`) — 들어온 예약만 다시 계획한다(큐에는 넣지 않음 · Beds24 호출 없음). 던지지 않는다.
- * 큐 넣기 · 보내기는 `/api/guest-messages/auto`(CRON_SECRET) 가 한다 — 정기 실행은 사용자 허락 뒤에 붙인다.
+ * 큐 넣기 · 보내기는 `/api/guest-messages/auto` 가 한다 — 정기 실행은 Supabase pg_cron 5분(`202611130006`, 운영 미적용).
  * 원본 예약 번호로 찾을 때는 방 나눔 사본(`70001::room::201`)까지 — 앞부분이 같은 행 전부.
  */
 export async function planAutoMessagesAfterWebhook(

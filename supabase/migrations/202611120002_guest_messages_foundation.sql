@@ -2,7 +2,7 @@
 --
 -- 문서: docs/product/47-guest-messaging.md §4 · §7 · §8 · §10
 --       docs/engineering/04-data-model.md → 「손님 메시지」, docs/engineering/05-rls-permissions.md → 「손님 메시지」
--- 상태: **운영 미적용** — 사용자가 Dashboard SQL Editor 또는 `supabase db push` 로 적용한다.
+-- 상태: 운영 적용 2026-11-12 (Dashboard SQL Editor).
 --
 -- 원칙
 -- - 메시지의 원본은 Foldy DB 다(Beds24 는 통로 하나 — `provider`). 지금 통로는 'beds24' 하나.

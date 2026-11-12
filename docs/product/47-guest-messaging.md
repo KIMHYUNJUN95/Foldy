@@ -1,7 +1,7 @@
 # 47. 손님 메시지 (Beds24 CS) — 기획
 
 > 상태: **0 · 1단계 구현(화면 없음) — 커밋 · 운영 적용 전** (2026-11-12). 2단계부터는 시안 컨펌 대기.
-> 마이그레이션 `supabase/migrations/202611120002_guest_messages_foundation.sql` — **운영 미적용**(사용자가 Dashboard SQL Editor 로 적용)
+> 마이그레이션 `supabase/migrations/202611120002_guest_messages_foundation.sql` — **운영 적용 2026-11-12**(Dashboard SQL Editor, 표 4 · RLS 4 · 정책 6 · 함수 1 · 권한 8행 확인)
 > 시안 캔버스: https://claude.ai/artifact/EPUHqKjNJKC5ezeqG5WuVn (PC 메시지함 · 답장 칸 상태 · 폰/폴드/태블릿 · 자동 안내 규칙 · ja/en)
 > 관련 문서: 15 예약 캘린더(건물 정보) · 08 수리 · 09 분실물 · 25 게스트 피드백 · 28 할 일 · 43~46 셀프 체크인 · 33 Beds24 쓰기 · 05 RLS · 04 데이터 모델
 
@@ -238,7 +238,7 @@ Beds24 예약 웹훅 ──▶ /api/beds24/webhook (기존) ──▶ 메시지 
 
 ## 7. 데이터 모델
 
-**1단계 확정**(`202611120002_guest_messages_foundation.sql`, 운영 미적용 — 칸 목록은 `docs/engineering/04-data-model.md` 「손님 메시지」):
+**1단계 확정**(`202611120002_guest_messages_foundation.sql`, 운영 적용 2026-11-12 — 칸 목록은 `docs/engineering/04-data-model.md` 「손님 메시지」):
 `guest_conversations` · `guest_messages` · `guest_message_outbox` · `guest_message_channel_state`.
 - 대화에 예약 상태 · 날짜(`booking_status` · `check_in_date` · `check_out_date`)를 사본으로 둔다 — 응답 목표 분류용. 건물 · 객실은 `property_id` · `room_id`(외래 키) + 표시용 `property_name` · `room_label`.
 - 메시지에 `provider_source`(통로가 준 출처 원문)를 더했다 — 모르는 출처를 `system` 으로 읽어도 원래 값이 남는다.
@@ -289,7 +289,7 @@ Beds24 예약 웹훅 ──▶ /api/beds24/webhook (기존) ──▶ 메시지 
 | 단계 | 내용 |
 | --- | --- |
 | 0 | V1~V4 확인(코드는 웹훅 원문 임시 기록만) — **임시 기록 구현 2026-11-12**(§3-4), 확인은 배포 · 적용 뒤 |
-| 1 | 수신(웹훅 추출 · 보정 조회 · 중복 막기) + 데이터 모델 + 어댑터 골격 — **구현 2026-11-12**(§4-0, 화면 없음 · 보정 조회 정기 실행 없음 · 운영 미적용) |
+| 1 | 수신(웹훅 추출 · 보정 조회 · 중복 막기) + 데이터 모델 + 어댑터 골격 — **구현 2026-11-12**(§4-0, 화면 없음 · 보정 조회 정기 실행 없음 · 운영 DB 적용 2026-11-12 · 코드 배포 전) |
 | 2 | PC 메시지함 · 모바일 3폭 · 답장 · 발송 큐 · 429 대기 · 내부 메모 · 처리 끝 |
 | 3 | 응답 목표 시간 · 사용량 표시 |
 | 4 | 건물별 정보 카드 · 정해 둔 문구 |

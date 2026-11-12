@@ -2494,7 +2494,7 @@ INSERT · UPDATE 신호만, DELETE 는 오지 않는다. 대신 `task_occurrence
 - 함수 `checkin.member_can_receive(org, user, capability)`(받는 사람 규칙) · `checkin.can_take_call(org, user)`(통화를 이어 가도 되는가).
 - `audit_log.action` 추가: `staff_call_started` · `staff_call_accepted` · `staff_call_no_answer` · `staff_call_canceled` · `staff_call_ended`. `meta` 는 `call_id` · `property_key` 만.
 
-## 2026-11-12 손님 메시지 — `guest_conversations` · `guest_messages` · `guest_message_outbox` · `guest_message_channel_state` (`202611120002`, 운영 미적용)
+## 2026-11-12 손님 메시지 — `guest_conversations` · `guest_messages` · `guest_message_outbox` · `guest_message_channel_state` (`202611120002`, 운영 적용 2026-11-12)
 
 기준 문서: `docs/product/47-guest-messaging.md` §4 · §7. 메시지의 원본은 이 표들이고 Beds24 는 통로(`provider = 'beds24'`) 하나다. 모두 조직 범위 + RLS(05 「손님 메시지」). 하드 삭제 — 조직 · 대화가 지워지면 따라 지워지고, 보관 기간(Q7)이 정해지기 전에는 지우는 작업이 없다.
 

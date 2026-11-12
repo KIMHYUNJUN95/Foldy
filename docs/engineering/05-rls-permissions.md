@@ -1795,7 +1795,7 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
   로컬 PGlite 에 이 마이그레이션을 그대로 적용해 `SET ROLE` 로 21가지(권한 없는 등록 거절 · 시작 상태 통과 · 신고자 수정 거절 · 처리자 ·
   service_role 통과 · 청소 기록 삭제 set null 통과)를 봤다(2026-11-10, `has_capability` · `auth` 는 흉내). 운영 미적용 — 적용은 사용자 컨펌.
 
-## 2026-11-12 손님 메시지 — `guest_messages.view` · `.reply` · `.manage` (`202611120002`, 운영 미적용)
+## 2026-11-12 손님 메시지 — `guest_messages.view` · `.reply` · `.manage` (`202611120002`, 운영 적용 2026-11-12)
 
 - 권한 키 셋(`src/config/capabilities.ts`, 묶음 「게스트 · 건물」): 기본 역할은 **임시**(47 Q2) — `view` · `reply` = owner · 전무 · cs_staff, **`manage` = owner · 전무만**. 알바는 역할로 안 받는다.
   개인 부여 · 차단 가능(`individual_grant` · `individual_deny` true), 기한 안 물음, 개발자 통과. 시드는 새 마이그레이션 + `202609100001` 생성 구간(레지스트리 사본, `capability-registry.test.ts`).

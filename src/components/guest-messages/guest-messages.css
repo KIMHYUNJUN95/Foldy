@@ -232,6 +232,11 @@
 .gm-composer--phone .gm-field__label { left: 14px; font-size: 11px; }
 /* 도구 줄은 가로로 넘기지 않는다 — 좁거나 글자가 크면 다음 줄로(번역 언어는 입력 칸 아래 줄, 2026-11-13 리뷰). */
 .gm-tools { display: flex; flex-wrap: wrap; gap: 8px; }
+/* PC 번역 언어 드롭다운: 버튼은 칸 폭 안에서 줄이고, 메뉴는 긴 en/ja 이름도 한 줄로(줄바꿈 · 잘림 없이) 연다. */
+.adm .gm-composer__bar .dd { flex: 0 1 auto; min-width: 0; max-width: 240px; }
+.adm .gm-composer__bar .dd__menu { width: max-content; max-width: min(360px, 90vw); }
+.adm .gm-composer__bar .dd__opt { white-space: nowrap; }
+.adm .gm-composer__bar .dd__opt__k { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .gm-composer__langline { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-width: 0; }
 .gm-composer__langline .gm-select--target { flex: 0 1 auto; min-width: 0; max-width: 100%; text-overflow: ellipsis; }
 .gm-composer__langline .gm-composer__hint { flex: 1 1 160px; min-width: 0; margin-left: 0; }

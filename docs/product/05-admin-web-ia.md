@@ -300,6 +300,10 @@ Permissions · Invite Codes · Attendance Sites/QR 등)은 위 3개 그룹의 �
   네이티브 `<select>`를 폼에서 대체할 땐 `DdFormSelect`, 네이티브 `<input type="date">`를 폼에서
   대체할 땐 `DateFormField`(둘 다 숨은 input 래퍼)를 쓴다. 과거의 두 번째 커스텀 드롭다운
   `AdminSelectField`(`.selfield`)는 폐기·삭제됨(2026-07-14) — `.dd`만 쓴다.
+  - **`placement`**(2026-11-13): `"down"`(기본) · `"up"`(`dd__menu--up`) — 화면 아래에 붙은 입력줄(손님 메시지 답장 작성기 번역 언어 등)은 위로 연다.
+  - **키보드 · 닫기**(2026-11-13): 버튼에서 ↓ ↑ Enter Space 로 열림(키보드로 열면 등장 애니메이션 없음). 열리면 고른 옵션(없으면 첫 옵션)에 초점,
+    ↓ ↑ Home End 로 옮김(끝에서 멈춤), Enter · Space 로 선택, Tab 은 닫고 초점을 버튼으로 돌려 다음 칸으로. `searchable` 이면 검색 입력에서 ↓ 로 목록에 들어간다.
+    Esc 는 **캡처 단계에서 가로채** 이 메뉴만 닫는다(바깥 패널 · 모달의 Esc 가 같이 닫히지 않음). Esc · 선택으로 닫으면 초점이 버튼으로 돌아간다(바깥 클릭은 아님). 옵션 초점은 `.dd__opt:focus-visible`.
 - `AdminReasonModal`
 - `useAdminPanelA11y`
 - `AdminExportButtons` — 콘솔의 **유일한** 내보내기 컨트롤 (아래 참조)

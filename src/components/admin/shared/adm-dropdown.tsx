@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Check, ChevronDown, Search, X } from "lucide-react";
 import { useSession } from "@/components/providers/session-provider";
 import { dictionaries } from "@/lib/i18n";
@@ -43,7 +43,28 @@ type AdmDropdownProps = {
    * 목록은 false 로 — 안 그러면 검색어와 무관한 첫 항목이 맨 위에 붙어 남는다(2026-10-23).
    */
   keepFirst?: boolean;
+  /** 메뉴가 열리는 방향. 화면 아래에 붙은 입력줄(답장 작성기 등)은 "up". */
+  placement?: "down" | "up";
 };
+
+/** 열린 메뉴에서 화살표 · Home · End 로 옮길 다음 옵션 위치(끝에서 멈춤). current -1 = 목록 밖(검색 입력). */
+export function nextOptionIndex(key: string, current: number, count: number): number {
+  if (count <= 0) return -1;
+  if (key === "Home") return 0;
+  if (key === "End") return count - 1;
+  if (key === "ArrowDown") return Math.min(current + 1, count - 1);
+  if (key === "ArrowUp") return current <= 0 ? 0 : current - 1;
+  return current;
+}
+
+/** 검색형에서 첫 옵션 위로 ↑ 하면 검색 입력으로 돌아간다. */
+export function returnsToSearch(key: string, current: number, searchable: boolean): boolean {
+  return searchable && key === "ArrowUp" && current === 0;
+}
+
+export function ddMenuClassName(opts: { wide: boolean; placement: "down" | "up"; instant: boolean }): string {
+  return `dd__menu${opts.wide ? " dd__menu--wide" : ""}${opts.placement === "up" ? " dd__menu--up" : ""}${opts.instant ? " dd__menu--instant" : ""}`;
+}
 
 /**
  * 모든 관리자 콘솔(사용자 / 근태 / 청소 / …)에서 네이티브 <select> 를 대체하는
@@ -65,11 +86,16 @@ export function AdmDropdown({
   searchPlaceholder,
   noResultLabel,
   keepFirst = true,
+  placement = "down",
 }: AdmDropdownProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  // 키보드로 연 메뉴는 등장 애니메이션을 건너뛴다(반복 동작에 움직임을 붙이지 않는다).
+  const [instant, setInstant] = useState(false);
   // 이 드롭다운은 19개 화면이 공유하는데 그중 절반 이상이 placeholder를 넘기지 않는다. 로케일을
   // prop으로 받으려면 호출부를 전부 고쳐야 하므로, 루트 레이아웃이 이미 제공하는 세션에서
   // 표시 언어를 읽어 사전 기본값을 고른다(SSR/CSR 모두 같은 값이라 하이드레이션도 안전하다).
@@ -90,20 +116,64 @@ export function AdmDropdown({
         close();
       }
     }
+    // 캡처 단계에서 가로채 바깥 패널 · 모달의 document Esc 가 같이 닫히지 않게 한다.
     function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") close();
+      if (event.key !== "Escape" || event.isComposing) return; // IME 변환 취소 Esc 는 건드리지 않는다
+      event.preventDefault();
+      event.stopPropagation();
+      close();
+      btnRef.current?.focus();
     }
     document.addEventListener("mousedown", onDocClick);
-    document.addEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey, true);
     return () => {
       document.removeEventListener("mousedown", onDocClick);
-      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("keydown", onKey, true);
     };
   }, [close, open]);
 
+  function optionEls(): HTMLButtonElement[] {
+    return Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="option"]') ?? []);
+  }
+
   useEffect(() => {
-    if (open && searchable) requestAnimationFrame(() => searchRef.current?.focus());
-  }, [open, searchable]);
+    if (!open) return;
+    if (searchable) {
+      requestAnimationFrame(() => searchRef.current?.focus());
+      return;
+    }
+    const els = optionEls();
+    // 마우스로 열 땐 포커스가 스크롤 영역을 끌고 가지 않게 한다.
+    (els.find((el) => el.getAttribute("aria-selected") === "true") ?? els[0])?.focus({ preventScroll: !instant });
+  }, [open, searchable, instant]);
+
+  function onRootKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    const { key } = event;
+    if (!open) {
+      if (key === "ArrowDown" || key === "ArrowUp") {
+        event.preventDefault();
+        setInstant(true);
+        setOpen(true);
+      }
+      return;
+    }
+    if (key === "Tab") {
+      // 포커스를 먼저 버튼으로 돌려 두면 Tab 이 그 자리에서 자연스럽게 다음 칸으로 간다.
+      btnRef.current?.focus();
+      close();
+      return;
+    }
+    if (key !== "ArrowDown" && key !== "ArrowUp" && key !== "Home" && key !== "End") return;
+    if (event.target instanceof HTMLInputElement && (key === "Home" || key === "End" || key === "ArrowUp")) return;
+    event.preventDefault();
+    const els = optionEls();
+    const index = els.indexOf(document.activeElement as HTMLButtonElement);
+    if (returnsToSearch(key, index, searchable)) {
+      searchRef.current?.focus();
+      return;
+    }
+    els[nextOptionIndex(key, index, els.length)]?.focus();
+  }
 
   const current = options.find((option) => option.value === value);
   const label = current ? current.label : (placeholder ?? fallbackPlaceholder);
@@ -118,11 +188,24 @@ export function AdmDropdown({
   const visible = searchable ? (head ? [head, ...filtered] : filtered) : options;
 
   return (
-    <div className={`dd${open ? " open" : ""}${searchable ? " dd--search" : ""}`} ref={rootRef}>
+    <div
+      className={`dd${open ? " open" : ""}${searchable ? " dd--search" : ""}`}
+      ref={rootRef}
+      onKeyDown={onRootKeyDown}
+    >
       <button
         type="button"
+        ref={btnRef}
         className={`dd__btn${size === "sm" ? " dd__btn--sm" : ""}`}
-        onClick={() => (open ? close() : setOpen(true))}
+        onClick={(event) => {
+          if (open) {
+            close();
+            return;
+          }
+          // detail 0 = Enter/Space 로 일으킨 클릭
+          setInstant(event.detail === 0);
+          setOpen(true);
+        }}
         disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
@@ -134,7 +217,7 @@ export function AdmDropdown({
         </span>
       </button>
       {open ? (
-        <div className={`dd__menu${wide ? " dd__menu--wide" : ""}`} role="listbox">
+        <div className={ddMenuClassName({ wide, placement, instant })} role="listbox" ref={menuRef}>
           {searchable ? (
             <div className="qsearch qsearch--dd">
               <span className="ic">
@@ -173,10 +256,12 @@ export function AdmDropdown({
                 key={option.value}
                 className={`dd__opt${on ? " on" : ""}`}
                 role="option"
+                tabIndex={-1}
                 aria-selected={on}
                 onClick={() => {
                   onChange(option.value);
                   close();
+                  btnRef.current?.focus();
                 }}
               >
                 {rich ? (

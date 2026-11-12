@@ -44,6 +44,7 @@ import {
   type InboxThread,
 } from "@/lib/guest-messages/inbox-model";
 import { haptic } from "@/lib/haptics";
+import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
 import { tokyoDateOf } from "@/lib/tokyo-date";
 import {
   CHANNEL_DOT,
@@ -1118,37 +1119,56 @@ export function Composer({
         ? fill(copy.channelHintTranslated, { lang: targetName, channel })
         : fill(copy.channelHint, { channel });
   // 번역 언어 고르기 — 칩 대신 드롭다운 하나(시각 규칙). 폰은 짧은 이름, PC 는 손님 언어에 「손님 언어」 꼬리표.
+  const onTargetChange = (value: string) => {
+    const next = value || null;
+    // 이미 고른 항목을 다시 눌러도 미리 보기 · 햅틱을 건드리지 않는다.
+    if (next === target) return;
+    haptic("light");
+    setTarget(next);
+    setPreview({ kind: "none" });
+    // 손대지 않은 초안은 넣는 언어가 바뀌면 그 언어 글로 바꾼다(번역해서 보낼 때 두 번 번역되지 않게).
+    if (draft && draftText !== null && text === draftText) {
+      const swapped = draftTextFor(next);
+      setText(swapped);
+      setDraftText(swapped);
+    }
+  };
+  const targetLabel = (code: string) => {
+    const name = languageName(code, locale) ?? code;
+    return code === guestTarget && variant === "pc"
+      ? fill(copy.translateToggleGuest, { lang: name })
+      : fill(copy.translateToggle, { lang: name });
+  };
+  // PC 는 공용 관리자 드롭다운(시스템 팝업이 콘솔과 안 맞음), 폰은 OS 선택기를 그대로 쓴다. 작성기가 화면 아래라 위로 연다.
   const targetSelect =
     mode === "reply" && targets.length > 0 ? (
-      <select
-        className="gm-select gm-select--target"
-        aria-label={copy.translateTargetLabel}
-        value={target ?? ""}
-        onChange={(event) => {
-          haptic("light");
-          const next = event.target.value || null;
-          setTarget(next);
-          setPreview({ kind: "none" });
-          // 손대지 않은 초안은 넣는 언어가 바뀌면 그 언어 글로 바꾼다(번역해서 보낼 때 두 번 번역되지 않게).
-          if (draft && draftText !== null && text === draftText) {
-            const swapped = draftTextFor(next);
-            setText(swapped);
-            setDraftText(swapped);
-          }
-        }}
-      >
-        <option value="">{copy.translateNone}</option>
-        {targets.map((code) => {
-          const name = languageName(code, locale) ?? code;
-          return (
+      variant === "pc" ? (
+        <AdmDropdown
+          size="sm"
+          placement="up"
+          ariaLabel={copy.translateTargetLabel}
+          value={target ?? ""}
+          onChange={onTargetChange}
+          options={[
+            { value: "", label: copy.translateNone },
+            ...targets.map((code) => ({ value: code, label: targetLabel(code) })),
+          ]}
+        />
+      ) : (
+        <select
+          className="gm-select gm-select--target"
+          aria-label={copy.translateTargetLabel}
+          value={target ?? ""}
+          onChange={(event) => onTargetChange(event.target.value)}
+        >
+          <option value="">{copy.translateNone}</option>
+          {targets.map((code) => (
             <option key={code} value={code}>
-              {code === guestTarget && variant === "pc"
-                ? fill(copy.translateToggleGuest, { lang: name })
-                : fill(copy.translateToggle, { lang: name })}
+              {targetLabel(code)}
             </option>
-          );
-        })}
-      </select>
+          ))}
+        </select>
+      )
     ) : null;
 
   return (

@@ -239,3 +239,13 @@
 @media (prefers-reduced-motion: reduce) {
   .mcw-day b, .mcw-month__pick, .mcw-sum, .mcw-ref { transition: none; }
 }
+
+/* 2026-11-12 예약 캘린더 점검 — 차단 읽기 실패 경고 · 짧은 알림 · 예약 없이 차단된 방 · 믿을 수 없는 빈 방 수 */
+.mcw-warn { margin: 0 0 10px; padding: 10px 14px; border-radius: 12px; background: #fdf3e2; color: #8a5300; font-size: 13px; line-height: 1.45; }
+.mcw-li.is-dim .mcw-li__room, .mcw-li.is-dim b { color: var(--mcw-soft); }
+.mcw-head__empty .is-uncertain { color: #8a5300; }
+.mcw-toast { position: fixed; left: 0; right: 0; bottom: calc(96px + env(safe-area-inset-bottom, 0px)); z-index: 210; display: flex; justify-content: center; padding: 0 24px; pointer-events: none; }
+.mcw-toast span { max-width: 420px; padding: 10px 18px; border-radius: 999px; background: rgb(22 20 31 / .92); color: #fff; font-size: 13px; font-weight: 500; text-align: center; pointer-events: auto; animation: mcw-toast-in 200ms cubic-bezier(.23, 1, .32, 1) both; }
+@keyframes mcw-toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (min-width: 600px) { .mcw-toast { bottom: 32px; } }
+@media (prefers-reduced-motion: reduce) { .mcw-toast span { animation: none; } }

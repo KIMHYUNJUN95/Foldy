@@ -31,6 +31,11 @@ export type PropertyMapMeta = {
   note?: string;
   sharedAccess: PropertyAccessInfo[];
   roomAccess?: PropertyRoomCode[];
+  /**
+   * 저장된 줄의 `updated_at` — 저장할 때 「내가 본 버전」으로 다시 보낸다(2026-11-12, 두 사람이 동시에 고칠 때 덮어쓰기 방지).
+   * `null` · 없음 = 아직 저장된 줄이 없고 코드 기본값을 보고 있다.
+   */
+  updatedAt?: string | null;
 };
 
 export const PROPERTY_MAP_META: PropertyMapMeta[] = [

@@ -1692,3 +1692,12 @@
   .adm .acw .admcal__bar, .adm .acw-row, .adm .acw-pb, .adm .acw-copy__done svg path, .adm .acw-copy__done svg polyline { animation: none; }
   .adm .acw .admcal__bar, .adm .acw-ib, .adm .acw-sq, .adm .acw-btn, .adm .acw-fresh svg { transition: none; }
 }
+
+/* 2026-11-12 예약 캘린더 점검 — 메모 저장 상태 · 차단 읽기 실패 경고 · 믿을 수 없는 빈 방 수 */
+.adm .acw-nf > .acw-nf__st { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 4px 8px; text-align: right; }
+.adm .acw-nf > .acw-nf__st.is-err { color: #c5282e; }
+.adm .acw-nf > .acw-nf__st.is-warn { justify-content: flex-start; text-align: left; color: #8a5300; }
+.adm .acw-nf__mine { display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 8px 10px; border-radius: 10px; background: #f6f5f9; color: #16141f; }
+.adm .acw-nf__mine-t { white-space: pre-wrap; word-break: break-word; font-size: 13px; }
+.adm .acw-warn { margin: 0 0 12px; padding: 10px 14px; border-radius: 12px; background: #fdf3e2; color: #8a5300; font-size: 13px; line-height: 1.45; }
+.adm .acw-empty-row__days .is-uncertain, .adm .acw-kpi b.is-uncertain { color: #8a5300; }

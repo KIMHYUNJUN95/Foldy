@@ -490,23 +490,21 @@ Read:
 
 - All active organization members
 
-Create / update / delete:
+Create / update / delete (예약 내부 메모 — 쓰기 권한, 2026-11-12):
 
-- Owner
-- Office Admin
-- CS Staff
-- Field Manager
-
-Blocked from write:
-
-- Staff
-- Part-time Staff
+- **관리자 웹 권한 키 `admin_web.access` 가 있는 사람 모두** (역할 기본 + 개인 부여 · 차단). 2026-11-12 사용자 결정 — 앱은 관리자 웹에 들어오는
+  사람에게 메모 칸을 보여 주는데 DB 는 역할 목록(owner · office_admin · cs_staff · field_manager)이라, 권한을 개인으로 받은 사람은 저장이 DB 에서
+  막히고 개인 차단된 사람은 직접 요청으로 쓸 수 있었다.
 
 Notes:
 - `reservation_internal_notes` is the admin reservation-calendar inspector memo table.
-- Read policy is `is_platform_admin()` OR `has_active_membership(organization_id)`.
-- Write policies keep the privileged operator scope:
-  `is_platform_admin()` OR `has_org_role(organization_id, ['owner','office_admin','cs_staff','field_manager'])`.
+- Read policy is `is_platform_admin()` OR `has_active_membership(organization_id)` (모바일 상세가 읽는다 — 그대로).
+- Write policies (`202611120001_reservation_notes_capability.sql`, 이름은 그대로 drop → create):
+  `admin members can insert/update/delete reservation internal notes` =
+  `is_platform_admin()` OR `has_capability(organization_id, auth.uid(), 'admin_web.access')`; insert · update 는 `updated_by_user_id = auth.uid()` 도.
+- 앱(`saveReservationInternalNoteAction`)은 `getAdminSessionForApi()`(같은 `admin_web.access`)로 막고 redirect 대신 `forbidden` 을 돌려준다. 쓰기는
+  사용자 세션(RLS 를 거친다). 조건부 저장(`updated_at` 일치)은 앱 쪽 규칙 — RLS 에 막힌 update · delete 는 오류 없이 0줄이라, 버전이 그대로인데
+  0줄이면 충돌이 아니라 `forbidden` 으로 본다. insert 거절(42501)도 `forbidden`.
 - Notes are organization-scoped operational metadata and are never exposed as public reservation
   data.
 
@@ -1589,7 +1587,7 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
   실행 권한 없음)이라 클라이언트 쓰기 권한을 넓히지 않는다.
 - `set_annual_leave_baseline_atomic` 은 시급제 역할(`part_time_staff` · `staff`)을 연차 대상에서 뺀다(앱 `isLeaveHourlyRole` 과 같게).
 - **그대로 둔 것:** `memberships` · `organizations` · `invite_codes` · `membership_permission_overrides`(보안 뼈대 — 역할로만), `reservation_internal_notes`
-  (권한 키 없음), 저장소(`storage.objects`) 업로드 규칙.
+  (권한 키 없음 — 2026-11-12 에 `admin_web.access` 로 옮김, 위 「reservation_internal_notes」), 저장소(`storage.objects`) 업로드 규칙.
 - 검증: 운영에서 리더에게 `board.manage` · `attendance.settings` 부여 + `cleaning.work` 차단 → 그 사람 흉내로 true · true · false 확인 후 rollback.
 
 ## 2026-10-22 저장소 사진 규칙 — 아르바이트 제외 없앰 (마이그레이션 `202610220001_storage_images_per_person.sql`, 운영 적용)

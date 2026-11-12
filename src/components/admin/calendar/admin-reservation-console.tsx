@@ -3,11 +3,14 @@
 import Link from "next/link";
 import {
   startTransition,
+  useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ComponentType,
   type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import {
   BedDouble,
@@ -43,8 +46,22 @@ import {
   type PropertyMapMeta,
 } from "@/lib/property-map-links";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import { useTokyoToday } from "@/components/shared/use-tokyo-today";
+import { assignLanes } from "@/lib/calendar-lanes";
+import {
+  isNoteChanged,
+  normalizeNote,
+  NoteSaveTracker,
+  pickLatestNote,
+  pruneSavedNotes,
+  type ReservationNoteSnapshot,
+  resolveNoteConflict,
+  type SavedNoteSnapshot,
+  RESERVATION_INTERNAL_NOTE_MAX_LENGTH,
+} from "@/lib/reservation-note-sync";
 import { collectBlockedRooms } from "@/lib/room-blocks";
 import { localizePropertyName } from "@/lib/room-label-normalization";
+import { splitVacantRooms } from "@/lib/vacant-rooms";
 import type { Database } from "@/types/database";
 import "./admin-reservation-console.css";
 import { useRoomPlaceLabel } from "@/components/shared/building-names";
@@ -64,6 +81,10 @@ type RoomCodeDraft = { roomLabel: string; code: string };
 
 export type AdminReservationConsoleProps = {
   beds24SyncPaused: boolean;
+  /** 차단 읽기 실패 — 빈 방 수 경고(2026-11-12). */
+  blocksLoadFailed?: boolean;
+  /** 건물 운영 정보 읽기 실패 — 옛 출입 코드 대신 오류 안내(2026-11-12). */
+  buildingInfoLoadFailed?: boolean;
   blockedProperties: Array<{
     propertyName: string;
     roomCount: number;
@@ -78,7 +99,8 @@ export type AdminReservationConsoleProps = {
   nextMonth: string;
   prevMonth: string;
   propertyOptions: string[];
-  reservationNotes: Record<string, string>;
+  /** 예약 id → { 메모, updated_at } — 저장 때 `updatedAt` 을 「내가 본 버전」으로 보낸다(2026-11-12). */
+  reservationNotes: Record<string, ReservationNoteSnapshot>;
   reservations: Array<{
     beds24Id: string;
     channel: ReservationChannel;
@@ -121,6 +143,13 @@ export type AdminReservationConsoleProps = {
 const DAY_WIDTH_MIN = 34;
 const LABEL_WIDTH_BASE = 176;
 const PANEL_TRANSITION_MS = 220;
+/** 월간 보드 — 겹치는 예약은 아래 줄로(레인). 한 줄 높이 · 막대 위치(2026-11-12). */
+const ROW_BASE_HEIGHT = 44;
+const BAR_TOP = 8;
+const LANE_STEP = 32;
+const FOCUSABLE = 'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+type NoteStatus = { kind: "saving" } | { kind: "failed"; message: string } | { kind: "conflict"; mine: string };
 /** 운영 기본 시각 — 손님별 시각이 아니다(모바일 상세 시트와 같은 값, docs/product/15 「Reservation Detail Modal Policy」). */
 const DEFAULT_CHECK_IN_TIME = "16:00";
 const DEFAULT_CHECK_OUT_TIME = "10:00";
@@ -154,11 +183,11 @@ const STATUS_STYLE: Record<
   ReservationStatus,
   { badge: string; dot: string; dimmed?: boolean }
 > = {
-  cancelled: { badge: "pill pill--danger", dot: "var(--danger)" },
+  cancelled: { badge: "pill pill--danger", dot: "var(--danger)", dimmed: true },
   checked_in: { badge: "pill pill--done", dot: "var(--done)" },
   checked_out: { badge: "pill pill--muted", dot: "var(--adm-muted)", dimmed: true },
   confirmed: { badge: "pill pill--info", dot: "var(--info)" },
-  no_show: { badge: "pill pill--danger", dot: "var(--danger)" },
+  no_show: { badge: "pill pill--danger", dot: "var(--danger)", dimmed: true },
 };
 
 function buildMonthLabel(month: string, locale: Locale) {
@@ -325,8 +354,17 @@ function legacyCopy(value: string) {
   return ok ? Promise.resolve() : Promise.reject(new Error("clipboard_unavailable"));
 }
 
+function withoutKey<T>(record: Record<string, T>, key: string): Record<string, T> {
+  if (!(key in record)) return record;
+  const next = { ...record };
+  delete next[key];
+  return next;
+}
+
 export function AdminReservationConsole({
   beds24SyncPaused,
+  blocksLoadFailed = false,
+  buildingInfoLoadFailed = false,
   blockedProperties,
   buildingInfos,
   canEditBuildingInfo,
@@ -343,11 +381,14 @@ export function AdminReservationConsole({
   roomRows,
   selectedMonth,
   selectedProperty,
-  today,
+  today: serverToday,
 }: AdminReservationConsoleProps) {
   const bRoom = useRoomPlaceLabel();
   const router = useRouter();
   const { dismiss, showToast, toast } = useAdminToast();
+  // 켜 둔 채 도쿄 자정을 넘기면 「오늘」 · 오늘 운영을 새 날로 — 서버도 새 날 창으로 다시 읽는다(2026-11-12).
+  const refreshForNewDay = useCallback(() => router.refresh(), [router]);
+  const today = useTokyoToday(serverToday, refreshForNewDay);
 
   const [activeView, setActiveView] = useState<ViewMode>("month");
   const [channelFilter, setChannelFilter] = useState<ReservationChannel | "all">("all");
@@ -357,9 +398,28 @@ export function AdminReservationConsole({
   const [savingBuilding, setSavingBuilding] = useState<string | null>(null);
   const [panelSelection, setPanelSelection] = useState<CalendarSelection>(null);
   const [propertyDrafts, setPropertyDrafts] = useState(() => cloneBuildingInfos(buildingInfos));
-  const [reservationNotes, setReservationNotes] = useState<Record<string, string>>(
-    initialReservationNotes,
-  );
+  // 고치기 시작할 때 본 버전 — 저장은 이 버전일 때만(그사이 남이 저장했으면 충돌, 2026-11-12).
+  const [editingBaseVersion, setEditingBaseVersion] = useState<string | null>(null);
+  // 새 건물 정보가 오면(새로고침 · 저장 뒤) 고치는 중이 아닌 건물은 새 값으로 — 예전엔 처음 받은 값을 계속 들고 있었다.
+  const [buildingInfosSource, setBuildingInfosSource] = useState(buildingInfos);
+  if (buildingInfosSource !== buildingInfos) {
+    setBuildingInfosSource(buildingInfos);
+    const fresh = cloneBuildingInfos(buildingInfos);
+    setPropertyDrafts((current) =>
+      editingBuilding && current[editingBuilding] ? { ...fresh, [editingBuilding]: current[editingBuilding] } : fresh,
+    );
+  }
+
+  // 내부 메모(2026-11-12): 서버 값(props) + 이 화면이 저장한 값 중 새것 · 고치는 중인 칸(drafts) · 칸별 상태.
+  const [savedNotes, setSavedNotes] = useState<Record<string, SavedNoteSnapshot>>({});
+  // 새 서버 묶음이 오면(저장 결과를 받은 뒤) 서버가 정답 — 남이 지운 메모가 이 화면에만 남지 않게(`pruneSavedNotes`).
+  const [notesSource, setNotesSource] = useState(initialReservationNotes);
+  if (notesSource !== initialReservationNotes) {
+    setNotesSource(initialReservationNotes);
+    setSavedNotes((current) => pruneSavedNotes(current, initialReservationNotes));
+  }
+  const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
+  const [noteStatus, setNoteStatus] = useState<Record<string, NoteStatus>>({});
   const [gridSizes, setGridSizes] = useState({
     dayWidth: DAY_WIDTH_MIN,
     labelWidth: LABEL_WIDTH_BASE,
@@ -417,8 +477,9 @@ export function AdminReservationConsole({
     if (selectedProperty && reservation.propertyName !== selectedProperty) return false;
     return reservation.status !== "cancelled" && reservation.status !== "no_show";
   });
-  const hasReservationNote = (reservationId: string) =>
-    Boolean(reservationNotes[reservationId]?.trim());
+  const latestNote = (reservationId: string) =>
+    pickLatestNote(initialReservationNotes[reservationId], savedNotes[reservationId]);
+  const hasReservationNote = (reservationId: string) => Boolean(normalizeNote(latestNote(reservationId).note));
   /** 「성인 2」 / 「성인 2 · 어린이 1」 / 합계만 — 막대 · 목록 한 줄용. */
   const guestShort = (reservation: AdminReservationConsoleProps["reservations"][number]) => {
     if (reservation.adults !== null) {
@@ -497,24 +558,189 @@ export function AdminReservationConsole({
     return () => observer.disconnect();
   }, [activeView, dates.length, isOutOfWindow]);
 
-  // 선언 순서: Esc 효과가 쓰기 전에 있어야 React Compiler 가 이 콘솔을 컴파일한다.
-  function closePanel() {
-    setIsPanelVisible(false);
-    window.setTimeout(() => {
-      setPanelSelection((current) => (current ? null : current));
-    }, PANEL_TRANSITION_MS);
+  // ── 내부 메모 저장(2026-11-12) ──────────────────────────────────────────────
+  // 바뀐 칸만, 내가 본 버전으로(`reservation-note-sync.ts`). 패널을 닫거나(Esc · 닫기 · 다른 예약 · 탭 바꾸기) 칸을 떠나면 저장한다.
+  // 중복 막기는 렌더와 상관없이 바로 바뀌는 `NoteSaveTracker`(보내기 전에 표시) — 칸을 떠난 직후 닫아도 같은 버전으로 두 번 보내지 않는다.
+  // 보내는 중에 또 저장하라고 하면 끝난 뒤 **첫 결과의 새 버전**으로 한 번 더 보낸다. 화면 표시는 `noteStatus`.
+  const [noteTracker] = useState(() => new NoteSaveTracker());
+
+  const noteErrorMessage = (error: string) =>
+    error === "forbidden"
+      ? copy.noteForbidden
+      : error === "note_too_long"
+        ? copy.noteTooLong
+        : error === "reservation_not_found"
+          ? copy.noteNotFound
+          : copy.internalNoteSaveFailedToast;
+
+  async function sendNote(reservationId: string, draft: string, base: ReservationNoteSnapshot): Promise<void> {
+    setNoteStatus((current) => ({ ...current, [reservationId]: { kind: "saving" } }));
+    let result: Awaited<ReturnType<typeof saveReservationInternalNoteAction>>;
+    try {
+      result = await saveReservationInternalNoteAction({
+        expectedUpdatedAt: base.updatedAt,
+        note: draft,
+        reservationId,
+      });
+    } catch {
+      result = { error: "save_failed", ok: false };
+    }
+
+    // 충돌인데 최신 값이 내가 보낸 값과 같으면 성공(같은 저장이 두 번 나간 경우 등).
+    let snapshot: ReservationNoteSnapshot | null = result.ok ? result.snapshot : null;
+    if (!result.ok && result.error === "conflict") {
+      const same = resolveNoteConflict(draft, result.current);
+      if (same.kind === "same") snapshot = same.snapshot;
+    }
+
+    if (snapshot) {
+      const saved = snapshot;
+      setSavedNotes((current) => ({ ...current, [reservationId]: { ...saved, supersedes: base.updatedAt } }));
+      noteTracker.clearDraftIf(reservationId, draft);
+      // 저장하는 동안 더 쓴 내용은 남긴다(다음 저장으로).
+      setNoteDrafts((current) =>
+        current[reservationId] !== undefined && normalizeNote(current[reservationId]) === normalizeNote(draft)
+          ? withoutKey(current, reservationId)
+          : current,
+      );
+      const next = noteTracker.takeQueued(reservationId) ? noteTracker.draft(reservationId) : undefined;
+      if (next !== undefined && isNoteChanged(next, saved)) {
+        await sendNote(reservationId, next, saved);
+        return;
+      }
+      noteTracker.end(reservationId);
+      setNoteStatus((current) => withoutKey(current, reservationId));
+      showToast(copy.internalNoteSavedToast);
+      return;
+    }
+
+    noteTracker.end(reservationId);
+    noteTracker.takeQueued(reservationId);
+    if (!result.ok && result.error === "conflict") {
+      // 덮어쓰지 않는다 — 최신 값을 보여 주고, 내가 쓴 내용은 따로 남긴다(「내 내용 다시 넣기」).
+      const current = result.current;
+      // 저장하는 동안 더 쓴 글까지 「내가 쓴 내용」으로 남긴다.
+      const latestMine = noteTracker.draft(reservationId) ?? draft;
+      setSavedNotes((saved) => ({ ...saved, [reservationId]: { ...current, supersedes: base.updatedAt } }));
+      noteTracker.clearDraftIf(reservationId, latestMine);
+      setNoteDrafts((drafts) => withoutKey(drafts, reservationId));
+      setNoteStatus((status) => ({ ...status, [reservationId]: { kind: "conflict", mine: latestMine } }));
+      showToast(copy.noteConflict, true);
+      return;
+    }
+    const message = noteErrorMessage(result.ok ? "save_failed" : result.error);
+    setNoteStatus((current) => ({ ...current, [reservationId]: { kind: "failed", message } }));
+    showToast(message, true);
   }
 
+  async function saveNote(reservationId: string, override?: string): Promise<void> {
+    if (override !== undefined) noteTracker.setDraft(reservationId, override);
+    const draft = override ?? noteTracker.draft(reservationId) ?? noteDrafts[reservationId];
+    if (draft === undefined) return;
+    if (noteTracker.isInflight(reservationId)) {
+      noteTracker.queue(reservationId);
+      return;
+    }
+    const base = latestNote(reservationId);
+    if (!isNoteChanged(draft, base)) {
+      noteTracker.clearDraftIf(reservationId, draft);
+      setNoteDrafts((current) => withoutKey(current, reservationId));
+      return;
+    }
+    if (!noteTracker.begin(reservationId)) {
+      noteTracker.queue(reservationId);
+      return;
+    }
+    await sendNote(reservationId, draft, base);
+  }
+
+  const flushOpenNote = () => {
+    if (panelSelection?.type === "reservation") void saveNote(panelSelection.reservationId);
+  };
+
+  // ── 상세 패널 — 열면 포커스를 패널 안으로, Tab 은 패널 안에서만 돌고, 닫으면 연 자리로 돌려준다(2026-11-12). ──
+  // 바탕을 덮는 막(scrim)이 있는 모달이라 `aria-modal` + 포커스 가두기. 닫힌 패널은 `inert`.
+  const panelRef = useRef<HTMLElement | null>(null);
+  const lastOutsideFocusRef = useRef<HTMLElement | null>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+
+  // 선언 순서: Esc 효과가 쓰기 전에 있어야 React Compiler 가 이 콘솔을 컴파일한다.
+  function closePanel() {
+    flushOpenNote();
+    setIsPanelVisible(false);
+  }
+
+  // 닫힌 뒤 미끄러져 나가는 시간이 지나면 내용을 비운다. 그사이 다른 예약을 고르면(다시 보임) 타이머가 취소된다 —
+  // 예전엔 닫자마자 다른 예약을 누르면 220ms 뒤 타이머가 새 선택을 지웠다.
   useEffect(() => {
-    if (!panelSelection) return;
+    if (isPanelVisible || !panelSelection) return;
+    const timer = window.setTimeout(() => setPanelSelection(null), PANEL_TRANSITION_MS);
+    return () => window.clearTimeout(timer);
+  }, [isPanelVisible, panelSelection]);
+
+  // Esc — 매 렌더 새 함수로 붙인다(낡은 메모 값으로 저장하지 않게).
+  useEffect(() => {
+    if (!panelSelection || !isPanelVisible) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        closePanel();
-      }
+      if (event.key === "Escape") closePanel();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [panelSelection]);
+  });
+
+  // 패널 밖에서 마지막으로 누르거나 포커스한 곳 — 닫을 때 그리로 돌려준다(Safari 는 버튼을 눌러도 포커스가 안 가서 pointerdown 도 본다).
+  useEffect(() => {
+    const remember = (event: Event) => {
+      const target = event.target instanceof HTMLElement ? event.target.closest<HTMLElement>(FOCUSABLE) : null;
+      if (target && !panelRef.current?.contains(target)) lastOutsideFocusRef.current = target;
+    };
+    document.addEventListener("focusin", remember);
+    document.addEventListener("pointerdown", remember, true);
+    return () => {
+      document.removeEventListener("focusin", remember);
+      document.removeEventListener("pointerdown", remember, true);
+    };
+  }, []);
+
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (!panel) return;
+    if (!isPanelVisible) {
+      const target = returnFocusRef.current;
+      returnFocusRef.current = null;
+      if (target?.isConnected && (panel.contains(document.activeElement) || document.activeElement === document.body)) {
+        target.focus({ preventScroll: true });
+      }
+      return;
+    }
+    if (!panelSelection) return;
+    if (!returnFocusRef.current) returnFocusRef.current = lastOutsideFocusRef.current;
+    if (panel.contains(document.activeElement)) return;
+    const raf = requestAnimationFrame(() => {
+      const first = panel.querySelector<HTMLElement>("[data-panel-autofocus]") ?? panel.querySelector<HTMLElement>(FOCUSABLE);
+      first?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [isPanelVisible, panelSelection]);
+
+  const trapPanelFocus = (event: ReactKeyboardEvent<HTMLElement>) => {
+    if (event.key !== "Tab") return;
+    const panel = event.currentTarget;
+    const items = [...panel.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.offsetParent !== null);
+    if (items.length === 0) {
+      event.preventDefault();
+      return;
+    }
+    const first = items[0];
+    const last = items[items.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
 
   const handleSyncRefresh = () => {
     if (beds24SyncPaused) return;
@@ -531,11 +757,13 @@ export function AdminReservationConsole({
   };
 
   const openReservationPanel = (reservationId: string) => {
+    if (panelSelection?.type === "reservation" && panelSelection.reservationId !== reservationId) flushOpenNote();
     setIsPanelVisible(true);
     setPanelSelection({ type: "reservation", reservationId });
   };
 
   const openRoomPanel = (roomKey: string) => {
+    flushOpenNote();
     setIsPanelVisible(true);
     setPanelSelection({ type: "room", roomKey });
   };
@@ -544,12 +772,21 @@ export function AdminReservationConsole({
     setChannelFilter("all");
   };
 
+  const startEditingBuilding = (propertyName: string) => {
+    setEditingBuilding(propertyName);
+    setEditingBaseVersion(buildingInfos.find((item) => item.canonicalName === propertyName)?.updatedAt ?? null);
+    // 고치기 시작할 때 지금 서버 값에서 시작한다.
+    const fresh = cloneBuildingInfos(buildingInfos);
+    setPropertyDrafts((current) => (fresh[propertyName] ? { ...current, [propertyName]: fresh[propertyName] } : current));
+  };
+
   const handleSaveBuildingInfo = async (propertyName: string) => {
     const draft = propertyDrafts[propertyName];
     if (!draft || savingBuilding) return;
 
     setSavingBuilding(propertyName);
     const result = await savePropertyOperationInfoAction({
+      expectedUpdatedAt: editingBaseVersion,
       canonicalName: propertyName,
       data: {
         address: draft.address,
@@ -565,11 +802,30 @@ export function AdminReservationConsole({
     setSavingBuilding(null);
 
     if (!result.ok) {
-      showToast(copy.buildingInfoSaveFailedToast, true);
+      if (result.error === "conflict") {
+        // 남이 먼저 저장했다 — 덮어쓰지 않고 최신 값을 보여 준 뒤 고치기를 끝낸다(다시 고치면 새 버전에서 시작).
+        const latest = cloneBuildingInfos([result.current]);
+        setPropertyDrafts((current) => ({ ...current, ...latest }));
+        setEditingBuilding(null);
+        setEditingBaseVersion(null);
+        showToast(copy.buildingInfoConflict, true);
+        router.refresh();
+        return;
+      }
+      showToast(
+        result.error === "forbidden"
+          ? copy.buildingInfoForbidden
+          : result.error === "too_long"
+            ? copy.buildingInfoTooLong
+            : copy.buildingInfoSaveFailedToast,
+        true,
+      );
       return;
     }
 
+    setPropertyDrafts((current) => ({ ...current, ...cloneBuildingInfos([result.info]) }));
     setEditingBuilding(null);
+    setEditingBaseVersion(null);
     showToast(copy.sessionSavedToast);
     router.refresh();
   };
@@ -588,6 +844,29 @@ export function AdminReservationConsole({
     { value: "manual", label: copy.channelManual },
   ];
 
+  // 보는 달의 방 × 날 표 — 묵는 밤 · 차단된 밤(2026-11-12 성능). 예약 · 차단 · 날짜가 바뀔 때만 다시 만든다.
+  const monthNights = useMemo(() => {
+    const taken = new Map<string, Set<string>>();
+    const blocked = new Map<string, Set<string>>();
+    const add = (map: Map<string, Set<string>>, key: string, date: string) => {
+      const bucket = map.get(key);
+      if (bucket) bucket.add(date);
+      else map.set(key, new Set([date]));
+    };
+    for (const reservation of reservations) {
+      if (reservation.status === "cancelled" || reservation.status === "no_show") continue;
+      for (const date of dates) {
+        if (reservation.checkInDate <= date && reservation.checkOutDate > date) add(taken, reservation.roomKey, date);
+      }
+    }
+    for (const block of roomBlocks) {
+      for (const date of dates) {
+        if (block.startDate <= date && block.endDate >= date) add(blocked, block.roomKey, date);
+      }
+    }
+    return { blocked, taken };
+  }, [dates, reservations, roomBlocks]);
+
   const renderMonthView = () => {
     const hasMatchingReservations = visibleReservations.length > 0;
     const visibleGroups = groupedRows
@@ -600,14 +879,13 @@ export function AdminReservationConsole({
       })
       .filter((group) => group.rows.length > 0 || group.blocked);
 
-    // 이번 달 가동률 = 판 밤 / (객실 × 날짜). 빈 방 줄 = 그날 밤 예약도 차단도 없는 방 수(채널 고르기와 무관).
-    const nightTaken = (roomKey: string, date: string) =>
-      activeReservations.some((r) => r.roomKey === roomKey && r.checkInDate <= date && r.checkOutDate > date);
-    const nightBlocked = (roomKey: string, date: string) =>
-      (blocksByRoom.get(roomKey) ?? []).some((block) => block.startDate <= date && block.endDate >= date);
+    // 이번 달 가동률 = 판 밤 / (객실 × 날짜). 빈 방 줄 = 그날 밤 예약도 차단도 없는 방 수(채널 고르기와 무관, `vacant-rooms.ts` 정의).
+    // 방 × 날 표(`monthNights`)를 한 번 만들어 둔 것을 읽는다 — 예전엔 칸마다 예약 전체를 다시 훑었다(2026-11-12).
+    const nightTaken = (roomKey: string, date: string) => monthNights.taken.get(roomKey)?.has(date) ?? false;
+    const nightBlocked = (roomKey: string, date: string) => monthNights.blocked.get(roomKey)?.has(date) ?? false;
     const groupStats = (rows: AdminReservationConsoleProps["roomRows"]) => {
       const empty = dates.map((date) => rows.filter((row) => !nightTaken(row.key, date) && !nightBlocked(row.key, date)).length);
-      const taken = rows.reduce((sum, row) => sum + dates.filter((date) => nightTaken(row.key, date)).length, 0);
+      const taken = rows.reduce((sum, row) => sum + (monthNights.taken.get(row.key)?.size ?? 0), 0);
       const percent = rows.length && dates.length ? Math.round((taken / (rows.length * dates.length)) * 100) : 0;
       return { empty, percent };
     };
@@ -713,8 +991,13 @@ export function AdminReservationConsole({
                             <div className="admcal__room-label">{copy.wEmptyRow}</div>
                             <div className="acw-empty-row__days">
                               {stats.empty.map((count, index) => (
-                                <span className={`num${count ? "" : " is-zero"}`} key={dates[index]}>
+                                <span
+                                  className={`num${count ? "" : " is-zero"}${blocksLoadFailed ? " is-uncertain" : ""}`}
+                                  key={dates[index]}
+                                  title={blocksLoadFailed ? copy.vacantUncertain : undefined}
+                                >
                                   {count || "–"}
+                                  {blocksLoadFailed ? "?" : ""}
                                 </span>
                               ))}
                             </div>
@@ -740,8 +1023,32 @@ export function AdminReservationConsole({
                                 reservation.checkInDate < `${nextMonth}-01` &&
                                 reservation.checkOutDate > `${selectedMonth}-01`,
                             );
+                            // 같은 방에 겹치는 예약은 아래 줄로(공용 `assignLanes`, 모바일과 같은 반열림 규칙) — 예전엔 한 줄에 겹쳐 그려
+                            // 아래 막대가 가려졌다(2026-11-12). 줄이 늘면 행도 그만큼 높아진다.
+                            // 줄은 살아 있는 예약만으로 나눈다 — 취소 · 노쇼 막대는 맨 위 줄에 흐리게 깔고 줄을 늘리지 않는다(취소 + 재예약이
+                            // 살아 있는 예약을 둘째 줄로 밀던 문제, 2026-11-12 리뷰).
+                            const isLive = (reservation: (typeof roomReservations)[number]) =>
+                              reservation.status !== "cancelled" && reservation.status !== "no_show";
+                            const { placed: liveBars, laneCount } = assignLanes(roomReservations.filter(isLive), (reservation) => ({
+                              start:
+                                reservation.checkInDate < `${selectedMonth}-01`
+                                  ? 0
+                                  : Number(reservation.checkInDate.slice(8)) - 1 + 0.5,
+                              end:
+                                reservation.checkOutDate >= `${nextMonth}-01`
+                                  ? dates.length
+                                  : Number(reservation.checkOutDate.slice(8)) - 1 + 0.5,
+                            }));
+                            const laneBars = [
+                              ...roomReservations.filter((reservation) => !isLive(reservation)).map((item) => ({ item, lane: 0 })),
+                              ...liveBars,
+                            ];
                             return (
-                              <div className="admcal__room-row" key={room.key}>
+                              <div
+                                className="admcal__room-row"
+                                key={room.key}
+                                style={laneCount > 1 ? { minHeight: `${ROW_BASE_HEIGHT + (laneCount - 1) * LANE_STEP}px` } : undefined}
+                              >
                                 <div className="admcal__room-label">{bRoom(room.displayRoomLabel)}</div>
                                 <div className="admcal__room-track">
                                   {dates.map((date) => {
@@ -814,7 +1121,7 @@ export function AdminReservationConsole({
                                       );
                                     })}
 
-                                  {roomReservations.map((reservation) => {
+                                  {laneBars.map(({ item: reservation, lane }) => {
                                     const checkInDay = Number(reservation.checkInDate.slice(8));
                                     const checkOutDay = Number(reservation.checkOutDate.slice(8));
                                     const hasInternalNote = hasReservationNote(reservation.id);
@@ -852,6 +1159,7 @@ export function AdminReservationConsole({
                                             "--acw-bar-tint": channelStyle.tint,
                                             "--admcal-status-dot": statusStyle.dot,
                                             left: `calc(${startUnit} * var(--admcal-day-width) + 3px)`,
+                                            top: lane > 0 ? `${BAR_TOP + lane * LANE_STEP}px` : undefined,
                                             width: `calc(${span} * var(--admcal-day-width) - 6px)`,
                                           } as CSSProperties
                                         }
@@ -894,7 +1202,12 @@ export function AdminReservationConsole({
   const renderTodayBoard = () => {
     const rangeShort = (r: { checkInDate: string; checkOutDate: string }) =>
       `${Number(r.checkInDate.slice(5, 7))}/${Number(r.checkInDate.slice(8))} – ${Number(r.checkOutDate.slice(5, 7))}/${Number(r.checkOutDate.slice(8))}`;
-    const vacantTonight = Math.max(0, activeRoomCount - occupiedKeysToday.size - [...blockedRoomKeysToday].filter((key) => !occupiedKeysToday.has(key)).length);
+    // 빈 방 = 오늘 밤 예약도 차단도 없는 방 — 모바일과 같은 정의(`vacant-rooms.ts`).
+    const vacantTonight = splitVacantRooms(
+      roomRows.filter((room) => !selectedProperty || room.propertyName === selectedProperty).map((room) => room.key),
+      occupiedKeysToday,
+      blockedRoomKeysToday,
+    ).vacant.length;
     const kpis = [
       { label: copy.kpiArrivals, value: arrivalsToday.length, unit: copy.wUnitCount, sub: copy.wKpiToday },
       { label: copy.kpiDepartures, value: departuresToday.length, unit: copy.wUnitCount, sub: copy.wKpiToday },
@@ -943,8 +1256,12 @@ export function AdminReservationConsole({
           {kpis.map((kpi) => (
             <div className="acw-kpi" key={kpi.label}>
               <span>{kpi.label}</span>
-              <b className={`num${kpi.accent ? " is-accent" : ""}`}>
+              <b
+                className={`num${kpi.accent ? " is-accent" : ""}${kpi.accent && blocksLoadFailed ? " is-uncertain" : ""}`}
+                title={kpi.accent && blocksLoadFailed ? copy.vacantUncertain : undefined}
+              >
                 {kpi.value}
+                {kpi.accent && blocksLoadFailed ? "?" : ""}
                 {kpi.unit ? <small>{kpi.unit}</small> : null}
               </b>
               <span>{kpi.sub}</span>
@@ -1023,6 +1340,17 @@ export function AdminReservationConsole({
   };
 
   const renderBuildingInfoBoard = () => {
+    // 읽기 실패면 옛 출입 코드(코드 기본값)를 보이지 않는다(2026-11-12).
+    if (buildingInfoLoadFailed) {
+      return (
+        <div className="admcal__state-card" role="status">
+          <TriangleAlert className="size-5" />
+          <div>
+            <div className="admcal__state-body">{copy.buildingInfoLoadFailed}</div>
+          </div>
+        </div>
+      );
+    }
     const cards = propertyOptions
       .filter((propertyName) => (selectedProperty ? propertyName === selectedProperty : true))
       .map((propertyName) => {
@@ -1092,6 +1420,7 @@ export function AdminReservationConsole({
                           className="acw-link is-soft"
                           onClick={() => {
                             setEditingBuilding(null);
+                            setEditingBaseVersion(null);
                             setPropertyDrafts(cloneBuildingInfos(buildingInfos));
                           }}
                           type="button"
@@ -1109,7 +1438,7 @@ export function AdminReservationConsole({
                         </button>
                       </>
                     ) : canEditBuildingInfo ? (
-                      <button className="acw-link is-soft" onClick={() => setEditingBuilding(card.propertyName)} type="button">
+                      <button className="acw-link is-soft" onClick={() => startEditingBuilding(card.propertyName)} type="button">
                         {copy.wEdit}
                       </button>
                     ) : null}
@@ -1142,13 +1471,16 @@ export function AdminReservationConsole({
                             }
                             value={access.code}
                           />
-                        ) : (
+                        ) : access.code ? (
                           <CopyCode
                             big
                             code={access.code}
                             copiedLabel={copy.wCodeCopied}
                             label={copy.wCopyCode.replace("{label}", labels.label)}
                           />
+                        ) : (
+                          // 지운 코드는 비어 있는 채로 남는다(2026-11-12 — 예전엔 기본값이 되살아났다).
+                          <span className="acw-soft">{copy.none}</span>
                         )}
                       </div>
                     );
@@ -1235,6 +1567,7 @@ export function AdminReservationConsole({
               className={activeView === tab.key ? "on" : ""}
               key={tab.key}
               onClick={() => {
+                flushOpenNote();
                 setActiveView(tab.key);
                 setIsPanelVisible(false);
                 setPanelSelection(null);
@@ -1314,6 +1647,13 @@ export function AdminReservationConsole({
         )}
       </div>
 
+      {/* 차단 정보를 못 읽었으면 빈 방 수를 믿을 수 없다 — 경고 줄(2026-11-12, 예전엔 로그만 남기고 빈 방으로 셌다). */}
+      {blocksLoadFailed && (activeView === "month" || activeView === "today" || activeView === "rooms") ? (
+        <p className="acw-warn" role="status">
+          {copy.blocksLoadFailed}
+        </p>
+      ) : null}
+
       {activeView === "month" && renderMonthView()}
       {activeView === "today" && renderTodayBoard()}
       {activeView === "rooms" && renderRoomStatusBoard()}
@@ -1326,6 +1666,9 @@ export function AdminReservationConsole({
         aria-label={panelReservation?.guestName ?? (panelRoom ? bRoom(panelRoom.displayRoomLabel) : copy.closePanel)}
         aria-modal={isPanelVisible || undefined}
         className={`admcal__panel${isPanelVisible ? " is-visible" : ""}`}
+        inert={!isPanelVisible}
+        onKeyDown={trapPanelFocus}
+        ref={panelRef}
         role="dialog"
       >
         {panelReservation ? (
@@ -1334,10 +1677,22 @@ export function AdminReservationConsole({
             channelLabel={buildChannelLabel(panelReservation.channel, dictionary)}
             channelStyle={CHANNEL_STYLE[panelReservation.channel]}
             copy={copy}
-            note={reservationNotes[panelReservation.id] ?? ""}
-            onChangeNote={(value) =>
-              setReservationNotes((current) => ({ ...current, [panelReservation.id]: value }))
-            }
+            note={noteDrafts[panelReservation.id] ?? latestNote(panelReservation.id).note}
+            noteStatus={noteStatus[panelReservation.id] ?? null}
+            onChangeNote={(value) => {
+              noteTracker.setDraft(panelReservation.id, value);
+              setNoteDrafts((current) => ({ ...current, [panelReservation.id]: value }));
+              setNoteStatus((current) =>
+                current[panelReservation.id]?.kind === "failed" ? withoutKey(current, panelReservation.id) : current,
+              );
+            }}
+            onRestoreMine={(mine) => {
+              noteTracker.setDraft(panelReservation.id, mine);
+              setNoteDrafts((current) => ({ ...current, [panelReservation.id]: mine }));
+              setNoteStatus((current) => withoutKey(current, panelReservation.id));
+              void saveNote(panelReservation.id, mine);
+            }}
+            onRetryNote={() => void saveNote(panelReservation.id)}
             onClose={closePanel}
             onCopyBeds24Id={async () => {
               try {
@@ -1357,19 +1712,7 @@ export function AdminReservationConsole({
               }
             }}
             onLinkedAction={(kind) => router.push(buildLinkedActionHref(kind, panelReservation.id))}
-            onSaveNote={async (value) => {
-              const result = await saveReservationInternalNoteAction(panelReservation.id, value);
-              if (!result.ok) {
-                showToast(copy.internalNoteSaveFailedToast, true);
-                return;
-              }
-
-              setReservationNotes((current) => ({
-                ...current,
-                [panelReservation.id]: result.note,
-              }));
-              showToast(copy.internalNoteSavedToast);
-            }}
+            onSaveNote={() => saveNote(panelReservation.id)}
             reservation={panelReservation}
             roomLabel={panelReservation.roomLabel}
             propertyLabel={localizedPropertyName(panelReservation.propertyName)}
@@ -1402,11 +1745,14 @@ function ReservationPanel({
   channelStyle,
   copy,
   note,
+  noteStatus,
   onChangeNote,
   onClose,
   onCopyBeds24Id,
   onCopyPhone,
   onLinkedAction,
+  onRestoreMine,
+  onRetryNote,
   onSaveNote,
   propertyLabel,
   reservation,
@@ -1418,12 +1764,15 @@ function ReservationPanel({
   channelStyle: { accent: string; background: string; badge: string };
   copy: ReturnType<typeof getDictionary>["admin"]["calendar"];
   note: string;
+  noteStatus: NoteStatus | null;
   onChangeNote: (value: string) => void;
   onClose: () => void;
   onCopyBeds24Id: () => void;
   onCopyPhone: () => void;
   onLinkedAction: (kind: "maintenance" | "complaint" | "lost") => void;
-  onSaveNote: (value: string) => Promise<void>;
+  onRestoreMine: (mine: string) => void;
+  onRetryNote: () => void;
+  onSaveNote: () => Promise<void>;
   propertyLabel: string;
   reservation: AdminReservationConsoleProps["reservations"][number];
   roomLabel: string;
@@ -1457,7 +1806,7 @@ function ReservationPanel({
             <Copy aria-hidden="true" />
           </button>
         </span>
-        <button aria-label={copy.wClose} className="acw-ib acw-ph__x" onClick={onClose} type="button">
+        <button aria-label={copy.wClose} className="acw-ib acw-ph__x" data-panel-autofocus onClick={onClose} type="button">
           <X aria-hidden="true" />
         </button>
       </div>
@@ -1502,17 +1851,42 @@ function ReservationPanel({
           <label htmlFor="acw-note">{copy.internalNote}</label>
           <textarea
             id="acw-note"
+            maxLength={RESERVATION_INTERNAL_NOTE_MAX_LENGTH}
             onChange={(event) => onChangeNote(event.target.value)}
-            onBlur={(event) => {
-              startTransition(() => {
-                void onSaveNote(event.target.value);
-              });
+            // 바뀐 칸만 저장한다(값이 그대로면 서버에 안 보낸다, 2026-11-12).
+            // 전환(startTransition)에 싸지 않는다 — 「저장 중」 표시가 밀리면 바로 이어진 닫기가 두 번째 요청을 보냈다(2026-11-12 리뷰).
+            onBlur={() => {
+              void onSaveNote();
             }}
             placeholder={copy.internalNotePlaceholder}
             rows={3}
             value={note}
           />
-          <span>{copy.wNoteHint}</span>
+          {noteStatus?.kind === "saving" ? (
+            <span aria-live="polite" className="acw-nf__st">
+              {copy.noteSaving}
+            </span>
+          ) : noteStatus?.kind === "failed" ? (
+            <span className="acw-nf__st is-err" role="alert">
+              <b>{copy.noteUnsaved}</b> · {noteStatus.message}
+              <button className="acw-link" onClick={onRetryNote} type="button">
+                {copy.noteRetry}
+              </button>
+            </span>
+          ) : noteStatus?.kind === "conflict" ? (
+            <span className="acw-nf__st is-warn" role="alert">
+              {copy.noteConflict}
+              <span className="acw-nf__mine">
+                <span className="acw-k">{copy.noteMyDraft}</span>
+                <span className="acw-nf__mine-t">{noteStatus.mine || "—"}</span>
+              </span>
+              <button className="acw-link" onClick={() => onRestoreMine(noteStatus.mine)} type="button">
+                {copy.noteRestoreDraft}
+              </button>
+            </span>
+          ) : (
+            <span>{copy.wNoteHint}</span>
+          )}
         </div>
 
         <div className="acw-links">
@@ -1572,7 +1946,7 @@ function RoomPanel({
         <div className="admcal__panel-kicker">
           {copy.roomStatusView} · {propertyLabel}
         </div>
-        <button className="admcal__panel-close" onClick={onClose} type="button">
+        <button aria-label={copy.closePanel} className="admcal__panel-close" data-panel-autofocus onClick={onClose} type="button">
           <X className="size-4" />
         </button>
         <div className="admcal__panel-title">{bRoom(room.displayRoomLabel)}</div>

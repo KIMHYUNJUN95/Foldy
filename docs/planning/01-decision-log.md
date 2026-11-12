@@ -2,6 +2,14 @@
 
 This file records important project decisions.
 
+## 2026-11-12 예약 내부 메모는 관리자 웹 권한(`admin_web.access`)이 있는 사람 모두 쓴다 (사용자 결정, 예약 캘린더 점검)
+
+- 앱은 관리자 웹에 들어오는 사람에게 메모 칸을 보여 주는데 DB 규칙은 역할 목록(owner · office_admin · cs_staff · field_manager)이라
+  어긋났다. 쓰기 규칙을 권한 키 `admin_web.access` 로 맞춘다(마이그레이션 `202611120001_reservation_notes_capability.sql`). 읽기는 그대로(활성 멤버 전원).
+- 메모 · 건물 정보 저장은 **화면이 본 버전(`updated_at`)일 때만** — 그사이 남이 바꿨으면 덮어쓰지 않고 충돌로 최신 값을 보여 준다.
+- 「빈 방」 = 그날 밤 예약도 차단도 없는 방(모바일 · PC 한 정의). 지운 출입 코드는 비어 있는 채로 남는다(기본값으로 되살아나지 않음).
+- 문서: 15 「예약 캘린더 점검 수정」, 05-rls 「reservation_internal_notes」, 04.
+
 ## 2026-11-04 청소 상황표 — 규칙 4개 확정 (사용자, 문서 45)
 
 - R9: 미룬 기간 중 새 체크아웃(미룬 날 뒤)은 정상 방 + 시작 허용.

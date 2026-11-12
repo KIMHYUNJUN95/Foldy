@@ -1,6 +1,7 @@
 "use client";
 
 import { MobileCalendarView, type CalendarReservationItem, type CalendarRoomBlock } from "@/components/calendar/mobile-calendar-view";
+import type { CalendarDeepLinkNotice } from "@/lib/calendar-deep-link";
 import type { PropertyMapMeta } from "@/lib/property-map-links";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import { useBeds24LiveRefresh } from "@/components/shared/beds24-live-refresh";
@@ -80,6 +81,10 @@ type MobileCalendarLiveViewProps = {
     today: string;
   };
   isOutOfWindow: boolean;
+  blocksLoadFailed?: boolean;
+  buildingInfoLoadFailed?: boolean;
+  deepLinkNotice?: CalendarDeepLinkNotice | null;
+  deepLinkRequestedId?: string | null;
   buildingInfos: PropertyMapMeta[];
   locale: Locale;
   organizationId: string;

@@ -95,3 +95,14 @@ export function tokyoDayStart(dateKey: string): string {
 export function tokyoDayEndExclusive(dateKey: string): string {
   return `${ymdShift(dateKey, 1)}T00:00:00+09:00`;
 }
+
+/**
+ * 지금부터 다음 도쿄 자정까지 남은 밀리초 (2026-11-12 예약 캘린더 점검).
+ *
+ * 캘린더를 켜 둔 채 자정을 넘기면 「오늘」 표시 · 오늘 체크인 목록이 어제에 머물렀다. 화면은 이 시간 뒤에 오늘 키를 다시 읽는다.
+ * 최소 1초 — 자정 바로 그 순간에 0 이 되어 타이머가 연달아 도는 일이 없게.
+ */
+export function msUntilNextTokyoMidnight(now: Date = new Date()): number {
+  const next = Date.parse(tokyoDayEndExclusive(tokyoDateOfDate(now)));
+  return Math.max(1000, next - now.getTime());
+}

@@ -1,8 +1,9 @@
-import { toOriginalReservationId } from "@/lib/beds24/reservation-id";
+import { shiftMonthKey } from "@/components/admin/shared/admin-month-key";
 import { normalizeReservationSource } from "@/lib/beds24/source-normalization";
-import { readBeds24BookingId } from "@/lib/beds24/reservation-status";
 import { isBeds24SyncPaused } from "@/lib/beds24/sync-control";
-import { listPropertyMapMeta } from "@/lib/property-operation-info";
+import { loadPropertyMapMeta } from "@/lib/property-operation-info";
+import { getReservationDisplayId } from "@/lib/reservation-display-id";
+import { resolveRoomBlockRoom } from "@/lib/room-block-room";
 import { listReservationInternalNotesInWindow, pickReservationNotes } from "@/lib/reservation-internal-notes";
 import { CALENDAR_PAYLOAD_KEYS, slimPayloadOf, slimPayloadSelect } from "@/lib/reservation-payload-slim";
 import {
@@ -137,9 +138,9 @@ export function isValidMonth(value: string | undefined): value is string {
   return !!value && /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
 }
 
+/** 달 키 이동 — 공용 `shiftMonthKey`(CLAUDE.md §4a, `Date` 로 달을 더하지 않는다). */
 export function shiftMonth(month: string, diff: number) {
-  const [year, monthIndex] = month.split("-").map(Number);
-  return new Date(Date.UTC(year, monthIndex - 1 + diff, 1)).toISOString().slice(0, 7);
+  return shiftMonthKey(month, diff);
 }
 
 export function buildDates(month: string) {
@@ -194,17 +195,6 @@ function getPhone(
   return getRawPayloadString(rawPayload, ["phone", "mobile", "guest_phone", "guestPhone"]);
 }
 
-function getDisplayReservationId(row: ReservationRow) {
-  if (row.raw_payload && typeof row.raw_payload === "object" && !Array.isArray(row.raw_payload)) {
-    const fromPayload = readBeds24BookingId(
-      row.raw_payload as Record<string, string | number | boolean | null>,
-    );
-    if (fromPayload) return fromPayload;
-  }
-
-  return toOriginalReservationId(row.source_reservation_id);
-}
-
 function toReservationChannel(source: string | null | undefined): ReservationChannel {
   const normalized = normalizeReservationSource(source);
   if (normalized === "Airbnb") return "airbnb";
@@ -232,9 +222,9 @@ export async function getAdminCalendarDashboardData(
   const operationalWindowEnd = `${shiftMonth(currentMonth, 2)}-01`;
 
   const supabase = await getSupabaseServerClient();
-  const [roomCatalog, buildingInfos, reservationsResult, roomBlocksResult, notesInWindow] = await Promise.all([
+  const [roomCatalog, buildingInfoResult, reservationsResult, roomBlocksResult, notesInWindow] = await Promise.all([
     getActiveRoomCatalog(session.organization.id, supabase),
-    listPropertyMapMeta(session),
+    loadPropertyMapMeta(session),
     // 1,000행 상한을 넘으면 조용히 잘린다 — 페이지로 끝까지 읽는다(`read-all-pages.ts`).
     // `raw_payload` 는 쓰는 키만(`reservation-payload-slim.ts`) — 통째면 954행에 약 2MB 였다.
     readAllPages<Record<string, unknown>>((from, to) =>
@@ -253,7 +243,7 @@ export async function getAdminCalendarDashboardData(
     readAllPages((from, to) =>
       supabase
         .from("room_blocks")
-        .select("id, property_name, room_label, start_date, end_date")
+        .select("id, property_name, room_label, external_room_id, start_date, end_date")
         .eq("organization_id", session.organization.id)
         // 「이 창에 걸치는」 구간. 창 밖에서 시작해 안으로 들어오는 블락도 잡아야 한다.
         .lt("start_date", operationalWindowEnd)
@@ -318,7 +308,7 @@ export async function getAdminCalendarDashboardData(
     });
 
     reservations.push({
-      beds24Id: getDisplayReservationId(row),
+      beds24Id: getReservationDisplayId(row),
       channel: toReservationChannel(row.source),
       checkInDate: row.check_in_date,
       checkOutDate: row.check_out_date,
@@ -333,29 +323,24 @@ export async function getAdminCalendarDashboardData(
     });
   }
 
+  const buildingInfos = buildingInfoResult.items;
   // 블락을 캘린더 행에 붙인다. 방 이름은 예약과 같은 축(`건물::표시방이름`)으로 맞춘다 —
   // 안 맞으면 그릴 행이 없으므로 조용히 버린다(로그만 남기는 편이 캘린더를 깨뜨리는 것보다 낫다).
   const roomBlocks: AdminCalendarRoomBlock[] = [];
+  // 읽다 실패하면 앞 페이지만 남는다 — 반쪽 블록은 그리지 않고, 화면에 「차단 정보를 못 불러왔다」를 띄운다(2026-11-12, 예전엔 로그만 → 빈 방 수가 조용히 틀렸다).
+  const blocksLoadFailed = Boolean(roomBlocksResult.error);
   if (roomBlocksResult.error) {
-    console.error("[admin-calendar] room block read failed", roomBlocksResult.error);
+    console.error("[admin-calendar] room block read failed", { message: roomBlocksResult.error.message });
   } else {
     for (const row of roomBlocksResult.data) {
       if (isExcludedOperationalProperty(row.property_name)) continue;
       if (isExcludedOperationalRoom(row.property_name, row.room_label)) continue;
-      const propertyName = getCanonicalPropertyName(row.property_name);
-      // 예약과 같은 해석기로 방 이름을 맞춘다(건물별 별칭 · 외부 방 이름까지 같은 규칙).
-      const resolvedBlockRoom = resolveReservationCanonicalRoomLabel(
-        { property_name: row.property_name, raw_payload: null, room_label: row.room_label },
-        {
-          globalExternalRoomToCanonical,
-          isAuthoritative: roomCatalog !== undefined,
-          lookups: roomLookups,
-        },
-      );
-      const canonicalRoomKey =
-        resolvedBlockRoom ?? (getCanonicalRoomLabel(propertyName, row.room_label) || row.room_label.trim());
-      const displayRoomLabel =
-        getDisplayRoomLabel(propertyName, canonicalRoomKey) || canonicalRoomKey;
+      // 모바일과 같은 해석기(`room-block-room.ts`) — Beds24 객실 id 먼저, 그다음 방 이름.
+      const { displayRoomLabel, propertyName } = resolveRoomBlockRoom(row, {
+        globalExternalRoomToCanonical,
+        isAuthoritative: roomCatalog !== undefined,
+        lookups: roomLookups,
+      });
       const roomKey = toRoomAxisKey(propertyName, displayRoomLabel);
       if (!roomRowsByKey.has(roomKey)) {
         // 맞는 행이 없으면 캘린더에서 조용히 사라진다 — 어떤 블락인지 로그를 남긴다(개인정보 없음).
@@ -400,6 +385,8 @@ export async function getAdminCalendarDashboardData(
 
   return {
     beds24SyncPaused: isBeds24SyncPaused(),
+    blocksLoadFailed,
+    buildingInfoLoadFailed: buildingInfoResult.loadFailed,
     buildingInfos: filteredBuildingInfos,
     currentMonth,
     dates,

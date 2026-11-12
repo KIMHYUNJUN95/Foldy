@@ -1,12 +1,14 @@
 ﻿import { redirect } from "next/navigation";
 import type { CalendarReservationItem } from "@/components/calendar/mobile-calendar-view";
 import { MobileCalendarLiveView } from "@/components/calendar/mobile-calendar-live-view";
-import { toOriginalReservationId } from "@/lib/beds24/reservation-id";
+import { shiftMonthKey } from "@/components/admin/shared/admin-month-key";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { getDictionary } from "@/lib/i18n";
 import { getMobileNavBadges } from "@/lib/nav-badges";
 import { getOnboardingState } from "@/lib/onboarding";
-import { listPropertyMapMeta } from "@/lib/property-operation-info";
+import { loadPropertyMapMeta } from "@/lib/property-operation-info";
+import { getReservationDisplayId } from "@/lib/reservation-display-id";
+import { resolveRoomBlockRoom } from "@/lib/room-block-room";
 import { listReservationInternalNotesInWindow, pickReservationNotes } from "@/lib/reservation-internal-notes";
 import { CALENDAR_PAYLOAD_KEYS, slimPayloadOf, slimPayloadSelect } from "@/lib/reservation-payload-slim";
 import {
@@ -20,10 +22,15 @@ import {
 } from "@/lib/room-label-normalization";
 import {
   type ActiveRoomCatalogItem,
+  buildGlobalExternalRoomToCanonical,
   buildPropertyRoomLookups,
   getActiveRoomCatalog,
+  getRawPayloadString,
+  type PropertyRoomLookups,
+  resolveReservationCanonicalRoomLabel,
 } from "@/lib/rooms";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
+import { type CalendarDeepLinkNotice, decideCalendarDeepLink } from "@/lib/calendar-deep-link";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { readAllPages } from "@/lib/supabase/read-all-pages";
 import type { Database } from "@/types/database";
@@ -97,58 +104,10 @@ function resolveMonth(value: string | undefined): string {
 }
 
 function getPhone(rawPayload: Database["public"]["Tables"]["reservations"]["Row"]["raw_payload"]) {
-  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
-    return null;
-  }
-
-  const keys = ["phone", "mobile", "guest_phone", "guestPhone"];
-  for (const key of keys) {
-    const value = (rawPayload as Record<string, unknown>)[key];
-    if (typeof value === "string" && value.trim().length > 0) {
-      return value.trim();
-    }
-  }
-
-  return null;
+  return getRawPayloadString(rawPayload, ["phone", "mobile", "guest_phone", "guestPhone"]);
 }
 
-function getDisplayReservationId(item: ReservationRow) {
-  const fromPayload = getRawPayloadString(item.raw_payload, [
-    "apiReference",
-    "api_reference",
-    "bookId",
-    "book_id",
-    "reservationId",
-    "reservation_id",
-    "bookingId",
-    "booking_id",
-    "id",
-  ]);
-  if (fromPayload) {
-    return fromPayload;
-  }
-  return toOriginalReservationId(item.source_reservation_id);
-}
-
-function getRawPayloadString(
-  rawPayload: Database["public"]["Tables"]["reservations"]["Row"]["raw_payload"],
-  keys: string[],
-) {
-  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
-    return null;
-  }
-  const record = rawPayload as Record<string, unknown>;
-  for (const key of keys) {
-    const value = record[key];
-    if (typeof value === "string" && value.trim().length > 0) {
-      return value.trim();
-    }
-    if (typeof value === "number") {
-      return String(value);
-    }
-  }
-  return null;
-}
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type MobileCalendarPageProps = {
   searchParams: Promise<{
@@ -229,30 +188,73 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
   // 운영 조회 구간: 항상 이번 달(오늘이 속한 달) + 다음 달.
   // UI 에서 이동하는 selectedMonth 가 아니라 오늘 기준으로 고정한다.
   const currentJstMonth = today.slice(0, 7); // 예: "2026-05"
-  const [opYear, opMonth] = currentJstMonth.split("-").map(Number);
   const operationalMonthStart = `${currentJstMonth}-01`; // 예: "2026-05-01"
-  // 배타적 상한: 다음 달의 다음 달 1일(지금부터 2개월 뒤)
-  const operationalWindowEnd = new Date(Date.UTC(opYear, opMonth + 1, 1)).toISOString().slice(0, 10); // 예: "2026-07-01"
+  // 배타적 상한: 다음 달의 다음 달 1일(지금부터 2개월 뒤). 달 이동은 공용 `shiftMonthKey`(CLAUDE.md §4a).
+  const operationalWindowEnd = `${shiftMonthKey(currentJstMonth, 2)}-01`; // 예: "2026-07-01"
 
   // 서버 측 구간 밖 확인: selectedMonth 가 2개월 운영 구간 밖이면
   // 예약 쿼리를 아예 건너뛴다. 이미 비어 있는 걸 아는 결과를 위해
   // DB 를 읽을 필요가 없다.
   // getActiveRoomLabels 는 디버그 일관성과 방 출처 표시를 위해 항상 가져온다.
-  const nextJstMonth = new Date(Date.UTC(opYear, opMonth, 1)).toISOString().slice(0, 7);
+  const nextJstMonth = shiftMonthKey(currentJstMonth, 1);
   const isOutOfWindow = selectedMonth !== currentJstMonth && selectedMonth !== nextJstMonth;
 
   const supabase = await getSupabaseServerClient();
 
+  // 예약 딥링크(2026-11-12) — 그 예약을 먼저 찾아 **그 예약의 달 · 건물로 다시 보내** 연다. 못 열면 이유를 알린다(`calendar-deep-link.ts`).
+  let deepLinkNotice: CalendarDeepLinkNotice | null = null;
+  let deepLinkReservationId: string | null = null;
+  if (initialReservationId) {
+    const found = UUID_PATTERN.test(initialReservationId)
+      ? await supabase
+          .from("reservations")
+          .select("id, check_in_date, check_out_date, property_name, room_label, status")
+          .eq("organization_id", session.organization.id)
+          .eq("id", initialReservationId)
+          .maybeSingle()
+      : { data: null, error: null };
+    const row = found.error ? null : found.data;
+    const decision = decideCalendarDeepLink({
+      currentMonth: currentJstMonth,
+      excluded: row
+        ? isExcludedOperationalProperty(row.property_name) || isExcludedOperationalRoom(row.property_name, row.room_label)
+        : false,
+      nextMonth: nextJstMonth,
+      reservation: row
+        ? {
+            checkInDate: row.check_in_date,
+            checkOutDate: row.check_out_date,
+            propertyName: getCanonicalPropertyName(row.property_name),
+            status: row.status,
+          }
+        : null,
+    });
+    if (decision.kind === "open") {
+      if (decision.month !== selectedMonth || decision.property !== selectedProperty) {
+        const target = new URLSearchParams({ month: decision.month, property: decision.property, reservationId: initialReservationId });
+        redirect(`/mobile/calendar?${target.toString()}`);
+      }
+      deepLinkReservationId = initialReservationId;
+    } else {
+      deepLinkNotice = found.error ? "not_found" : decision.reason;
+    }
+  }
+
   let reservations: CalendarReservationItem[] = [];
   let roomMasterRooms: string[] | undefined;
   let roomCatalog: ActiveRoomCatalogItem[] | undefined;
+  let resolveContext: {
+    globalExternalRoomToCanonical: Map<string, string>;
+    isAuthoritative: boolean;
+    lookups: PropertyRoomLookups;
+  } | null = null;
 
   // 서로 기다릴 필요 없는 읽기(객실 · 예약 · 메모 · 차단 · 건물 정보 · 배지)는 한 번에 시작한다(2026-10-19 속도 — 전에는
   // 메모 5번 · 차단 · 배지가 차례로 붙어 약 13단계였다).
   const roomBlocksPromise = readAllPages((from, to) =>
     supabase
       .from("room_blocks")
-      .select("id, property_name, room_label, start_date, end_date")
+      .select("id, property_name, room_label, external_room_id, start_date, end_date")
       .eq("organization_id", session.organization.id)
       .lt("start_date", operationalWindowEnd)
       .gte("end_date", operationalMonthStart)
@@ -260,7 +262,7 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
       .order("id", { ascending: true })
       .range(from, to),
   );
-  const sidePromise = Promise.all([getMobileNavBadges(), listPropertyMapMeta(session)]);
+  const sidePromise = Promise.all([getMobileNavBadges(), loadPropertyMapMeta(session)]);
   // 첫 await 전에 거절돼도 처리되지 않은 거절로 남지 않게 — 실제 오류는 아래 await 가 그대로 던진다.
   roomBlocksPromise.catch(() => undefined);
   sidePromise.catch(() => undefined);
@@ -301,92 +303,16 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
     roomCatalog = catalog;
     const roomLookups = buildPropertyRoomLookups(roomCatalog ?? []);
 
-    // property 교차 externalRoomId 조회: 건물 이름 불일치를 처리한다(예: Beds24가
-    // 일본어 "荒木町A" 를 보내서 정규화기의 별칭 범위에 따라 정규 "아라키초A" 로
-    // 정규화되지 않을 수 있는 경우). externalRoomId 는 rooms 테이블 전체에서 유일하다.
-    const globalExternalRoomToCanonical = new Map<string, string>(
-      (roomCatalog ?? [])
-        .filter((item) => item.externalRoomId !== null)
-        .map((item) => [item.externalRoomId as string, item.canonicalRoomLabel]),
-    );
-
-    const resolveReservationCanonicalRoomLabel = (item: ReservationRow) => {
-      const canonicalPropertyName = getCanonicalPropertyName(item.property_name);
-      const allowed =
-        roomLookups.allowedCanonicalByProperty[canonicalPropertyName] ?? new Set<string>();
-      const rawLabelMap = roomLookups.canonicalByRawLabel[canonicalPropertyName] ?? {};
-      const externalIdMap = roomLookups.canonicalByExternalId[canonicalPropertyName] ?? {};
-      const isAuthoritative = roomMasterRooms !== undefined;
-
-      const acceptCanonical = (key: string | null | undefined): string | null => {
-        if (!key || !allowed.has(key)) return null;
-        return key;
-      };
-
-      const payloadUnitId = getRawPayloadString(item.raw_payload, [
-        "roomId",
-        "room_id",
-        "unitId",
-        "unit_id",
-      ]);
-      if (payloadUnitId) {
-        const fromExternal =
-          externalIdMap[payloadUnitId] ??
-          globalExternalRoomToCanonical.get(payloadUnitId) ??
-          null;
-        const resolved = acceptCanonical(fromExternal);
-        if (resolved) return resolved;
-        if (isAuthoritative) return null;
-      }
-
-      const payloadUnitName = getRawPayloadString(item.raw_payload, [
-        "unitName",
-        "unit_name",
-        "roomName",
-        "room_name",
-        "roomLabel",
-        "unitLabel",
-        "unit_label",
-        "room_label",
-      ]);
-      if (payloadUnitName) {
-        const exactPayload = acceptCanonical(rawLabelMap[payloadUnitName]);
-        if (exactPayload) return exactPayload;
-        const normalizedPayload = acceptCanonical(
-          getCanonicalRoomLabel(canonicalPropertyName, payloadUnitName),
-        );
-        if (normalizedPayload) return normalizedPayload;
-      }
-
-      const exactRoomLabel = acceptCanonical(rawLabelMap[item.room_label]);
-      if (exactRoomLabel) return exactRoomLabel;
-
-      const normalizedRoomLabel = acceptCanonical(
-        getCanonicalRoomLabel(canonicalPropertyName, item.room_label),
-      );
-      if (normalizedRoomLabel) return normalizedRoomLabel;
-
-      if (isAuthoritative) {
-        return null;
-      }
-
-      if (payloadUnitId) {
-        const fromExternal =
-          externalIdMap[payloadUnitId] ??
-          globalExternalRoomToCanonical.get(payloadUnitId) ??
-          null;
-        const resolved = acceptCanonical(fromExternal);
-        if (resolved) return resolved;
-      }
-
-      return normalizedRoomLabel;
-    };
+    // 방 해석은 관리자 캘린더와 같은 공용 해석기(`rooms.ts`) — 예전엔 이 파일에 똑같은 복사본이 있었다(2026-11-12 정리).
+    const globalExternalRoomToCanonical = buildGlobalExternalRoomToCanonical(roomCatalog ?? []);
+    resolveContext = { globalExternalRoomToCanonical, isAuthoritative: roomMasterRooms !== undefined, lookups: roomLookups };
+    const resolveContextNow = resolveContext;
+    const resolveRoom = (item: ReservationRow) => resolveReservationCanonicalRoomLabel(item, resolveContextNow);
 
     // 화면이 쓰는 예약만 넘긴다(2026-10-19 — HTML 약 470KB 의 대부분이 두 달 창 예약 목록이었다). 격자 · 빈 방 줄 ·
     // 예약 시트는 **보고 있는 달**, 목록 탭 · 건물 고르기의 「오늘 빈 방」은 **오늘** 만 본다. 다른 달은 그 달로 넘어가면
     // 서버가 다시 읽는다. 작업의 예약 딥링크는 체크인 달(`month`)을 같이 실어 보내 보고 있는 달에 들어 있다.
-    const [selYear, selMonthNumber] = selectedMonth.split("-").map(Number);
-    const selectedMonthEndExclusive = new Date(Date.UTC(selYear, selMonthNumber, 1)).toISOString().slice(0, 10);
+    const selectedMonthEndExclusive = `${shiftMonthKey(selectedMonth, 1)}-01`;
     const filteredRows = data.map(toReservationRow).filter(
       (item) =>
         !isExcludedOperationalProperty(item.property_name) &&
@@ -405,7 +331,7 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
       // 사내 기준 시스템과 같다. 고아 방은 아래에서
       // 방 축에 추가되어 막대가 놓일 행이 생긴다.
       const internalRoomKey =
-        resolveReservationCanonicalRoomLabel(item) ||
+        resolveRoom(item) ||
         getCanonicalRoomLabel(canonicalProperty, item.room_label) ||
         item.room_label.trim();
       // 내부 키 → 표시 라벨로 바꿔서 402 와 402_2 가 한 캘린더 행을 공유한다.
@@ -421,7 +347,7 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
         propertyName: canonicalProperty,
         roomLabel,
         source: item.source,
-        sourceReservationId: getDisplayReservationId(item),
+        sourceReservationId: getReservationDisplayId(item),
         status: item.status,
       };
     };
@@ -439,7 +365,7 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
     );
     reservations = reservations.map((item) => ({
       ...item,
-      internalNote: reservationNotes[item.id]?.trim() || null,
+      internalNote: reservationNotes[item.id]?.note.trim() || null,
     }));
   }
 
@@ -481,10 +407,17 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
   // Beds24 캘린더 블락. 예약이 아니라 인벤토리 오버라이드라 별도 테이블에서 온다.
   // 방 축은 예약과 같은 표시 라벨을 쓴다 — 어긋나면 그릴 행이 없다.
   const roomBlocksResult = await roomBlocksPromise;
+  // 읽다 실패하면 앞 페이지만 남는다 — 반쪽 블록은 그리지 않고, 화면에 경고를 띄운다(2026-11-12, 예전엔 로그만 → 빈 방 수가 조용히 틀렸다).
+  const blocksLoadFailed = Boolean(roomBlocksResult.error);
   if (roomBlocksResult.error) {
-    console.error("[mobile/calendar] room block read failed", roomBlocksResult.error);
+    console.error("[mobile/calendar] room block read failed", { message: roomBlocksResult.error.message });
   }
-  // 읽다 실패하면 앞 페이지만 남는다 — 반쪽 블록은 그리지 않는다(관리자 캘린더와 같다).
+  // 방 해석은 관리자 캘린더와 같은 공용 해석기(`room-block-room.ts`, Beds24 객실 id 먼저). 창 밖 달은 예약을 안 읽어 해석 표를 여기서 만든다.
+  const blockResolveContext = resolveContext ?? {
+    globalExternalRoomToCanonical: buildGlobalExternalRoomToCanonical(roomCatalog ?? []),
+    isAuthoritative: roomCatalog !== undefined,
+    lookups: buildPropertyRoomLookups(roomCatalog ?? []),
+  };
   const roomBlocks = (roomBlocksResult.error ? [] : roomBlocksResult.data)
     .filter(
       (row) =>
@@ -492,15 +425,13 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
         !isExcludedOperationalRoom(row.property_name, row.room_label),
     )
     .map((row) => {
-      const propertyName = getCanonicalPropertyName(row.property_name);
-      const canonicalRoomLabel =
-        getCanonicalRoomLabel(propertyName, row.room_label) || row.room_label.trim();
+      const { displayRoomLabel, propertyName } = resolveRoomBlockRoom(row, blockResolveContext);
       return {
         endDate: row.end_date,
         id: row.id,
         // 건물도 넘긴다 — 화면이 고른 건물의 블락만 그린다(다른 건물 같은 번호 방에 그려지던 버그, 2026-10-26).
         propertyName,
-        roomLabel: getDisplayRoomLabel(propertyName, canonicalRoomLabel) || canonicalRoomLabel,
+        roomLabel: displayRoomLabel,
         startDate: row.start_date,
       };
     });
@@ -549,7 +480,8 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
       }
     : null;
 
-  const [navBadges, buildingInfos] = await sidePromise;
+  const [navBadges, buildingInfoResult] = await sidePromise;
+  const buildingInfos = buildingInfoResult.items;
 
   return (
     // 넓은 화면(2026-10-05): 폭 전부(`wide`) — 격자는 날짜 칸이 고정 폭이라 넓을수록 더 많은 날을 한 번에 본다. 목록 · 건물
@@ -633,6 +565,10 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
         }}
         wcopy={dictionary.mobile.calendarW}
         isOutOfWindow={isOutOfWindow}
+        blocksLoadFailed={blocksLoadFailed}
+        buildingInfoLoadFailed={buildingInfoResult.loadFailed}
+        deepLinkNotice={deepLinkNotice}
+        deepLinkRequestedId={initialReservationId}
         buildingInfos={buildingInfos}
         locale={session.user.preferredLanguage}
         organizationId={session.organization.id}
@@ -648,7 +584,7 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
         selectedProperty={effectiveSelectedProperty}
         statusLabels={dictionary.admin.reservationStatusLabels}
         today={today}
-        initialReservationId={initialReservationId}
+        initialReservationId={deepLinkReservationId}
       />
     </MobileShell>
   );

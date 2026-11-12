@@ -777,10 +777,13 @@ unique (organization_id, reservation_id)
 Notes:
 - One note row per reservation per organization.
 - Empty save from the admin calendar deletes the row instead of storing blank text.
+- **Conditional writes (2026-11-12):** the client sends the `updated_at` it last saw (`null` = no row). The server updates /
+  deletes only `where updated_at = <seen>`, and inserts only when no row exists (unique violation → conflict). Zero rows →
+  `conflict` + the current value; the UI never overwrites silently. Rules: `src/lib/reservation-note-sync.ts`.
 - This table is operational metadata owned by Foldy, distinct from Beds24 reservation source data.
 - Read access is intentionally broader than write access: all active organization members can read
-  the note, while create / update / delete remains limited to the privileged reservation-calendar
-  operator roles.
+  the note, while create / update / delete requires the `admin_web.access` capability (2026-11-12,
+  `202611120001_reservation_notes_capability.sql`; before that a role list).
 
 ## order_requests
 
@@ -1923,6 +1926,11 @@ Constraints / behavior:
 - unique on `(organization_id, canonical_name)`
 - stores overrides on top of the static property seed metadata
 - intended for shared address, access, and ops-note editing from admin calendar
+- **2026-11-12:** a saved row is authoritative — an emptied `shared_access` / `room_access` (or blank codes) stays empty instead
+  of falling back to the seed (`PROPERTY_MAP_META`); the seed is used only when there is no row, or when the table is missing
+  (42P01 · PGRST205). Other read errors surface as `loadFailed` (no stale seed codes). Saves are conditional on the
+  `updated_at` seen when editing started (`null` = insert only if absent); a mismatch returns `conflict` + the current row.
+  Rules: `src/lib/property-operation-info-rules.ts`.
 
 ## 2026-08-03 `attendance_correction_requests` — 철회 상태 추가
 

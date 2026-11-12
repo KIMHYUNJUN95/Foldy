@@ -39,6 +39,8 @@ export default async function AdminCalendarPage({ searchParams }: PageProps) {
       <Beds24LiveRefresh kinds={LIVE_KINDS} organizationId={session.organization.id} />
       <AdminReservationConsole
         beds24SyncPaused={data.beds24SyncPaused}
+        blocksLoadFailed={data.blocksLoadFailed}
+        buildingInfoLoadFailed={data.buildingInfoLoadFailed}
         blockedProperties={[]}
         buildingInfos={data.buildingInfos}
         canEditBuildingInfo={canEditPropertyOperationInfo(session)}

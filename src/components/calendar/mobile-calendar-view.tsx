@@ -7,6 +7,12 @@ import type { UIEvent } from "react";
 import { Check, ChevronDown, ChevronLeft, ChevronRight, Copy, ExternalLink, Pencil, Phone } from "lucide-react";
 import "./mobile-calendar.css";
 import { collectBlockedRooms } from "@/lib/room-blocks";
+import { shiftMonthKey } from "@/components/admin/shared/admin-month-key";
+import { useTokyoToday } from "@/components/shared/use-tokyo-today";
+import { useToastMotion } from "@/components/shell/use-toast-motion";
+import { assignLanes } from "@/lib/calendar-lanes";
+import type { CalendarDeepLinkNotice } from "@/lib/calendar-deep-link";
+import { occupiedRoomsOn, splitVacantRooms } from "@/lib/vacant-rooms";
 import { type PropertyMapMeta, getPropertyAddress } from "@/lib/property-map-links";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { DatePickerSheet } from "@/components/shell/date-picker-sheet";
@@ -110,6 +116,14 @@ type MobileCalendarViewProps = {
   // 서버에서 계산: selectedMonth 가 2개월 운영 창 밖이면 true.
   // 클라이언트에서 다시 계산하지 않도록 prop 으로 넘기며, 기준은 하나로 유지한다.
   isOutOfWindow: boolean;
+  /** 차단(`room_blocks`) 읽기 실패 — 빈 방 수를 믿을 수 없다는 경고를 띄운다(2026-11-12). */
+  blocksLoadFailed?: boolean;
+  /** 건물 운영 정보 읽기 실패 — 옛 출입 코드 대신 오류 안내(2026-11-12). */
+  buildingInfoLoadFailed?: boolean;
+  /** 딥링크로 온 예약을 못 여는 이유 — 서버가 정한다(`calendar-deep-link.ts`). */
+  deepLinkNotice?: CalendarDeepLinkNotice | null;
+  /** 딥링크로 요청된 예약 id(그대로) — 못 여는 알림의 열쇠에 쓴다(이유 + id). */
+  deepLinkRequestedId?: string | null;
   buildingInfos: PropertyMapMeta[];
   locale: Locale;
   reservations: CalendarReservationItem[];
@@ -212,54 +226,18 @@ function roundCalendarPx(value: number) {
   return Math.round(value * 100) / 100;
 }
 
-/** 반개구간으로 렌더링 -> 경계가 같은 교체(퇴실=입실)는 겹치지 않는 것으로 본다. */
-function reservationBarsOverlap(
-  a: Pick<ReservationBarBounds, "leftPx" | "rightPx">,
-  b: Pick<ReservationBarBounds, "leftPx" | "rightPx">,
-) {
-  return a.leftPx < b.rightPx && b.leftPx < a.rightPx;
-}
-
+/** 같은 방에 겹치는 예약은 아래 줄로 — PC 월간 보드와 같은 공용 레인 계산(`calendar-lanes.ts`, 반열림 구간). */
 function assignReservationLanes(
   items: CalendarReservationItem[],
   rangeStart: string,
   rangeEndExclusive: string,
   datesLength: number,
 ): { bars: ReservationBarLayout[] } {
-  if (items.length === 0) {
-    return { bars: [] };
-  }
-
-  const bars = items.map((item) => {
-    const bounds = computeReservationBarBounds(item, rangeStart, rangeEndExclusive, datesLength);
-    return { ...bounds, id: item.id, item };
-  });
-
-  const sorted = [...bars].sort((a, b) => {
-    if (a.leftPx !== b.leftPx) return a.leftPx - b.leftPx;
-    return a.rightPx - b.rightPx;
-  });
-
-  const lanes: Array<Array<Pick<ReservationBarBounds, "leftPx" | "rightPx">>> = [];
-  const assigned: ReservationBarLayout[] = [];
-
-  for (const bar of sorted) {
-    let laneIndex = 0;
-    for (; laneIndex < lanes.length; laneIndex += 1) {
-      const overlaps = lanes[laneIndex].some((existing) =>
-        reservationBarsOverlap(bar, existing),
-      );
-      if (!overlaps) break;
-    }
-
-    if (laneIndex === lanes.length) {
-      lanes.push([]);
-    }
-    lanes[laneIndex].push({ leftPx: bar.leftPx, rightPx: bar.rightPx });
-    assigned.push({ ...bar, laneIndex });
-  }
-
-  return { bars: assigned };
+  const { placed } = assignLanes(
+    items.map((item) => ({ ...computeReservationBarBounds(item, rangeStart, rangeEndExclusive, datesLength), id: item.id, item })),
+    (bar) => ({ start: bar.leftPx, end: bar.rightPx }),
+  );
+  return { bars: placed.map(({ item: bar, lane }) => ({ ...bar, laneIndex: lane })) };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -324,8 +302,9 @@ async function copyText(value: string) {
   textarea.style.left = "-9999px";
   document.body.appendChild(textarea);
   textarea.select();
-  document.execCommand("copy");
+  const ok = document.execCommand("copy");
   document.body.removeChild(textarea);
+  if (!ok) throw new Error("clipboard_unavailable");
 }
 
 function sharedAccessLabel(
@@ -372,11 +351,27 @@ export function MobileCalendarView({
   selectedProperty: selectedPropertyProp,
   selectedMonth,
   selectedMonthLabel,
-  today,
+  today: serverToday,
   initialReservationId,
+  blocksLoadFailed = false,
+  buildingInfoLoadFailed = false,
+  deepLinkNotice = null,
+  deepLinkRequestedId = null,
 }: MobileCalendarViewProps) {
   const searchParams = useSearchParams();
   const router = useRouter();
+  // 켜 둔 채 도쿄 자정을 넘기면 「오늘」 · 오늘 목록을 새 날로 — 서버도 새 날 창으로 다시 읽는다(2026-11-12).
+  const refreshForNewDay = useCallback(() => router.refresh(), [router]);
+  const today = useTokyoToday(serverToday, refreshForNewDay);
+  // 짧은 알림(복사 실패 · 딥링크를 못 여는 이유) — 탭 바 위 알약, 5초 뒤 사라진다.
+  const [notice, setNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(null), 5000);
+    return () => clearTimeout(timer);
+  }, [notice]);
+  const dismissNotice = useCallback(() => setNotice(null), []);
+  const noticeRef = useToastMotion<HTMLDivElement>(dismissNotice);
   // 활성 건물은 실제 URL에서 먼저 구하고, 없으면 서버 prop 으로 대체한다.
   // /mobile/calendar 로의 부드러운 클라이언트 이동(router.push)은 프리페치/캐시된 RSC
   // 페이로드를 쓸 수 있고, 그 searchParams 가 URL 과 다를 수 있다(예: 파라미터 없는 건물 선택기 페이로드).
@@ -453,13 +448,9 @@ export function MobileCalendarView({
     return new Date(Date.UTC(year, month, 0)).getUTCDate();
   }, [selectedMonth]);
   const dates = useMemo(() => buildRange(rangeStart, daysInMonth), [daysInMonth, rangeStart]);
-  const [selectedYear, selectedMonthNumber] = selectedMonth.split("-").map(Number);
-  const previousMonth = new Date(Date.UTC(selectedYear, selectedMonthNumber - 2, 1))
-    .toISOString()
-    .slice(0, 7);
-  const nextMonth = new Date(Date.UTC(selectedYear, selectedMonthNumber, 1))
-    .toISOString()
-    .slice(0, 7);
+  // 달 이동은 공용 `shiftMonthKey`(CLAUDE.md §4a) — `Date` 로 달을 더하지 않는다.
+  const previousMonth = shiftMonthKey(selectedMonth, -1);
+  const nextMonth = shiftMonthKey(selectedMonth, 1);
   // 막대 너비/겹침 계산의 배타적 상한.
   // 이번 달 마지막 날이 아니라 다음 달 1일을 쓰면 마지막
   // 날 열이 온전히 포함된다: 06-01 에 끝나는 숙박은 05-31 을 전부 차지한다.
@@ -570,33 +561,27 @@ export function MobileCalendarView({
       ),
     [activeReservations, listReferenceDate],
   );
-  const emptyRoomLabels = useMemo(() => {
-    const occupiedRoomSet = new Set(stayingToday.map((item) => item.roomLabel));
-    return rooms.filter((room) => !occupiedRoomSet.has(room));
-  }, [rooms, stayingToday]);
-
   /**
-   * 기준일에 막혀 있는 방.
-   *
-   * **「오늘 빈 객실」 수에서 빼지는 않는다.** 그 숫자는 「물리적으로 비어 있는 방」이고 블락은
-   * 판매만 막은 것이라 방 자체는 비어 있다 — 빼면 청소·점검 인원이 보는 숫자가 달라진다.
-   * 대신 목록에서 「차단」으로 표시해, 팔 수 있는 방으로 착각하지 않게 한다.
+   * 고른 날의 빈 방 — **예약도 차단도 없는 방**(`vacant-rooms.ts`, 머리 줄 · 요약 줄 · 건물 고르기 · PC 와 같은 정의, 2026-11-12).
+   * 예전엔 목록 탭은 차단을 안 빼고 머리 줄은 빼서 같은 날 숫자가 둘이었다. 예약 없이 차단된 방은 목록 아래에 「차단」으로 따로 보인다.
    */
-  const blockedRoomsAtReference = useMemo(
-    () => collectBlockedRooms(scopedRoomBlocks, listReferenceDate, (block) => block.roomLabel),
-    [listReferenceDate, scopedRoomBlocks],
+  const { vacant: emptyRoomLabels, blockedEmpty: blockedEmptyRoomLabels } = useMemo(
+    () =>
+      splitVacantRooms(
+        rooms,
+        new Set(stayingToday.map((item) => item.roomLabel)),
+        collectBlockedRooms(scopedRoomBlocks, listReferenceDate, (block) => block.roomLabel),
+      ),
+    [listReferenceDate, rooms, scopedRoomBlocks, stayingToday],
   );
 
   // 날짜별 「빈 방」 수(머리 줄) — 렌더마다 날짜 × 예약을 다시 돌지 않게 한 번만 센다(2026-10-26).
   const emptyCountByDate = useMemo(() => {
     const counts = new Map<string, number>();
     for (const date of dates) {
-      const occupied = new Set<string>();
-      for (const item of activeInRange) {
-        if (item.checkInDate <= date && item.checkOutDate > date) occupied.add(item.roomLabel);
-      }
+      const occupied = occupiedRoomsOn(activeInRange, date, (item) => item.roomLabel);
       const blocked = collectBlockedRooms(scopedRoomBlocks, date, (block) => block.roomLabel);
-      counts.set(date, rooms.filter((room) => !occupied.has(room) && !blocked.has(room)).length);
+      counts.set(date, splitVacantRooms(rooms, occupied, blocked).vacant.length);
     }
     return counts;
   }, [activeInRange, dates, rooms, scopedRoomBlocks]);
@@ -656,23 +641,78 @@ export function MobileCalendarView({
   // reservationId 는 위 selectedProperty 와 같은 낡은 RSC 페이로드 문제 때문에 서버 prop 이 아니라
   // 실제 URL(useSearchParams)에서 읽는다. 예약 목록은 이 파라미터와 상관없이
   // 따로 가져오므로, 캐시된 목록에도 대상이 들어 있다.
-  const deepLinkReservationId =
-    searchParams.get("reservationId") ?? initialReservationId ?? null;
+  const urlDeepLinkId = searchParams.get("reservationId");
+  const deepLinkReservationId = urlDeepLinkId ?? initialReservationId ?? null;
   // 가드 Set 은 (예약 전이 아니라) rAF 콜백 안에서 설정한다. 그래야 React StrictMode 의 mount→cleanup→
   // mount 이중 호출이 유일한 예약된 열기를 취소하지 못한다: 첫 cleanup 은 완료 표시 없이 그 프레임만
   // 취소하고, 두 번째 mount 가 다시 예약한다. rAF 로 미루면 setState 가 이펙트 본문 밖에 있게 되기도 한다
   // (lint: react-hooks/set-state-in-effect).
-  const autoOpenedIdRef = useRef<string | null>(null);
+  // 한 번 쓴 딥링크 열쇠(「open:id」 · 「notice:이유:id」). 주소에 `reservationId` 가 **새로 생기면**(같은 링크를 다시 눌러도) 비운다 —
+  // 예전엔 한 화면에서 같은 링크 · 같은 이유 알림이 한 번만 동작했다(2026-11-12 리뷰). 우리가 주소에서 지울 때(값 → 없음)는 비우지 않는다.
+  const [consumedDeepLink, setConsumedDeepLink] = useState<string | null>(null);
+  const [prevUrlDeepLinkId, setPrevUrlDeepLinkId] = useState(urlDeepLinkId);
+  if (prevUrlDeepLinkId !== urlDeepLinkId) {
+    setPrevUrlDeepLinkId(urlDeepLinkId);
+    if (urlDeepLinkId) setConsumedDeepLink(null);
+  }
+  // 2026-11-12: 서버가 예약의 달 · 건물로 다시 보내 준다(`calendar-deep-link.ts`). 여기선 **고른 건물의 예약일 때만** 연다 — 건물을
+  // 고르기 전에 표시만 해 두었다가 고른 뒤 시트가 뜬금없이 뜨던 일을 막는다. 못 열면 이유를 알림으로, 한 번 쓴 주소 값은 지운다.
+  const deepLinkMessages: Record<CalendarDeepLinkNotice, string> = {
+    cancelled: wcopy.deepLinkCancelled,
+    no_property: wcopy.deepLinkNoProperty,
+    not_found: wcopy.deepLinkNotFound,
+    out_of_window: wcopy.deepLinkOutOfWindow,
+  };
+  const deepLinkMessagesRef = useRef(deepLinkMessages);
   useEffect(() => {
-    if (!deepLinkReservationId) return;
-    if (autoOpenedIdRef.current === deepLinkReservationId) return;
-    if (!reservations.some((r) => r.id === deepLinkReservationId)) return;
+    deepLinkMessagesRef.current = deepLinkMessages;
+  });
+  useEffect(() => {
+    const key = deepLinkNotice
+      ? `notice:${deepLinkNotice}:${deepLinkRequestedId ?? ""}`
+      : deepLinkReservationId
+        ? `open:${deepLinkReservationId}`
+        : null;
+    if (!key || consumedDeepLink === key) return;
     const raf = requestAnimationFrame(() => {
-      autoOpenedIdRef.current = deepLinkReservationId;
-      openReservationSheet(deepLinkReservationId);
+      setConsumedDeepLink(key);
+      // 한 번 쓴 딥링크는 주소에서 지운다 — 뒤로 왔다 다시 오거나 새로고침해도 시트 · 알림이 또 뜨지 않게(내비게이션 없이).
+      const url = new URL(window.location.href);
+      if (url.searchParams.has("reservationId")) {
+        url.searchParams.delete("reservationId");
+        window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}`);
+      }
+      if (deepLinkNotice) {
+        setNotice(deepLinkMessagesRef.current[deepLinkNotice]);
+        return;
+      }
+      const target = reservations.find((r) => r.id === deepLinkReservationId);
+      if (!target) {
+        setNotice(deepLinkMessagesRef.current.not_found);
+        return;
+      }
+      if (target.propertyName !== selectedProperty) {
+        setNotice(deepLinkMessagesRef.current.no_property);
+        return;
+      }
+      openReservationSheet(target.id);
     });
     return () => cancelAnimationFrame(raf);
-  }, [deepLinkReservationId, reservations, openReservationSheet]);
+  }, [consumedDeepLink, deepLinkNotice, deepLinkRequestedId, deepLinkReservationId, reservations, openReservationSheet, selectedProperty]);
+
+  // 복사 — 실패하면(권한 · 보안 컨텍스트) 조용히 넘어가지 않고 알린다(2026-11-12).
+  const copyAndFlash = useCallback(
+    async (value: string, onCopied: () => void) => {
+      try {
+        await copyText(value);
+        onCopied();
+      } catch {
+        haptic("error");
+        setNotice(wcopy.copyFailed);
+      }
+    },
+    [wcopy.copyFailed],
+  );
 
 
   // 건물 없이 들어오면 **늘 건물 고르기 화면**이다(2026-10-15 사용자 결정 — 「건물 고르기 화면 그대로 있어야 해」).
@@ -750,14 +790,20 @@ export function MobileCalendarView({
     new Intl.DateTimeFormat(locale, { month: "long", day: "numeric", weekday: "short", timeZone: "UTC" }).format(parseDate(date));
 
   // 건물마다 객실 수 · 오늘 빈 방 — 건물 고르기 목록에 쓴다.
+  // 빈 방 = 예약도 차단도 없는 방(`vacant-rooms.ts` — 캘린더 머리 줄 · 목록과 같은 정의).
   const buildingRows = propertyOptions.map((property) => {
     const propertyRooms = propertyRoomsMap?.[property] ?? [];
-    const occupied = new Set(
-      reservations
-        .filter((item) => item.propertyName === property && item.checkInDate <= today && item.checkOutDate > today)
-        .map((item) => item.roomLabel),
+    const occupied = occupiedRoomsOn(
+      reservations.filter((item) => item.propertyName === property),
+      today,
+      (item) => item.roomLabel,
     );
-    return { property, rooms: propertyRooms.length, empty: propertyRooms.filter((room) => !occupied.has(room)).length };
+    const blocked = collectBlockedRooms(
+      roomBlocks.filter((block) => block.propertyName === property),
+      today,
+      (block) => block.roomLabel,
+    );
+    return { property, rooms: propertyRooms.length, empty: splitVacantRooms(propertyRooms, occupied, blocked).vacant.length };
   });
 
   const buildingList = (onPick?: () => void) => (
@@ -832,10 +878,7 @@ export function MobileCalendarView({
           <button
             aria-label={copiedKey === "res" ? w.copied : w.copyResNo}
             className="mcw-ib is-sm"
-            onClick={async () => {
-              await copyText(item.sourceReservationId);
-              onCopied("res");
-            }}
+            onClick={() => void copyAndFlash(item.sourceReservationId, () => onCopied("res"))}
             title={w.copyResNo}
             type="button"
           >
@@ -868,10 +911,7 @@ export function MobileCalendarView({
             <button
               aria-label={copiedKey === "phone" ? w.copied : w.copyPhone}
               className={`mcw-sq${copiedKey === "phone" ? " is-done" : ""}`}
-              onClick={async () => {
-                await copyText(phone);
-                onCopied("phone");
-              }}
+              onClick={() => void copyAndFlash(phone, () => onCopied("phone"))}
               title={w.copyPhone}
               type="button"
             >
@@ -907,10 +947,7 @@ export function MobileCalendarView({
             {address ? (
               <button
                 className="mcw-link"
-                onClick={async () => {
-                  await copyText(address);
-                  onCopied("addr");
-                }}
+                onClick={() => void copyAndFlash(address, () => onCopied("addr"))}
                 type="button"
               >
                 {copiedKey === "addr" ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
@@ -920,8 +957,10 @@ export function MobileCalendarView({
           </span>
         </div>
         <div className="mcw-codes">
+          {/* 지운 코드(빈 값)는 보이지 않는다 — 저장된 빈 값이 기본값으로 되살아나지 않게 된 뒤(2026-11-12). */}
           {meta.sharedAccess.map((item, index) => {
             const key = `s${index}`;
+            if (!item.code) return null;
             return (
               <div className="mcw-code" key={key}>
                 <span className="mcw-code__t">
@@ -931,10 +970,7 @@ export function MobileCalendarView({
                 <button
                   aria-label={copiedKey === key ? w.copied : `${sharedAccessLabel(item, copy)} · ${copy.copyNumber}`}
                   className={`mcw-sq${copiedKey === key ? " is-done" : ""}`}
-                  onClick={async () => {
-                    await copyText(item.code);
-                    onCopied(key);
-                  }}
+                  onClick={() => void copyAndFlash(item.code, () => onCopied(key))}
                   type="button"
                 >
                   {copiedKey === key ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
@@ -945,18 +981,15 @@ export function MobileCalendarView({
         </div>
         <div className="mcw-rcodes">
           <span className="mcw-k">{w.roomCodes}</span>
-          {meta.roomAccess && meta.roomAccess.length > 0 ? (
-            meta.roomAccess.map((item) => {
+          {meta.roomAccess && meta.roomAccess.some((item) => item.code) ? (
+            meta.roomAccess.filter((item) => item.code).map((item) => {
               const key = `r${item.roomLabel}`;
               return (
                 <button
                   aria-label={`${roomName(item.roomLabel)} · ${copy.copyNumber}`}
                   className="mcw-rcode"
                   key={item.roomLabel}
-                  onClick={async () => {
-                    await copyText(item.code);
-                    onCopied(key);
-                  }}
+                  onClick={() => void copyAndFlash(item.code, () => onCopied(key))}
                   type="button"
                 >
                   <span className="mcw-mono">{roomName(item.roomLabel)}</span>
@@ -1029,6 +1062,13 @@ export function MobileCalendarView({
           <ChevronDown aria-hidden="true" />
         </button>
       </div>
+
+      {/* 차단 정보를 못 읽었으면 빈 방 수를 믿을 수 없다 — 경고 줄(2026-11-12, 예전엔 조용히 빈 방으로 셌다). */}
+      {blocksLoadFailed && mode !== "map" ? (
+        <p className="mcw-warn" role="status">
+          {w.blocksLoadFailed}
+        </p>
+      ) : null}
 
       <div className="mcw-seg" role="tablist" aria-label={w.title}>
         {(
@@ -1118,8 +1158,14 @@ export function MobileCalendarView({
                     {dates.map((date) => {
                       const count = emptyCountByDate.get(date) ?? 0;
                       return (
-                        <span className={`num${count ? "" : " is-zero"}`} key={`e-${date}`} style={{ width: `${DAY_WIDTH}px` }}>
+                        <span
+                          className={`num${count ? "" : " is-zero"}${blocksLoadFailed ? " is-uncertain" : ""}`}
+                          key={`e-${date}`}
+                          style={{ width: `${DAY_WIDTH}px` }}
+                          title={blocksLoadFailed ? w.vacantUncertain : undefined}
+                        >
                           {count || "–"}
+                          {blocksLoadFailed ? "?" : ""}
                         </span>
                       );
                     })}
@@ -1208,7 +1254,7 @@ export function MobileCalendarView({
                 {w.daySummary
                   .replace("{in}", String(checkInsToday.length))
                   .replace("{out}", String(checkOutsToday.length))
-                  .replace("{empty}", String(emptyRoomLabels.length))}
+                  .replace("{empty}", `${emptyRoomLabels.length}${blocksLoadFailed ? "?" : ""}`)}
               </span>
               <ChevronRight aria-hidden="true" />
             </button>
@@ -1273,19 +1319,30 @@ export function MobileCalendarView({
               </div>
               <div className="mcw-list">
                 {listTab === "empty" ? (
-                  emptyRoomLabels.length === 0 ? (
-                    <p className="mcw-none">{copy.noEmptyRooms}</p>
-                  ) : (
-                    emptyRoomLabels.map((roomLabel) => (
-                      <div className="mcw-li" key={roomLabel}>
+                  <>
+                    {emptyRoomLabels.length === 0 ? (
+                      <p className="mcw-none">{copy.noEmptyRooms}</p>
+                    ) : (
+                      emptyRoomLabels.map((roomLabel) => (
+                        <div className="mcw-li" key={roomLabel}>
+                          <span className="mcw-li__room">{roomName(roomLabel)}</span>
+                          <span className="mcw-li__t">
+                            <b>{propertyName(selectedProperty)}</b>
+                          </span>
+                        </div>
+                      ))
+                    )}
+                    {/* 예약 없이 차단된 방 — 빈 방 수에는 안 들어가고(팔 수 없다) 아래에 따로(2026-11-12). */}
+                    {blockedEmptyRoomLabels.map((roomLabel) => (
+                      <div className="mcw-li is-dim" key={`b-${roomLabel}`}>
                         <span className="mcw-li__room">{roomName(roomLabel)}</span>
                         <span className="mcw-li__t">
                           <b>{propertyName(selectedProperty)}</b>
-                          {blockedRoomsAtReference.has(roomLabel) ? <span>{w.blocked}</span> : null}
+                          <span>{w.blocked}</span>
                         </span>
                       </div>
-                    ))
-                  )
+                    ))}
+                  </>
                 ) : listItems.length === 0 ? (
                   <p className="mcw-none">{w.none}</p>
                 ) : (
@@ -1336,7 +1393,13 @@ export function MobileCalendarView({
         )
       ) : null}
 
-      {mode === "map" ? (
+      {mode === "map" && buildingInfoLoadFailed ? (
+        <div className="mcw-empty" role="status">
+          <b>{w.buildingInfoLoadFailed}</b>
+        </div>
+      ) : null}
+
+      {mode === "map" && !buildingInfoLoadFailed ? (
         <div className={isTablet ? "mcw-split" : ""}>
           <div className="mcw-listcol">
             <p className="mcw-soft">{w.mapHint.replace("{n}", String(buildingInfos.length))}</p>
@@ -1446,6 +1509,12 @@ export function MobileCalendarView({
             <div className="mcw-detail">{accessBody(selectedMapProperty, (key) => setMapCopyFeedback(key), mapCopyFeedback)}</div>
           </div>
         </BottomSheet>
+      ) : null}
+
+      {notice ? (
+        <div aria-live="polite" className="mcw-toast" ref={noticeRef} role="status">
+          <span>{notice}</span>
+        </div>
       ) : null}
     </div>
   );

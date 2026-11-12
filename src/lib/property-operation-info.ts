@@ -1,189 +1,142 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AppSession } from "@/lib/session";
+import { PROPERTY_MAP_META, type PropertyMapMeta } from "@/lib/property-map-links";
 import {
-  PROPERTY_MAP_META,
-  type PropertyAccessInfo,
-  type PropertyMapMeta,
-  type PropertyRoomCode,
-} from "@/lib/property-map-links";
+  classifyPropertyInfoReadError,
+  cloneBasePropertyMapMeta,
+  mergePropertyMapMeta,
+  type PropertyInfoInput,
+  type PropertyOperationInfoOverride,
+  validatePropertyInfoInput,
+} from "@/lib/property-operation-info-rules";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import type { Database, Json } from "@/types/database";
 
-type PropertyOperationInfoRow =
-  Database["public"]["Tables"]["property_operation_infos"]["Row"];
-type PropertyOperationInfoOverride = Pick<
-  PropertyOperationInfoRow,
-  | "canonical_name"
-  | "address_ko"
-  | "address_ja"
-  | "address_en"
-  | "shared_access"
-  | "room_access"
-  | "note"
->;
+// 규칙(합치기 · 검사 · 오류 나누기)은 `property-operation-info-rules.ts` — 여기는 DB 읽기 · 쓰기만.
 
-const ACCESS_LABEL_KEYS = new Set<PropertyAccessInfo["labelKey"]>([
-  "doorPassword",
-  "keyBox",
-  "keyBoxPassword",
-  "linenStorageEntrancePassword",
-  "roomPassword",
-  "storage",
-  "storagePassword",
-]);
-
-const ACCESS_PREFIX_KEYS = new Set<NonNullable<PropertyAccessInfo["prefixKey"]>>(["floor1"]);
-const ACCESS_NOTE_KEYS = new Set<NonNullable<PropertyAccessInfo["noteKey"]>>(["allRoomsSame"]);
-
-function normalizeText(value: string | null | undefined) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function sanitizeSharedAccess(value: unknown, fallback: PropertyAccessInfo[]) {
-  if (!Array.isArray(value)) return fallback;
-
-  const sanitized = value
-    .map((entry) => {
-      if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
-      const record = entry as Record<string, unknown>;
-      const labelKey = record.labelKey;
-      const code = normalizeText(typeof record.code === "string" ? record.code : null);
-      const prefixKey = record.prefixKey;
-      const noteKey = record.noteKey;
-      if (!ACCESS_LABEL_KEYS.has(labelKey as PropertyAccessInfo["labelKey"])) return null;
-      if (!code) return null;
-      const safeLabelKey = labelKey as PropertyAccessInfo["labelKey"];
-      return {
-        labelKey: safeLabelKey,
-        code,
-        prefixKey: ACCESS_PREFIX_KEYS.has(prefixKey as NonNullable<PropertyAccessInfo["prefixKey"]>)
-          ? (prefixKey as NonNullable<PropertyAccessInfo["prefixKey"]>)
-          : undefined,
-        noteKey: ACCESS_NOTE_KEYS.has(noteKey as NonNullable<PropertyAccessInfo["noteKey"]>)
-          ? (noteKey as NonNullable<PropertyAccessInfo["noteKey"]>)
-          : undefined,
-      } satisfies PropertyAccessInfo;
-    })
-    .filter((entry) => entry !== null) as PropertyAccessInfo[];
-
-  return sanitized.length > 0 ? sanitized : fallback;
-}
-
-function sanitizeRoomAccess(value: unknown, fallback: PropertyRoomCode[]) {
-  if (!Array.isArray(value)) return fallback;
-  const sanitized = value
-    .map((entry) => {
-      if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
-      const record = entry as Record<string, unknown>;
-      const roomLabel = normalizeText(typeof record.roomLabel === "string" ? record.roomLabel : null);
-      const code = normalizeText(typeof record.code === "string" ? record.code : null);
-      if (!roomLabel || !code) return null;
-      return { roomLabel, code } satisfies PropertyRoomCode;
-    })
-    .filter((entry) => entry !== null) as PropertyRoomCode[];
-  return sanitized.length > 0 ? sanitized : fallback;
-}
-
-function toJson(value: PropertyAccessInfo[] | PropertyRoomCode[]): Json {
-  return value as unknown as Json;
-}
-
-function mergePropertyMapMeta(
-  base: PropertyMapMeta,
-  override?: PropertyOperationInfoOverride,
-): PropertyMapMeta {
-  if (!override) {
-    return {
-      ...base,
-      note: base.note ?? "",
-      roomAccess: (base.roomAccess ?? []).map((room) => ({ ...room })),
-      sharedAccess: base.sharedAccess.map((access) => ({ ...access })),
-    };
-  }
-
-  return {
-    ...base,
-    address: {
-      ko: normalizeText(override.address_ko) || base.address.ko,
-      ja: normalizeText(override.address_ja) || base.address.ja,
-      en: normalizeText(override.address_en) || base.address.en,
-    },
-    note: normalizeText(override.note),
-    roomAccess: sanitizeRoomAccess(override.room_access, base.roomAccess ?? []),
-    sharedAccess: sanitizeSharedAccess(override.shared_access, base.sharedAccess),
-  };
-}
+const SELECT_COLUMNS =
+  "canonical_name, address_ko, address_ja, address_en, shared_access, room_access, note, updated_at";
 
 function untyped(client: SupabaseClient<Database>): SupabaseClient {
   return client as unknown as SupabaseClient;
 }
 
-function cloneBasePropertyMapMeta(item: PropertyMapMeta): PropertyMapMeta {
-  return {
-    ...item,
-    note: item.note ?? "",
-    roomAccess: (item.roomAccess ?? []).map((room) => ({ ...room })),
-    sharedAccess: item.sharedAccess.map((access) => ({ ...access })),
-  };
-}
-
-export async function listPropertyMapMeta(session: AppSession): Promise<PropertyMapMeta[]> {
+/**
+ * 건물 운영 정보 — 읽기 실패를 **숨기지 않는다**(2026-11-12).
+ *
+ * 표가 없을 때(마이그레이션 전)만 코드 기본값. 다른 오류면 `loadFailed: true` 와 빈 목록 — 옛 출입 코드를 보이지 않는다.
+ */
+export async function loadPropertyMapMeta(
+  session: AppSession,
+): Promise<{ items: PropertyMapMeta[]; loadFailed: boolean }> {
   const supabase = await getSupabaseServerClient();
   const { data, error } = await untyped(supabase)
     .from("property_operation_infos")
-    .select(
-      "canonical_name, address_ko, address_ja, address_en, shared_access, room_access, note",
-    )
+    .select(SELECT_COLUMNS)
     .eq("organization_id", session.organization.id);
 
   if (error) {
-    if (error.message.includes("property_operation_infos")) {
-      return PROPERTY_MAP_META.map(cloneBasePropertyMapMeta);
+    if (classifyPropertyInfoReadError(error) === "missing_table") {
+      return { items: PROPERTY_MAP_META.map(cloneBasePropertyMapMeta), loadFailed: false };
     }
-    throw new Error(error.message);
+    console.error("[property-operation-info] read failed", { code: error.code });
+    return { items: [], loadFailed: true };
   }
 
   const overrideMap = new Map(
     ((data ?? []) as PropertyOperationInfoOverride[]).map((row) => [row.canonical_name, row]),
   );
-
-  return PROPERTY_MAP_META.map((item) =>
-    mergePropertyMapMeta(item, overrideMap.get(item.canonicalName)),
-  );
+  return {
+    items: PROPERTY_MAP_META.map((item) => mergePropertyMapMeta(item, overrideMap.get(item.canonicalName))),
+    loadFailed: false,
+  };
 }
 
+/** 예전 모양(목록만) — 읽기 실패면 던진다(부르는 쪽이 `.catch` 로 처리, 룸 링크). */
+export async function listPropertyMapMeta(session: AppSession): Promise<PropertyMapMeta[]> {
+  const result = await loadPropertyMapMeta(session);
+  if (result.loadFailed) throw new Error("property_info_read_failed");
+  return result.items;
+}
+
+export type SavePropertyOperationInfoResult =
+  | { ok: true; info: PropertyMapMeta }
+  | { ok: false; error: "conflict"; current: PropertyMapMeta }
+  | { ok: false; error: "invalid_input" | "invalid_property" | "save_failed" | "too_long" };
+
+async function readCurrent(
+  service: SupabaseClient,
+  organizationId: string,
+  base: PropertyMapMeta,
+): Promise<PropertyMapMeta | null> {
+  const { data, error } = await service
+    .from("property_operation_infos")
+    .select(SELECT_COLUMNS)
+    .eq("organization_id", organizationId)
+    .eq("canonical_name", base.canonicalName)
+    .maybeSingle();
+  if (error) return null;
+  return mergePropertyMapMeta(base, (data ?? undefined) as PropertyOperationInfoOverride | undefined);
+}
+
+/**
+ * 저장 — 화면이 본 버전(`expectedUpdatedAt`)일 때만 고친다(2026-11-12).
+ *
+ * - `null` = 저장된 줄이 없던 화면 → 아직 없을 때만 만든다(겹치면 23505 → 충돌).
+ * - 값 = 그 `updated_at` 이 그대로일 때만 update. 0줄이면 누가 먼저 고친 것 → 충돌 + 최신 값.
+ */
 export async function savePropertyOperationInfo(input: {
   canonicalName: string;
-  data: Pick<PropertyMapMeta, "address" | "note" | "roomAccess" | "sharedAccess">;
+  data: PropertyInfoInput;
+  expectedUpdatedAt: string | null;
   session: AppSession;
-}) {
+}): Promise<SavePropertyOperationInfoResult> {
   const base = PROPERTY_MAP_META.find((item) => item.canonicalName === input.canonicalName);
-  if (!base) {
-    throw new Error("invalid_property");
-  }
+  if (!base) return { ok: false, error: "invalid_property" };
 
-  const service = getSupabaseServiceClient();
-  const payload: Database["public"]["Tables"]["property_operation_infos"]["Insert"] = {
-    organization_id: input.session.organization.id,
-    canonical_name: input.canonicalName,
-    address_ko: normalizeText(input.data.address.ko) || base.address.ko,
-    address_ja: normalizeText(input.data.address.ja) || base.address.ja,
-    address_en: normalizeText(input.data.address.en) || base.address.en,
-    note: normalizeText(input.data.note),
-    room_access: toJson(
-      sanitizeRoomAccess(input.data.roomAccess ?? [], base.roomAccess ?? []),
-    ),
-    shared_access: toJson(
-      sanitizeSharedAccess(input.data.sharedAccess ?? [], base.sharedAccess),
-    ),
+  const checked = validatePropertyInfoInput(base, input.data);
+  if (!checked.ok) return { ok: false, error: checked.error };
+
+  const organizationId = input.session.organization.id;
+  const service = untyped(getSupabaseServiceClient());
+  const values = {
+    ...checked.value,
+    room_access: checked.value.room_access as unknown as Json,
+    shared_access: checked.value.shared_access as unknown as Json,
   };
 
-  const { error } = await untyped(service)
-    .from("property_operation_infos")
-    .upsert(payload, { onConflict: "organization_id,canonical_name" });
+  const conflict = async (): Promise<SavePropertyOperationInfoResult> => {
+    const current = await readCurrent(service, organizationId, base);
+    return current ? { ok: false, error: "conflict", current } : { ok: false, error: "save_failed" };
+  };
 
-  if (error) {
-    throw new Error(error.message);
+  if (input.expectedUpdatedAt === null) {
+    const { data, error } = await service
+      .from("property_operation_infos")
+      .insert({ ...values, canonical_name: input.canonicalName, organization_id: organizationId })
+      .select(SELECT_COLUMNS)
+      .single();
+    if (error) {
+      if (error.code === "23505") return conflict();
+      console.error("[property-operation-info] insert failed", { code: error.code });
+      return { ok: false, error: "save_failed" };
+    }
+    return { ok: true, info: mergePropertyMapMeta(base, data as PropertyOperationInfoOverride) };
   }
+
+  const { data, error } = await service
+    .from("property_operation_infos")
+    .update(values)
+    .eq("organization_id", organizationId)
+    .eq("canonical_name", input.canonicalName)
+    .eq("updated_at", input.expectedUpdatedAt)
+    .select(SELECT_COLUMNS)
+    .maybeSingle();
+  if (error) {
+    console.error("[property-operation-info] update failed", { code: error.code });
+    return { ok: false, error: "save_failed" };
+  }
+  if (!data) return conflict();
+  return { ok: true, info: mergePropertyMapMeta(base, data as PropertyOperationInfoOverride) };
 }

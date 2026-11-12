@@ -548,3 +548,10 @@ When created from an active cleaning timer, the request should automatically lin
 - 요청 목록 · 상세(PC · 모바일) · 모바일 홈 활동 · PC 대시보드가 새로고침 없이 바뀐다 — 누가 올리거나 상태를 바꾸면 열어 둔 화면에 바로 보인다.
   `requestLiveSources()` (`src/lib/live-sources.ts`) → `<LiveRefresh>`. 남이 **지운** 건은 다음 갱신 때 빠진다(삭제 신호 없음).
   공용 규칙: `docs/product/16-mobile-navigation.md` 「실시간 갱신 — 공용」.
+
+## 손님 메시지에서 만들기 (2026-11-13, 커밋 전)
+
+- 손님 메시지 대화의 「업무 만들기 → 수리 · 점검」이 신고를 만든다. 검사 · 저장은 모바일 신고 폼과 **같은 함수** `createMaintenanceRecord`(`src/lib/maintenance-create.ts`) — 폼 액션 `createMaintenanceReport` 는 폼 값을 읽고 결과 코드를 예전 redirect 주소로 바꾸기만 한다(검사 순서 · 내용 · 오류 코드 그대로). 권한도 그대로(조직 구성원 + 메시지를 보려면 `guest_messages.view`).
+- 건물 · 방은 대화의 예약에서 미리 채우고, 직원이 고른 자리가 예약과 같을 때만 예약을 잇는다. 손님 사진은 옮기지 않는다(Beds24 에 있음). 「급함」 처음 값 = 숙박 중인 손님.
+- **같은 요청 id 로 두 번 와도 신고 한 건** — 메시지 화면이 만든 요청 id(`submissionId`)로 기존 중복 막기 규칙을 그대로 쓴다(응답이 끊겨 다시 눌러도 한 건). 돌려받은 신고가 이 사람이 10분 안에 만든 것이 아니면 대화에 잇지 않는다(`conflict`, 47 §5-7).
+- 상세(PC 패널 · 모바일)에 **「손님 메시지에서 · 손님 이름」** 링크 — 메시지에서 만든 신고이고 보는 사람이 `guest_messages.view` 를 가졌을 때만. PC `?report=<id>` 로 패널이 바로 열린다. 신고를 끝내면(`closed`) 그 대화 답장 칸에 「해결됐어요」 초안이 들어간다(보내지 않음). 문서 47 §6-4 · §5-7. 링크는 `guest_message_links`(202611130005, 미적용).

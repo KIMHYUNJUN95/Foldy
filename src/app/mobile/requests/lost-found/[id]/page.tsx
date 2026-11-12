@@ -1,3 +1,4 @@
+import { GuestMessageBackLink } from "@/components/guest-messages/guest-message-back-link";
 import { notFound, redirect } from "next/navigation";
 import { Check } from "lucide-react";
 import { AnnouncementImageGrid } from "@/components/announcements/announcement-image-grid";
@@ -128,6 +129,9 @@ export default async function MobileLostItemDetailPage({ params, searchParams }:
               <span key={i}>{roomText || i > 0 ? ` · ${x}` : x}</span>
             ))}
         </p>
+        {session.capabilities.includes("guest_messages.view") ? (
+          <GuestMessageBackLink targetType="lost_found" targetId={item.id} surface="mobile" locale={locale} />
+        ) : null}
 
         <AnnouncementImageGrid imageUrls={item.image_urls} closeLabel={dictionary.common.close} imageAltLabel={copy.handling.photosLabel} />
 

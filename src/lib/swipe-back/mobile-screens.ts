@@ -45,6 +45,8 @@ export const MOBILE_SCREENS: readonly string[] = [
   "/mobile/linen-return/record/[id]/edit",
   "/mobile/lost-found/new",
   "/mobile/maintenance/new",
+  "/mobile/messages",
+  "/mobile/messages/[id]",
   "/mobile/notifications",
   "/mobile/ops/automation",
   "/mobile/ops/calendar",

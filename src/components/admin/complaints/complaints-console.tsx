@@ -438,6 +438,7 @@ export function ComplaintsConsole(props: Props) {
             canChangeStatus={props.canChangeSelectedStatus}
             canDelete={props.canDeleteSelected}
             linkedReviewHref={null}
+            locale={locale}
           />
         </ReviewDetailOverlay>
       ) : null}

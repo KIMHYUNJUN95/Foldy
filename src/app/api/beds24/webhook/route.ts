@@ -10,6 +10,7 @@ import {
 import { forwardBeds24Delivery, parseForwardTargets } from "@/lib/beds24/webhook-forward";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { requestMatchesSecret } from "@/lib/api-secret";
+import { planAutoMessagesAfterWebhook } from "@/lib/guest-messages/auto-scheduler";
 import {
   ingestBeds24WebhookMessages,
   prepareCapturedMessagesPayload,
@@ -326,6 +327,10 @@ export async function POST(request: NextRequest) {
       console.error("[beds24/webhook] guest message ingest failed", error instanceof Error ? error.message : "unknown");
     }
   });
+
+  // 손님 메시지 자동 안내(docs/product/47 §5-6) — 들어온 예약만 다시 계획한다(날짜 바뀜 · 취소 · 확정 직후). 큐 넣기 · Beds24 호출 없음.
+  // 안에서 모든 오류를 삼킨다.
+  after(() => planAutoMessagesAfterWebhook(supabase, results));
 
   // 부분 실패한 배치를 Beds24 가 전달 실패로 보고 재시도 폭주를 하지 않도록
   // 항상 2xx 로 ACK 한다. 실패한 행은 위에서(응답 뒤) 기록되고

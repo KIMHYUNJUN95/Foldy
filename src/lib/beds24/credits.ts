@@ -19,6 +19,8 @@ export type Beds24CreditInfo = {
   requestCost: number | null;
   remaining: number | null;
   resetsIn: number | null;
+  /** 5분 한도 자체 — 헤더가 있을 때만(지금 실측으로는 안 온다). 없으면 키가 없다. */
+  limit?: number;
 };
 
 /** 헤더가 없으면 null 이다. `Number(null) === 0` 이라 이 구분을 빼먹으면 «잔여 0» 으로 읽힌다. */
@@ -33,7 +35,9 @@ function readNumericHeader(headers: Headers, names: string[]): number | null {
 }
 
 export function readBeds24Credits(headers: Headers): Beds24CreditInfo {
+  const limit = readNumericHeader(headers, ["x-five-min-limit", "X-FiveMinCreditLimit"]);
   return {
+    ...(limit !== null && limit > 0 ? { limit } : {}),
     requestCost: readNumericHeader(headers, ["x-request-cost", "X-RequestCost"]),
     remaining: readNumericHeader(headers, [
       "x-five-min-limit-remaining",

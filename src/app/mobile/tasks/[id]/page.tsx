@@ -1,3 +1,4 @@
+import { GuestMessageBackLink } from "@/components/guest-messages/guest-message-back-link";
 import { redirect } from "next/navigation";
 import { TaskDetailView } from "@/components/tasks/task-detail-view";
 import { MobileShell } from "@/components/shell/mobile-shell";
@@ -104,6 +105,11 @@ export default async function MobileTaskDetailPage({ params, searchParams }: Pag
   return (
     <MobileShell activeItem="tasks" badges={navBadges} title={dict.tasks.detailTitle}>
       <LiveRefresh sources={taskDetailLiveSources(session.organization.id, session.user.id, task.id)} />
+      {session.capabilities.includes("guest_messages.view") ? (
+        <div className="gm-backlink-row">
+          <GuestMessageBackLink targetType="task" targetId={task.id} surface="mobile" locale={locale} />
+        </div>
+      ) : null}
       <TaskDetailView
         buildingLabels={dict.cleaning.buildingLabels}
         canEditCore={canEditTaskCore(session, task)}

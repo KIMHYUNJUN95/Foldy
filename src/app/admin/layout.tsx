@@ -5,7 +5,9 @@ import { StaffCallHost } from "@/components/checkin-call/staff-call-host";
 import { BuildingNamesProvider } from "@/components/shared/building-names";
 import { getDictionary } from "@/lib/i18n";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
+import { countAwaitingConversations } from "@/lib/guest-messages/inbox-server";
 import { countPendingIdDocumentPeople } from "@/lib/staff-documents/server";
+import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 // 관리자 콘솔은 모바일 앱과 완전히 분리된, 독립적으로 설치 가능한 PWA 다. Next.js 메타데이터는
 // 세그먼트별로 병합되므로 여기서 `manifest` 를 덮어쓰면 모든 /admin/* 경로가 루트 모바일 매니페스트 대신
@@ -27,16 +29,26 @@ export const metadata: Metadata = {
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await getCurrentAppSession();
   const dictionary = getDictionary(session?.user.preferredLanguage ?? "ko");
-  // 사용자 메뉴 숫자 = 신분 서류 확인 대기 — 서류를 볼 권한이 있는 사람에게만 계산한다.
-  const pendingIdDocs =
-    session && session.organization.id !== "platform" && session.capabilities.includes("staff_documents.view")
-      ? await countPendingIdDocumentPeople(session.organization.id)
-      : 0;
+  const inOrg = Boolean(session && session.organization.id !== "platform");
+  // 두 숫자는 서로 기다리지 않게 같이 센다.
+  const [pendingIdDocs, awaitingMessages] = await Promise.all([
+    // 사용자 메뉴 숫자 = 신분 서류 확인 대기 — 서류를 볼 권한이 있는 사람에게만 계산한다.
+    session && inOrg && session.capabilities.includes("staff_documents.view")
+      ? countPendingIdDocumentPeople(session.organization.id)
+      : Promise.resolve(0),
+    // 손님 메시지 메뉴 숫자 = 답장 기다림 — 보기 권한이 있는 사람에게만(RLS 가 다시 본다). docs/product/47 §5-1
+    session && inOrg && session.capabilities.includes("guest_messages.view")
+      ? getSupabaseServerClient().then((client) => countAwaitingConversations(client, session.organization.id))
+      : Promise.resolve(0),
+  ]);
+  const navBadges: Record<string, number> = {};
+  if (pendingIdDocs > 0) navBadges.users = pendingIdDocs;
+  if (awaitingMessages > 0) navBadges.messages = awaitingMessages;
   return (
     <>
       <AdminEntry />
       {/* 건물 이름을 보는 사람 언어로(2026-10-23) — 모바일과 같은 공급자. 데이터는 한국어 정규 명칭이라 그릴 때 `useBuildingName()` 으로 바꾼다. */}
-      <AdminNavBadgesProvider badges={pendingIdDocs > 0 ? { users: pendingIdDocs } : {}}>
+      <AdminNavBadgesProvider badges={navBadges}>
         <BuildingNamesProvider labels={dictionary.cleaning.buildingLabels}>
           {children}
           {/* 직원 통화 받기(docs/product/46 §6) — 레이아웃에 붙여 화면을 옮겨도 통화가 이어진다. */}

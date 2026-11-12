@@ -176,6 +176,7 @@ export async function reconcileGuestMessages(
       remaining: headerCredit.remaining,
       resetsAt: headerCredit.resetsIn !== null ? pageMs + headerCredit.resetsIn * 1000 : null,
       requestCost: headerCredit.requestCost,
+      ...(headerCredit.limit !== undefined ? { limit: headerCredit.limit } : {}),
     };
     await recordGuestMessageCredit(supabase, organizationIds, credit, "guest-messages-reconcile", pageMs);
     result.creditsRemaining = credit.remaining;

@@ -67,6 +67,7 @@ function snapshotFromHeaders(headers: Headers, nowMs: number): ChannelCreditSnap
     remaining: credit.remaining,
     resetsAt: credit.resetsIn !== null ? nowMs + credit.resetsIn * 1000 : null,
     requestCost: credit.requestCost,
+    ...(credit.limit !== undefined ? { limit: credit.limit } : {}),
   };
 }
 

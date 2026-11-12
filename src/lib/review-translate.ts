@@ -71,11 +71,30 @@ export type TranslationResult =
  * 센다. 이제 1,000행씩 끝까지 읽고 `source_char_count`(저장할 때 남긴 원문 길이)를 더한다. 그 칸이 없는 옛 줄만
  * 번역문 길이로 대신한다. 조직을 가리지 않는다 — DeepL 키 하나를 모든 조직이 같이 쓴다.
  */
-async function monthlyCharsUsed(db: SupabaseClient, monthStartIso: string): Promise<number> {
+async function monthlyCharsUsed(db: SupabaseClient, monthStartIso: string, strict: boolean): Promise<number> {
   const withCount = await sumMonthlyChars(db, monthStartIso, true);
   // 칸이 없으면(마이그레이션 전) 번역문 길이로 대신 센다 — 예전 방식이지만 1,000행 상한은 없다.
-  if (withCount === "missing_column") return (await sumMonthlyChars(db, monthStartIso, false)) as number;
-  return withCount;
+  const reviews = withCount === "missing_column" ? ((await sumMonthlyChars(db, monthStartIso, false)) as number) : withCount;
+  // 손님 메시지 번역(2026-11-13, docs/product/47 §9)도 같은 키 · 같은 한도를 쓴다 — `translation_usage` 에 쓴 양을 적는다.
+  const extra = await sumTranslationUsage(db, monthStartIso);
+  if (extra === "unavailable") {
+    // 표 · 함수가 아직 없거나(마이그레이션 202611130001 전) 읽지 못했다. 리뷰 번역은 예전과 똑같이 리뷰 글자만으로 센다.
+    // 손님 메시지 번역(strict)은 쓴 양을 모르니 멈춘다.
+    return strict ? Number.POSITIVE_INFINITY : reviews;
+  }
+  return reviews + extra;
+}
+
+/** 이번 달 `translation_usage` 합계(손님 메시지 번역) — DB 함수 하나로 더한다(줄을 읽지 않음). 읽지 못하면 "unavailable". */
+async function sumTranslationUsage(db: SupabaseClient, monthStartIso: string): Promise<number | "unavailable"> {
+  try {
+    const { data, error } = await db.rpc("translation_usage_since", { p_since: monthStartIso });
+    if (error) return "unavailable";
+    const value = typeof data === "number" ? data : Number(data);
+    return Number.isFinite(value) && value >= 0 ? value : "unavailable";
+  } catch {
+    return "unavailable";
+  }
 }
 
 async function sumMonthlyChars(
@@ -110,7 +129,7 @@ async function sumMonthlyChars(
  */
 export type TranslationBudget = { reserve(chars: number): Promise<boolean>; refund(chars: number): void };
 
-export function createTranslationBudget(): TranslationBudget {
+export function createTranslationBudget(options: { strict?: boolean } = {}): TranslationBudget {
   let used: Promise<number> | null = null;
   let reserved = 0;
   return {
@@ -120,7 +139,7 @@ export function createTranslationBudget(): TranslationBudget {
         const monthStart = new Date();
         monthStart.setUTCDate(1);
         monthStart.setUTCHours(0, 0, 0, 0);
-        used = monthlyCharsUsed(db, monthStart.toISOString());
+        used = monthlyCharsUsed(db, monthStart.toISOString(), options.strict === true);
       }
       const base = await used;
       if (base + reserved + chars > MONTHLY_CHAR_BUDGET) return false;
@@ -131,6 +150,71 @@ export function createTranslationBudget(): TranslationBudget {
       reserved = Math.max(0, reserved - chars);
     },
   };
+}
+
+export type DeepLResult =
+  | { status: "ok"; text: string; detectedSourceLanguage: string | null; chars: number }
+  | { status: "unavailable"; reason: "not_configured" | "budget_exhausted" | "failed" };
+
+/**
+ * DeepL 한 번 부르기 — 키 확인 · 월 한도 잡기 · 실패하면 돌려놓기. 리뷰 번역과 손님 메시지 번역(docs/product/47 §9)이 같이 쓴다.
+ * `targetLang` 은 DeepL 코드(`KO` · `JA` · `EN-US` · `FR` …). `text` 는 호출부가 서버에서 읽었거나(손님 말) 길이를 제한한 글이어야 한다.
+ */
+export async function deeplTranslate(input: {
+  text: string;
+  targetLang: string;
+  sourceLang?: string | null;
+  budget: TranslationBudget;
+}): Promise<DeepLResult> {
+  const text = input.text.trim();
+  if (!text) return { status: "unavailable", reason: "failed" };
+  const env = getDeepLEnv();
+  if (!env) return { status: "unavailable", reason: "not_configured" };
+
+  const chars = charCount(text);
+  if (!(await input.budget.reserve(chars))) {
+    return { status: "unavailable", reason: "budget_exhausted" };
+  }
+
+  const body = new URLSearchParams();
+  body.set("text", text);
+  body.set("target_lang", input.targetLang);
+  if (input.sourceLang) body.set("source_lang", input.sourceLang);
+
+  let translated: string | null = null;
+  let detected: string | null = null;
+  try {
+    const response = await fetch(env.url, {
+      method: "POST",
+      headers: {
+        Authorization: `DeepL-Auth-Key ${env.key}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body,
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      input.budget.refund(chars);
+      return { status: "unavailable", reason: "failed" };
+    }
+    const json = (await response.json()) as {
+      translations?: { text?: unknown; detected_source_language?: unknown }[];
+    };
+    const first = json.translations?.[0];
+    if (first && typeof first.text === "string") translated = first.text;
+    if (first && typeof first.detected_source_language === "string") {
+      detected = first.detected_source_language;
+    }
+  } catch {
+    input.budget.refund(chars);
+    return { status: "unavailable", reason: "failed" };
+  }
+
+  if (translated === null) {
+    input.budget.refund(chars);
+    return { status: "unavailable", reason: "failed" };
+  }
+  return { status: "ok", text: translated, detectedSourceLanguage: detected, chars };
 }
 
 /**
@@ -187,54 +271,17 @@ export async function translateReviewPart(input: {
     return { status: "ok", text: cached.translated_text, sourceLocale: cached.source_locale, cached: true };
   }
 
-  const env = getDeepLEnv();
-  if (!env) return { status: "unavailable", reason: "not_configured" };
-
-  const budget = input.budget ?? createTranslationBudget();
-  const chars = charCount(sourceText);
-  if (!(await budget.reserve(chars))) {
-    return { status: "unavailable", reason: "budget_exhausted" };
-  }
-
-  const body = new URLSearchParams();
-  body.set("text", sourceText);
-  body.set("target_lang", DEEPL_TARGET[targetLocale]);
   const sourceLang = input.sourceLanguageCode?.trim().toUpperCase();
-  if (sourceLang) body.set("source_lang", sourceLang.slice(0, 2));
-
-  let translated: string | null = null;
-  let detected: string | null = null;
-  try {
-    const response = await fetch(env.url, {
-      method: "POST",
-      headers: {
-        Authorization: `DeepL-Auth-Key ${env.key}`,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body,
-      cache: "no-store",
-    });
-    if (!response.ok) {
-      budget.refund(chars);
-      return { status: "unavailable", reason: "failed" };
-    }
-    const json = (await response.json()) as {
-      translations?: { text?: unknown; detected_source_language?: unknown }[];
-    };
-    const first = json.translations?.[0];
-    if (first && typeof first.text === "string") translated = first.text;
-    if (first && typeof first.detected_source_language === "string") {
-      detected = first.detected_source_language;
-    }
-  } catch {
-    budget.refund(chars);
-    return { status: "unavailable", reason: "failed" };
-  }
-
-  if (translated === null) {
-    budget.refund(chars);
-    return { status: "unavailable", reason: "failed" };
-  }
+  const deepl = await deeplTranslate({
+    text: sourceText,
+    targetLang: DEEPL_TARGET[targetLocale],
+    sourceLang: sourceLang ? sourceLang.slice(0, 2) : null,
+    budget: input.budget ?? createTranslationBudget(),
+  });
+  if (deepl.status !== "ok") return deepl;
+  const translated = deepl.text;
+  const detected = deepl.detectedSourceLanguage;
+  const chars = deepl.chars;
 
   const row = {
     organization_id: organizationId,

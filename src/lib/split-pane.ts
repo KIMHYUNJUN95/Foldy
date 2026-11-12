@@ -44,6 +44,8 @@ const FEATURE_DETAIL_PATTERNS = {
   bugs: /^\/mobile\/bugs\/(?!new$)[^/]+$/,
   complaints: /^\/mobile\/complaints\/(reviews\/)?(?!new$|reviews$)[^/]+$/,
   linen: /^\/mobile\/linen-return\/record\/[^/]+(\/edit)?$/,
+  /** 손님 메시지(2026-11-13, 문서 47 §5-4) — 대화 한 건. */
+  messages: /^\/mobile\/messages\/[^/]+$/,
   requests: /^\/mobile\/requests\/(maintenance|lost-found|orders)\/(?!new$|disposed$|returned$)[^/]+$/,
   suggestions: /^\/mobile\/suggestions\/(?!new$|referenced$)[^/]+(\/edit)?$/,
   tasks: /^\/mobile\/tasks\/(?!new$|projects$)[^/]+(\/edit)?$/,

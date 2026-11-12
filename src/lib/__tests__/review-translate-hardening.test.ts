@@ -178,3 +178,45 @@ describe("원문 글자 수는 코드포인트로(DB char_length 와 같게)", (
     expect(fake.tables.review_translations[0].source_char_count).toBe(3);
   });
 });
+
+describe("손님 메시지 번역 사용량(translation_usage) 합치기 — 2026-11-13", () => {
+  const fetchMock = vi.fn();
+  beforeEach(() => {
+    process.env.DEEPL_API_KEY = "k:fx";
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ translations: [{ text: "안녕", detected_source_language: "EN" }] }) });
+    vi.stubGlobal("fetch", fetchMock);
+  });
+  afterEach(() => {
+    delete process.env.DEEPL_API_KEY;
+    vi.unstubAllGlobals();
+  });
+
+  function withRpc(rpc: (name: string) => Promise<{ data: unknown; error: unknown }>) {
+    const fake = createComplaintsFakeDb({ tables: { external_reviews: [reviewRow()], review_translations: [] } });
+    const rpcCalls: string[] = [];
+    state.db = new Proxy(fake.client as object, {
+      get(target, key) {
+        if (key === "rpc") return (name: string) => (rpcCalls.push(name), rpc(name));
+        return (target as Record<string | symbol, unknown>)[key];
+      },
+    });
+    return rpcCalls;
+  }
+
+  it("합계는 DB 함수 한 번으로 더해서 리뷰 번역 한도에 들어간다", async () => {
+    const calls = withRpc(async () => ({ data: 449_995, error: null }));
+    const out = await translateReviewPart({ organizationId: ORG, externalReviewId: REVIEW, part: "review", targetLocale: "ko", sourceText: "hello world" });
+    expect(out).toEqual({ status: "unavailable", reason: "budget_exhausted" });
+    expect(calls).toEqual(["translation_usage_since"]);
+  });
+
+  it("함수를 못 읽으면 리뷰 번역은 예전처럼 리뷰 글자만으로 세고(멈추지 않음), 손님 메시지(strict)는 멈춘다", async () => {
+    withRpc(async () => ({ data: null, error: { code: "PGRST202", message: "missing" } }));
+    const out = await translateReviewPart({ organizationId: ORG, externalReviewId: REVIEW, part: "review", targetLocale: "ko", sourceText: "hello world" });
+    expect(out.status).toBe("ok");
+    withRpc(async () => ({ data: null, error: { code: "57014", message: "timeout" } }));
+    expect(await createTranslationBudget().reserve(10)).toBe(true);
+    expect(await createTranslationBudget({ strict: true }).reserve(10)).toBe(false);
+  });
+});

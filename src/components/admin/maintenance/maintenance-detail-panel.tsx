@@ -1,5 +1,7 @@
 "use client";
 
+import { GuestMessageBackLink } from "@/components/guest-messages/guest-message-back-link";
+
 // Admin 수리·점검 console — 우측 상세 패널. Read-centric: 처리(확인·상태 변경·메모)는 현장 모바일이
 // 담당하고, 여기서는 기록 열람 + 관리자 예외 개입(강제 완료 / 무효 / 삭제)만 한다.
 // maint-views.js 의 panel() 을 따른다.
@@ -88,6 +90,7 @@ export function MaintenanceDetailPanel({
             {report.room ? <b className="mono">{report.room}</b> : <b>{t.buildingOnly}</b>} · {report.buildingLabel}
             {aging ? <span className="mwp__aging"> · {t.oldFlag}</span> : null}
           </div>
+          <GuestMessageBackLink targetType="maintenance" targetId={report.id} surface="admin" locale={locale} />
         </div>
 
         <div className="panel__body mwp__body">

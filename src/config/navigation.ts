@@ -22,6 +22,7 @@ import {
   Bug,
   Megaphone,
   MessageSquareWarning,
+  MessagesSquare,
   Newspaper,
   Package,
   Recycle,
@@ -271,6 +272,17 @@ const mobileNavComplaints = {
   icon: MessageSquareWarning,
 } as const satisfies NavigationItem;
 
+// 손님 메시지(2026-11-13) — OTA 손님 대화 보기 · 답장. `guest_messages.view` 가 있는 사람에게만 보인다(셸이 거른다).
+// 사이드 메뉴 + 하단 탭 후보. docs/product/47-guest-messaging.md §5-2
+const mobileNavMessages = {
+  id: "messages",
+  label: localizedNavigationLabels.mobile.messages,
+  shortLabel: localizedNavigationLabels.mobile.messagesShort,
+  href: "/mobile/messages",
+  icon: MessagesSquare,
+  capability: "guest_messages.view",
+} as const satisfies NavigationItem;
+
 // 하단 탭 바는 가운데 액션("추가") 버튼을 쓰므로 탭이 4개뿐이다.
 // "청소"는 하단 바가 아니라 사이드 메뉴(햄버거)에 일부러 둔다.
 export const mobileBottomNavigation = [
@@ -296,6 +308,7 @@ export const mobileSidebarNavigation = [
   mobileNavBoard,
   mobileNavSuggestions,
   mobileNavComplaints,
+  mobileNavMessages,
   mobileNavLinenReturn,
   {
     id: "directory",
@@ -477,6 +490,14 @@ export const adminNavigation = [
     href: "/admin/complaints",
     icon: MessageSquareWarning,
   },
+  // 손님 메시지(2026-11-13) — OTA 손님 대화 · 답장. 보기 권한 `guest_messages.view` 가 있는 사람에게만. docs/product/47 §5-1
+  {
+    id: "messages",
+    capability: "guest_messages.view",
+    label: localizedNavigationLabels.admin.messages,
+    href: "/admin/messages",
+    icon: MessagesSquare,
+  },
   // 셀프 체크인(2026-11-04) — 도착 목록 · 기기 · 건물 설정. 보기 권한 `checkin.view` 가 있는 사람에게만 보인다. docs/product/44 §4-4
   {
     id: "checkin",
@@ -610,6 +631,7 @@ export const adminNavGroupOf: Record<string, AdminNavGroupKey> = {
   "linen-return": "operations",
   orders: "operations",
   complaints: "operations",
+  messages: "operations",
   checkin: "operations",
   // 채용은 사람을 다루므로 「인력」 묶음이다 — 근태·사용자와 같은 자리.
   recruit: "people",

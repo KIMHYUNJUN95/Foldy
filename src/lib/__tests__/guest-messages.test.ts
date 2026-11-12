@@ -295,6 +295,14 @@ describe("conversation state (mirror of guest_conversation_apply_messages)", () 
     expect(nextConversationState(expired, guest, now)).toMatchObject({ status: "awaiting", snooze_until: null });
   });
 
+  it("a reply to an expired snooze closes it (shown as awaiting); an active snooze stays snoozed", () => {
+    const reply = p({ replyAt: "2026-11-12T03:00:00Z", messageAt: "2026-11-12T03:00:00Z" });
+    const expired = { ...base, status: "snoozed" as const, snooze_until: "2026-11-12T01:00:00Z", last_guest_at: "2026-11-12T02:00:00Z" };
+    expect(nextConversationState(expired, reply, now)).toMatchObject({ status: "done", snooze_until: null });
+    const active = { ...expired, snooze_until: "2026-11-12T05:00:00Z" };
+    expect(nextConversationState(active, reply, now)).toMatchObject({ status: "snoozed", snooze_until: "2026-11-12T05:00:00Z" });
+  });
+
   it("a host reply after the last guest message closes awaiting; internal notes do not", () => {
     const waiting = { ...base, status: "awaiting" as const, last_guest_at: "2026-11-12T02:00:00Z" };
     expect(nextConversationState(waiting, p({ messageAt: "2026-11-12T02:30:00Z" }), now).status).toBe("awaiting");

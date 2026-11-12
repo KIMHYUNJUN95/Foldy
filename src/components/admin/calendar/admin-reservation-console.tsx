@@ -1,5 +1,6 @@
 "use client";
 
+import { BuildingGuestInfoPanel } from "@/components/admin/messages/building-guest-info-panel";
 import Link from "next/link";
 import {
   startTransition,
@@ -429,6 +430,8 @@ export function AdminReservationConsole({
 
   const uiLocale = initialLocale;
   const dictionary = getDictionary(uiLocale);
+  // 「손님용 정보」 옆 패널 — 손님 메시지 끼워 넣기에 쓰는 건물 안내(47 §6-3). 열린 건물의 정식 이름.
+  const [guestInfoBuilding, setGuestInfoBuilding] = useState<string | null>(null);
   const copy = dictionary.admin.calendar;
   const statusLabels = dictionary.admin.reservationStatusLabels;
   const buildingLabels = dictionary.cleaning.buildingLabels;
@@ -1438,9 +1441,14 @@ export function AdminReservationConsole({
                         </button>
                       </>
                     ) : canEditBuildingInfo ? (
-                      <button className="acw-link is-soft" onClick={() => startEditingBuilding(card.propertyName)} type="button">
-                        {copy.wEdit}
-                      </button>
+                      <>
+                        <button className="acw-link is-soft" onClick={() => startEditingBuilding(card.propertyName)} type="button">
+                          {copy.wEdit}
+                        </button>
+                        <button className="acw-link is-soft" onClick={() => setGuestInfoBuilding(card.propertyName)} type="button">
+                          {dictionary.guestMessages.guestInfoOpen}
+                        </button>
+                      </>
                     ) : null}
                   </span>
                 </div>
@@ -1658,6 +1666,15 @@ export function AdminReservationConsole({
       {activeView === "today" && renderTodayBoard()}
       {activeView === "rooms" && renderRoomStatusBoard()}
       {activeView === "info" && renderBuildingInfoBoard()}
+      {guestInfoBuilding ? (
+        <BuildingGuestInfoPanel
+          canonicalName={guestInfoBuilding}
+          copy={dictionary.guestMessages}
+          locale={uiLocale}
+          onClose={() => setGuestInfoBuilding(null)}
+          notify={(message) => showToast(message)}
+        />
+      ) : null}
 
       <div className={`admcal__panel-scrim${isPanelVisible ? " is-visible" : ""}`} onClick={closePanel} />
 

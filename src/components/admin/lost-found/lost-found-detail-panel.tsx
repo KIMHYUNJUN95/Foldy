@@ -1,5 +1,7 @@
 "use client";
 
+import { GuestMessageBackLink } from "@/components/guest-messages/guest-message-back-link";
+
 // Admin 분실물 console — 우측 상세 패널. 화이트 리디자인(2026-10-14, 시안 LF-PC · LFReturn-PC): 위 한 줄(임박 · 상태 ·
 // 분류) + 삭제 · 닫기, 제목, 사진, 진행 중이면 「자동 폐기까지 D-n」 막대, 정보 줄. 아래는 진행 중이면
 // [반환 처리] · [보관 연장 | 폐기 처리] · 상태 정정, 완료면 「관리자 예외 개입」 복원. 상자 · 칩 없음.
@@ -86,6 +88,7 @@ export function LostFoundDetailPanel({ item, t, adminRestoreLabel, autoDisposeLa
           <div className="lfp__sub">
             {item.room ? <b className="mono">{item.room}</b> : <b>{t.buildingWhole}</b>} · {item.buildingLabel}
           </div>
+          <GuestMessageBackLink targetType="lost_found" targetId={item.id} surface="admin" locale={locale} />
         </div>
 
         <div className="panel__body lfp__body">

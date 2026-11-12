@@ -1,3 +1,4 @@
+import { GuestMessageBackLink } from "@/components/guest-messages/guest-message-back-link";
 import { notFound, redirect } from "next/navigation";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { ComplaintDetail } from "@/components/complaints/complaint-detail";
@@ -46,6 +47,11 @@ export default async function MobileComplaintDetailPage({ params }: PageProps) {
 
   return (
     <MobileShell activeItem="complaints" badges={navBadges} title={dict.complaints.pageTitle}>
+      {session.capabilities.includes("guest_messages.view") ? (
+        <div className="gm-backlink-row">
+          <GuestMessageBackLink targetType="complaint" targetId={complaint.id} surface="mobile" locale={locale} />
+        </div>
+      ) : null}
       <ComplaintDetail
         complaint={complaint}
         comments={comments}

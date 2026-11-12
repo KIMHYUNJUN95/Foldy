@@ -258,6 +258,18 @@ async function ensureConversation(
   return { row, created };
 }
 
+/**
+ * 자동 안내(5단계)가 메시지 없이 대화를 만들 때 — 받기와 같은 규칙(고유 제약 · 있는 값을 null 로 덮지 않음).
+ * 새 대화는 `done`(손님 말이 없으니 기다림이 아님). 대화 번호만 돌려준다.
+ */
+export async function ensureConversationForBooking(
+  supabase: Client,
+  args: { organizationId: string; provider: GuestMessageProvider; providerBookingId: string; seed: ConversationSeed },
+): Promise<{ id: string; created: boolean }> {
+  const { row, created } = await ensureConversation(supabase, args);
+  return { id: row.id, created };
+}
+
 export type IngestResult = {
   conversationId: string;
   created: boolean;
@@ -357,6 +369,11 @@ export async function ingestConversationMessages(
     seed: ConversationSeed;
     messages: readonly NormalizedMessage[];
     now: Date;
+    /**
+     * 과거 메시지 가져오기(backfill.ts)에서 부를 때 true. 「48시간 넘은 안 읽은 손님 말은 답장 기다림으로 열지 않기」 규칙을
+     * 새 대화뿐 아니라 **이미 있는 대화에도** 적용한다 — 몇 년 전 말이 「답장 기다림 · 늦음」을 만들지 않게(47 「과거 메시지 가져오기」).
+     */
+    history?: boolean;
   },
 ): Promise<IngestResult> {
   const { row: conversation, created } = await ensureConversation(supabase, args);
@@ -462,7 +479,33 @@ export async function ingestConversationMessages(
     }
   }
 
-  const params = summarizeAddedMessages(args.messages, { isNewConversation: created, now: args.now });
+  // 자동 안내(5단계)가 되돌아온 host 메시지는 직원 답장이 아니다 — 손님이 기다리는 대화를 「처리 끝」으로 닫지 않게 답장 시각에서 뺀다.
+  // 웹훅은 이력 전체를 싣으므로 매번 뺀다(큐 줄의 외부 번호 · 이번에 auto 큐 줄에 이은 것).
+  let summarized: readonly NormalizedMessage[] = args.messages;
+  if (args.messages.some((message) => message.direction === "host")) {
+    const autoExternal = new Set<string>();
+    const autoRows = await supabase
+      .from("guest_message_outbox")
+      .select("id, external_id")
+      .eq("organization_id", args.organizationId)
+      .eq("conversation_id", conversation.id)
+      .eq("kind", "auto");
+    if (autoRows.error) console.error("[guest-messages] auto outbox read failed", autoRows.error.message);
+    const autoIds = new Set<string>();
+    for (const row of (autoRows.data ?? []) as Array<{ id: string; external_id: string | null }>) {
+      autoIds.add(row.id);
+      if (row.external_id) autoExternal.add(row.external_id);
+    }
+    for (const echo of plan.echoMerges) if (autoIds.has(echo.outboxId)) autoExternal.add(echo.message.externalId);
+    if (autoExternal.size > 0) {
+      summarized = args.messages.filter((message) => !(message.direction === "host" && autoExternal.has(message.externalId)));
+    }
+  }
+
+  const params = summarizeAddedMessages(summarized, {
+    isNewConversation: created || args.history === true,
+    now: args.now,
+  });
   const applied = await supabase.rpc("guest_conversation_apply_messages", {
     p_conversation_id: conversation.id,
     p_organization_id: args.organizationId,

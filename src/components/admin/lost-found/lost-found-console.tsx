@@ -49,6 +49,8 @@ type LostFoundConsoleProps = {
   deleteAccess: RequestDeleteAccess;
   /** 처리 권한(`lost_found.handle`) — 모바일 처리와 같은 키. 없으면 패널의 처리 단추를 숨긴다. */
   canHandle: boolean;
+  /** `?item=` 로 처음 열 패널(6단계 — 손님 메시지 대화에서 열기). */
+  initialSelectedId?: string | null;
   locale: Locale;
   items: AdminLostItemVM[];
   loadError: boolean;
@@ -61,7 +63,7 @@ function isThisMonthTokyo(dateOrDateTime: string | null, monthKey: string): bool
   return dateOrDateTime.slice(0, 7) === monthKey;
 }
 
-export function LostFoundConsole({ canHandle, deleteAccess, locale, items, loadError }: LostFoundConsoleProps) {
+export function LostFoundConsole({ canHandle, deleteAccess, initialSelectedId = null, locale, items, loadError }: LostFoundConsoleProps) {
   const router = useRouter();
   const dictionary = getDictionary(locale);
   const t = dictionary.lostFound.console;
@@ -72,7 +74,7 @@ export function LostFoundConsole({ canHandle, deleteAccess, locale, items, loadE
     const range = defaultRangeTokyo();
     return { status: "all", category: "all", method: "all", building: "all", reporter: "all", from: range.from, to: range.to, query: "" };
   });
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
   const [confirm, setConfirm] = useState<{ kind: LFActionKind; id: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 

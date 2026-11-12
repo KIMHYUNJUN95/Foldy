@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { X } from "lucide-react";
+import { GuestMessageBackLink } from "@/components/guest-messages/guest-message-back-link";
 import type { Complaint, ComplaintComment } from "@/lib/complaints";
 import type { Dictionary } from "@/lib/i18n";
 import { tokyoDateOf } from "@/lib/tokyo-date";
@@ -38,6 +39,8 @@ type Props = {
   canChangeStatus: boolean;
   canDelete: boolean;
   linkedReviewHref: string | null;
+  /** 「손님 메시지에서」 줄 글자 언어(6단계). */
+  locale: string;
 };
 
 function stamp(iso: string): string {
@@ -56,6 +59,7 @@ export function ComplaintDetailPanel({
   canComment,
   canChangeStatus,
   canDelete,
+  locale,
 }: Props) {
   const isOpen = complaint.status === "open";
   const platform =
@@ -126,6 +130,7 @@ export function ComplaintDetailPanel({
               <span>{platform}</span>
             </span>
             <h2 className="cxw-ph__title is-lg">{complaint.title}</h2>
+            <GuestMessageBackLink targetType="complaint" targetId={complaint.id} surface="admin" locale={locale} />
           </div>
           {canDelete ? <ComplaintDeleteButton complaintId={complaint.id} closeHref={closeHref} labels={actionLabels} /> : null}
           <Link href={closeHref} className="cxw-ph__x" aria-label={labels.close} data-panel-close scroll={false}>

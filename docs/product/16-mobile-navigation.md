@@ -634,7 +634,7 @@ Current rules:
   - 누르자마자(미리 받아 둔 로딩 경계) 셸 자리 로딩이 그려지고 본문이 밀려 들어온다 → 데이터가 오면 본문만 나타남.
   - **하위 화면이 있는 폴더마다** `loading.tsx` 가 이 파일을 다시 내보낸다(orders · maintenance · requests(+ orders · maintenance · lost-found) ·
     tasks(+ projects · [id]) · bugs · complaints(+ reviews) · announcements · ops · lost-found · cleaning · linen-return(+ record · record/[id]) ·
-    board(+ [id]) · attendance(+ leave · correction) · suggestions(+ [id]) · users). Next 는 로딩 경계를 「그 폴더 레이아웃의 자식 칸」마다
+    board(+ [id]) · attendance(+ leave · correction) · suggestions(+ [id]) · users · messages(+ [id])). Next 는 로딩 경계를 「그 폴더 레이아웃의 자식 칸」마다
     두고 **검색어(`?view=`)는 칸 키에서 뺀다** — 그래서 같은 화면의 필터 · 탭(`?view=`) 바꾸기는 로딩이 끼지 않는다.
     **새 규칙:** 모바일에 하위 화면이 있는 폴더를 새로 만들면 같은 한 줄 `loading.tsx` 를 둔다.
   - 탭바 모양은 그 경로를 지난번에 그린 셸 설정(`getShellHint` — 메뉴 · 탭바 숨김 · 제목 · 넓은 화면)과 마지막 배지를 따른다. 처음 가는
@@ -881,7 +881,7 @@ Current rules:
   | ✅ 전체 화면(셸 없음) | **직원 통화 받기**(레이아웃 호스트, 2026-11-06: 폰 · 폴드 받기 화면 여백이 `fold:` 로 넓어짐, 통화는 전체 영상 + 아래 조작, 태블릿은 `tablet:` 로 영상을 잘리지 않게 맞추고 예약은 가운데 카드 시트) |
   | ✅ 전체 화면(셸 없음) | **재류카드 · 마이넘버 카드 등록** `/account/id-card`(2026-10-23: 폰 한 단 · 폴드 확인 화면 사진 \| 칸 2열 · 태블릿 촬영 화면 오른쪽 단계 칸 — `41-residence-card-workflow.md` §10) |
   | ✅ 폭 전부(`wide`) | **청소 현황판** `/mobile/cleaning`(배정 담당, 2026-10-28: 폰 한 단 + 바닥 시트 · 폴드 건물 2열 + 시트 · 태블릿 가로 오른쪽 380px 칸에서 담당 넣기 — `07-cleaning-workflow.md`) · 홈 `/mobile` · 판매 캘린더 `/mobile/ops/calendar` · **예약 캘린더** `/mobile/calendar`(격자는 날짜 칸 고정 폭이라 넓을수록 더 많은 날, 목록 = 체크인 · 체크아웃 · 숙박 중 폴드 2열 · 태블릿 3열, 건물 정보 카드 2/3열) · **게시판 신고 처리** `/mobile/board/reports`(묶음 줄 폰 1 · 폴드 2 · 태블릿 3열, 2026-10-06 · 화이트 2026-10-15) · **내 시프트** `/mobile/shift` · **사람별 시프트**(관리자) `/mobile/users/[id]/shift`(폰 시트 · 폴드 달력 아래 · 태블릿 오른쪽 칸, 2026-10-23) · **오늘 내 방** `/mobile/shift/today`(2026-10-21: 폰 한 단 · 폴드 가운데 600px · 태블릿 가로는 달력/목록 + 오른쪽 380px 옅은 회색 칸(다가오는 일정 · 고른 날 · 고른 방), 칸 사이 세로줄 없음 · 2026-10-22 HIG 다듬기 — 폰은 「청소 시작」이 탭 바 위 sticky — `37-cleaning-shift-assignment.md`) |
-  | ✅ 목록 → 상세 2분할(`split` + `SplitList`) | 할 일(+ 프로젝트 — **2026-10-15 화이트 리디자인**: 오늘 · 내일 · 관리함은 목록 \| 상세 칸, 고른 줄 옅은 보라 · 목록과 칸 사이 세로줄 없음. 완료 · 지시 · 프로젝트 · 캘린더는 칸이 비어 있으면 넓게(최대 720 · 캘린더는 달력 \| 고른 날 목록), 줄을 눌러 칸이 열리면 2분할로 — `18-todo-task-workflow.md` 「화이트 리디자인 — 모바일」. 할 일 상세 · 새 할 일 · 수정을 화면으로 열면(폴드 · 태블릿에서 칸 밖, 2026-10-29) 버그 · 제안함처럼 가운데 540px 한 줄) · 요청(+ 처리 끝난 분실물) · 컴플레인 · 공지 · 게시판 · **제안함**(2026-10-15 화이트 리디자인: 목록 400px \| 칸, 연 줄 옅은 보라 · 세로줄 없음, 폴드는 가운데 540px 한 줄 — `22-staff-suggestions-workflow.md` 「화이트 리디자인 — 모바일」) · **버그**(2026-10-15 화이트 리디자인: 같은 방식, 새 신고 폼은 셸 안 가운데 540px — `25-bug-report-workflow.md` 「화이트 리디자인 — 모바일」) · 린넨 반품 기록 · **린넨 장부**(기록 → 칸) · **사용자 관리**(2026-10-20: 멤버 목록 \| 멤버 상세 칸, 고른 줄 옅은 보라 · 초대코드 탭은 한 단 — `17-user-profile-directory.md` 「모바일 사용자 관리」) · **직원 서류**(2026-10-26: `/mobile/users/documents` 목록 \| 확인 칸 · 대신 올리기 폼, 패턴 `staffDocs`, 폰 탭 이름 「서류」 · 폴드는 화면 이동 + 올리기 폼 두 단 — `41-residence-card-workflow.md` 「R4 구현」) · **알림**(알림이 가리키는 상세를 칸에 — `SPLIT_DETAIL_PATTERNS.notifications` = 위 상세 주소 전부, `useSplitPush`. **2026-10-15 화이트 리디자인**: 목록 400px \| 칸, 연 줄 옅은 보라 · 세로줄 없음 · 태블릿에선 밀기 없음, 폴드는 가운데 540px 한 줄 — `14-notification-design.md` 「알림 화면 — 화이트 리디자인」) |
+  | ✅ 목록 → 상세 2분할(`split` + `SplitList`) | **손님 메시지** `/mobile/messages`(2026-11-13, 문서 47 §5-4: 폰 · 폴드 목록 → `/mobile/messages/[id]` 대화 · 탭바 유지 · 답장 칸은 아래에 붙음(이 화면만 셸 본문 아래 여백을 폰 `--tabbar-h + 12px` · 폴드 · 칸 0 으로 줄이고 sticky `bottom: 0`) · 예약 정보 `BottomSheet` · 태블릿 가로는 `SplitList` 칸 안 대화, 칸에서 처리 끝 · 나중에 → 왼쪽 줄 접힘 · 칸 고른 줄은 옅은 보라 바탕(공용 테두리 대신) — 화면 확인 폰 · 폴드 · 태블릿 × ko/ja/en 2026-11-13 로컬 QA. 3 · 4단계: 답장 칸 도구 줄 맨 앞 「정해 둔 문구」 · 「건물 정보」 → 공용 `BottomSheet`(누르면 커서 자리에 넣고 시트 닫힘, 도구 줄은 가로로 넘김) · 목록 머리 「받는 통로 멈춤」 줄(관리 권한, 멈췄을 때만) — 47 §5-5. 5단계: 예약 정보 시트 아래 「보낼 자동 안내」 목록(읽기만 — 규칙 · 멈추기는 PC) — 47 §5-6) · 할 일(+ 프로젝트 — **2026-10-15 화이트 리디자인**: 오늘 · 내일 · 관리함은 목록 \| 상세 칸, 고른 줄 옅은 보라 · 목록과 칸 사이 세로줄 없음. 완료 · 지시 · 프로젝트 · 캘린더는 칸이 비어 있으면 넓게(최대 720 · 캘린더는 달력 \| 고른 날 목록), 줄을 눌러 칸이 열리면 2분할로 — `18-todo-task-workflow.md` 「화이트 리디자인 — 모바일」. 할 일 상세 · 새 할 일 · 수정을 화면으로 열면(폴드 · 태블릿에서 칸 밖, 2026-10-29) 버그 · 제안함처럼 가운데 540px 한 줄) · 요청(+ 처리 끝난 분실물) · 컴플레인 · 공지 · 게시판 · **제안함**(2026-10-15 화이트 리디자인: 목록 400px \| 칸, 연 줄 옅은 보라 · 세로줄 없음, 폴드는 가운데 540px 한 줄 — `22-staff-suggestions-workflow.md` 「화이트 리디자인 — 모바일」) · **버그**(2026-10-15 화이트 리디자인: 같은 방식, 새 신고 폼은 셸 안 가운데 540px — `25-bug-report-workflow.md` 「화이트 리디자인 — 모바일」) · 린넨 반품 기록 · **린넨 장부**(기록 → 칸) · **사용자 관리**(2026-10-20: 멤버 목록 \| 멤버 상세 칸, 고른 줄 옅은 보라 · 초대코드 탭은 한 단 — `17-user-profile-directory.md` 「모바일 사용자 관리」) · **직원 서류**(2026-10-26: `/mobile/users/documents` 목록 \| 확인 칸 · 대신 올리기 폼, 패턴 `staffDocs`, 폰 탭 이름 「서류」 · 폴드는 화면 이동 + 올리기 폼 두 단 — `41-residence-card-workflow.md` 「R4 구현」) · **알림**(알림이 가리키는 상세를 칸에 — `SPLIT_DETAIL_PATTERNS.notifications` = 위 상세 주소 전부, `useSplitPush`. **2026-10-15 화이트 리디자인**: 목록 400px \| 칸, 연 줄 옅은 보라 · 세로줄 없음 · 태블릿에선 밀기 없음, 폴드는 가운데 540px 한 줄 — `14-notification-design.md` 「알림 화면 — 화이트 리디자인」) |
   | ✅ 칸 직접(`split` + `useIsTablet`) | **룸 링크**(2026-10-15 화이트 리디자인: 태블릿 가로 건물 목록 \| 객실 \| 상세 칸, 폴드는 폰과 같은 한 줄 540px) · **청소 기록**(기록 \| 상세 칸, 폴드는 날짜 묶음 2열) · **근무 기록**(2026-10-13 리디자인: 태블릿 가로 달력 \| 월 기록, 상세는 시트 · 폴드는 한 줄) · **직원 목록**(2026-10-14 리디자인: 태블릿 가로 목록 \| 프로필 칸, 폴드는 한 줄에 번호까지) · **예약 캘린더 리스트 · 지도**(2026-10-14 리디자인: 태블릿 가로 목록 \| 예약 상세 / 건물 \| 출입 정보) |
   | ✅ 두 칸 배치(`split` + 화면 CSS) | **가동률** `/mobile/ops/occupancy`(2026-10-15: 태블릿 링 · 앞으로 3달 \| 건물별 + 아래 월별 추이, 폴드 540px 한 줄) · **매출** `/mobile/ops/revenue`(2026-10-15: 태블릿 총매출 · 숫자 · 채널 \| 건물별 + 아래 월별 매출 15칸, 폴드 540px 한 줄 · 월별 9칸, 폰 7칸) · **자동화** `/mobile/ops/automation`(2026-10-15: 태블릿 오늘 발송 + 목록 330px \| 상세 직접 그림, 폴드 540px 한 줄 · 목록 → 상세 `?job=`) · **근태 홈**(2026-10-19: 태블릿 제목 아래 링 · 출퇴근 \| 바로가기 · 오늘 기록 두 칸 같은 폭, 폴드 520px) · **급여**(태블릿: 급여 카드 · 구간 \| 일별 표) · **급여 준비**(관리자) `/mobile/payroll`(2026-10-25, 알바 급여 P3: 폰 한 줄 목록 → 하단 시트 · 폴드 표(이름 · 시간 · 총지급 · 실수령) → 같은 시트 · 태블릿 가로 목록 \| 사람 칸(시트 없음) — `39-part-time-payroll-automation-plan.md` §5-A. P5(2026-10-26) 결재 · 지급: 폰 맨 위 「결재할 급여」 카드 → `?view=approve`, 폴드 표 + 아래 막대, 태블릿 확인표 \| 320px 결재 칸 · 지급 현금 \| 이체 두 단 — 39 「P5 구현」) · **휴가 달력**(태블릿: 달력 \| 휴가 목록) |
   | ✅ 카드 여러 열(`split`) | **청소**(줄 목록 — 폴드 = 청소 목록 \| 셋팅 목록 + 오늘 기록 2열 · 태블릿 = 3열, 진행 중 링은 태블릿에서 링 \| 버튼, 2026-10-13 화이트) · **린넨 반품 건물 고르기**(폰 2 · 폴드 3 · 태블릿 4열) · **출근자 명단**(출근 중 · 퇴근 완료 섹션 나란히) |
@@ -978,6 +978,7 @@ Current count definitions (org-scoped, RLS-enforced; each fails closed to 0 so a
 | `announcements` | published announcements the user has not read (`announcement_reads`); clears on read |
 | `board` | org board posts not authored by the user, not hidden by report/block, without a `board_post_reads` row; clears on open |
 | `notifications` | unread notifications (`read_at is null`) — via `countUnreadNotifications` (placeholder, to be revisited) |
+| `messages` | 손님 메시지 「답장 기다림」 대화(끝난 「나중에」 포함) — `countAwaitingConversations`, **`guest_messages.view` 가 있는 사람에게만**(없으면 0, RLS 서버 클라이언트). 2026-11-13, 47 §5-4 |
 
 `home`, `calendar`, and `directory` intentionally show no badge.
 
@@ -1336,3 +1337,18 @@ Future navigation additions must also update the side-menu badge table and `getM
 `review-list` · `complaint-list` · `review-rooms-board` · `complaint-detail` · `review-detail`(`src/components/complaints/*`) — 클라이언트는
 `useRoomPlaceLabel()` / `useBuildingName()`, 서버는 `localizeRoomPlaceLabel()`. PC 콘솔(건물 · 객실별 표 · 객실 고르기)도 같은 날 맞췄다.
 서버로 보내는 값(필터 · 등록)은 정규 이름 그대로. 자세한 것은 `docs/product/25-complaint-workflow.md` → 「2026-11-10 점검 보강」.
+
+## 손님 메시지 → 업무 (2026-11-13, 6단계 · 커밋 전)
+
+- 대화 화면 「더 보기」 시트 → 「업무 만들기」 → 종류 목록 시트(만들 수 있는 것만 · 붙인 손님 말 미리 보기) → 만들기 칸 시트. 모두 공용 `BottomSheet`(X 없음). 만들기 칸 시트는 `flex max-h-[88dvh] flex-col` + 안쪽 스크롤 칸(`.gm-tform-scroll`) — 태블릿 가운데 카드(86dvh)에서 「만들기」가 카드 밖으로 밀리지 않게.
+- 「손님 말 고르기」는 시트를 닫고 고르기 모드: 손님 말풍선이 단추가 되고(누름 = 옅은 보라 바탕 · `light` 햅틱), 답장 칸 자리에 「n개 붙임 · 취소 · 완료」. 답장 칸은 숨기기만(쓰던 글 유지).
+- 만든 뒤 토스트 「만들었어요 · 종류」 + 「열기」(모바일 상세), 성공 햅틱은 서버 확인 뒤. 대화 안 업무 줄의 「열기」는 44px 누름 자리를 유지하고 음수 여백으로 줄 높이만 맞춘다.
+- 업무 상세(수리 · 분실물 · 할 일 · 게스트 피드백)에 「손님 메시지에서 · 손님 이름」 링크(`guest_messages.view` 가 있을 때만). 화면 확인: 폰 390 · 폴드 720 · 태블릿 1180 × ko · ja · en. 상세: 문서 47 §5-7.
+
+### 손님 메시지 — 셸 연결 (2026-11-13)
+
+- 메뉴: `mobileNavMessages`(`src/config/navigation.ts`, id `messages` · 아이콘 lucide `MessagesSquare` 말풍선 둘 · 짧은 이름 `messagesShort`) — 사이드 메뉴 줄이고 **하단 탭 후보**(탭 편집 시트에서 고를 수 있음, 기본 탭은 그대로 — Q1 임시). `capability: "guest_messages.view"` 라 권한 없는 사람에게는 메뉴 · 탭 후보 모두 안 보인다(서버도 다시 막음).
+- 배지: 위 「Side-menu operational badge counts」 표의 `messages`.
+- 뒤로가기: `/mobile/messages` · `/mobile/messages/[id]` 를 `src/lib/swipe-back/mobile-screens.ts` 에 등록 — 대화 화면은 화면 스와이프로 목록으로. 고르기 모드의 말풍선 누르기는 가로 제스처가 아니라 따로 끄지 않는다.
+- 넓은 화면: 목록 → 대화는 `SplitList` + `split`(태블릿 가로는 칸 안 대화, 폰 · 폴드는 화면 이동) — 「화면별 넓은 화면 대응 현황」 표의 손님 메시지 줄.
+- 로딩: `messages/loading.tsx` · `messages/[id]/loading.tsx` 한 줄 재내보내기.

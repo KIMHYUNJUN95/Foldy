@@ -70,6 +70,8 @@ export type ChannelCreditSnapshot = {
   remaining: number | null;
   resetsAt: number | null;
   requestCost: number | null;
+  /** 5분 한도 자체(헤더가 줄 때만 — 지금 Beds24 는 남은 양만 준다). 없으면 화면이 200 으로 추정한다. */
+  limit?: number | null;
 };
 
 export type OutboundItem = {

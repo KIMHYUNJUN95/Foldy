@@ -83,7 +83,8 @@ async function readCurrent(
 /**
  * 저장 — 화면이 본 버전(`expectedUpdatedAt`)일 때만 고친다(2026-11-12).
  *
- * - `null` = 저장된 줄이 없던 화면 → 아직 없을 때만 만든다(겹치면 23505 → 충돌).
+ * - `null` = 저장된 줄이 없던 화면 → 아직 없을 때만 만든다(겹치면 23505 → 충돌). 단, 겹친 줄이 손님용 정보 저장이 만든 줄
+ *   (`staff_info_saved = false`, 직원 칸은 기본값)이면 그 줄을 고친다(2026-11-13).
  * - 값 = 그 `updated_at` 이 그대로일 때만 update. 0줄이면 누가 먼저 고친 것 → 충돌 + 최신 값.
  */
 export async function savePropertyOperationInfo(input: {
@@ -118,7 +119,20 @@ export async function savePropertyOperationInfo(input: {
       .select(SELECT_COLUMNS)
       .single();
     if (error) {
-      if (error.code === "23505") return conflict();
+      if (error.code === "23505") {
+        // 손님용 정보 저장(손님 메시지 47 §6-3)이 먼저 줄을 만들었으면 직원 칸은 아직 기본값이다 — 그 줄이면 충돌 대신 고친다.
+        // 사람이 직원 칸을 저장한 줄(`staff_info_saved = true`)이면 지금처럼 충돌.
+        const adopted = await service
+          .from("property_operation_infos")
+          .update(values)
+          .eq("organization_id", organizationId)
+          .eq("canonical_name", input.canonicalName)
+          .eq("staff_info_saved", false)
+          .select(SELECT_COLUMNS)
+          .maybeSingle();
+        if (!adopted.error && adopted.data) return { ok: true, info: mergePropertyMapMeta(base, adopted.data as PropertyOperationInfoOverride) };
+        return conflict();
+      }
       console.error("[property-operation-info] insert failed", { code: error.code });
       return { ok: false, error: "save_failed" };
     }

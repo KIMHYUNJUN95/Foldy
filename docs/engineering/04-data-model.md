@@ -1931,6 +1931,7 @@ Constraints / behavior:
   (42P01 · PGRST205). Other read errors surface as `loadFailed` (no stale seed codes). Saves are conditional on the
   `updated_at` seen when editing started (`null` = insert only if absent); a mismatch returns `conflict` + the current row.
   Rules: `src/lib/property-operation-info-rules.ts`.
+- **2026-11-13 (`202611130003`, 미적용):** `guest_info jsonb` + `guest_info_updated_at` — guest-facing building info for guest messages (doc 47 §6-3). Separate version column so staff-field saves and guest-info saves never conflict with each other; see 「손님 메시지 3 · 4단계」 below.
 
 ## 2026-08-03 `attendance_correction_requests` — 철회 상태 추가
 
@@ -2510,7 +2511,7 @@ INSERT · UPDATE 신호만, DELETE 는 오지 않는다. 대신 `task_occurrence
   **고유 제약 `(organization_id, provider, external_id)`**(부분 인덱스가 아니라 제약 — PostgREST upsert 대상, null 끼리는 겹쳐도 됨) · **`outbox_id` 고유**(발송 큐 한 줄 = 메시지 한 줄).
   인덱스: (대화, sent_at) · (조직, sent_at desc) · author.
   - **발송 계약**: 2단계 발송 작업은 `sent` 를 저장할 때 메시지 줄을 `outbox_id` 로 upsert 한다 — 되돌아옴 합치기(웹훅이 먼저 옴)가 만든 줄에 잇고 새로 넣지 않는다.
-- `guest_message_outbox` — 발송 큐. `(conversation_id, organization_id)` → 대화(cascade). `kind`(`reply` · `auto`) · `rule_id`(외래 키는 5단계 `auto_message_rules` 때) · `body`(빈 글 금지) ·
+- `guest_message_outbox` — 발송 큐. `(conversation_id, organization_id)` → 대화(cascade). `kind`(`reply` · `auto`) · `rule_id`(외래 키 → `auto_message_rules`, set null — `202611130004` 에서 걸었다) · `body`(빈 글 금지) ·
   `status`(`queued` · `sending` · `sent` · `uncertain` · `failed` · `cancelled` — `uncertain` = 요청은 나갔는데 결과를 모름, 다시 보내지 않고 되돌아옴으로 `sent` 확정) · `attempts` · `next_try_at` · `error_code` · `external_id` · `idempotency_key`(고유 `(organization_id, idempotency_key)`) ·
   `created_by` → `auth.users` · `sent_at`(`sent` 면 필수). 인덱스: 보낼 차례(`status in ('queued','sending')` 부분, next_try_at) · (대화, created_at desc) · external_id(부분) · (조직, status).
 - `guest_message_channel_state` — 조직마다 한 줄(PK `organization_id`). `provider` · `last_webhook_at` · `last_message_webhook_at` · `last_reconcile_at`(한 페이지라도 읽었을 때만) · `last_reconcile_error` ·
@@ -2521,5 +2522,63 @@ INSERT · UPDATE 신호만, DELETE 는 오지 않는다. 대신 `task_occurrence
   (시각은 `greatest` 로만 앞으로, 「답장 기다림」은 새 안 읽은 손님 말이 기존 손님 말 · 답장보다 모두 나중일 때만, 「나중에」 유지 · 해제, 답장 → done). `security definer` · `search_path=''` · 실행 service_role 만. 규칙 문서: 47 §4-0.
 - `beds24_webhook_events.raw_payload` 칸 설명에 손님 메시지 임시 원문 기록(`messages_capture`) 예외를 적었다(47 §3-4).
 - 권한 키 시드: 새 마이그레이션의 insert + `202609100001` 자동 생성 구간(레지스트리 사본, 기존 키 추가 때와 같은 방식).
-- 미룬 표: `auto_message_rules` · `auto_message_runs` · `guest_message_links` · `property_operation_infos` 손님용 칸(47 §10 의 4~6단계).
+- 1단계 뒤에 더한 것(모두 **미적용**, 아래 날짜 구역): 2단계 `202611130001` · 건물 손님 칸 · 정해 둔 문구 `202611130003` · 자동 안내 `auto_message_rules` · `auto_message_runs` `202611130004` · 메시지 → 업무 `guest_message_links` `202611130005`.
 - 타입: `src/types/database.ts` 손으로 맞춤(생성 명령은 `npx supabase gen types typescript --linked`, 운영 적용 뒤).
+
+## 2026-11-13 손님 메시지 2단계 (`202611130001_guest_messages_stage2.sql`, **어디에도 적용 안 함**)
+
+기준 문서: `docs/product/47-guest-messaging.md` §5-4 · §9. 202611120002(운영 적용됨)는 고치지 않고, 바뀌는 것은 모두 이 파일에 둔다.
+
+- `translation_usage` — 손님 메시지 번역(손님 말 · 답장 미리 보기)이 쓴 DeepL 글자 수. 칸: `id` · `organization_id`(→ organizations, cascade) · `feature`(`guest_message` · `guest_reply`) · `char_count`(> 0) · `created_at`. 인덱스 `(created_at)` · `(organization_id, created_at)`. 글은 남기지 않는다. 월 합계는 함수 `translation_usage_since(p_since)`(DB 가 한 번에 더함) — `src/lib/review-translate.ts` 의 한도 = 리뷰 번역 글자 + 이 합.
+- `guest_message_translations` — 손님 말 번역 캐시. PK `(message_id, lang)`, `message_id` → guest_messages(cascade) · `organization_id` · `lang`(`ko` · `ja` · `en`) · `body` · `created_at`. 있으면 덮지 않는다(`on conflict do nothing`). 옛 칸 `guest_messages.body_translated` 는 답장 줄의 「직원이 쓴 원문」에만 쓴다.
+- `guest_message_outbox.claimed_at` — 발송 작업이 `sending` 으로 잡은 시각. 10분 넘게 `sending` 이면 `uncertain`(`error_code = 'stuck'`)으로 푼다(다시 보내지 않음).
+- 함수 `guest_message_enqueue_reply(...)` — 답장 큐 줄 + 대기 메시지 줄을 한 번에. 같은 키면 `(outbox_id, duplicate = true, same_body)`.
+  마지막 인자 `p_body_lang`(기본 null) = 번역해서 보낼 때 고른 언어 → `guest_messages.body_lang`(번역해서 보낸 답장만, 형식 `^[a-z]{2}(-[a-z]{2,4})?$` 체크).
+- `guest_messages.body_lang text` — 우리 답장이 손님에게 나간 언어(직원이 고른 번역 대상). 원문 그대로 보낸 답장 · 손님 말은 null.
+- 함수 `guest_conversation_last_lines(p_organization_id, p_conversation_ids)` — 대화마다 마지막 손님 말 · 답장 한 줄(`distinct on`).
+- 함수 `guest_conversation_apply_messages` 다시 정의 — 끝난 「나중에」(`snoozed` · `snooze_until <= p_now`)에 답장이 오면 `awaiting` 처럼 `done` + `snooze_until` 비움.
+- 새 표 · 함수는 모두 service_role 만(RLS 켬 · 정책 없음 · anon/authenticated 권한 없음, 05).
+
+## 2026-11-13 손님 메시지 과거 가져오기 — `guest_message_backfill_state` (`202611130002_guest_messages_backfill.sql`, **어디에도 적용 안 함**)
+
+기준 문서: `docs/product/47-guest-messaging.md` §4-0-2(2026-11-12 결정: 과거 메시지 999일 전부).
+
+- `guest_message_backfill_state` — 조직마다 한 줄(PK `organization_id` → organizations, cascade). `provider`(`beds24`) · `status`(`idle` · `running` · `paused` · `done` · `failed`, 기본 `idle`) ·
+  `max_age_days`(기본 999, 1~999) · `next_page`(다음에 읽을 페이지, ≥ 1) · `pages_done` · `fetched_count` · `imported_count` · `skipped_count`(이미 있던 메시지) · `unrouted_count`(조직 못 정함 · 다른 조직 · 엇갈림) · `failed_bookings` · `page_attempts`(지금 커서 페이지 실패 횟수 — 3번이면 넘어감) · `failed_booking_ids` text[](넘어간 예약 번호, 최대 500) ·
+  `started_at` · `finished_at` · `last_run_at` · `last_error`(멈춘 이유 코드) · `resume_after`(429 · 저크레딧 때 Beds24 리셋 시각) · `last_measure` jsonb(재기 모드 `{ at, rows, requestCost, remaining, resetsIn, nextPageExists, order }`) · `lease_until` · `run_id` uuid(지금 실행 — 서버 쓰기는 `status = 'running' and run_id = 내 번호` 조건) · `created_at` · `updated_at`(트리거).
+- 함수 `guest_message_backfill_claim(p_organization_id, p_restart = false, p_lease_seconds = 120, p_now = now())` → 줄(setof): 줄이 없으면 만들고, 도는 실행이 없거나 lease 가 지났을 때만 `running` 으로 잡고 새 `run_id`(`gen_random_uuid()`)를 붙인다. lease 는 30~300초로 자른다.
+  `done` 은 `p_restart` 일 때만 다시 잡고, `p_restart` 면 커서 · 숫자 · 실패 기록을 처음으로 되돌린다. 못 잡으면 빈 결과. `security definer` · `search_path=''` · 실행 service_role 만.
+- 메시지 자체는 기존 `guest_messages` · `guest_conversations` 에 들어간다(중복은 `(organization_id, provider, external_id)` 고유 제약으로 건너뜀). 과거 메시지는 「답장 기다림」을 만들지 않는다(47 §4-0-2).
+- 하드 삭제 — 조직이 지워지면 따라 지워진다. 보관 기간(Q7)은 아직 열려 있다.
+- 타입: `src/types/database.ts` 손으로 맞춤(표 + 함수).
+
+## 2026-11-13 손님 메시지 3 · 4단계 (`202611130003_guest_messages_stage3_4.sql`, **어디에도 적용 안 함**)
+
+기준 문서: `docs/product/47-guest-messaging.md` §5-5 · §6-3.
+
+- `property_operation_infos.guest_info jsonb not null default '{}'` — 손님에게 보내도 되는 건물 안내. 모양 `{ wifiName, wifiPassword, checkIn, checkOut, luggage, parking, trash, directions, freeText }`, 와이파이 둘은 문자열 · 나머지는 `{ ko, ja, en }`. 체크: 객체 · 64KB 이하. 앱 검사 `validateGuestInfoInput()`(짧은 칸 120 · 글 500 · 그 밖 안내 2,000, 넘으면 거절).
+- `property_operation_infos.guest_info_updated_at timestamptz` — 손님 칸 버전(처음 저장 전 null). 저장은 이 값 조건(null 이면 「아직 없음」 조건).
+- 트리거 `property_operation_infos_touch()`(before insert/update, 옛 `set_updated_at` 트리거를 바꿈): 직원 칸(주소 · 출입 코드 · 메모)이 바뀌면 `updated_at`, `guest_info` 가 바뀌면 `guest_info_updated_at` 만 올린다 — 두 저장이 서로를 충돌로 막지 않게. 넣을 때 `guest_info` 가 비어 있지 않을 때만 `guest_info_updated_at` 을 채운다.
+- `property_operation_infos.staff_info_saved boolean not null default true` — 직원 칸을 사람이 저장했나. 손님용 정보 저장이 줄을 처음 만들면 false → 그 뒤 「줄 없음」 화면의 출입 코드 저장이 23505 대신 이 줄을 고친다(`staff_info_saved = false` 조건). 직원 칸이 바뀌면 트리거가 true.
+- 함수(모두 `security definer` · `search_path = ''` · 실행 service_role 만): `guest_message_claim_manual_check(org, now, interval_seconds)` → boolean(줄 잠금 안에서 `settings.lastManualCheckAt` 확인 + 기록) · `guest_message_save_settings(org, targets, night_pause, credit_reserve, stall_hours)`(`settings` 는 `responseTargetMinutes` 키만 바꿈) · `guest_message_saved_replies_reorder(org, ids[])` → 바뀐 줄 수(unnest with ordinality, 10 간격).
+- `guest_message_saved_replies` — 정해 둔 문구. `id` · `organization_id`(→ organizations, cascade) · `title`(1~80) · `body_ko` · `body_ja` · `body_en`(각 ≤ 2,000, 하나 이상 비어 있지 않음) · `sort_order`(0~100000) · `created_by`(→ auth.users, set null) · `created_at` · `updated_at`(트리거 `guest_message_saved_replies_touch` — 제목 · 본문이 바뀔 때만, 순서만 바뀌면 그대로; 앱은 고치기 저장을 이 값 조건으로). 인덱스 `(organization_id, sort_order)`. 조직마다 200개(앱). 하드 삭제.
+- 타입: `src/types/database.ts` 손으로 맞춤.
+
+## 2026-11-13 손님 메시지 5단계 자동 안내 — `auto_message_rules` · `auto_message_runs` (`202611130004_guest_messages_auto.sql`, **어디에도 적용 안 함**)
+
+기준 문서: `docs/product/47-guest-messaging.md` §5-3 · §5-6. 적용 순서: `202611130001` → `0002` → `0003` → `0004`.
+
+- `auto_message_rules` — 자동 안내 규칙. `id` · `organization_id`(→ organizations, cascade) · `name`(1~80) · `trigger`(`confirmed` · `before_checkin` · `day_of_checkin` · `before_checkout` · `after_checkout`) · `offset_days`(0~30, 트리거별 검사: 체크인 전 · 체크아웃 뒤 ≥ 1, 당일 · 확정 = 0, 체크아웃 전 ≥ 0) · `send_time`(`HH:MM` 도쿄, 확정 직후만 null) · `target_buildings`(건물 키, 비면 전부) · `target_channels`(airbnb/booking/expedia/agoda/vrbo, 비면 전부) · `target_statuses`(confirmed/request/inquiry, 1개 이상, 기본 `{confirmed}`) · `body_ko` · `body_ja` · `body_en`(각 ≤ 2,000, 하나 이상) · `enabled`(기본 false) · `enabled_at`(꺼짐 → 켜짐 때 트리거가 찍음) · `sort_order` · `created_by`(→ auth.users, set null) · `created_at` · `updated_at`(트리거 `auto_message_rules_touch` — 글 · 설정이 바뀔 때만; 앱은 고치기 저장을 이 값 조건으로). `unique(id, organization_id)`. 조직마다 50개(앱). 하드 삭제.
+- `auto_message_runs` — 규칙 × 예약 한 줄(`UNIQUE(rule_id, provider, provider_booking_id)` — 같은 예약에 두 번 안 감). `rule_id`(+ `organization_id` 복합 외래 키 → 규칙, cascade) · `provider` · `provider_booking_id` · `reservation_id` · `conversation_id` · `outbox_id`(각 set null) · 예약 사본(건물 · 방 · 손님 이름 · 날짜 · 채널 — 다시 계획할 때마다 맞춤) · `rule_trigger`(계획할 때의 규칙 트리거 — 바뀌면 시각을 처음부터) · `scheduled_at` · `status`(scheduled/skipped/paused/queued/sent/failed/cancelled) · `skip_reason`(empty_variable/direct_booking/unknown_channel/cancelled/past_due/no_body/rule_disabled/not_target — skipped · cancelled 일 때만) · `missing_variables text[]` · `paused_at` · `paused_by` · `queued_at`(queued · sent · failed 면 필수 — `outbox_id` 가 아니라 이 값으로 본다: 큐 줄이 지워지면 `outbox_id` 가 비기 때문) · `created_at` · `updated_at`. 인덱스: 보낼 차례(`auto_message_runs_due_idx`) · 조직 + 예약 · 조직 + 시각 · 규칙 · 예약 · 대화 · 큐 · 멈춘 사람(외래 키마다).
+- `guest_message_outbox.rule_id` → `auto_message_rules(id)` 외래 키(set null). 붙이기 전에 가리킬 곳 없는 값은 비운다.
+- 함수 `guest_message_enqueue_auto(org, run_id, conversation_id, provider, body, now)` → `(outbox_id, enqueued)`: `security definer` · `search_path = ''` · 실행 service_role 만. 실행 줄을 잠그고 `scheduled` 이고 `paused_at` 이 비었을 때만 발송 큐(`kind = 'auto'`, 멱등 키 `auto:<run id>`) + 대기 메시지 줄을 넣고 실행 줄을 `queued` 로. 다른 조직 · 다른 상태면 `enqueued = false`.
+- 타입: `src/types/database.ts` 손으로 맞춤.
+
+## 2026-11-13 손님 메시지 6단계 — `guest_message_links` · `guest_message_saved_replies.purpose` (`202611130005_guest_message_links.sql`, **어디에도 적용 안 함**)
+
+기준 문서: `docs/product/47-guest-messaging.md` §5-7 · §6-4.
+
+- `guest_message_links` — 대화(와 고른 손님 말) ↔ 업무 한 줄. 칸: `id` · `organization_id`(→ organizations cascade) · `conversation_id`(→ guest_conversations cascade) · `message_id`(→ guest_messages set null, 여럿 골랐으면 가장 이른 손님 말) · `target_type`(`maintenance` · `lost_found` · `task` · `complaint`) · `target_id`(외래 키 없음 — 업무 표가 여럿. 업무가 지워지면 화면이 「지워짐」) · `created_by`(→ auth.users set null) · `created_at`. 고유 `(organization_id, target_type, target_id)` — 업무 하나에 링크 하나. 인덱스 `(conversation_id, created_at)` · `message_id` · `created_by`. 트리거 `guest_message_links_check`(넣기 · 대화 · 메시지 · 업무 바꾸기 때 대화가 그 조직 것인지, 메시지가 그 대화 · 조직 것인지, 업무가 종류마다 그 표의 같은 조직 줄인지 — 아니면 23514). 서버 전용 함수 `guest_message_set_resolved_reply(p_organization_id, p_id)` — 「해결됐어요」 표시를 한 트랜잭션에 옮긴다(고른 줄이 없으면 false, 아무것도 안 바꿈).
+- `guest_message_saved_replies.purpose` text null — `'resolved'` 면 이어진 업무가 끝났을 때 답장 칸에 띄울 「해결됐어요」 초안(보내지 않음). check `purpose in ('resolved')`, 부분 고유 인덱스 `guest_message_saved_replies_resolved_unique (organization_id) where purpose = 'resolved'`(조직마다 하나).
+- 업무 상태는 링크에 사본으로 두지 않는다 — 대화를 열 때 각 업무 표(`maintenance_reports.status/completed_at` · `lost_items.status/handled_at` · `tasks.status/completed_at/deleted_at` · `customer_complaints.status/resolved_at`)에서 읽는다.
+- 같이 바뀐 코드: 할 일 만들기에 선택 요청 id(같은 id 로 다시 오면 내가 10분 안에 만든 줄만 돌려줌, 되돌리기 지우기는 조직 필터 추가). 수리 · 분실물 · 할 일 만들기 검사 · 저장을 공용 함수(`src/lib/maintenance-create.ts` · `lost-item-create.ts` · `task-create.ts`)로 옮김(내용 그대로). `src/types/database.ts` 에 표 · 칸 추가.

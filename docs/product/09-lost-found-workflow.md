@@ -745,3 +745,10 @@ hold_reason          -- text, nullable. 연장 사유(고가·중요 등은 여�
 - 요청 목록 · 상세(PC · 모바일) · 모바일 홈 활동 · PC 대시보드가 새로고침 없이 바뀐다 — 누가 올리거나 상태를 바꾸면 열어 둔 화면에 바로 보인다.
   `requestLiveSources()` (`src/lib/live-sources.ts`) → `<LiveRefresh>`. 남이 **지운** 건은 다음 갱신 때 빠진다(삭제 신호 없음).
   공용 규칙: `docs/product/16-mobile-navigation.md` 「실시간 갱신 — 공용」.
+
+## 손님 메시지에서 만들기 (2026-11-13, 커밋 전)
+
+- 손님 메시지 대화의 「업무 만들기 → 분실물」이 분실물을 등록한다. 검사 · 저장은 모바일 등록 폼과 **같은 함수** `createLostItemRecord`(`src/lib/lost-item-create.ts`) — 폼 액션 `createLostItem` 은 결과 코드를 예전 redirect 주소로 바꾸기만 한다. 권한 그대로.
+- 건물 · 방 · 예약 · 손님 이름은 대화에서 미리 채운다(예약은 고른 자리가 같을 때만). 손님 사진은 옮기지 않는다.
+- **같은 요청 id 로 두 번 와도 분실물 한 건** — 요청 id(`submissionId`)로 기존 중복 막기 규칙 그대로. 돌려받은 줄이 이 사람이 10분 안에 만든 것이 아니면 대화에 잇지 않는다(`conflict`, 47 §5-7).
+- 상세(PC 패널 · 모바일)에 「손님 메시지에서」 링크(`guest_messages.view` 가 있을 때만). PC `/admin/lost-found?item=<id>` 로 패널이 바로 열린다(목록에 없는 id 는 무시). 반환(`returned`)되면 그 대화에 「해결됐어요」 초안(보내지 않음, 폐기는 아님). 문서 47 §6-4 · §5-7. 링크는 `guest_message_links`(202611130005, 미적용).

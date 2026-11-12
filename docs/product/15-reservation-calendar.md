@@ -722,6 +722,11 @@ direction above.
     `/mobile/calendar`
   - shared metadata currently includes localized address overrides (`ko`, `ja`, `en`), shared
     access codes, room-level access codes, and a shared ops note
+  - **2026-11-13 (guest messages stage 4, not yet committed):** each building card has a 「손님용 정보」
+    link (`property_info.edit` only) opening the shared right panel for guest-facing info stored in
+    `property_operation_infos.guest_info` (Wi-Fi, check-in/out, luggage, parking, trash, directions,
+    free text — per language ko/ja/en). It has its own version (`guest_info_updated_at`), so it never
+    conflicts with the card's staff edit. Used by the guest-message composer inserts (doc 47 §5-5 · §6-3).
 - The admin reservation export action now opens `/admin/calendar/print` instead of downloading a
   reservation CSV. The print route renders an A4 landscape month board intended for browser print /
   save-as-PDF output.

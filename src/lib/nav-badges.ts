@@ -7,6 +7,7 @@ import { getCleaningOperatingDateKey } from "@/lib/cleaning";
 import { countDistinctRooms } from "@/lib/cleaning-record-rules";
 import { countUnreadNotifications } from "@/lib/notifications/queries";
 import { getCurrentAppSession } from "@/lib/session";
+import { countAwaitingConversations } from "@/lib/guest-messages/inbox-server";
 import { countPendingIdDocumentPeople } from "@/lib/staff-documents/server";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database";
@@ -26,6 +27,8 @@ import type { Database } from "@/types/database";
  * - board:         읽음 행이 없는 조직 게시판 글 (본인이 쓴 글 제외; 열면 사라짐).
  * - users:         재류카드 / 마이넘버 카드 확인을 기다리는 사람 — `staff_documents.view` 권한이 있는
  *                  보는 사람에게만 (다른 사람에게는 키 자체가 없음).
+ * - messages:      손님 메시지 「답장 기다림」(끝난 「나중에」 포함) — `guest_messages.view` 가 있는 사람에게만.
+ *                  docs/product/47-guest-messaging.md §5-2
  * - notifications: 읽지 않은 알림 (read_at 이 null). [임시 — 다시 살펴볼 것]
  *
  * 홈, 캘린더, 연락처는 의도적으로 배지가 없다.
@@ -118,7 +121,7 @@ export const getMobileNavBadges = cache(async (): Promise<NavBadgeCounts> => {
   const dayStartIso = dayStart.toISOString();
   const dayEndIso = dayEnd.toISOString();
 
-  const [cleaning, orders, maintenance, lostToday, linenReturn, announcements, board, notifications, users] =
+  const [cleaning, orders, maintenance, lostToday, linenReturn, announcements, board, notifications, users, messages] =
     await Promise.all([
       // 오늘 남은 청소 (도쿄): 시작했지만 아직 완료하지 않은 것.
       // 숫자는 방 수(2인 방 = 1, docs/product/45 C6) — 오늘 진행 중 기록은 적어서 방 키만 읽는다.
@@ -173,6 +176,8 @@ export const getMobileNavBadges = cache(async (): Promise<NavBadgeCounts> => {
         organizationId: orgId,
       }).catch(() => 0),
       session.capabilities.includes("staff_documents.view") ? countPendingIdDocumentPeople(orgId) : Promise.resolve(0),
+      // RLS 서버 클라이언트 — 읽기 정책이 `guest_messages.view` 를 다시 본다.
+      session.capabilities.includes("guest_messages.view") ? countAwaitingConversations(supabase, orgId) : Promise.resolve(0),
     ]);
 
   return {
@@ -183,6 +188,7 @@ export const getMobileNavBadges = cache(async (): Promise<NavBadgeCounts> => {
     board,
     notifications,
     users,
+    messages,
   };
 });
 

@@ -158,7 +158,7 @@ export function summarizeAddedMessages(
 }
 
 /**
- * 대화 상태 바꾸기 — **DB 함수 `guest_conversation_apply_messages`(마이그레이션 202611120002)의 거울**. 실제 저장은 DB 함수가
+ * 대화 상태 바꾸기 — **DB 함수 `guest_conversation_apply_messages`(마이그레이션 202611120002 → 202611130001 에서 다시 정의)의 거울**. 실제 저장은 DB 함수가
  * 한 문장으로 한다(읽고 → 고치기 사이에 직원 「처리 끝」이 덮이지 않게). 이 함수는 규칙 시험용이고, 둘을 고칠 때는 함께 고친다.
  *
  * - 시각 칸은 뒤로 가지 않는다.
@@ -189,12 +189,14 @@ export function nextConversationState(
       snoozeUntil = null;
     }
   } else if (
-    current.status === "awaiting" &&
+    // 끝난 「나중에」는 답장 기다림과 같이 본다(202611130001 판).
+    (current.status === "awaiting" || (current.status === "snoozed" && !snoozeActive)) &&
     params.replyAt !== null &&
     lastReply !== null &&
     Date.parse(lastReply) >= (lastGuest ? Date.parse(lastGuest) : -Infinity)
   ) {
     status = "done";
+    snoozeUntil = null;
   }
   return { status, snooze_until: snoozeUntil, last_guest_at: lastGuest, last_reply_at: lastReply, last_message_at: lastMessage };
 }

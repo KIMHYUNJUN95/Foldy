@@ -1,3 +1,4 @@
+import { GuestMessageBackLink } from "@/components/guest-messages/guest-message-back-link";
 import { notFound, redirect } from "next/navigation";
 import { AnnouncementImageGrid } from "@/components/announcements/announcement-image-grid";
 import { MaintenanceHandlingForm } from "@/components/requests/maintenance-handling-form";
@@ -127,6 +128,10 @@ export default async function MobileMaintenanceDetailPage({ params, searchParams
               <span key={i}>{roomText || i > 0 ? ` · ${x}` : x}</span>
             ))}
         </p>
+        {/* 손님 메시지에서 만든 신고면 그 대화로(메시지함을 볼 수 있는 사람만, 47 §6-4). */}
+        {session.capabilities.includes("guest_messages.view") ? (
+          <GuestMessageBackLink targetType="maintenance" targetId={report.id} surface="mobile" locale={locale} />
+        ) : null}
 
         {report.guest_name ? (
           <p className="mdw-warn">

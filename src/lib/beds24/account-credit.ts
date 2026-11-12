@@ -17,6 +17,8 @@ export type AccountCreditRecord = {
   remaining: number | null;
   resetsAt: number | null;
   requestCost: number | null;
+  /** 5분 한도(헤더가 준 경우만). */
+  limit: number | null;
   recordedAt: number;
   source: string;
 };
@@ -25,7 +27,7 @@ type Client = SupabaseClient<Database>;
 
 export async function recordBeds24AccountCredit(
   supabase: Client,
-  credit: { remaining: number | null; resetsAt: number | null; requestCost: number | null },
+  credit: { remaining: number | null; resetsAt: number | null; requestCost: number | null; limit?: number | null },
   source: string,
   nowMs: number = Date.now(),
 ): Promise<void> {
@@ -44,6 +46,7 @@ export async function recordBeds24AccountCredit(
           remaining: credit.remaining,
           resetsAt: credit.resetsAt,
           requestCost: credit.requestCost,
+          ...(typeof credit.limit === "number" ? { limit: credit.limit } : {}),
           recordedAt: nowMs,
           source,
         } as unknown as Json,
@@ -72,6 +75,7 @@ export async function readBeds24AccountCredit(supabase: Client, nowMs: number = 
     remaining: num(meta.remaining),
     resetsAt: num(meta.resetsAt),
     requestCost: num(meta.requestCost),
+    limit: num(meta.limit),
     recordedAt: num(meta.recordedAt) ?? 0,
     source: typeof meta.source === "string" ? meta.source : "",
   };

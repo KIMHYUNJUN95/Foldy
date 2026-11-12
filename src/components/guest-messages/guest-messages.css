@@ -1,0 +1,1004 @@
+/*
+ * 손님 메시지함 — PC 콘솔 · 모바일 3폭 공용(2026-11-13, 시안 R2Main · R2PhoneThread · Fold · Tablet · States).
+ * docs/product/47-guest-messaging.md §5
+ * 사용자 시각 규칙: 세로 구분선 · 카드 테두리 · 상자 구역 없음 / 구분선 0.5px #E4E3E9 / 고른 줄 옅은 보라 배경(왼쪽 막대 금지) /
+ * 상태는 회색 글자 / 급함 #c4364b / 주 버튼 #7A52E6 / 입력칸 흰 바탕 1px #E0E0E6 · 둥근 12 · 위에 걸친 라벨.
+ * 변수 이름은 `--gm-*`(콘솔 · 전역 토큰과 겹치지 않게 — admin-console.css 머리 주석).
+ */
+
+.gm-root {
+  --gm-ink: #16141f;
+  --gm-muted: #6b6878;
+  --gm-sep: #e4e3e9;
+  --gm-fill: #f7f7f9;
+  --gm-select: #f3effd;
+  --gm-primary: #7a52e6;
+  --gm-primary-press: #5f3cc4;
+  --gm-urgent: #c4364b;
+  --gm-input: #e0e0e6;
+  --gm-ease: cubic-bezier(0.23, 1, 0.32, 1);
+  /* 칸 바탕(목록 · 예약 패널) — 세로 구분선 대신. */
+  --gm-pane: #fafafb;
+  color: var(--gm-ink);
+}
+
+.gm-urgent { color: var(--gm-urgent); font-weight: 600; }
+.gm-hint { font-size: 12px; color: var(--gm-muted); line-height: 1.5; }
+.gm-link { border: 0; background: none; padding: 0; font: inherit; color: var(--gm-primary); cursor: pointer; text-decoration: none; }
+.gm-link:hover { color: var(--gm-primary-press); }
+.gm-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* ── 버튼 ── */
+.gm-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--gm-fill);
+  color: var(--gm-ink);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.2;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    transform 140ms var(--gm-ease),
+    background-color 140ms ease;
+}
+.gm-btn:hover:not(:disabled) { background: #efeff3; }
+.gm-btn:active:not(:disabled) { transform: scale(0.97); }
+.gm-btn:disabled { opacity: 0.45; cursor: default; }
+.gm-btn[aria-pressed="true"] { background: var(--gm-select); font-weight: 600; }
+.gm-btn--primary { background: var(--gm-primary); color: #fff; font-weight: 600; }
+.gm-btn--primary:hover:not(:disabled) { background: var(--gm-primary-press); }
+.gm-btn--lg { min-height: 40px; border-radius: 12px; padding: 0 20px; font-size: 14px; }
+.gm-btn--sm { min-height: 30px; font-size: 12px; padding: 0 10px; }
+.gm-btn:focus-visible,
+.gm-link:focus-visible,
+.gm-row:focus-visible,
+.gm-chipbtn:focus-visible,
+.gm-send-round:focus-visible { outline: 2px solid var(--gm-primary); outline-offset: 2px; }
+.gm-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+
+/* ── 목록 줄 ── */
+.gm-row {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  padding: 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 120ms ease;
+}
+@media (hover: hover) and (pointer: fine) { .gm-row:hover { background: var(--gm-fill); } }
+.gm-row[aria-current="true"],
+.gm-row[data-selected] { background: var(--gm-select); }
+.gm-ava {
+  position: relative;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 18px;
+  background: var(--gm-fill);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+}
+.gm-row__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.gm-row__top { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.gm-row__name { font-size: 14px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.gm-row__name[data-unread] { font-weight: 600; }
+.gm-row__wait { margin-left: auto; flex: none; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--gm-muted); }
+.gm-row__wait[data-tone="strong"] { color: var(--gm-ink); font-weight: 600; }
+.gm-row__wait[data-tone="urgent"] { color: var(--gm-urgent); font-weight: 600; }
+.gm-row__line { font-size: 13px; color: var(--gm-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gm-row__line[data-unread] { color: var(--gm-ink); }
+.gm-row__meta { display: flex; gap: 6px; min-width: 0; font-size: 12px; color: var(--gm-muted); }
+.gm-row__metatext { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.gm-row__channel { flex: none; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; color: var(--gm-ink); }
+.gm-row__channel .gm-dot { width: 7px; height: 7px; }
+.gm-row__channel + .gm-row__metatext::before { content: "·"; margin-right: 6px; color: var(--gm-muted); }
+.gm-row__alert { flex: none; font-weight: 600; }
+.gm-row__alert[data-tone="urgent"] { color: var(--gm-urgent); }
+
+/* ── 대화 ── */
+.gm-thread { display: flex; flex-direction: column; gap: 14px; }
+.gm-thread__empty { margin: auto; color: var(--gm-muted); font-size: 14px; }
+.gm-day { display: flex; flex-direction: column; gap: 14px; }
+.gm-day__label { align-self: center; font-size: 12px; color: var(--gm-muted); }
+.gm-system { align-self: center; margin: 0; font-size: 12px; color: var(--gm-muted); text-align: center; max-width: 80%; }
+.gm-msg { display: flex; flex-direction: column; gap: 4px; max-width: min(70%, 560px); }
+.gm-msg--guest { align-self: flex-start; }
+.gm-msg--host,
+.gm-msg--note { align-self: flex-end; align-items: flex-end; }
+.gm-bubble { padding: 12px 14px; font-size: 14px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; transition: opacity 200ms ease; }
+@supports (transition-behavior: allow-discrete) {
+  .gm-bubble {
+    @starting-style { opacity: 0; }
+  }
+}
+.gm-bubble--guest { background: var(--gm-fill); border-radius: 16px 16px 16px 6px; }
+.gm-bubble--host { background: var(--gm-select); border-radius: 16px 16px 6px 16px; }
+.gm-msg--host[data-status="queued"] .gm-bubble--host,
+.gm-msg--host[data-status="sending"] .gm-bubble--host { opacity: 0.72; }
+.gm-bubble--note { background: #fbf7e8; border-radius: 16px 16px 6px 16px; }
+.gm-msg__foot { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 12px; color: var(--gm-muted); }
+.gm-msg__foot svg { flex: none; }
+/* 상태 글자 앞 아이콘은 글자와 한 줄(Tailwind preflight 가 svg 를 block 으로 만든다). */
+.gm-status { display: inline; }
+.gm-status svg { display: inline-block; vertical-align: -2px; margin-right: 4px; }
+.gm-msg__tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; }
+/* 안내 글은 한 줄을 다 쓰고, 버튼 묶음(재시도 · 보내기 취소)은 서로 갈라지지 않는다. */
+.gm-msg__tools > .gm-hint { flex: 1 1 100%; text-align: right; }
+.gm-msg__buttons { display: inline-flex; flex-wrap: nowrap; gap: 6px; }
+.gm-edit { display: flex; flex-direction: column; gap: 8px; width: min(520px, 100%); }
+.gm-input {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 64px;
+  border: 1px solid var(--gm-input);
+  border-radius: 12px;
+  background: #fff;
+  padding: 12px 14px;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--gm-ink);
+}
+.gm-input:focus { outline: none; border-color: var(--gm-primary); box-shadow: 0 0 0 4px var(--gm-select); }
+.gm-metaline { display: inline-flex; align-items: baseline; gap: 6px; font-size: 12px; color: var(--gm-muted); min-width: 0; }
+.gm-metaline > .gm-dot { align-self: center; }
+/* 「·」 는 각 항목 앞에 그리고, 줄 맨 앞 것은 왼쪽 14px 를 잘라 숨긴다 — 줄이 바뀌어도 줄 앞 · 끝에 「·」 가 남지 않는다. */
+.gm-sep-list { display: flex; flex-wrap: wrap; min-width: 0; margin-left: -14px; clip-path: inset(0 0 0 14px); }
+/* 항목 안에서 줄이 바뀌면 둘째 줄은 「·」 자리만큼 들여 쓴다(내어쓰기) — 잘린 왼쪽 14px 에 글자가 묻히지 않게. */
+.gm-sep-list > * { white-space: nowrap; padding-left: 14px; text-indent: -14px; }
+.gm-sep-list > * > * { text-indent: 0; }
+.gm-sep-list > *::before { content: "·"; display: inline-block; width: 14px; text-indent: 0; text-align: center; }
+/* 긴 항목(기다린 시간 · 대화 줄 아래 상태 글)은 항목 안에서 줄바꿈을 허용한다. */
+.gm-sep-list > :last-child, .gm-sep-list--end > * { white-space: normal; }
+/* 오른쪽 붙은 줄(대화 줄 아래 글)은 줄 앞이 칸 왼쪽에 닿지 않는다 — 거꾸로 「·」 를 항목 뒤에 두고 오른쪽 14px 를 잘라
+   줄 끝 「·」 를 숨긴다. 「·」 는 항목 오른쪽 여백(14px) 안에 있어 항목 글자가 잘린 자리로 들어가지 않는다. */
+.gm-sep-list--end { justify-content: flex-end; margin-left: 0; margin-right: -14px; clip-path: inset(0 14px 0 0); }
+.gm-sep-list--end > * { position: relative; padding-left: 0; padding-right: 14px; text-indent: 0; }
+.gm-sep-list--end > *::before { content: none; }
+.gm-sep-list--end > *::after { content: "·"; position: absolute; right: 0; bottom: 0; width: 14px; text-align: center; }
+.gm-nw { white-space: nowrap; }
+.gm-dot { width: 8px; height: 8px; border-radius: 4px; flex: none; }
+
+/* ── 답장 칸 ── */
+.gm-composer { display: flex; flex-direction: column; gap: 10px; }
+.gm-composer__row { display: flex; align-items: flex-end; gap: 8px; }
+.gm-composer__bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.gm-composer__hint { margin-left: auto; text-align: right; }
+/* PC 아래 줄: 「내부 메모」 · 번역 언어 · 「보내기」(늘 오른쪽 끝)가 한 줄, 안내 글은 그 아래 한 줄을 다 쓴다 — 「보내기」가 혼자 떨어지지 않게. */
+.gm-composer__bar .gm-composer__hint { order: 10; flex: 1 1 100%; min-width: 0; margin-left: 0; text-align: left; }
+.gm-composer__bar > .gm-btn--primary { flex: none; margin-left: auto; }
+.gm-composer--phone .gm-composer__hint { margin-left: 4px; text-align: left; }
+.gm-composer__readonly { margin: 0; font-size: 13px; color: var(--gm-muted); }
+.gm-field { position: relative; display: block; flex: 1; min-width: 0; }
+.gm-field__label {
+  position: absolute;
+  left: 12px;
+  top: -8px;
+  z-index: 1;
+  padding: 0 4px;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gm-muted);
+  max-width: calc(100% - 24px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gm-field__input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  resize: none;
+  border: 1px solid var(--gm-input);
+  border-radius: 12px;
+  background: #fff;
+  padding: 14px 16px 12px;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--gm-ink);
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+/* 자리 글자도 대비 4.5:1 이상(흰 바탕에 #6b6878 ≈ 5.6:1). */
+.gm-field__input::placeholder { color: var(--gm-muted); }
+.gm-field__input:focus { outline: none; border-color: var(--gm-primary); box-shadow: 0 0 0 4px var(--gm-select); }
+.gm-field:focus-within .gm-field__label { color: var(--gm-primary); }
+.gm-field[data-mode="note"] .gm-field__input { background: #fffdf5; }
+.gm-field[data-mode="note"] .gm-field__label { background: #fffdf5; }
+.gm-field__input:disabled { background: var(--gm-fill); }
+.gm-composer--phone .gm-field__input { border-radius: 18px; font-size: 15px; line-height: 1.4; padding: 12px 16px; }
+.gm-composer--phone .gm-field__label { left: 14px; font-size: 11px; }
+/* 도구 줄은 가로로 넘기지 않는다 — 좁거나 글자가 크면 다음 줄로(번역 언어는 입력 칸 아래 줄, 2026-11-13 리뷰). */
+.gm-tools { display: flex; flex-wrap: wrap; gap: 8px; }
+.gm-composer__langline { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-width: 0; }
+.gm-composer__langline .gm-select--target { flex: 0 1 auto; min-width: 0; max-width: 100%; text-overflow: ellipsis; }
+.gm-composer__langline .gm-composer__hint { flex: 1 1 160px; min-width: 0; margin-left: 0; }
+.gm-chipbtn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--gm-fill);
+  font: inherit;
+  font-size: 13px;
+  color: var(--gm-ink);
+  white-space: nowrap;
+}
+.gm-chipbtn[aria-pressed="true"] { background: var(--gm-select); font-weight: 600; }
+.gm-send-round {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 22px;
+  background: var(--gm-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    transform 140ms var(--gm-ease),
+    opacity 140ms ease;
+}
+.gm-send-round:active:not(:disabled) { transform: scale(0.94); }
+.gm-send-round:disabled { opacity: 0.4; }
+.gm-preview { display: flex; flex-direction: column; gap: 8px; }
+.gm-preview__title { font-size: 14px; font-weight: 700; }
+.gm-blocked { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 12px; background: var(--gm-fill); }
+.gm-blocked__text { display: flex; gap: 8px; font-size: 13px; line-height: 1.6; color: var(--gm-ink); }
+.gm-blocked__text svg { flex: none; margin-top: 4px; color: var(--gm-muted); }
+.gm-blocked__row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.gm-blocked__email { font-size: 13px; color: var(--gm-muted); margin-right: auto; overflow-wrap: anywhere; }
+
+/* ── 예약 정보 ── */
+.gm-resv { margin: 0; display: flex; flex-direction: column; }
+.gm-resv__row { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 8px 0; border-bottom: 0.5px solid var(--gm-sep); font-size: 14px; }
+.gm-resv__row:last-child { border-bottom: 0; }
+.gm-resv__row dt { flex: none; width: 84px; font-size: 13px; color: var(--gm-muted); }
+.gm-resv__row dd { margin: 0; flex: 1; min-width: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.gm-resv__num { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.gm-resv__num .gm-link { margin-left: auto; font-size: 13px; }
+.gm-resv__sub { display: block; font-size: 12px; color: var(--gm-muted); }
+
+/* ── 빈 · 오류 ── */
+.gm-empty { margin: auto; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 48px 16px; text-align: center; }
+.gm-empty b { font-size: 15px; }
+.gm-empty span { font-size: 13px; color: var(--gm-muted); }
+
+/* ── 확인 창(가운데) ── */
+.gm-confirm { position: fixed; inset: 0; z-index: 120; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(2, 6, 23, 0.45); }
+.gm-confirm__card {
+  width: min(380px, 100%);
+  background: #fff;
+  border-radius: 20px;
+  padding: 22px 20px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 24px 48px -16px rgba(22, 20, 31, 0.35);
+  transition:
+    transform 200ms var(--gm-ease),
+    opacity 200ms ease;
+  @starting-style { transform: scale(0.96); opacity: 0; }
+}
+.gm-confirm__title { font-size: 16px; }
+.gm-confirm__body { margin: 0; font-size: 14px; line-height: 1.6; color: var(--gm-muted); }
+
+/* ══ PC 콘솔 ══════════════════════════════════════════════════════════════ */
+.gm-console { display: flex; height: calc(100dvh - 72px); margin: -28px -32px -60px; min-height: 520px; background: #fff; }
+.gm-console__list {
+  width: 372px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 12px 12px 0 16px;
+  box-sizing: border-box;
+  background: var(--gm-pane);
+}
+@media (max-width: 1360px) { .gm-console__list { width: 340px; } }
+.gm-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 0 0 10px 12px; }
+.gm-filters__overdue { flex: 1 1 100%; font-size: 12px; color: var(--gm-urgent); font-weight: 600; white-space: nowrap; }
+.gm-filters .gm-select { white-space: nowrap; }
+.gm-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-bottom: 16px; }
+/* 목록 줄을 감싼 접힘 칸(.row-collapse grid)이 긴 미리보기 글에 밀려 넓어지지 않게. */
+.gm-mrows .row-collapse,
+.gm-scroll .row-collapse { grid-template-columns: minmax(0, 1fr); }
+/* 줄 사이 0.5px 구분선 — 공용 규칙대로 글자 시작점(줄 여백 + 동그라미 36 + 간격 12)부터. */
+.gm-mrows > * + *,
+.gm-scroll > * + * { position: relative; }
+.gm-mrows > * + *::before,
+.gm-scroll > * + *::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 12px;
+  left: calc(12px + 36px + 12px);
+  height: 0.5px;
+  background: var(--gm-sep);
+  pointer-events: none;
+}
+.gm-mrows > * + *::before { left: calc(8px + 36px + 12px); right: 8px; }
+/* 고른 줄의 위 · 아래 구분선은 숨긴다(바탕색과 겹쳐 보이지 않게). */
+.gm-scroll > *:has(.gm-row[aria-current="true"])::before,
+.gm-scroll > *:has(.gm-row[aria-current="true"]) + *::before,
+.gm-mrows > *:has(.gm-row[data-split-active])::before,
+.gm-mrows > *:has(.gm-row[data-split-active]) + *::before { opacity: 0; }
+/* 세 칸은 세로 줄 없이 바탕색으로 나눈다(목록 · 예약 패널 옅은 회색, 대화 흰색 — 사용자 시각 규칙). */
+.gm-console__thread { flex: 1; min-width: 0; display: flex; flex-direction: column; background: #fff; }
+.gm-thead {
+  flex: none;
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 28px;
+  box-sizing: border-box;
+  border-bottom: 0.5px solid var(--gm-sep);
+}
+.gm-thead__who { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.gm-thead__name { font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gm-thead__actions { flex: none; display: flex; flex-wrap: nowrap; justify-content: flex-end; gap: 8px; position: relative; }
+.gm-tbody { flex: 1; min-height: 0; overflow-y: auto; padding: 24px 28px; display: flex; flex-direction: column; }
+.gm-tfoot { flex: none; padding: 14px 28px 18px; border-top: 0.5px solid var(--gm-sep); }
+.gm-console__panel {
+  width: 320px;
+  flex: none;
+  padding: 22px 28px;
+  box-sizing: border-box;
+  background: var(--gm-pane);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  overflow-y: auto;
+}
+@media (max-width: 1360px) { .gm-console__panel { width: 272px; padding: 22px 20px; } }
+.gm-panel__kicker { font-size: 12px; color: var(--gm-muted); }
+.gm-panel__title { margin: 0; font-size: 18px; font-weight: 700; overflow-wrap: anywhere; }
+.gm-pop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 30;
+  width: 300px;
+  padding: 8px 0;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow:
+    0 12px 32px rgba(22, 20, 31, 0.14),
+    0 0 0 0.5px var(--gm-sep);
+  display: flex;
+  flex-direction: column;
+  transform-origin: top right;
+  transition:
+    transform 160ms var(--gm-ease),
+    opacity 160ms ease;
+  @starting-style { transform: scale(0.97); opacity: 0; }
+}
+.gm-pop__title { padding: 8px 16px 6px; font-size: 13px; font-weight: 700; }
+.gm-pop__item {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  color: var(--gm-ink);
+}
+.gm-pop__item:hover { background: var(--gm-fill); }
+.gm-pop__custom { display: flex; flex-direction: column; gap: 8px; padding: 10px 16px 6px; box-shadow: 0 -0.5px 0 var(--gm-sep); margin-top: 4px; }
+.gm-pop__pickers { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* ══ 모바일 ═══════════════════════════════════════════════════════════════ */
+.gm-mlist-head { display: flex; flex-direction: column; gap: 12px; margin-bottom: 8px; }
+.gm-mlist-head h1 { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.01em; }
+.gm-mselects { display: flex; gap: 8px; flex-wrap: wrap; }
+.gm-select {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 34px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--gm-fill)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236b6878' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")
+    no-repeat right 10px center;
+  padding: 0 30px 0 12px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--gm-ink);
+  max-width: 100%;
+}
+.gm-mrows { display: flex; flex-direction: column; margin: 0 -8px; }
+.gm-mrows .gm-row { padding: 12px 8px; }
+/* 태블릿 2분할: 고른 줄은 옅은 보라 바탕만(공용 칸 테두리 대신 — 왼쪽 막대 · 테두리 금지 규칙). 키보드 초점 고리는 남긴다. */
+.split-list a.gm-row[data-split-active] { outline: none; background: var(--gm-select); }
+.split-list a.gm-row[data-split-active]:focus-visible { outline: 2px solid var(--gm-primary); outline-offset: 2px; }
+/* 대화 화면은 셸 본문 높이를 다 쓴다 — 셸 칸(`[data-shell-column]`)을 이 화면일 때만 세로 flex 로(숫자 없이). */
+[data-shell-column]:has(> .gm-mthread) { min-height: 100%; display: flex; flex-direction: column; }
+/* 셸 본문의 아래 여백(탭바 + 여유 124px)은 이 화면에서 탭바 자리만 — 답장 칸이 탭바 바로 위에 붙고 그 밑에 빈 칸이 남지 않게.
+   탭바 실제 높이는 `--tabbar-h` 보다 둥근 윗모서리 · 라벨 줄만큼 조금 크다(390 폭 실측 76 vs 67) → 12px 더. */
+[data-shell-scroll]:has(.gm-mthread) { padding-bottom: calc(var(--tabbar-h) + 12px); }
+@media (min-width: 600px) { [data-shell-scroll]:has(.gm-mthread) { padding-bottom: 0; } }
+html[data-pane] [data-shell-scroll]:has(.gm-mthread) { padding-bottom: 0 !important; }
+.gm-mthread { flex: 1; display: flex; flex-direction: column; }
+.gm-mthread__head { display: flex; align-items: center; gap: 4px; padding-bottom: 10px; border-bottom: 0.5px solid var(--gm-sep); }
+.gm-mthread__who {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border: 0;
+  background: none;
+  padding: 0;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+.gm-mthread__who h1 { margin: 0; font-size: 18px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gm-mthread__sub { font-size: 12px; color: var(--gm-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gm-iconbtn {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gm-ink);
+}
+.gm-iconbtn[aria-pressed="true"] { background: var(--gm-select); color: var(--gm-primary); }
+.gm-mthread__body { flex: 1; padding: 16px 0; display: flex; flex-direction: column; }
+.gm-mthread .gm-msg { max-width: 84%; }
+.gm-mthread .gm-bubble { font-size: 15px; line-height: 1.55; }
+.gm-mthread .gm-bubble--guest { border-radius: 18px 18px 18px 6px; }
+.gm-mthread .gm-bubble--host,
+.gm-mthread .gm-bubble--note { border-radius: 18px 18px 6px 18px; }
+/* 답장 칸은 스크롤해도 아래에 붙는다. sticky 의 bottom 은 스크롤 칸의 아래 여백(위 규칙 — 폰은 탭바 자리, 폴드 · 칸은 0)
+   안쪽에서 재므로 0 이면 된다(탭바 높이를 또 더하면 그만큼 빈 칸이 생긴다). */
+.gm-mfoot {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  padding: 10px 0 12px;
+  background: rgba(255, 255, 255, 0.96);
+  -webkit-backdrop-filter: blur(16px) saturate(1.6);
+  backdrop-filter: blur(16px) saturate(1.6);
+  border-top: 0.5px solid var(--gm-sep);
+}
+.gm-sheet { display: flex; flex-direction: column; gap: 4px; padding: 4px 20px 20px; }
+.gm-sheet__title { margin: 0 0 6px; font-size: 16px; font-weight: 700; }
+.gm-sheet__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  border: 0;
+  border-bottom: 0.5px solid var(--gm-sep);
+  background: none;
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+  color: var(--gm-ink);
+  padding: 0;
+}
+.gm-sheet__item:last-child { border-bottom: 0; }
+.gm-sheet__label { flex: 1; min-width: 0; }
+.gm-sheet__item svg { flex: none; color: var(--gm-primary); }
+
+/* 손가락 화면 — 누르는 자리 44px 이상(HIG). 글자가 커져도(최대 1.35배) 줄바꿈으로 버틴다. */
+@media (pointer: coarse) {
+  .gm-select { height: auto; min-height: 44px; }
+  .gm-btn,
+  .gm-btn--sm { min-height: 44px; }
+  .gm-chipbtn { height: auto; min-height: 44px; }
+  .gm-link { display: inline-flex; align-items: center; min-height: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gm-btn,
+  .gm-send-round,
+  .gm-pop,
+  .gm-confirm__card,
+  .gm-bubble { transition: none; }
+}
+
+/* PC 토스트 · 되돌리기는 아래(답장 칸 · 버튼 위)가 아니라 대화 머리 바로 밑에 뜬다 — 답장 칸을 가리지 않게.
+   콘솔 위 막대 72 + 대화 머리 64 + 여유 12. */
+.adm .gm-console .adm-undo,
+.adm .gm-console .adm-toast { top: 148px; bottom: auto; }
+
+/* 답장 칸 「번역해서 보낼 언어」 — 드롭다운 하나(칩 대신). 손가락 화면에선 도구 줄 안에서 줄어들지 않는다. */
+.gm-select--target { flex: none; max-width: 100%; }
+
+/* ══ 3 · 4단계 (2026-11-13) — 답장 칸 넣기 · 설정 탭 · 정해 둔 문구 · 건물 손님용 정보 ═══════════════════ */
+
+/* ── 답장 칸 「정해 둔 문구」 · 「건물 정보 넣기」 (시안 R2Main 팝오버 · R2PhoneThread 시트) ── */
+.gm-inserts { position: relative; display: flex; gap: 8px; flex: none; }
+.gm-insert-pop {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 10px);
+  z-index: 30;
+  width: 380px;
+  max-height: min(440px, 60vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 8px 0;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow:
+    0 12px 32px rgba(22, 20, 31, 0.14),
+    0 0 0 0.5px var(--gm-sep);
+  display: flex;
+  flex-direction: column;
+  transform-origin: bottom left;
+  transition:
+    transform 160ms var(--gm-ease),
+    opacity 160ms ease;
+  @starting-style { transform: scale(0.97); opacity: 0; }
+}
+.gm-insert__head { display: flex; align-items: baseline; gap: 8px; padding: 8px 16px 6px; }
+.gm-insert-sheet .gm-insert__head { padding: 0 0 6px; }
+.gm-insert__title { margin: 0; font-size: 13px; font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+.gm-insert-sheet .gm-insert__title { font-size: 16px; }
+.gm-insert__lang { margin-left: auto; flex: none; font-size: 12px; color: var(--gm-muted); }
+.gm-insert__list { display: flex; flex-direction: column; }
+.gm-insert__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: var(--gm-ink);
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+.gm-insert-sheet .gm-insert__item { padding: 10px 0; min-height: 48px; }
+@media (hover: hover) and (pointer: fine) { .gm-insert__item:hover:not(:disabled) { background: var(--gm-fill); } }
+.gm-insert__item:focus-visible { outline: 2px solid var(--gm-primary); outline-offset: -2px; }
+.gm-insert__item:disabled { cursor: default; }
+/* 줄 사이 구분선 — 글자 시작점부터(공용 규칙). */
+.gm-insert__list > * + *, .gm-insert__staff > .gm-insert__item + .gm-insert__item { box-shadow: inset 0 0.5px 0 var(--gm-sep); }
+.gm-insert__k { width: 96px; flex: none; font-size: 13px; color: var(--gm-muted); overflow-wrap: anywhere; }
+.gm-insert__item--reply .gm-insert__k { width: 120px; color: var(--gm-ink); font-weight: 600; }
+.gm-insert__v { flex: 1; min-width: 0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gm-insert__item:disabled .gm-insert__v,
+.gm-insert__v[data-empty] { color: var(--gm-muted); }
+.gm-insert-sheet .gm-insert__v { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.gm-insert__code { font-variant-numeric: tabular-nums; }
+.gm-insert__staff { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; padding-top: 10px; box-shadow: inset 0 0.5px 0 var(--gm-sep); }
+.gm-insert__staff > .gm-hint { padding: 0 16px 4px; }
+.gm-insert-sheet .gm-insert__staff > .gm-hint { padding: 0 0 4px; }
+.gm-insert__stafftitle { display: flex; align-items: center; gap: 6px; padding: 0 16px; font-size: 12px; font-weight: 700; }
+.gm-insert-sheet .gm-insert__stafftitle { padding: 0; }
+.gm-insert__stafftitle svg { display: inline-block; }
+.gm-insert__state { margin: 0; display: flex; gap: 8px; align-items: center; padding: 10px 16px 12px; font-size: 13px; color: var(--gm-muted); }
+.gm-insert-sheet .gm-insert__state { padding: 10px 0; }
+.gm-insert__foot {
+  margin-top: 4px;
+  padding: 10px 16px 6px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  color: var(--gm-primary);
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: 0 -0.5px 0 var(--gm-sep);
+}
+.gm-insert__foot:hover { color: var(--gm-primary-press); }
+
+/* ── PC 탭 줄 (대화 · 정해 둔 문구 · 설정) — 탭이 둘 이상일 때만 그린다 ── */
+.gm-page { display: flex; flex-direction: column; height: calc(100dvh - 72px); margin: -28px -32px -60px; min-height: 520px; background: #fff; }
+.gm-page > .gm-console { margin: 0; height: auto; flex: 1; min-height: 0; }
+.gm-tabs { flex: none; display: flex; gap: 28px; padding: 0 32px; box-shadow: inset 0 -0.5px 0 var(--gm-sep); background: #fff; }
+.gm-tab {
+  padding: 10px 0 12px;
+  font-size: 14px;
+  color: var(--gm-muted);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  transition: color 120ms ease;
+}
+.gm-tab:hover { color: var(--gm-ink); }
+.gm-tab[aria-current="page"] { color: var(--gm-ink); font-weight: 700; border-bottom-color: var(--gm-ink); }
+.gm-tab:focus-visible { outline: 2px solid var(--gm-primary); outline-offset: 2px; border-radius: 4px; }
+.gm-tabpage { flex: 1; min-height: 0; overflow-y: auto; }
+
+/* ── 목록 위 「받는 통로 멈춤」 (관리 권한만) ── */
+.gm-stall { display: flex; flex-direction: column; gap: 6px; margin: 0 0 10px 12px; padding: 12px 14px; border-radius: 12px; background: #fdf1f3; }
+.gm-stall__text { display: flex; gap: 8px; font-size: 13px; line-height: 1.5; color: var(--gm-ink); }
+.gm-stall__text svg { flex: none; margin-top: 3px; color: var(--gm-urgent); }
+.gm-stall__row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.gm-stall__row .gm-hint { margin-right: auto; }
+.gm-mlist-head .gm-stall { margin: 0; }
+
+/* ── 설정 탭 (시안 R2Settings) ── */
+.gm-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 72px; row-gap: 40px; padding: 32px 40px 48px; max-width: 1360px; }
+@media (max-width: 1360px) { .gm-settings { column-gap: 48px; padding: 28px 32px 40px; } }
+.gm-set { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.gm-set--wide { grid-column: 1 / -1; }
+.gm-set__head { display: flex; align-items: baseline; gap: 12px; }
+.gm-set__title { margin: 0; font-size: 17px; font-weight: 700; }
+.gm-set__badge { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--gm-muted); white-space: nowrap; }
+.gm-set__badge[data-tone="urgent"] { color: var(--gm-urgent); font-weight: 600; }
+.gm-set__badge i { width: 8px; height: 8px; border-radius: 4px; background: #2f9e6b; }
+.gm-set__badge[data-tone="urgent"] i { background: var(--gm-urgent); }
+.gm-set__body { margin: 0 0 12px; font-size: 13px; color: var(--gm-muted); line-height: 1.6; max-width: 62ch; }
+.gm-set__row { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 6px 0; box-shadow: inset 0 -0.5px 0 var(--gm-sep); }
+.gm-set__row:last-of-type { box-shadow: none; }
+/* 단위 드롭다운 폭을 고정해 숫자 칸이 줄마다 같은 자리에 서게(분 · 시간 · 分 · 時間 · min · hours). */
+.gm-set__row > .gm-num + * { flex: none; min-width: 84px; }
+.gm-set__label { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.gm-set__label b { font-size: 14px; font-weight: 600; }
+.gm-set__label span { font-size: 12px; color: var(--gm-muted); line-height: 1.5; }
+.gm-num {
+  width: 72px;
+  height: 40px;
+  box-sizing: border-box;
+  border: 1px solid var(--gm-input);
+  border-radius: 12px;
+  background: #fff;
+  text-align: center;
+  font: inherit;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  color: var(--gm-ink);
+}
+.gm-num:focus { outline: none; border-color: var(--gm-primary); box-shadow: 0 0 0 4px var(--gm-select); }
+.gm-num[aria-invalid="true"] { border-color: var(--gm-urgent); }
+.gm-unit { width: 40px; font-size: 13px; color: var(--gm-muted); }
+.gm-switch {
+  position: relative;
+  flex: none;
+  width: 44px;
+  height: 26px;
+  border: 0;
+  border-radius: 13px;
+  background: #d9d8e0;
+  cursor: pointer;
+  transition: background-color 160ms ease;
+}
+.gm-switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(22, 20, 31, 0.2);
+  transition: transform 180ms var(--gm-ease);
+}
+.gm-switch[aria-checked="true"] { background: var(--gm-primary); }
+.gm-switch[aria-checked="true"]::after { transform: translateX(18px); }
+.gm-switch:focus-visible { outline: 2px solid var(--gm-primary); outline-offset: 2px; }
+.gm-set__foot { display: flex; align-items: center; gap: 12px; margin-top: 8px; padding-top: 14px; box-shadow: inset 0 0.5px 0 var(--gm-sep); }
+.gm-set__foot .gm-hint { flex: 1; min-width: 0; }
+.gm-set__foot .gm-btn--primary { margin-left: auto; flex: none; }
+.gm-set__error { font-size: 12px; color: var(--gm-urgent); font-weight: 600; }
+.gm-credit { display: flex; flex-direction: column; gap: 10px; padding: 4px 0 18px; box-shadow: inset 0 -0.5px 0 var(--gm-sep); }
+.gm-credit__nums { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.gm-credit__big { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.gm-credit__of { font-size: 14px; color: var(--gm-muted); }
+.gm-credit__reset { margin-left: auto; font-size: 13px; color: var(--gm-muted); font-variant-numeric: tabular-nums; }
+.gm-credit__bar { position: relative; height: 10px; border-radius: 5px; background: #f1f0f4; overflow: hidden; }
+.gm-credit__used { position: absolute; left: 0; top: 0; bottom: 0; background: var(--gm-primary); border-radius: 5px; transition: width 300ms var(--gm-ease); }
+.gm-credit__reserve { position: absolute; right: 0; top: 0; bottom: 0; background: #d9cef8; }
+.gm-credit__legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--gm-muted); }
+.gm-credit__legend span { display: inline-flex; align-items: center; gap: 6px; }
+.gm-credit__legend i { width: 10px; height: 10px; border-radius: 3px; background: var(--gm-primary); }
+.gm-credit__legend i[data-k="reserve"] { background: #d9cef8; }
+.gm-stat { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 6px 0; box-shadow: inset 0 -0.5px 0 var(--gm-sep); font-size: 14px; }
+.gm-stat__k { width: 180px; flex: none; font-size: 13px; color: var(--gm-muted); }
+.gm-stat__v { min-width: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.gm-stat__v small { display: block; font-size: 12px; color: var(--gm-muted); }
+.gm-stat__v[data-tone="urgent"] { color: var(--gm-urgent); }
+.gm-stat__link { margin-left: auto; flex: none; font-size: 13px; }
+@media (max-width: 1360px) { .gm-stat__k { width: 148px; } }
+.gm-backfill { display: flex; flex-direction: column; gap: 4px; }
+.gm-backfill__status { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; padding: 10px 0; font-size: 14px; }
+.gm-backfill__status b { font-weight: 700; }
+.gm-backfill__status[data-tone="urgent"] b { color: var(--gm-urgent); }
+.gm-backfill__lines { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--gm-muted); font-variant-numeric: tabular-nums; }
+.gm-backfill__actions { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 12px; }
+
+/* ── 정해 둔 문구 탭 · 건물 손님용 정보 (목록 + 오른쪽 고치기, 시안 R2Building 꼴) ── */
+.gm-replies { display: flex; min-height: 100%; }
+.gm-replies__list { flex: 1; min-width: 0; padding: 24px 40px; display: flex; flex-direction: column; gap: 4px; background: var(--gm-pane); }
+.gm-replies__top { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 12px; }
+.gm-replies__top p { margin: 0; flex: 1; font-size: 13px; color: var(--gm-muted); line-height: 1.6; max-width: 62ch; }
+.gm-reply-row { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 8px 12px; border-radius: 12px; }
+.gm-reply-row + .gm-reply-row { box-shadow: inset 0 0.5px 0 var(--gm-sep); }
+.gm-reply-row[data-selected] { background: var(--gm-select); box-shadow: none; }
+.gm-reply-row[data-selected] + .gm-reply-row { box-shadow: none; }
+.gm-reply-row__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; border: 0; background: none; padding: 0; font: inherit; text-align: left; color: inherit; cursor: pointer; }
+.gm-reply-row__main b { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.gm-reply-row__main span { font-size: 12px; color: var(--gm-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gm-reply-row__main:focus-visible { outline: 2px solid var(--gm-primary); outline-offset: 4px; border-radius: 6px; }
+.gm-reply-row__langs { width: 140px; flex: none; font-size: 12px; color: var(--gm-muted); }
+.gm-reply-row__move { display: flex; gap: 2px; flex: none; }
+.gm-iconbtn-sm { width: 32px; height: 32px; border: 0; border-radius: 9px; background: transparent; color: var(--gm-muted); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.gm-iconbtn-sm:hover:not(:disabled) { background: var(--gm-fill); color: var(--gm-ink); }
+.gm-iconbtn-sm:disabled { opacity: 0.35; cursor: default; }
+.gm-iconbtn-sm:focus-visible { outline: 2px solid var(--gm-primary); outline-offset: 1px; }
+.gm-iconbtn-sm[data-tone="danger"] { color: var(--gm-urgent); }
+.gm-editor { width: 560px; flex: none; padding: 24px 32px; box-sizing: border-box; background: #fff; display: flex; flex-direction: column; gap: 14px; }
+@media (max-width: 1360px) { .gm-editor { width: 480px; padding: 24px; } }
+.gm-editor__kicker { font-size: 12px; color: var(--gm-muted); }
+.gm-editor__title { margin: 0; font-size: 20px; font-weight: 700; overflow-wrap: anywhere; }
+.gm-editor__foot { margin-top: auto; display: flex; align-items: center; gap: 8px; padding-top: 14px; box-shadow: inset 0 0.5px 0 var(--gm-sep); }
+.gm-editor__foot .gm-btn--primary { margin-left: auto; }
+.gm-notch { position: relative; display: block; }
+.gm-notch__label { position: absolute; left: 12px; top: -8px; padding: 0 4px; background: #fff; font-size: 12px; font-weight: 600; color: var(--gm-muted); line-height: 16px; max-width: calc(100% - 24px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gm-notch:focus-within .gm-notch__label { color: var(--gm-primary); }
+.gm-notch__input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 44px;
+  border: 1px solid var(--gm-input);
+  border-radius: 12px;
+  background: #fff;
+  padding: 12px 14px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--gm-ink);
+  resize: vertical;
+}
+.gm-notch__input::placeholder { color: var(--gm-muted); }
+.gm-notch__input:focus { outline: none; border-color: var(--gm-primary); box-shadow: 0 0 0 4px var(--gm-select); }
+.gm-vars { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.gm-vars .gm-hint { flex: 1 1 100%; }
+.gm-langseg { margin-left: auto; display: inline-flex; gap: 2px; padding: 3px; border-radius: 10px; background: var(--gm-fill); }
+.gm-langseg button { height: 28px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; font: inherit; font-size: 12px; color: var(--gm-muted); cursor: pointer; white-space: nowrap; }
+.gm-langseg button[aria-selected="true"] { background: #fff; box-shadow: 0 1px 2px rgba(22, 20, 31, 0.08); color: var(--gm-ink); font-weight: 600; }
+.gm-langseg button:focus-visible { outline: 2px solid var(--gm-primary); outline-offset: 1px; }
+.gm-ginfo__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 12px; padding-top: 6px; }
+.gm-ginfo__grid .gm-notch--span { grid-column: span 2; }
+.gm-staff { display: flex; flex-direction: column; gap: 2px; padding-top: 12px; box-shadow: inset 0 0.5px 0 var(--gm-sep); }
+.gm-staff__title { margin: 0 0 4px; display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; }
+.gm-staff__title svg { display: inline-block; }
+.gm-staff__row { display: flex; align-items: center; gap: 12px; min-height: 40px; font-size: 13px; box-shadow: inset 0 -0.5px 0 var(--gm-sep); }
+.gm-staff__row:last-of-type { box-shadow: none; }
+.gm-staff__row > span:first-child { width: 120px; flex: none; color: var(--gm-muted); }
+.gm-staff__row > span:last-child { margin-left: auto; font-size: 12px; color: var(--gm-muted); text-align: right; }
+.adm .gm-ginfo-panel.panel { width: 560px; }
+.adm .gm-ginfo-panel .panel__body { display: flex; flex-direction: column; gap: 14px; }
+.gm-ginfo-panel .gm-notch__label { background: #fff; }
+
+/* 저장 충돌 — 쓴 글은 그대로, 고르기 두 개(건물 손님용 정보 패널 · 정해 둔 문구 편집). */
+.gm-conflict { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border-radius: 12px; background: #fdf0f2; color: #8a1f30; font-size: 13px; line-height: 1.5; }
+.gm-conflict__acts { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+
+/* ── 자동 안내 탭 (5단계, 시안 Rules) — 목록 칸 바탕 · 세로 구분선 없음 · 고른 줄 옅은 보라 ── */
+.gm-auto .gm-replies__list { gap: 2px; }
+.gm-auto__off { margin: 0 0 8px; padding: 10px 14px; border-radius: 12px; background: #f1f0f4; font-size: 13px; color: var(--gm-muted); line-height: 1.5; }
+.gm-auto__head { display: flex; align-items: center; gap: 12px; min-height: 34px; padding: 0 12px; font-size: 12px; color: var(--gm-muted); }
+.gm-auto__head > span:first-child { flex: 1; min-width: 0; }
+.gm-auto__head > span:nth-child(2), .gm-auto__when { width: 200px; flex: none; }
+.gm-auto__head > span:nth-child(3), .gm-auto__next { width: 120px; flex: none; }
+.gm-auto__head > span:nth-child(4), .gm-auto__on { width: 56px; flex: none; display: flex; justify-content: flex-end; }
+.gm-auto__when { font-size: 13px; line-height: 1.4; }
+.gm-auto__next { font-size: 13px; color: var(--gm-muted); font-variant-numeric: tabular-nums; }
+.gm-auto__row .gm-reply-row__main span { white-space: normal; }
+.gm-auto__foot { margin: 14px 12px 0; font-size: 12px; color: var(--gm-muted); line-height: 1.6; max-width: 72ch; }
+@media (max-width: 1360px) {
+  .gm-auto__head > span:nth-child(2), .gm-auto__when { width: 168px; }
+  .gm-auto__head > span:nth-child(3), .gm-auto__next { width: 104px; }
+}
+.gm-auto__upcoming { display: flex; flex-direction: column; gap: 2px; margin-top: 32px; padding: 0 12px; }
+.gm-auto__upcoming .gm-set__head { align-items: center; }
+.gm-auto__filter { margin-left: auto; min-width: 180px; }
+.gm-arun { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 6px 0; box-shadow: inset 0 -0.5px 0 var(--gm-sep); }
+.gm-arun:last-child { box-shadow: none; }
+.gm-arun__at { width: 120px; flex: none; font-size: 13px; font-variant-numeric: tabular-nums; }
+.gm-arun__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.gm-arun__main b { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.gm-arun__main span { font-size: 12px; color: var(--gm-muted); overflow-wrap: anywhere; }
+.gm-arun__status { width: 168px; flex: none; font-size: 12px; color: var(--gm-muted); line-height: 1.4; }
+.gm-arun__act { width: 96px; flex: none; display: flex; justify-content: flex-end; }
+/* 안내 글이 짧으면(ko) 「새 안내」가 줄 가운데 뜨지 않게 — 글은 62ch 상한, 단추는 오른쪽 끝. */
+.gm-auto .gm-replies__top > .gm-btn { margin-left: auto; flex: none; }
+.gm-auto__titlebar { display: flex; align-items: flex-start; gap: 12px; }
+.gm-auto__titlebar > div { flex: 1; min-width: 0; }
+.gm-auto__field { display: flex; flex-direction: column; gap: 8px; }
+.gm-auto__k { font-size: 12px; font-weight: 600; color: var(--gm-muted); }
+.gm-auto__when-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.gm-auto__when-row > .dd { min-width: 200px; }
+.gm-auto__offset, .gm-auto__time { display: inline-flex; align-items: center; gap: 6px; }
+.gm-auto__offset .gm-num { width: 64px; }
+.gm-auto__targets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.gm-auto__targets .dd, .gm-auto__targets .dd__btn { width: 100%; min-width: 0; }
+.gm-auto__codes { display: inline-flex; align-items: center; gap: 4px; }
+.gm-auto__preview { display: flex; flex-direction: column; gap: 8px; padding-top: 14px; box-shadow: inset 0 0.5px 0 var(--gm-sep); }
+.gm-auto__preview-head { display: flex; align-items: center; gap: 8px; }
+.gm-auto__preview-head .dd { margin-left: auto; min-width: 0; max-width: 70%; }
+.gm-auto__bubble {
+  align-self: flex-end;
+  max-width: 92%;
+  background: var(--gm-select);
+  border-radius: 16px 16px 6px 16px;
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.gm-auto__missing { font-size: 12px; line-height: 1.5; }
+
+/* 한 예약의 자동 안내(PC 대화 패널 · 모바일 예약 정보 시트) */
+.gm-aruns { display: flex; flex-direction: column; gap: 0; padding-top: 14px; box-shadow: inset 0 0.5px 0 var(--gm-sep); }
+.gm-aruns__head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+.gm-aruns__title { margin: 0; font-size: 14px; font-weight: 700; }
+.gm-aruns__manage { margin-left: auto; font-size: 12px; }
+.gm-aruns__row { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 6px 0; box-shadow: inset 0 -0.5px 0 var(--gm-sep); }
+.gm-aruns__row:last-child { box-shadow: none; }
+.gm-aruns__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.gm-aruns__main b { font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.gm-aruns__main > span { font-size: 12px; color: var(--gm-muted); line-height: 1.4; }
+.gm-aruns__at { font-variant-numeric: tabular-nums; }
+.gm-sheet .gm-aruns { margin-top: 8px; }
+
+/* ══ 6단계 — 메시지 → 업무 한 번에(시안 R2Task · R2PhoneTask · R2PhoneThread · R2Main) ════════════════ */
+/* 대화 안 업무 링크 줄 — 시스템 줄처럼 가운데, 아이콘 · 회색 상태 글자 · 「열기」. */
+/* 아이콘 · 종류 · 상태가 한 줄 글처럼 흐른다(아이콘이 혼자 윗줄로 떨어지지 않게) — 상태 · 시각은 회색, 끝난 업무는 종류도 회색. */
+.gm-tlink { align-self: center; margin: 0; max-width: 86%; font-size: 13px; line-height: 1.55; color: var(--gm-ink); text-align: center; }
+.gm-tlink__text { overflow-wrap: anywhere; }
+.gm-tlink__icon { display: inline-flex; margin-right: 5px; vertical-align: -2px; color: var(--gm-muted); }
+.gm-tlink__kind { font-weight: 600; }
+.gm-tlink__meta { color: var(--gm-muted); }
+.gm-tlink[data-done] .gm-tlink__kind { color: var(--gm-muted); }
+/* 모바일 공용 규칙이 링크를 44px 로 키운다 — 누르는 자리는 그대로 두고 위아래 음수 여백으로 줄 높이만 글자 높이에 맞춘다. */
+.gm-tlink__open { display: inline-flex; align-items: center; margin: -12px 0 -12px 8px; font-size: 13px; white-space: nowrap; vertical-align: middle; }
+.gm-tpanel .gm-tlink { align-self: stretch; display: flex; align-items: center; gap: 10px; text-align: left; max-width: none; min-height: 44px; padding: 6px 0; box-shadow: inset 0 -0.5px 0 var(--gm-sep); }
+.gm-tpanel .gm-tlink__text { flex: 1; min-width: 0; }
+.gm-tpanel .gm-tlink:last-child { box-shadow: none; }
+.gm-tpanel .gm-tlink__open { margin: 0; flex: none; }
+/* 고르는 중인 손님 말 — 단추지만 말풍선 모양 그대로. 고른 말은 옅은 보라 바탕(테두리 · 왼쪽 막대 없음). */
+.gm-bubble--pick { border: 0; font: inherit; text-align: left; color: inherit; cursor: pointer; transition: background-color 160ms ease, transform 140ms var(--gm-ease); }
+.gm-bubble--pick:active { transform: scale(0.985); }
+.gm-bubble--pick:focus-visible { outline: 2px solid var(--gm-primary); outline-offset: 2px; }
+.gm-msg[data-picked] .gm-bubble--guest { background: var(--gm-select); }
+.gm-msg__picked { color: var(--gm-primary); font-weight: 600; }
+.gm-mthread .gm-bubble--pick { font-size: 15px; line-height: 1.55; }
+
+/* PC 예약 패널 「업무 만들기」 구역 */
+.gm-tpanel { display: flex; flex-direction: column; gap: 10px; padding-top: 14px; box-shadow: inset 0 0.5px 0 var(--gm-sep); }
+.gm-tpanel__title { margin: 0; font-size: 14px; font-weight: 700; }
+.gm-tpanel__hint { margin: 0; }
+.gm-tpanel__links { display: flex; flex-direction: column; }
+.gm-tkinds { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.gm-tkind {
+  display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 12px; border: 0; border-radius: 12px;
+  background: #fff; font: inherit; font-size: 13px; line-height: 1.3; color: var(--gm-ink); text-align: left; cursor: pointer;
+  transition: background-color 140ms ease, transform 140ms var(--gm-ease);
+}
+.gm-tkind svg { flex: none; }
+.gm-tkind span { min-width: 0; overflow-wrap: anywhere; }
+@media (hover: hover) and (pointer: fine) { .gm-tkind:hover { background: var(--gm-select); } }
+.gm-tkind:active { transform: scale(0.97); }
+.gm-tkind:focus-visible { outline: 2px solid var(--gm-primary); outline-offset: 2px; }
+
+/* 만들기 칸 — PC 오른쪽 패널(넓힘) · 폰 시트 공용 */
+.gm-console__panel--task { width: 400px; background: #fff; box-shadow: -0.5px 0 0 var(--gm-sep), -16px 0 32px rgba(22, 20, 31, 0.06); }
+@media (max-width: 1360px) { .gm-console__panel--task { width: 340px; padding-bottom: 0; } }
+.gm-tform { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.gm-tform--phone { padding: 4px 20px 20px; gap: 14px; }
+/* 업무 만들기 시트의 스크롤 칸 — 시트(flex column · max-h)의 남은 높이만 쓰고 안에서 스크롤(스크롤바는 공용 규칙대로 숨김).
+   맨 아래 여백(홈 표시줄 포함) — 「만들기」가 시트 아래 가장자리 · 둥근 모서리에 붙어 잘리던 것(폴드 2026-11-13). */
+.gm-tform-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+/* PC 오른쪽 패널 — 칸이 길어 패널이 스크롤돼도 「만들기」 줄은 패널 아래에 붙어 늘 보인다(1280×800 에서 잘리던 것). */
+.gm-console__panel--task { padding-bottom: 0; }
+.gm-tform--pc .gm-tform__foot { position: sticky; bottom: 0; z-index: 1; margin-top: auto; padding-bottom: 18px; background: #fff; }
+.gm-tform__head { display: flex; align-items: center; gap: 8px; }
+.gm-tform__title { margin: 0; font-size: 18px; font-weight: 700; }
+.gm-tform--phone .gm-tform__title { font-size: 19px; }
+.gm-tform__close { margin-left: auto; width: 34px; height: 34px; border-radius: 10px; }
+/* 종류 고르기 — 회색 바탕 안 흰 알약(분할 단추). 4개가 좁으면 2줄. */
+.gm-tseg { display: grid; grid-template-columns: repeat(var(--n, 4), minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 12px; background: var(--gm-fill); }
+.gm-tseg[data-count="2"] { --n: 2; }
+.gm-tseg[data-count="3"] { --n: 3; }
+.gm-tseg__item {
+  min-height: 36px; padding: 4px 6px; border: 0; border-radius: 9px; background: none; font: inherit; font-size: 13px; line-height: 1.25;
+  color: var(--gm-muted); cursor: pointer; overflow-wrap: anywhere; transition: background-color 160ms ease, color 160ms ease;
+}
+.gm-tseg__item[aria-checked="true"] { background: #fff; color: var(--gm-ink); font-weight: 600; box-shadow: 0 1px 2px rgba(22, 20, 31, 0.08); }
+.gm-tseg__item:focus-visible { outline: 2px solid var(--gm-primary); outline-offset: 1px; }
+@media (max-width: 1360px) { .gm-tseg { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.gm-tform__rows { display: flex; flex-direction: column; }
+.gm-tform__row { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 4px 0; font-size: 14px; box-shadow: inset 0 -0.5px 0 var(--gm-sep); }
+.gm-tform__rows > .gm-tform__row:last-child, .gm-tform__row--plain { box-shadow: none; }
+.gm-tform__k { flex: none; width: 76px; font-size: 13px; color: var(--gm-muted); overflow-wrap: anywhere; }
+.gm-tform__v { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; overflow-wrap: anywhere; }
+.gm-tform__v .dd { min-width: 0; max-width: 100%; }
+.gm-tform__note { margin-left: auto; }
+.gm-tform__select { flex: 1; min-width: 0; }
+.gm-tform__input { height: 46px; padding: 0 16px; }
+.gm-tform__textarea { min-height: 112px; resize: vertical; }
+.gm-tform__picked { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: -6px; }
+.gm-tform__check { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 14px; }
+.gm-tform__check input { width: 20px; height: 20px; margin: 0; accent-color: var(--gm-primary); flex: none; }
+.gm-tform__foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding-top: 14px; box-shadow: inset 0 0.5px 0 var(--gm-sep); }
+.gm-tform__foot > .gm-hint { flex: 1 1 160px; min-width: 0; }
+.gm-tform__foot > .gm-btn { margin-left: auto; }
+.gm-tform--phone .gm-tform__foot > .gm-btn { flex: 1 1 100%; min-height: 48px; }
+
+/* 폰 종류 시트(시안 R2PhoneTask) */
+.gm-tsheet { gap: 12px; }
+.gm-tsheet .gm-sheet__title { margin: 0; font-size: 19px; }
+.gm-tsheet__sub { margin-top: -8px; }
+.gm-tpicked {
+  display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border: 0; border-radius: 14px; background: var(--gm-fill);
+  font: inherit; font-size: 13px; line-height: 1.55; color: var(--gm-ink); text-align: left; cursor: pointer;
+}
+.gm-tpicked svg { flex: none; margin-top: 3px; color: var(--gm-muted); }
+.gm-tkindlist { display: flex; flex-direction: column; }
+.gm-tkindrow { display: flex; align-items: center; gap: 14px; min-height: 60px; border: 0; background: none; padding: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.gm-tkindrow__icon { width: 40px; height: 40px; flex: none; border-radius: 12px; background: var(--gm-fill); display: flex; align-items: center; justify-content: center; }
+.gm-tkindrow__icon[data-first] { background: var(--gm-select); }
+.gm-tkindrow__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding: 10px 0; box-shadow: inset 0 -0.5px 0 var(--gm-sep); }
+.gm-tkindrow:last-child .gm-tkindrow__text { box-shadow: none; }
+.gm-tkindrow__text b { font-size: 15px; font-weight: 600; }
+.gm-tkindrow__text span { font-size: 12px; color: var(--gm-muted); }
+.gm-tsheet__foot { text-align: center; }
+
+/* 폰 고르기 줄 — 답장 칸 자리에 붙는다(고르는 동안). */
+.gm-tselect { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.gm-tselect > .gm-hint { flex: 1 1 140px; min-width: 0; }
+
+/* 「해결됐어요」 초안이 들어간 답장 칸 — 테두리 1.5px 보라 + 라벨 보라(시안 R2PhoneThread). */
+.gm-field[data-draft] .gm-field__input { border: 1.5px solid var(--gm-primary); }
+.gm-field[data-draft] .gm-field__label { color: var(--gm-primary); }
+
+/* 업무 상세의 「손님 메시지에서」 */
+.gm-backlink { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; font-size: 13px; color: #7a52e6; text-decoration: none; }
+.gm-backlink:hover { color: #5f3cc4; }
+.gm-backlink svg { flex: none; }
+@media (pointer: coarse) { .gm-backlink { min-height: 44px; } .gm-tseg__item { min-height: 44px; } }
+.gm-backlink-row:has(.gm-backlink) { padding-bottom: 4px; }
+
+/* 6단계 — 정해 둔 문구의 「해결 초안」 표시 */
+.gm-reply-row__tag { margin-left: 8px; padding: 1px 7px; border-radius: 999px; background: #F3EFFD; color: #4B3A8C; font-style: normal; font-size: 11px; font-weight: 600; vertical-align: 1px; white-space: nowrap; }
+.gm-resolved-toggle { display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; font-size: 13px; color: var(--gm-ink, #1f2430); line-height: 1.45; cursor: pointer; }
+.gm-resolved-toggle input { margin-top: 2px; width: 16px; height: 16px; flex: none; accent-color: var(--primary, #23285a); }

@@ -7,7 +7,22 @@ type Filter = (row: Row) => boolean;
 
 export const FAKE_MAX_ROWS = 1000;
 
-export function createFakeSupabase(tables: Record<string, Row[]>) {
+/** 칸 값 — `raw_payload->>id` 같은 JSON 경로는 그 칸이 줄에 있으면 그것, 없으면 jsonb 안에서 읽는다. */
+function valueOf(row: Row, column: string): unknown {
+  if (column in row) return row[column];
+  const arrow = column.indexOf("->>");
+  if (arrow > 0) {
+    const json = row[column.slice(0, arrow)];
+    if (json && typeof json === "object") return (json as Row)[column.slice(arrow + 3)];
+  }
+  return undefined;
+}
+
+export function createFakeSupabase(
+  tables: Record<string, Row[]>,
+  /** 이름별 가짜 DB 함수(없으면 `{ data: true }`). 같은 표 묶음을 받아 직접 고친다. */
+  rpcHandlers: Record<string, (args: Record<string, unknown>, tables: Record<string, Row[]>) => { data: unknown; error: unknown }> = {},
+) {
   const writes: Array<{ table: string; op: string; payload?: unknown; matched?: Row[] }> = [];
   const rpcCalls: Array<{ name: string; args: unknown }> = [];
   let nextId = 1;
@@ -16,6 +31,7 @@ export function createFakeSupabase(tables: Record<string, Row[]>) {
     const filters: Filter[] = [];
     let op: "select" | "insert" | "upsert" | "update" | "delete" = "select";
     let payload: unknown;
+    let upsertOptions: { onConflict?: string; ignoreDuplicates?: boolean } = {};
     let rangeFrom: number | null = null;
     let rangeTo: number | null = null;
     let single = false;
@@ -23,6 +39,25 @@ export function createFakeSupabase(tables: Record<string, Row[]>) {
     const rows = () => (tables[table] ??= []);
 
     const run = () => {
+      if (op === "upsert" && upsertOptions.onConflict) {
+        // 겹침 칸이 주어지면 PostgREST 처럼 — 있으면 고치거나(ignoreDuplicates 면 건너뜀), 없으면 넣는다.
+        const keys = upsertOptions.onConflict.split(",").map((k) => k.trim());
+        const list = (Array.isArray(payload) ? payload : [payload]) as Row[];
+        const out: Row[] = [];
+        for (const row of list) {
+          const existing = rows().find((r) => keys.every((k) => String(r[k]) === String(row[k])));
+          if (existing) {
+            if (!upsertOptions.ignoreDuplicates) Object.assign(existing, row);
+            out.push(existing);
+          } else {
+            const inserted = { id: `id-${nextId++}`, created_at: new Date().toISOString(), ...row };
+            rows().push(inserted);
+            out.push(inserted);
+          }
+        }
+        writes.push({ op, payload: list, table });
+        return { data: single ? out[0] : out, error: null };
+      }
       if (op === "insert" || op === "upsert") {
         const list = (Array.isArray(payload) ? payload : [payload]) as Row[];
         const inserted = list.map((row) => ({ id: `id-${nextId++}`, created_at: new Date().toISOString(), ...row }));
@@ -65,24 +100,24 @@ export function createFakeSupabase(tables: Record<string, Row[]>) {
         return api;
       },
       eq(column: string, value: unknown) {
-        filters.push((row) => String(row[column]) === String(value));
+        filters.push((row) => String(valueOf(row, column)) === String(value));
         return api;
       },
       neq(column: string, value: unknown) {
-        filters.push((row) => String(row[column]) !== String(value));
+        filters.push((row) => String(valueOf(row, column)) !== String(value));
         return api;
       },
       gte(column: string, value: unknown) {
-        filters.push((row) => String(row[column]) >= String(value));
+        filters.push((row) => String(valueOf(row, column)) >= String(value));
         return api;
       },
       gt(column: string, value: unknown) {
-        filters.push((row) => String(row[column]) > String(value));
+        filters.push((row) => String(valueOf(row, column)) > String(value));
         return api;
       },
       in(column: string, values: unknown[]) {
         const set = new Set(values.map(String));
-        filters.push((row) => set.has(String(row[column])));
+        filters.push((row) => set.has(String(valueOf(row, column))));
         return api;
       },
       insert(value: unknown) {
@@ -91,25 +126,36 @@ export function createFakeSupabase(tables: Record<string, Row[]>) {
         return api;
       },
       is(column: string, value: unknown) {
-        filters.push((row) => (row[column] ?? null) === value);
+        filters.push((row) => (valueOf(row, column) ?? null) === value);
         return api;
       },
-      limit() {
+      limit(count?: number) {
+        if (typeof count === "number" && rangeTo === null) {
+          rangeFrom = rangeFrom ?? 0;
+          rangeTo = rangeFrom + count - 1;
+        }
         return api;
       },
       lt(column: string, value: unknown) {
-        filters.push((row) => String(row[column]) < String(value));
+        filters.push((row) => String(valueOf(row, column)) < String(value));
         return api;
       },
       lte(column: string, value: unknown) {
-        filters.push((row) => String(row[column]) <= String(value));
+        filters.push((row) => String(valueOf(row, column)) <= String(value));
         return api;
       },
       maybeSingle() {
         single = true;
         return api;
       },
-      not() {
+      like(column: string, pattern: string) {
+        const re = new RegExp(`^${pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/%/g, ".*").replace(/_/g, ".")}$`);
+        filters.push((row) => re.test(String(valueOf(row, column) ?? "")));
+        return api;
+      },
+      /** `not(칸, "is", null)` 만 흉내(그 밖은 거르지 않음). */
+      not(column?: string, operator?: string, value?: unknown) {
+        if (column && operator === "is") filters.push((row) => (valueOf(row, column) ?? null) !== value);
         return api;
       },
       order(column: string, options?: { ascending?: boolean }) {
@@ -140,9 +186,10 @@ export function createFakeSupabase(tables: Record<string, Row[]>) {
         payload = value;
         return api;
       },
-      upsert(value: unknown) {
+      upsert(value: unknown, options?: { onConflict?: string; ignoreDuplicates?: boolean }) {
         op = "upsert";
         payload = value;
+        upsertOptions = options ?? {};
         return api;
       },
     };
@@ -153,6 +200,8 @@ export function createFakeSupabase(tables: Record<string, Row[]>) {
     from: (table: string) => builder(table),
     rpc: async (name: string, args: unknown) => {
       rpcCalls.push({ args, name });
+      const handler = rpcHandlers[name];
+      if (handler) return handler(args as Record<string, unknown>, tables);
       return { data: true, error: null };
     },
   };

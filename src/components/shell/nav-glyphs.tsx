@@ -73,6 +73,12 @@ export const NAV_GLYPHS: Record<string, ReactNode> = {
       <path data-knock="" d="M4 13h4l1.2 2.2h5.6L16 13h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   ),
+  // 손님 메시지(2026-11-13) — 말풍선(시안 「메시지」 탭과 같은 모양).
+  messages: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path data-fill="" d="M20 11.5a7.5 7.5 0 01-10.9 6.7L4.5 19.5l1.2-4.2A7.5 7.5 0 1120 11.5z" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
+    </svg>
+  ),
   attendance: (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <circle data-fill="" cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.9" />

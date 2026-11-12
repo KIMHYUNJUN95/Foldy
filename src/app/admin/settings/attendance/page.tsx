@@ -1,7 +1,7 @@
 import Link from "next/link";
 import QRCode from "qrcode";
 import { redirect } from "next/navigation";
-import { Check, Plus, Printer, TriangleAlert } from "lucide-react";
+import { Check, Printer, TriangleAlert } from "lucide-react";
 import {
   issueAttendanceSiteQr,
   revokeAttendanceTrustedDevice,
@@ -28,6 +28,7 @@ import { getPayrollSettingsCopy } from "@/lib/payroll-settings-i18n";
 import { hasOrganizationContext } from "@/lib/session";
 import type { AttendanceSiteRow } from "@/lib/attendance";
 import { readSiteDraft } from "@/lib/attendance-site-form";
+import { distinctPrintName } from "@/lib/attendance-site-panel";
 
 type PageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -63,6 +64,8 @@ function tokyoDate(iso: string) {
 //
 // QR 은 인쇄물이라 "지금 뽑아도 되는가"를 출력 전에 알려주는 것이 이 화면의 핵심 책임이다.
 // See docs/product/24-attendance-workflow.md → "QR Deep Link" / "인쇄 전 안전장치".
+// 2026-11-12 다듬기(SiteNew): 요약은 「현장 N곳 · QR 없음 N」, QR 이 없으면 패널 맨 위 회색 한 줄 + 「QR 만들기」,
+// 좌표는 한 줄로 접고 「좌표 고치기」로 펼친다. 저장은 오른쪽 아래 보통 너비.
 export default async function AdminAttendanceSettingsPage({ searchParams }: PageProps) {
   const session = await requireAdminSession();
   if (!session.capabilities.includes("attendance.settings") || !hasOrganizationContext(session)) {
@@ -124,26 +127,33 @@ export default async function AdminAttendanceSettingsPage({ searchParams }: Page
   const flashIsError = Boolean(errorKey);
   const w = settings.white;
   const activeRows = rows.filter((row) => row.site.is_active);
-  const readyCount = activeRows.filter(
-    (row) => row.token && attendanceQrLinkState(buildAttendanceQrValue(row.token.token)) === "ok",
+  const missingCount = activeRows.filter((row) => !row.token).length;
+  const needsFixCount = activeRows.filter(
+    (row) => row.token && attendanceQrLinkState(buildAttendanceQrValue(row.token.token)) !== "ok",
   ).length;
-  const attentionCount = activeRows.length - readyCount;
   const propertyLabel = new Map(propertyOptions.map((option) => [option.id, option.label]));
   const qrStatusOf = (row: (typeof rows)[number]) => {
     if (!row.site.is_active) return { label: settings.attendanceSiteInactive, cls: "is-off" };
-    if (!row.token) return { label: settings.attendanceQrNone, cls: "is-red" };
+    if (!row.token) return { label: w.qrNoneShort, cls: "is-red" };
     return attendanceQrLinkState(buildAttendanceQrValue(row.token.token)) === "ok"
       ? { label: settings.attendanceQrOk, cls: "is-ok" }
       : { label: settings.attendanceQrNeedsFix, cls: "is-red" };
   };
-  const selectedStatus = selectedRow ? qrStatusOf(selectedRow) : null;
+  // 패널 맨 위 한 줄 「활성 · QR 없음」 — 활성 여부와 QR 상태를 따로 적는다(비활성 현장도 QR 상태는 보인다).
+  const panelQr = !selectedSite
+    ? null
+    : !activeQr
+      ? { label: w.qrNone, red: selectedSite.is_active }
+      : qrLinkState === "ok"
+        ? { label: w.qrStatus.replace("{s}", settings.attendanceQrOk), red: false }
+        : { label: w.qrStatus.replace("{s}", settings.attendanceQrNeedsFix), red: true };
   const inactiveHref = showInactive
     ? // 끄는 링크: 선택 현장이 비활성이면 선택도 함께 해제한다(안 그러면 강제로 다시 켜진다).
       `/admin/settings/attendance${selectedSite && selectedSite.is_active ? `?site=${selectedSite.id}` : ""}`
     : `/admin/settings/attendance?inactive=1${selectedSite ? `&site=${selectedSite.id}` : ""}`;
 
   return (
-    <AdminShell activeItem="settings" title={settings.attendanceTitle}>
+    <AdminShell activeItem="settings" title={settings.settingsTitle}>
       <div className="stw">
         <SettingsSubnav
           active="attendance"
@@ -166,12 +176,16 @@ export default async function AdminAttendanceSettingsPage({ searchParams }: Page
             <div className="stw-bar">
               <span className="stw-sum">
                 <span>{w.sitesN.replace("{n}", String(activeRows.length))}</span>
-                <span className="dot">·</span>
-                <span>{w.readyN.replace("{n}", String(readyCount))}</span>
-                {attentionCount > 0 ? (
+                {missingCount > 0 ? (
                   <>
                     <span className="dot">·</span>
-                    <span className="is-red">{w.attentionN.replace("{n}", String(attentionCount))}</span>
+                    <span className="is-red">{w.qrMissingN.replace("{n}", String(missingCount))}</span>
+                  </>
+                ) : null}
+                {needsFixCount > 0 ? (
+                  <>
+                    <span className="dot">·</span>
+                    <span className="is-red">{w.qrNeedsFixN.replace("{n}", String(needsFixCount))}</span>
                   </>
                 ) : null}
                 {inactiveCount > 0 ? (
@@ -184,12 +198,16 @@ export default async function AdminAttendanceSettingsPage({ searchParams }: Page
                 ) : null}
               </span>
               <span className="stw-bar__r">
-                <Link className="stw-chip" href="/admin/settings/attendance/print" target="_blank">
+                <Link
+                  className="stw-icon is-fill"
+                  href="/admin/settings/attendance/print"
+                  target="_blank"
+                  aria-label={w.printAllAria}
+                  title={w.printAllAria}
+                >
                   <Printer aria-hidden="true" />
-                  {settings.attendanceQrPrintAll}
                 </Link>
                 <Link className="stw-chip is-pri" href="/admin/settings/attendance?site=new">
-                  <Plus aria-hidden="true" />
                   {settings.attendanceNewSite}
                 </Link>
               </span>
@@ -209,6 +227,7 @@ export default async function AdminAttendanceSettingsPage({ searchParams }: Page
                   {visibleRows.map((row) => {
                     const status = qrStatusOf(row);
                     const building = row.site.property_id ? propertyLabel.get(row.site.property_id) : null;
+                    const printName = distinctPrintName(row.site.name, row.site.print_name);
                     return (
                       <Link
                         className={`stw-tr${selectedSite?.id === row.site.id ? " on" : ""}${row.site.is_active ? "" : " is-off"}`}
@@ -216,16 +235,11 @@ export default async function AdminAttendanceSettingsPage({ searchParams }: Page
                         key={row.site.id}
                         aria-current={selectedSite?.id === row.site.id ? "true" : undefined}
                       >
-                        <span className="stw-who">
-                          <span className="stw-av" aria-hidden="true">
-                            {Array.from(row.site.name)[0] ?? "·"}
-                          </span>
-                          <span className="stw-who__t">
-                            <b>{row.site.name}</b>
-                            <span>{w.printNameLine.replace("{name}", row.site.print_name || "—")}</span>
-                          </span>
+                        <span className="stw-who__t">
+                          <b>{row.site.name}</b>
+                          {printName ? <span>{printName}</span> : null}
                         </span>
-                        <span className={building ? undefined : "is-soft"}>{building ?? w.notBuilding}</span>
+                        <span className={building ? undefined : "stw-none"}>{building ?? "—"}</span>
                         <span className="r num">{row.site.allowed_radius_meters}m</span>
                         <span className={`r stw-q ${status.cls}`}>{status.label}</span>
                       </Link>
@@ -238,11 +252,11 @@ export default async function AdminAttendanceSettingsPage({ searchParams }: Page
             {/* 기억된 기기 — 조직 전체 목록이라 현장 패널이 아니라 목록 아래에 둔다. */}
             <section className="stw-dev" aria-labelledby="stw-dev-t">
               <h2 id="stw-dev-t">
-                {settings.attendanceDevicesTitle} <span className="num is-soft">{trustedDevices.length}</span>
+                {settings.attendanceDevicesTitle} <span className="stw-dev__n num">{w.devicesN.replace("{n}", String(trustedDevices.length))}</span>
               </h2>
               <p>{settings.attendanceDevicesDescription}</p>
               {trustedDevices.length === 0 ? (
-                <p className="stw-hint" style={{ margin: "0 2px" }}>{settings.attendanceDevicesEmpty}</p>
+                <div className="stw-dev__empty">{settings.attendanceDevicesEmpty}</div>
               ) : (
                 <>
                   <div className="stw-th" aria-hidden="true">
@@ -284,27 +298,47 @@ export default async function AdminAttendanceSettingsPage({ searchParams }: Page
 
           {/* ── 패널: 선택한 현장 / 새 현장 ── */}
           <aside className="stw-panel" key={selectedSite?.id ?? "new"} aria-label={selectedSite?.name ?? w.newSiteTitle}>
-            <div className="stw-hd">
-              {selectedSite && selectedStatus ? (
+            <div className="stw-hd is-row">
+              <div className="stw-hd__t">
                 <div className="stw-meta">
-                  <span className={selectedStatus.cls === "is-red" ? "is-red" : undefined}>
-                    {w.qrStatus.replace("{s}", selectedStatus.label)}
-                  </span>
-                  {selectedSite.is_active ? <span>{w.active}</span> : null}
+                  {selectedSite && panelQr ? (
+                    <>
+                      <span>{selectedSite.is_active ? w.active : settings.attendanceSiteInactive}</span>
+                      <span className={panelQr.red ? "is-red" : undefined}>{panelQr.label}</span>
+                    </>
+                  ) : (
+                    <span>{w.siteSection}</span>
+                  )}
                 </div>
-              ) : (
-                <div className="stw-meta">
-                  <span>{w.siteSection}</span>
-                </div>
-              )}
-              <h2>{selectedSite ? selectedSite.name : w.newSiteTitle}</h2>
-              {selectedSite ? null : <span>{w.newSiteHint}</span>}
+                <h2>{selectedSite ? selectedSite.name : w.newSiteTitle}</h2>
+                {selectedSite ? null : <span>{w.newSiteHint}</span>}
+              </div>
+              {selectedSite && activeQr && qrLinkState === "ok" ? (
+                <Link
+                  className="stw-icon is-fill"
+                  href={`/admin/settings/attendance/print?site=${selectedSite.id}`}
+                  target="_blank"
+                  aria-label={w.printAria}
+                  title={w.printAria}
+                >
+                  <Printer aria-hidden="true" />
+                </Link>
+              ) : null}
             </div>
 
-            {/* QR 먼저 — 이 화면에 들어오는 이유. 인쇄 전에 "지금 뽑아도 되는가"를 알려준다. */}
-            {selectedSite ? (
+            {/* QR 먼저 — 이 화면에 들어오는 이유. 없으면 회색 한 줄 + 「QR 만들기」, 있으면 인쇄해도 되는지부터. */}
+            {selectedSite && !activeQr ? (
+              <form action={issueAttendanceSiteQr} className="stw-qrnew">
+                <input name="siteId" type="hidden" value={selectedSite.id} />
+                <p>{w.qrCreateIntro}</p>
+                <button className="stw-btn is-dark" type="submit">
+                  {w.qrCreate}
+                </button>
+              </form>
+            ) : null}
+            {selectedSite && activeQr ? (
               <div className="stw-qr">
-                {activeQr && qrSvg ? (
+                {qrSvg ? (
                   <div
                     className={`stw-qr__img${qrLinkState === "ok" ? "" : " is-dim"}`}
                     role="img"
@@ -314,47 +348,27 @@ export default async function AdminAttendanceSettingsPage({ searchParams }: Page
                 ) : null}
                 <div className="stw-qr__b">
                   <b className={qrLinkState === "ok" ? "is-green" : "is-red"}>
-                    {!activeQr
-                      ? settings.attendanceQrNone
-                      : qrLinkState === "ok"
-                        ? settings.attendanceQrOk
-                        : settings.attendanceQrNeedsFix}
+                    {qrLinkState === "ok" ? settings.attendanceQrOk : settings.attendanceQrNeedsFix}
                   </b>
                   <p>
-                    {!activeQr
-                      ? settings.attendanceNoQr
-                      : qrLinkState === "ok"
-                        ? settings.attendanceQrReady
-                        : qrLinkState === "local"
-                          ? settings.attendanceQrWarnLocal
-                          : settings.attendanceQrWarnMissing}
+                    {qrLinkState === "ok"
+                      ? settings.attendanceQrReady
+                      : qrLinkState === "local"
+                        ? settings.attendanceQrWarnLocal
+                        : settings.attendanceQrWarnMissing}
                   </p>
-                  {activeQr ? <small className="num">{w.qrIssuedOn.replace("{date}", tokyoDate(activeQr.issued_at))}</small> : null}
+                  <small className="num">{w.qrIssuedOn.replace("{date}", tokyoDate(activeQr.issued_at))}</small>
                   <div className="stw-qr__acts">
-                    {activeQr ? (
-                      <SettingsConfirm
-                        action={issueAttendanceSiteQr}
-                        fields={{ siteId: selectedSite.id }}
-                        trigger={settings.attendanceReissueQr}
-                        triggerClassName="stw-link"
-                        title={w.reissueTitle}
-                        body={w.reissueBody}
-                        keep={w.keep}
-                        ok={w.reissueOk}
-                      />
-                    ) : (
-                      <form action={issueAttendanceSiteQr}>
-                        <input name="siteId" type="hidden" value={selectedSite.id} />
-                        <button className="stw-link" type="submit">
-                          {settings.attendanceIssueQr}
-                        </button>
-                      </form>
-                    )}
-                    {activeQr && qrLinkState === "ok" ? (
-                      <Link className="stw-link" href={`/admin/settings/attendance/print?site=${selectedSite.id}`} target="_blank">
-                        {w.print}
-                      </Link>
-                    ) : null}
+                    <SettingsConfirm
+                      action={issueAttendanceSiteQr}
+                      fields={{ siteId: selectedSite.id }}
+                      trigger={settings.attendanceReissueQr}
+                      triggerClassName="stw-link"
+                      title={w.reissueTitle}
+                      body={w.reissueBody}
+                      keep={w.keep}
+                      ok={w.reissueOk}
+                    />
                   </div>
                 </div>
               </div>
@@ -393,10 +407,10 @@ export default async function AdminAttendanceSettingsPage({ searchParams }: Page
               <div className="stw-f">
                 <label className="stw-nf">
                   <span>{settings.attendancePrintName}</span>
-                  <input defaultValue={selectedSite?.print_name ?? draft?.printName ?? ""} name="printName" placeholder={selectedSite?.name ?? ""} autoComplete="off" />
+                  <input defaultValue={selectedSite?.print_name ?? draft?.printName ?? ""} name="printName" placeholder={w.printNameHint} autoComplete="off" />
                 </label>
-                <span className="stw-hint">{w.printNameHint}</span>
               </div>
+              <h3 className="stw-sub">{w.locationTitle}</h3>
               {/*
                 근무지를 어느 **건물**로 볼지. 이 연결이 없으면 교통비 자동 연결이 건물을 못 찾고
                 이름으로 더듬어야 한다 — 근무지 이름(`아라키초A`)과 건물 이름(Beds24 원본
@@ -428,8 +442,10 @@ export default async function AdminAttendanceSettingsPage({ searchParams }: Page
                   latInvalid: w.latInvalid,
                   lngInvalid: w.lngInvalid,
                   mapLink: w.mapLink,
+                  editCoords: w.editCoords,
                   radiusLabel: w.radiusLabel,
                   radiusCustom: w.radiusCustom,
+                  radiusCustomShort: w.radiusCustomShort,
                   radiusHint: w.radiusHint,
                   radiusInvalid: w.radiusInvalid,
                 }}
@@ -437,7 +453,7 @@ export default async function AdminAttendanceSettingsPage({ searchParams }: Page
             </form>
 
             {/* 맨 아래 한 줄: 비활성화 · 삭제(글자) + 변경 저장. 폼이 겹치지 않게 저장 버튼은 form 속성으로 위 폼을 제출한다. */}
-            <div className="stw-f" style={{ marginTop: "auto" }}>
+            <div className="stw-f">
               <div className="stw-foot">
                 {selectedSite ? (
                   <SiteDangerActions

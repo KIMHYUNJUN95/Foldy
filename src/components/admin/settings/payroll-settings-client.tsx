@@ -1,15 +1,17 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { ArrowRight, Check } from "lucide-react";
 import { saveOrgPayrollSettings, type OrgPayrollSettingsPatch } from "@/actions/payroll-settings";
 import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
 import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
 import type { Locale } from "@/lib/i18n";
 import { fillCopy, type PayrollSettingsCopy } from "@/lib/payroll-settings-i18n";
-import { upcomingPaydays } from "@/lib/payroll-settings-rules";
+import { daysBetweenKeys, upcomingPaydaysFrom } from "@/lib/payroll-settings-rules";
 import type { OrgPayrollSettings } from "@/lib/payroll-settings-server";
 
-// 설정 › 급여 — 시안 SettingsPay-PC. 고르거나 칸을 벗어나면 바로 저장(조용히), 성공은 작은 토스트.
+// 설정 › 급여 — 시안 SettingsPay-PC → 2026-11-12 다듬기(PayNew). 고르거나 칸을 벗어나면 바로 저장, 성공은 작은 토스트
+// (지급일만 칸 옆 「✓ 저장됨」 — 서버가 저장을 확인한 뒤에만).
 // 지급일이 쉬는 날이면 늘 앞 평일로 옮긴다(2026-10-25 결정 — 「앞/뒤 평일」 고르기 없음).
 
 type Member = { id: string; name: string };
@@ -30,14 +32,15 @@ export function PayrollSettingsClient({
   copy,
   initial,
   members,
-  fromWorkYm,
+  today,
   thisYear,
   locale,
 }: {
   copy: PayrollSettingsCopy;
   initial: OrgPayrollSettings;
   members: Member[];
-  fromWorkYm: string;
+  /** 도쿄 오늘 `YYYY-MM-DD` — 다음 지급일 · 「N일 뒤」 기준. */
+  today: string;
   thisYear: number;
   locale: Locale;
 }) {
@@ -50,7 +53,10 @@ export function PayrollSettingsClient({
   const [payDayText, setPayDayText] = useState(String(initial.payDay));
   const [payDay, setPayDay] = useState(initial.payDay);
   const [payDayError, setPayDayError] = useState(false);
+  const [payDaySaved, setPayDaySaved] = useState(false);
   const savedPayDay = useRef(initial.payDay);
+  // 마지막으로 친 글자 — 저장 응답이 왔을 때 그사이 고쳤는지 본다(onChange 에서만 갱신).
+  const payDayTextRef = useRef(String(initial.payDay));
 
   const [senmu, setSenmu] = useState(initial.senmuApproverId ?? "");
   const [president, setPresident] = useState(initial.presidentApproverId ?? "");
@@ -61,11 +67,11 @@ export function PayrollSettingsClient({
   const [editText, setEditText] = useState("");
   const [editError, setEditError] = useState(false);
 
-  async function persist(patch: OrgPayrollSettingsPatch): Promise<boolean> {
+  async function persist(patch: OrgPayrollSettingsPatch, quiet = false): Promise<boolean> {
     setError(null);
     const res = await saveOrgPayrollSettings(patch);
     if (res.ok) {
-      showToast(copy.saved);
+      if (!quiet) showToast(copy.saved);
       return true;
     }
     if (res.reason === "forbidden") setError(copy.errorForbidden);
@@ -89,8 +95,13 @@ export function PayrollSettingsClient({
     setPayDayError(false);
     setPayDay(n);
     setPayDayText(String(n));
+    payDayTextRef.current = String(n);
     if (n === savedPayDay.current) return;
-    if (await persist({ payDay: n })) savedPayDay.current = n;
+    if (await persist({ payDay: n }, true)) {
+      savedPayDay.current = n;
+      // 응답을 기다리는 사이 칸을 다시 고쳤으면 「저장됨」을 띄우지 않는다(다음 blur 때 새 값이 저장된다).
+      if (payDayTextRef.current === String(n)) setPayDaySaved(true);
+    }
   }
 
   async function pickApprover(which: "senmu" | "president", id: string) {
@@ -151,12 +162,28 @@ export function PayrollSettingsClient({
   const weekdayOf = (ymd: string) => weekdays[new Date(`${ymd}T00:00:00Z`).getUTCDay()] ?? "";
   const dayLabel = (d: number) => (locale === "en" ? ordinal(d) : String(d));
 
-  const paydays = useMemo(() => upcomingPaydays(fromWorkYm, payDay, 12), [fromWorkYm, payDay]);
+  const paydays = useMemo(() => upcomingPaydaysFrom(today, payDay, 12), [today, payDay]);
+  const [next, ...later] = paydays;
+  const daysLeft = daysBetweenKeys(today, next.date);
+  const nextWeekday = new Intl.DateTimeFormat(LOCALE_TAG[locale], { weekday: "long", timeZone: "UTC" }).format(
+    new Date(`${next.date}T00:00:00Z`),
+  );
+  const shiftReason = (p: (typeof paydays)[number]) =>
+    p.shiftedBecause === "sun"
+      ? fillCopy(copy.shiftedSun, { d: dayLabel(dayOf(p.nominal)) })
+      : p.shiftedBecause === "sat"
+        ? fillCopy(copy.shiftedSat, { d: dayLabel(dayOf(p.nominal)) })
+        : p.shiftedBecause === "holiday" && p.holiday
+          ? fillCopy(copy.shiftedHoliday, { d: dayLabel(dayOf(p.nominal)), holiday: copy.holidays[p.holiday] })
+          : "";
 
-  const approverPick = (which: "senmu" | "president", value: string, label: string) => (
-    <div className="stwp-row">
-      <span className="stwp-k jp">{label}</span>
-      <div className="stwp-v stwp-dd">
+  // 결재 단계 — 작은 회색 「1 · 전무」 위 · 드롭다운 아래. 드롭다운 이름(aria)은 기존 「전무 결재」 그대로.
+  const approverStep = (which: "senmu" | "president", value: string, step: string, label: string) => (
+    <div className="stwp-step">
+      <span className="stwp-step__k stwp-jp" aria-hidden="true">
+        {step}
+      </span>
+      <div className="stwp-dd">
         <AdmDropdown
           options={memberOptions}
           value={value}
@@ -198,27 +225,37 @@ export function PayrollSettingsClient({
 
           <section className="stwp-sec">
             <h2>{copy.secPayday}</h2>
-            <div className="stwp-rows">
-              <div className="stwp-row">
-                <label className="stwp-k" htmlFor="stwp-payday">
-                  {copy.payDayLabel}
-                </label>
-                <span className="stwp-v">
-                  <input
-                    id="stwp-payday"
-                    className={`stwp-day num${payDayError ? " is-bad" : ""}`}
-                    inputMode="numeric"
-                    value={payDayText}
-                    aria-invalid={payDayError}
-                    onChange={(e) => setPayDayText(e.target.value.replace(/\D/g, "").slice(0, 2))}
-                    onBlur={() => void commitPayDay()}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") e.currentTarget.blur();
-                    }}
-                  />
-                  {copy.payDayUnit ? <span>{copy.payDayUnit}</span> : null}
-                </span>
-              </div>
+            <div className="stwp-pay">
+              <span aria-hidden="true">{copy.payDayPrefix}</span>
+              <label className="sr-only" htmlFor="stwp-payday">
+                {copy.payDayLabel}
+              </label>
+              <input
+                id="stwp-payday"
+                className={`stwp-day num${payDayError ? " is-bad" : ""}`}
+                inputMode="numeric"
+                value={payDayText}
+                aria-invalid={payDayError}
+                onChange={(e) => {
+                  const next = e.target.value.replace(/\D/g, "").slice(0, 2);
+                  payDayTextRef.current = next;
+                  setPayDayText(next);
+                  setPayDaySaved(false);
+                }}
+                onBlur={() => void commitPayDay()}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                }}
+              />
+              {copy.payDaySuffix ? <span aria-hidden="true">{copy.payDaySuffix}</span> : null}
+              <span className="stwp-saved" role="status">
+                {payDaySaved ? (
+                  <>
+                    <Check aria-hidden="true" />
+                    {copy.savedInline}
+                  </>
+                ) : null}
+              </span>
             </div>
             {payDayError ? <p className="stwp-note is-red">{copy.payDayRange}</p> : null}
             <p className="stwp-note">{copy.holidayRule}</p>
@@ -226,16 +263,17 @@ export function PayrollSettingsClient({
 
           <section className="stwp-sec">
             <h2>{copy.secApproval}</h2>
-            <div className="stwp-rows">
-              {approverPick("senmu", senmu, copy.senmuApprover)}
-              {approverPick("president", president, copy.presidentApprover)}
+            <div className="stwp-steps">
+              {approverStep("senmu", senmu, copy.approverStep1, copy.senmuApprover)}
+              <ArrowRight className="stwp-steps__arrow" aria-hidden="true" />
+              {approverStep("president", president, copy.approverStep2, copy.presidentApprover)}
             </div>
             {approverError ? <p className="stwp-note is-red">{copy.sameApproverError}</p> : null}
             <p className="stwp-note">{copy.approvalNote}</p>
           </section>
 
           <section className="stwp-sec">
-            <h2 className="jp">{copy.secInsurance}</h2>
+            <h2 className="stwp-jp">{copy.secInsurance}</h2>
             <div className="stwp-rows">
               {years.map((year) => {
                 const value = rates[String(year)];
@@ -299,29 +337,27 @@ export function PayrollSettingsClient({
           </section>
         </div>
 
-        <aside className="stwp-side">
-          <h2>{copy.upcomingTitle}</h2>
-          <p className="stwp-note">{copy.upcomingNote}</p>
+        <aside className="stwp-side" aria-label={copy.upcomingTitle}>
+          <span className="stwp-next__k">{fillCopy(copy.nextPayHead, { m: fillCopy(copy.monthFor, { m: m(next.workYm) }) })}</span>
+          <p className="stwp-next">
+            <b className="num">{fillCopy(copy.payDateBig, { m: m(next.date.slice(0, 7)), d: dayOf(next.date) })}</b>
+            <span>{nextWeekday}</span>
+          </p>
+          <span className="stwp-next__sub num">
+            {daysLeft <= 0 ? copy.daysToday : daysLeft === 1 ? copy.daysTomorrow : fillCopy(copy.daysUntil, { n: daysLeft })}
+            {shiftReason(next) ? ` · ${shiftReason(next)}` : ""}
+          </span>
+          <h3>{copy.laterTitle}</h3>
           <ol className="stwp-pd">
-            {paydays.map((p, i) => {
-              const why =
-                p.shiftedBecause === "sun"
-                  ? fillCopy(copy.shiftedSun, { d: dayLabel(dayOf(p.nominal)) })
-                  : p.shiftedBecause === "sat"
-                    ? fillCopy(copy.shiftedSat, { d: dayLabel(dayOf(p.nominal)) })
-                    : p.shiftedBecause === "holiday" && p.holiday
-                      ? fillCopy(copy.shiftedHoliday, { d: dayLabel(dayOf(p.nominal)), holiday: copy.holidays[p.holiday] })
-                      : "";
-              return (
-                <li key={p.workYm} className={`${i === 0 ? "is-next" : ""}${p.shiftedBecause ? " is-moved" : ""}`}>
-                  <span className="stwp-pd__m">{fillCopy(copy.monthFor, { m: m(p.workYm) })}</span>
-                  <b className="num">
-                    {fillCopy(copy.payDate, { m: m(p.date.slice(0, 7)), d: dayOf(p.date), w: weekdayOf(p.date) })}
-                  </b>
-                  <span className="stwp-pd__why">{i === 0 && !why ? copy.nextPay : why}</span>
-                </li>
-              );
-            })}
+            {later.map((p) => (
+              <li key={p.workYm}>
+                <span className="stwp-pd__m">{fillCopy(copy.monthFor, { m: m(p.workYm) })}</span>
+                <b className="num">
+                  {fillCopy(copy.payDate, { m: m(p.date.slice(0, 7)), d: dayOf(p.date), w: weekdayOf(p.date) })}
+                </b>
+                <span className="stwp-pd__why">{shiftReason(p)}</span>
+              </li>
+            ))}
           </ol>
         </aside>
       </div>

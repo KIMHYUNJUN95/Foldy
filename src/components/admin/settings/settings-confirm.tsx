@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { haptic } from "@/lib/haptics";
 
@@ -11,8 +11,12 @@ import { haptic } from "@/lib/haptics";
 type Props = {
   action: (formData: FormData) => void | Promise<void>;
   fields: Record<string, string>;
-  trigger: string;
+  /** 글자 또는 아이콘 — 아이콘이면 `triggerAriaLabel` 을 꼭 넘긴다. */
+  trigger: ReactNode;
   triggerClassName: string;
+  triggerAriaLabel?: string;
+  /** 지금은 실행할 수 없음(예: 멤버가 있는 조직) — 창을 열지 않는다. */
+  triggerDisabled?: boolean;
   title: string;
   body: string;
   keep: string;
@@ -29,7 +33,7 @@ function OkButton({ label, danger }: { label: string; danger?: boolean }) {
   );
 }
 
-export function SettingsConfirm({ action, fields, trigger, triggerClassName, title, body, keep, ok, danger }: Props) {
+export function SettingsConfirm({ action, fields, trigger, triggerClassName, triggerAriaLabel, triggerDisabled, title, body, keep, ok, danger }: Props) {
   const [open, setOpen] = useState(false);
   const [shown, setShown] = useState(false);
 
@@ -56,6 +60,9 @@ export function SettingsConfirm({ action, fields, trigger, triggerClassName, tit
       <button
         type="button"
         className={triggerClassName}
+        aria-label={triggerAriaLabel}
+        title={triggerAriaLabel}
+        disabled={triggerDisabled}
         onClick={() => {
           haptic("light");
           setOpen(true);

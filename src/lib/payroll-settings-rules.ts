@@ -112,6 +112,24 @@ export function upcomingPaydays(fromWorkYm: string, payDay: number, count = 12):
   return Array.from({ length: count }, (_, i) => paydayFor(shiftYm(fromWorkYm, i), payDay));
 }
 
+/** 두 날짜 키 사이 일수(`to` − `from`). 둘 다 도쿄 날짜 키라 UTC 자정끼리 빼도 어긋나지 않는다. */
+export function daysBetweenKeys(from: string, to: string): number {
+  const [fy, fm, fd] = from.split("-").map(Number);
+  const [ty, tm, td] = to.split("-").map(Number);
+  return Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86_400_000);
+}
+
+/**
+ * 오늘(도쿄 날짜 키)부터 다가오는 지급일 `count` 개. 지난달분이 이번 달에 아직 안 나갔으면(오늘이 지급일이어도) 그것부터 —
+ * 이번 달분부터 세면 11월 5일에 「다음 지급」이 12월로 보인다.
+ */
+export function upcomingPaydaysFrom(today: string, payDay: number, count = 12): Payday[] {
+  const thisYm = today.slice(0, 7);
+  const prevYm = shiftYm(thisYm, -1);
+  const from = paydayFor(prevYm, payDay).date >= today ? prevYm : thisYm;
+  return upcomingPaydays(from, payDay, count);
+}
+
 /** 雇用保険 근로자 부담률 표(연도 → 1,000분의 n). DB jsonb 를 안전하게 읽는다. */
 export function parseInsuranceRates(raw: unknown): Record<string, number> {
   const out: Record<string, number> = {};

@@ -6,7 +6,8 @@ import {
 } from "@/app/admin/settings/attendance/actions";
 import { SettingsConfirm } from "./settings-confirm";
 
-// 출퇴근 현장 정리 — 비활성화 / 다시 활성화 / 완전 삭제(2026-10-15 화이트 리디자인: 패널 맨 아래 글자 버튼).
+// 출퇴근 현장 정리 — 비활성화 / 다시 활성화 / 완전 삭제(2026-10-15 화이트 리디자인: 패널 맨 아래 글자 버튼,
+// 2026-11-12 비활성화는 회색 글자 — 되돌릴 수 있는 일이라 빨강을 쓰지 않는다).
 //
 // 비활성화는 되돌릴 수 있어 바로 실행한다. 삭제는 되돌릴 수 없고(붙여둔 인쇄 QR 도 즉시 죽는다) 확인 창을 거친다.
 // **출퇴근 기록이 있는 현장은 삭제 자체가 불가능하다** — `attendance_sessions` 의 FK 가 `on delete restrict`
@@ -39,7 +40,7 @@ export function SiteDangerActions({
         <form action={setAttendanceSiteActiveAction}>
           <input name="siteId" type="hidden" value={siteId} />
           <input name="activate" type="hidden" value={isActive ? "0" : "1"} />
-          <button className={`stw-btn is-text ${isActive ? "is-red" : "is-violet"}`} type="submit">
+          <button className={`stw-btn is-text ${isActive ? "is-soft" : "is-violet"}`} type="submit">
             {isActive ? labels.deactivate : labels.activate}
           </button>
         </form>

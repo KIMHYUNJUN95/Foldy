@@ -44,7 +44,7 @@ export function SettingsSubnav({
         </Link>
       ) : null}
       {showOrganization ? <Link className={active === "organization" ? "on" : undefined} href="/admin/settings/organization" aria-current={active === "organization" ? "page" : undefined}>
-        {w.tabOrganization} <small>{w.devOnly}</small>
+        {w.tabOrganization}
       </Link> : null}
     </nav>
   );

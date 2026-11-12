@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { japanHolidays } from "@/lib/japan-holidays";
 import {
+  daysBetweenKeys,
   EMPTY_MEMBER_PAYROLL_SETTING,
   paydayFor,
   payrollIssues,
   twoMonthsAfter,
   upcomingPaydays,
+  upcomingPaydaysFrom,
 } from "@/lib/payroll-settings-rules";
 
 /** 알바 급여 P1 — 공휴일 · 지급일 · 확인 필요 규칙(docs/product/39 §3-A · §3-C). */
@@ -126,5 +128,32 @@ describe("payrollIssues", () => {
   it("twoMonthsAfter — 말일 넘침은 그 달 말일", () => {
     expect(twoMonthsAfter("2026-12-31")).toBe("2027-02-28");
     expect(twoMonthsAfter("2026-03-01")).toBe("2026-05-01");
+  });
+});
+
+describe("daysBetweenKeys", () => {
+  it("달 · 해를 넘겨도 날짜 수만 센다", () => {
+    expect(daysBetweenKeys("2026-11-12", "2026-12-10")).toBe(28);
+    expect(daysBetweenKeys("2026-12-31", "2027-01-01")).toBe(1);
+    expect(daysBetweenKeys("2026-11-12", "2026-11-12")).toBe(0);
+  });
+});
+
+describe("upcomingPaydaysFrom", () => {
+  it("이번 달 지급일이 지났으면 이번 달분부터", () => {
+    const list = upcomingPaydaysFrom("2026-11-12", 10, 12);
+    expect(list).toHaveLength(12);
+    expect(list[0].workYm).toBe("2026-11");
+    expect(list[0].date).toBe("2026-12-10");
+  });
+  it("지난달분이 아직 안 나갔으면 그것부터(지급일 당일 포함)", () => {
+    expect(upcomingPaydaysFrom("2026-11-05", 10)[0].workYm).toBe("2026-10");
+    expect(upcomingPaydaysFrom("2026-11-10", 10)[0].workYm).toBe("2026-10");
+    expect(upcomingPaydaysFrom("2026-11-11", 10)[0].workYm).toBe("2026-11");
+  });
+  it("앞당긴 지급일 기준으로 판단한다", () => {
+    // 2027-01-10 은 일요일 → 1월 8일(금). 1월 9일에는 이미 나갔다.
+    expect(upcomingPaydaysFrom("2027-01-08", 10)[0].workYm).toBe("2026-12");
+    expect(upcomingPaydaysFrom("2027-01-09", 10)[0].workYm).toBe("2027-01");
   });
 });

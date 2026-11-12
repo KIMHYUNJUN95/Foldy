@@ -83,10 +83,19 @@ export type PayrollSettingsCopy = {
   insuranceRateInvalid: string;
   yearLabel: string; // "{y}년도" — 雇用保険 율은 年度(4월~3월) 단위
   upcomingTitle: string;
-  upcomingNote: string;
+  payDayPrefix: string; // "매월" — 「매월 [10] 일」
+  payDaySuffix: string;
+  savedInline: string;
+  approverStep1: string; // "1 · 전무"
+  approverStep2: string;
+  nextPayHead: string; // "다음 지급 · {m}"
+  payDateBig: string; // "{m}월 {d}일"
+  daysUntil: string; // "오늘부터 {n}일 뒤"
+  daysTomorrow: string;
+  daysToday: string;
+  laterTitle: string;
   monthFor: string; // "{m}월분"
   payDate: string; // "{m}월 {d}일 ({w})"
-  nextPay: string;
   shiftedSun: string; // "{d}일 일요일"
   shiftedSat: string;
   shiftedHoliday: string; // "{d}일 {holiday}"
@@ -157,11 +166,11 @@ const ko: PayrollSettingsCopy = {
   payDayUnit: "일",
   payDayRange: "1~28 사이로 넣어 주세요.",
   holidayRule: "토 · 일 · 일본 공휴일(대체휴일 포함)이면 앞 평일로 옮겨요. 급여 기간은 1일~말일.",
-  secApproval: "결재",
+  secApproval: "결재 순서",
   senmuApprover: "전무 결재",
   presidentApprover: "사장 결재",
   approverNone: "정하지 않음",
-  approvalNote: "급여를 넘기기 전에 이 순서로 확인을 받아요.",
+  approvalNote: "급여를 넘기기 전에 이 순서로 확인을 받아요. 같은 사람을 두 번 고를 수 없어요.",
   sameApproverError: "전무와 사장은 다른 사람이어야 해요.",
   secInsurance: "고용보험 근로자 부담률",
   insuranceRateValue: "1,000분의 {n}",
@@ -172,13 +181,22 @@ const ko: PayrollSettingsCopy = {
   insuranceRateInvalid: "0 이상 100 미만의 숫자로 넣어 주세요.",
   yearLabel: "{y}년도",
   upcomingTitle: "앞으로 12달 지급일",
-  upcomingNote: "위 규칙으로 계산한 실제 날짜예요.",
+  payDayPrefix: "매월",
+  payDaySuffix: "일",
+  savedInline: "저장됨",
+  approverStep1: "1 · 전무",
+  approverStep2: "2 · 사장",
+  nextPayHead: "다음 지급 · {m}",
+  payDateBig: "{m}월 {d}일",
+  daysUntil: "오늘부터 {n}일 뒤",
+  daysTomorrow: "내일",
+  daysToday: "오늘",
+  laterTitle: "그다음 지급일",
   monthFor: "{m}월분",
   payDate: "{m}월 {d}일 ({w})",
-  nextPay: "다음 지급",
-  shiftedSun: "{d}일 일요일",
-  shiftedSat: "{d}일 토요일",
-  shiftedHoliday: "{d}일 {holiday}",
+  shiftedSun: "{d}일이 일요일",
+  shiftedSat: "{d}일이 토요일",
+  shiftedHoliday: "{d}일이 {holiday}",
   weekdaysShort: "일,월,화,수,목,금,토",
   save: "저장",
   cancel: "취소",
@@ -265,11 +283,11 @@ const ja: PayrollSettingsCopy = {
   payDayUnit: "日",
   payDayRange: "1〜28の間で入れてください。",
   holidayRule: "土 · 日 · 祝日(振替休日を含む)なら前の平日に繰り上げます。給与期間は1日〜末日。",
-  secApproval: "決裁",
+  secApproval: "決裁の順番",
   senmuApprover: "専務決裁",
   presidentApprover: "社長決裁",
   approverNone: "未設定",
-  approvalNote: "給与を確定する前にこの順で確認を受けます。",
+  approvalNote: "給与を確定する前にこの順で確認を受けます。同じ人を2回選ぶことはできません。",
   sameApproverError: "専務と社長は別の人にしてください。",
   secInsurance: "雇用保険 労働者負担率",
   insuranceRateValue: "1,000分の{n}",
@@ -280,10 +298,19 @@ const ja: PayrollSettingsCopy = {
   insuranceRateInvalid: "0以上100未満の数字で入れてください。",
   yearLabel: "{y}年度",
   upcomingTitle: "今後12か月の支給日",
-  upcomingNote: "上のルールで計算した実際の日付です。",
+  payDayPrefix: "毎月",
+  payDaySuffix: "日",
+  savedInline: "保存済み",
+  approverStep1: "1 · 専務",
+  approverStep2: "2 · 社長",
+  nextPayHead: "次回支給 · {m}",
+  payDateBig: "{m}月{d}日",
+  daysUntil: "今日から{n}日後",
+  daysTomorrow: "明日",
+  daysToday: "今日",
+  laterTitle: "その後の支給日",
   monthFor: "{m}月分",
   payDate: "{m}月{d}日({w})",
-  nextPay: "次回支給",
   shiftedSun: "{d}日が日曜",
   shiftedSat: "{d}日が土曜",
   shiftedHoliday: "{d}日が{holiday}",
@@ -373,11 +400,11 @@ const en: PayrollSettingsCopy = {
   payDayUnit: "",
   payDayRange: "Enter a day from 1 to 28.",
   holidayRule: "If it falls on a Saturday, Sunday or Japanese holiday (incl. substitute holidays), pay moves to the weekday before. Pay period: 1st to month end.",
-  secApproval: "Approval",
+  secApproval: "Approval order",
   senmuApprover: "専務 approval",
   presidentApprover: "社長 approval",
   approverNone: "Not set",
-  approvalNote: "Payroll is checked in this order before it goes out.",
+  approvalNote: "Payroll is checked in this order before it goes out. You can't pick the same person twice.",
   sameApproverError: "専務 and 社長 must be different people.",
   secInsurance: "Employment insurance — employee rate",
   insuranceRateValue: "{n} per 1,000",
@@ -388,10 +415,19 @@ const en: PayrollSettingsCopy = {
   insuranceRateInvalid: "Enter a number from 0 up to (not including) 100.",
   yearLabel: "FY{y}",
   upcomingTitle: "Pay days for the next 12 months",
-  upcomingNote: "Actual dates from the rule above.",
+  payDayPrefix: "Day",
+  payDaySuffix: "of every month",
+  savedInline: "Saved",
+  approverStep1: "1 · 専務",
+  approverStep2: "2 · 社長",
+  nextPayHead: "Next · {m}",
+  payDateBig: "{m} {d}",
+  daysUntil: "In {n} days",
+  daysTomorrow: "Tomorrow",
+  daysToday: "Today",
+  laterTitle: "After that",
   monthFor: "{m} pay",
   payDate: "{w}, {m} {d}",
-  nextPay: "Next",
   shiftedSun: "{d} is a Sunday",
   shiftedSat: "{d} is a Saturday",
   shiftedHoliday: "{d} is {holiday}",

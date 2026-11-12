@@ -26,7 +26,7 @@ export default async function AdminPayrollSettingsPage() {
 
   if (!canManage) {
     return (
-      <AdminShell activeItem="settings" title={copy.pageTitle}>
+      <AdminShell activeItem="settings" title={settings.settingsTitle}>
         <div className="stw">
           <AdminNoAccess title={dictionary.admin.shared.noAccessTitle} body={dictionary.admin.shared.noAccessBody} />
         </div>
@@ -55,7 +55,7 @@ export default async function AdminPayrollSettingsPage() {
   const today = tokyoToday();
 
   return (
-    <AdminShell activeItem="settings" title={copy.pageTitle}>
+    <AdminShell activeItem="settings" title={settings.settingsTitle}>
       <div className="stw">
         <SettingsSubnav
           active="payroll"
@@ -69,7 +69,7 @@ export default async function AdminPayrollSettingsPage() {
           copy={copy}
           initial={org}
           members={members}
-          fromWorkYm={today.slice(0, 7)}
+          today={today}
           thisYear={Number(today.slice(0, 4))}
           locale={locale}
         />

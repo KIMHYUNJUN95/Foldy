@@ -7481,3 +7481,12 @@ Status: Confirmed (2026-10-19). 실제 Beds24 시험 대기.
 - **마지막 오너는 계정 삭제 · 정지 · 역할 변경이 안 된다**(DB 트리거 `last_owner`). 오너 넘기기 기능은 아직 없다 — 지금 두 운영 조직은 활성 오너가 각 2명.
 - 멤버 삭제는 DB 정리(한 트랜잭션) → 로그인 계정 삭제 순서. 로그인 계정 삭제만 실패하면 계정을 정지해 두고 기록을 남긴 뒤 성공으로 돌려준다(들어올 수 없게 막는 것이 우선).
 - 상세: `docs/engineering/05-rls-permissions.md` · `04-data-model.md` · `docs/product/04-organization-invitations.md` · `17-user-profile-directory.md` · `27-permission-override-workflow.md` · `01-user-roles.md`.
+
+## 2026-11-12 — 손님 메시지(Beds24 CS)는 Foldy 가 원본 · 웹훅 중심
+
+- 범위: 메시지함(보기 + 답장) + 자동 안내. Beds24 Auto Actions 는 쓰지 않고 규칙은 Foldy 가 갖는다.
+- 메시지 원본은 Foldy DB, Beds24 는 채널 어댑터 하나(수신 · 발송 · 읽음). 나중에 Beds24 를 빼도 화면 · 규칙은 그대로.
+- 수신은 예약 웹훅(메시지가 실려 옴 — 위키 원문), 놓친 것만 10~15분 보정 조회. 크레딧은 답장 · 자동 안내 · 읽음에만 쓰고 직원 답장이 가격 반영보다 먼저.
+- 넣는 것: 응답 목표 시간 · 사용량 표시 · 건물별 정보 카드(`property_operation_infos` 넓히기) · 메시지 → 업무 한 번에. 뺀 것: 담당자 「답장 쓰는 중」 표시. 미룸: AI 답장 초안(AI 기능 때) · 푸시 알림(알림 일괄 구현 때).
+- 상세: `docs/product/47-guest-messaging.md`. (사용자 확정 2026-11-12)
+- 1단계(받기 바탕) 구현 2026-11-12: 표 4개 + DB 함수(`202611120002`), 권한 `guest_messages.view` · `.reply` · `.manage`(임시 기본값 — view · reply 는 대표 · 전무 · CS, manage 는 대표 · 전무만, 알바 없음, Q2), 보정 조회는 자동 일정에 넣지 않음(주기 실행은 V1 확인 뒤 사용자 허락).

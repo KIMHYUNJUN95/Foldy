@@ -24,7 +24,7 @@ export const CAPABILITY_GROUPS = [
   { id: "cleaning", keys: ["cleaning.work", "cleaning.read_all", "cleaning.assign", "cleaning.assign_swap", "cleaning.force_complete", "linen.manage"] },
   { id: "requests", keys: ["maintenance_status_change", "lost_found.handle", "order_processor", "request.delete_any"] },
   { id: "comms", keys: ["announcement.create", "announcement.manage", "board.manage", "board.moderate", "bug.review"] },
-  { id: "guest", keys: ["complaint.write", "complaint.manage", "complaint.comment", "property_info.edit"] },
+  { id: "guest", keys: ["complaint.write", "complaint.manage", "complaint.comment", "property_info.edit", "guest_messages.view", "guest_messages.reply", "guest_messages.manage"] },
   { id: "ops", keys: ["ops_admin.access", "ops_calendar.write", "room_links.access", "automation.manage"] },
   { id: "checkin", keys: ["checkin.view", "checkin.documents", "checkin.manage", "checkin.call"] },
   { id: "recruit", keys: ["job_application.read", "job_application.triage", "job_application.delete", "staff_documents.view"] },

@@ -1794,3 +1794,29 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 - 확인: SQL 정적 검사(`src/lib/__tests__/requests-processing-guard-sql.test.ts` — 트리거 부착 · 키 · 시작 상태 · 쓰는 열 · set null 예외)와
   로컬 PGlite 에 이 마이그레이션을 그대로 적용해 `SET ROLE` 로 21가지(권한 없는 등록 거절 · 시작 상태 통과 · 신고자 수정 거절 · 처리자 ·
   service_role 통과 · 청소 기록 삭제 set null 통과)를 봤다(2026-11-10, `has_capability` · `auth` 는 흉내). 운영 미적용 — 적용은 사용자 컨펌.
+
+## 2026-11-12 손님 메시지 — `guest_messages.view` · `.reply` · `.manage` (`202611120002`, 운영 미적용)
+
+- 권한 키 셋(`src/config/capabilities.ts`, 묶음 「게스트 · 건물」): 기본 역할은 **임시**(47 Q2) — `view` · `reply` = owner · 전무 · cs_staff, **`manage` = owner · 전무만**. 알바는 역할로 안 받는다.
+  개인 부여 · 차단 가능(`individual_grant` · `individual_deny` true), 기한 안 물음, 개발자 통과. 시드는 새 마이그레이션 + `202609100001` 생성 구간(레지스트리 사본, `capability-registry.test.ts`).
+- 표 네 개 모두 RLS 켬. `anon` · `authenticated` 의 표 권한을 먼저 모두 거두고 필요한 것만 준다. `service_role` 은 전부(웹훅 수신 · 보정 조회 · 발송 큐 · 2단계 서버 액션).
+
+| 표 | authenticated SELECT | authenticated UPDATE | INSERT · DELETE |
+| --- | --- | --- | --- |
+| `guest_conversations` | `guest_messages.view` | `guest_messages.view` **와** `guest_messages.reply`, 칸 권한 `status` · `snooze_until` 만 | 권한 없음(서버만) |
+| `guest_messages` | `guest_messages.view` | 권한 없음 | 권한 없음 |
+| `guest_message_outbox` | `guest_messages.view` | 권한 없음 | 권한 없음 |
+| `guest_message_channel_state` | `guest_messages.manage` | `guest_messages.manage`, 칸 권한 `settings` · `night_pause` · `credit_reserve` · `stall_hours` 만 | 권한 없음 |
+
+- 판정은 모두 `(select is_platform_admin()) or has_capability(organization_id, (select auth.uid()), '<키>')` — 활성 멤버 · 역할 기본값(전무 = owner) · 개인 부여 · 차단(대표 · 전무 면역)을 같이 본다. `auth.uid()` 만 보는 정책은 없다.
+- 크레딧 기록 칸(`last_credit_*` · `last_*_at`)은 일반 사용자가 못 쓴다 — 서버가 받은 응답 헤더만 쓴다. 대화의 조직 · 예약 · 손님 칸도 못 바꾼다.
+- 하위 표는 `(conversation_id, organization_id)` 복합 외래 키라 다른 조직 대화에 메시지 · 큐 줄을 붙일 수 없다(service_role 이라도). 메시지 중복 막기도 조직마다(`(organization_id, provider, external_id)`).
+- 함수 `guest_conversation_apply_messages`: `security definer` · `search_path=''`, public · anon · authenticated 실행 권한 회수, service_role 만. 대화 id 와 조직 id 가 함께 맞아야 바뀐다.
+- 서버 쪽 조직 확인: 웹훅 · 보정 조회 모두 매핑(건물 · 객실 → 조직)으로 정하고, 모든 메시지 · 큐 조회에 `organization_id` 를 건다. 보정 조회는 매핑 조직과 기존 대화 조직이 다르면 넣지 않는다. 기본값(`BEDS24_DEFAULT_ORGANIZATION_ID`)으로만 정해지면 경고 로그.
+- 보정 조회 라우트 `/api/beds24/messages-reconcile` 은 `CRON_SECRET`(Bearer)만 받는다.
+- 확인: 로컬 PGlite 에 이 마이그레이션을 그대로 적용(두 번 돌려도 됨)하고 `SET ROLE` 로 50가지를 봤다(2026-11-12 검토 반영 뒤, `has_capability` 는 `202610280002` 의 실제 본문, `auth` · 멤버십 등은 흉내) —
+  cs_staff 읽기 · 상태 고치기 통과 · 연결 상태 0행 · 설정 고치기 0행, owner 읽기 · 설정 고치기 통과, 다른 칸 · 조직 바꾸기 42501, 알바 0행, 알바 + 개인 부여 view 는 대화만 · 상태 고치기 0행,
+  개인 부여 reply 만(view 없음) 상태 고치기 0행, cs_staff + 개인 차단 0행, 다른 조직 0행, authenticated 의 메시지 · 큐 쓰기 · 크레딧 칸 · 상태 함수 실행 42501, anon 42501,
+  같은 번호 조직 안 중복 무시 · 다른 조직은 따로, 발송 큐 한 줄 = 메시지 한 줄, `uncertain` 상태, 다른 조직 대화 FK 거부, 멱등 키 고유, 대화 삭제 cascade,
+  상태 함수(새 손님 말 → awaiting · 같은 말 다시 와도 직원 done 유지 · 시각 뒤로 안 감 · 더 새 말이면 다시 엶 · 답장 → done · 「나중에」 유지/해제 · 다른 조직 id 면 0행), `raw_payload` 칸 설명.
+  Supabase 실제 프로젝트에서는 아직 안 돌려 봤다. 운영 미적용 — 적용은 사용자 컨펌.

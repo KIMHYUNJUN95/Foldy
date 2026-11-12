@@ -10,6 +10,11 @@ import {
 import { forwardBeds24Delivery, parseForwardTargets } from "@/lib/beds24/webhook-forward";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { requestMatchesSecret } from "@/lib/api-secret";
+import {
+  ingestBeds24WebhookMessages,
+  prepareCapturedMessagesPayload,
+  shouldCaptureWebhookMessages,
+} from "@/lib/guest-messages/webhook-ingest";
 
 /**
  * 가격 웹훅이 건물 다시 읽기(「창이 끝나면 한 번 더」면 최대 20초 대기 + 건물 하나 동기화)를 응답
@@ -289,16 +294,38 @@ export async function POST(request: NextRequest) {
   // 일부 예약 처리에 실패하면 재생/디버깅을 위해 그 원문 본문을 보관한다.
   const anyFailed = failed > 0;
   const durationMs = Math.round(performance.now() - startedAt);
+  // 손님 메시지 임시 원문 기록(V1, docs/product/47 §3-4) — `BEDS24_WEBHOOK_CAPTURE_MESSAGES=1` 일 때만, 메시지가 실린 배달만.
+  // 실제 배달 모양을 확인하면 끈다. 표는 같은 beds24_webhook_events(모드 `messages_capture`). 첨부는 길이만, 크기 상한.
+  // 실패 배치는 예전대로 원문 전체(재처리용)를 남긴다.
+  const captureMessages = shouldCaptureWebhookMessages(body);
+  const keepRaw = anyFailed || captureMessages;
   after(() =>
     recordBeds24WebhookEvent({
       supabase,
       durationMs,
       httpStatus: anyFailed ? 207 : 200,
       results,
-      rawBody: anyFailed ? body : undefined,
-      contentType: anyFailed ? contentType : undefined,
+      rawBody: anyFailed ? body : captureMessages ? prepareCapturedMessagesPayload(body) : undefined,
+      contentType: keepRaw ? contentType : undefined,
+      extraModes: captureMessages ? ["messages_capture"] : undefined,
     }),
   );
+
+  // 손님 메시지 받기(docs/product/47 §4) — 예약 처리가 끝난 뒤, 응답 뒤에. Beds24 를 새로 부르지 않는다(크레딧 0).
+  // 안에서 모든 오류를 삼킨다 — 예약 처리 결과 · 웹훅 응답에 영향이 없다. 바깥 try 는 혹시 모를 동기 예외까지 막는다.
+  after(async () => {
+    try {
+      await ingestBeds24WebhookMessages({
+        supabase,
+        body,
+        bookingPayloads,
+        results,
+        organizationIdDefault,
+      });
+    } catch (error) {
+      console.error("[beds24/webhook] guest message ingest failed", error instanceof Error ? error.message : "unknown");
+    }
+  });
 
   // 부분 실패한 배치를 Beds24 가 전달 실패로 보고 재시도 폭주를 하지 않도록
   // 항상 2xx 로 ACK 한다. 실패한 행은 위에서(응답 뒤) 기록되고

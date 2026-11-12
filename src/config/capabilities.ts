@@ -471,6 +471,43 @@ export const CAPABILITIES = {
     developerOnly: false,
   },
   /**
+   * 손님 메시지(Beds24 CS) 보기 — docs/product/47-guest-messaging.md §8.
+   * **기본 역할은 임시(열린 질문 Q2, 2026-11-12)**: `complaint.manage` 와 같은 역할(대표 · 전무 · CS). 알바는 역할로 안 받는다.
+   * 알바 · 야간 직원에게 줄 수 있게 개인 부여 · 차단을 연다. 상시 업무라 기한은 묻지 않는다.
+   */
+  "guest_messages.view": {
+    roles: ["owner", "senior_managing_director", "cs_staff"],
+    individualGrant: true,
+    individualDeny: true,
+    asksExpiry: false,
+    platformBypass: true,
+    systemOnly: false,
+    developerOnly: false,
+  },
+  /** 손님 메시지 답장 · 내부 메모 · 처리 끝 · 나중에(47 §8). 기본 역할은 위와 같이 임시(Q2). */
+  "guest_messages.reply": {
+    roles: ["owner", "senior_managing_director", "cs_staff"],
+    individualGrant: true,
+    individualDeny: true,
+    asksExpiry: false,
+    platformBypass: true,
+    systemOnly: false,
+    developerOnly: false,
+  },
+  /**
+   * 자동 안내 규칙 · 정해 둔 문구 · 응답 목표 · 사용량 표시(47 §8 · §6-2). 기본 역할 **임시**(Q2, 2026-11-12 검토 반영):
+   * 대표 · 전무만 — 자동 안내는 모든 손님에게 나가고 크레딧 선을 바꾸므로 CS 는 역할로 안 받는다(필요하면 개인 부여).
+   */
+  "guest_messages.manage": {
+    roles: ["owner", "senior_managing_director"],
+    individualGrant: true,
+    individualDeny: true,
+    asksExpiry: false,
+    platformBypass: true,
+    systemOnly: false,
+    developerOnly: false,
+  },
+  /**
    * 남이 쓴 요청(수리 · 분실물 · 주문) 삭제(예전 `DELETE_ANY_ROLES` 네 곳). docs/product/10 · 08 · 09
    * 현장 관리자는 빠진다 — 문서 08 · 09 · 10 은 「현장 관리자는 남의 요청을 못 지운다」인데 코드 · DB 만 열려 있었다(2026-11-10,
    * 마이그레이션 202611100001).

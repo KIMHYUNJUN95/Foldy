@@ -25,12 +25,14 @@ export async function recordBeds24WebhookEvent(params: {
   contentType?: string | null;
   /** 요청을 받은 때부터 응답 직전까지(ms). 응답 뒤 작업(after)은 포함하지 않는다. */
   durationMs?: number | null;
+  /** 결과 모드 뒤에 붙일 표시(예: 손님 메시지 임시 원문 기록 `messages_capture` — 47 §3-4). */
+  extraModes?: string[];
 }): Promise<void> {
   try {
     const { results } = params;
     const succeeded = results.filter((result) => result.ok).length;
     const failed = results.length - succeeded;
-    const modes = Array.from(new Set(results.map((result) => result.mode)));
+    const modes = Array.from(new Set([...results.map((result) => result.mode), ...(params.extraModes ?? [])]));
     const bookingSummary = results.map((result) => ({
       bookId: result.ok ? result.originalReservationId ?? result.sourceReservationId : result.sourceReservationId,
       status: result.ok ? result.mappedStatus : null,

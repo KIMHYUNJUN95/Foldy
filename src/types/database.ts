@@ -3633,6 +3633,326 @@ export type Database = {
           },
         ]
       }
+      guest_conversations: {
+        Row: {
+          booking_status: string | null
+          channel: string | null
+          check_in_date: string | null
+          check_out_date: string | null
+          created_at: string
+          guest_language: string | null
+          guest_name: string | null
+          id: string
+          last_guest_at: string | null
+          last_message_at: string | null
+          last_reply_at: string | null
+          organization_id: string
+          property_id: string | null
+          property_name: string | null
+          provider: string
+          provider_booking_id: string
+          reservation_id: string | null
+          room_id: string | null
+          room_label: string | null
+          snooze_until: string | null
+          status: "awaiting" | "done" | "snoozed"
+          updated_at: string
+        }
+        Insert: {
+          booking_status?: string | null
+          channel?: string | null
+          check_in_date?: string | null
+          check_out_date?: string | null
+          created_at?: string
+          guest_language?: string | null
+          guest_name?: string | null
+          id?: string
+          last_guest_at?: string | null
+          last_message_at?: string | null
+          last_reply_at?: string | null
+          organization_id: string
+          property_id?: string | null
+          property_name?: string | null
+          provider: string
+          provider_booking_id: string
+          reservation_id?: string | null
+          room_id?: string | null
+          room_label?: string | null
+          snooze_until?: string | null
+          status?: "awaiting" | "done" | "snoozed"
+          updated_at?: string
+        }
+        Update: {
+          booking_status?: string | null
+          channel?: string | null
+          check_in_date?: string | null
+          check_out_date?: string | null
+          created_at?: string
+          guest_language?: string | null
+          guest_name?: string | null
+          id?: string
+          last_guest_at?: string | null
+          last_message_at?: string | null
+          last_reply_at?: string | null
+          organization_id?: string
+          property_id?: string | null
+          property_name?: string | null
+          provider?: string
+          provider_booking_id?: string
+          reservation_id?: string | null
+          room_id?: string | null
+          room_label?: string | null
+          snooze_until?: string | null
+          status?: "awaiting" | "done" | "snoozed"
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guest_conversations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guest_conversations_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "reservations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guest_conversations_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guest_conversations_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      guest_message_channel_state: {
+        Row: {
+          created_at: string
+          credit_reserve: number
+          last_credit_remaining: number | null
+          last_credit_reset_at: string | null
+          last_message_webhook_at: string | null
+          last_reconcile_at: string | null
+          last_reconcile_error: string | null
+          last_request_cost: number | null
+          last_webhook_at: string | null
+          night_pause: boolean
+          organization_id: string
+          provider: string
+          settings: Json
+          stall_hours: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          credit_reserve?: number
+          last_credit_remaining?: number | null
+          last_credit_reset_at?: string | null
+          last_message_webhook_at?: string | null
+          last_reconcile_at?: string | null
+          last_reconcile_error?: string | null
+          last_request_cost?: number | null
+          last_webhook_at?: string | null
+          night_pause?: boolean
+          organization_id: string
+          provider?: string
+          settings?: Json
+          stall_hours?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          credit_reserve?: number
+          last_credit_remaining?: number | null
+          last_credit_reset_at?: string | null
+          last_message_webhook_at?: string | null
+          last_reconcile_at?: string | null
+          last_reconcile_error?: string | null
+          last_request_cost?: number | null
+          last_webhook_at?: string | null
+          night_pause?: boolean
+          organization_id?: string
+          provider?: string
+          settings?: Json
+          stall_hours?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guest_message_channel_state_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      guest_message_outbox: {
+        Row: {
+          attempts: number
+          body: string
+          conversation_id: string
+          created_at: string
+          created_by: string | null
+          error_code: string | null
+          external_id: string | null
+          id: string
+          idempotency_key: string
+          kind: "reply" | "auto"
+          next_try_at: string
+          organization_id: string
+          rule_id: string | null
+          sent_at: string | null
+          status: "queued" | "sending" | "sent" | "uncertain" | "failed" | "cancelled"
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          body: string
+          conversation_id: string
+          created_at?: string
+          created_by?: string | null
+          error_code?: string | null
+          external_id?: string | null
+          id?: string
+          idempotency_key: string
+          kind: "reply" | "auto"
+          next_try_at?: string
+          organization_id: string
+          rule_id?: string | null
+          sent_at?: string | null
+          status?: "queued" | "sending" | "sent" | "uncertain" | "failed" | "cancelled"
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          body?: string
+          conversation_id?: string
+          created_at?: string
+          created_by?: string | null
+          error_code?: string | null
+          external_id?: string | null
+          id?: string
+          idempotency_key?: string
+          kind?: "reply" | "auto"
+          next_try_at?: string
+          organization_id?: string
+          rule_id?: string | null
+          sent_at?: string | null
+          status?: "queued" | "sending" | "sent" | "uncertain" | "failed" | "cancelled"
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guest_message_outbox_conversation_fkey"
+            columns: ["conversation_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "guest_conversations"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "guest_message_outbox_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      guest_messages: {
+        Row: {
+          attachments: Json
+          author_user_id: string | null
+          body: string
+          body_translated: string | null
+          conversation_id: string
+          created_at: string
+          direction: "guest" | "host" | "internal" | "system"
+          external_id: string | null
+          id: string
+          organization_id: string
+          outbox_id: string | null
+          provider: string
+          provider_source: string | null
+          read_at: string | null
+          sent_at: string
+          translated_lang: string | null
+          updated_at: string
+        }
+        Insert: {
+          attachments?: Json
+          author_user_id?: string | null
+          body?: string
+          body_translated?: string | null
+          conversation_id: string
+          created_at?: string
+          direction: "guest" | "host" | "internal" | "system"
+          external_id?: string | null
+          id?: string
+          organization_id: string
+          outbox_id?: string | null
+          provider: string
+          provider_source?: string | null
+          read_at?: string | null
+          sent_at: string
+          translated_lang?: string | null
+          updated_at?: string
+        }
+        Update: {
+          attachments?: Json
+          author_user_id?: string | null
+          body?: string
+          body_translated?: string | null
+          conversation_id?: string
+          created_at?: string
+          direction?: "guest" | "host" | "internal" | "system"
+          external_id?: string | null
+          id?: string
+          organization_id?: string
+          outbox_id?: string | null
+          provider?: string
+          provider_source?: string | null
+          read_at?: string | null
+          sent_at?: string
+          translated_lang?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guest_messages_conversation_fkey"
+            columns: ["conversation_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "guest_conversations"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "guest_messages_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guest_messages_outbox_id_fkey"
+            columns: ["outbox_id"]
+            isOneToOne: false
+            referencedRelation: "guest_message_outbox"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       hourly_rate_history: {
         Row: {
           created_at: string
@@ -7286,6 +7606,24 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      guest_conversation_apply_messages: {
+        Args: {
+          p_conversation_id: string
+          p_guest_at: string | null
+          p_message_at: string | null
+          p_now?: string
+          p_organization_id: string
+          p_reply_at: string | null
+          p_unread_guest_at: string | null
+        }
+        Returns: {
+          last_guest_at: string | null
+          last_message_at: string | null
+          last_reply_at: string | null
+          snooze_until: string | null
+          status: string
+        }[]
+      }
       linen_submit_return: {
         Args: {
           p_building: string

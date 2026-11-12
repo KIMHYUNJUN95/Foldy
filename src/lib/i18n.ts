@@ -4298,6 +4298,9 @@ const FALLBACK_DICTIONARY = {
           "complaint.manage": "Change a complaint’s status (resolved or reopened) and edit or delete complaints written by others.",
           "complaint.comment": "Comment on complaints to share how they’re being handled.",
           "property_info.edit": "Edit each building’s operating info (how to enter, door-lock codes, notes, etc.).",
+          "guest_messages.view": "See the guest message inbox and conversations from Airbnb, Booking.com and other channels. They can’t reply.",
+          "guest_messages.reply": "Reply to guests, leave internal notes, and mark conversations as done or later. Direct bookings can’t be replied to.",
+          "guest_messages.manage": "Manage auto-message rules, saved replies, response targets, and Beds24 usage and inbound status.",
           "ops_admin.access": "See the sales calendar, occupancy, revenue, ledger and automation screens (PC and app). Changing prices also needs “Sales calendar — make changes”.",
           "ops_calendar.write": "On the sales calendar: change prices, minimum stay, blocks and manual bookings, and edit, move or cancel reservations. Changes go straight to Airbnb and Booking.com.",
           "room_links.access": "See, connect and edit each room’s Airbnb and Booking.com listing links.",
@@ -4511,6 +4514,18 @@ const FALLBACK_DICTIONARY = {
           "complaint.comment": {
             label: "Guest feedback — comment",
             desc: "Comment on guest feedback",
+          },
+          "guest_messages.view": {
+            label: "Guest messages — view",
+            desc: "See the OTA guest message inbox",
+          },
+          "guest_messages.reply": {
+            label: "Guest messages — reply",
+            desc: "Reply · internal notes · done · later",
+          },
+          "guest_messages.manage": {
+            label: "Guest messages — manage",
+            desc: "Auto messages · saved replies · response targets · usage",
           },
           "request.delete_any": {
             label: "Requests — delete others'",
@@ -13345,6 +13360,9 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
             "complaint.manage": "컴플레인의 상태를 바꾸고(해결 · 다시 열기) 다른 사람이 쓴 컴플레인도 고치고 지워요.",
             "complaint.comment": "컴플레인에 댓글을 달아 처리 상황을 나눠요.",
             "property_info.edit": "건물별 운영 정보(출입 방법 · 도어락 비밀번호 · 안내사항 등)를 고쳐요.",
+            "guest_messages.view": "Airbnb · Booking.com 같은 손님 메시지함과 대화를 봐요. 답장은 못 해요.",
+            "guest_messages.reply": "손님에게 답장하고, 내부 메모를 남기고, 대화를 「처리 끝」 · 「나중에」로 바꿔요. 직접 예약에는 답장할 수 없어요.",
+            "guest_messages.manage": "자동 안내 규칙 · 정해 둔 문구 · 응답 목표 시간 · Beds24 사용량과 받는 통로 상태를 관리해요.",
             "ops_admin.access": "판매 캘린더 · 가동률 · 매출 · 전표 · 자동화 화면을 봐요(PC · 앱). 가격을 바꾸려면 「판매 캘린더 — 바꾸기」도 필요해요.",
             "ops_calendar.write": "판매 캘린더에서 가격 · 최소 숙박 · 방 막기 · 수기 예약, 예약 수정 · 옮기기 · 취소를 해요. 바꾼 내용은 Airbnb · Booking.com 에 바로 나가요.",
             "room_links.access": "객실별 Airbnb · Booking.com 리스팅 링크를 보고 연결 · 편집해요.",
@@ -13558,6 +13576,18 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
             "complaint.comment": {
               label: "게스트 피드백 — 댓글",
               desc: "게스트 피드백에 댓글",
+            },
+            "guest_messages.view": {
+              label: "손님 메시지 — 보기",
+              desc: "OTA 손님 메시지함 보기",
+            },
+            "guest_messages.reply": {
+              label: "손님 메시지 — 답장",
+              desc: "답장 · 내부 메모 · 처리 끝 · 나중에",
+            },
+            "guest_messages.manage": {
+              label: "손님 메시지 — 관리",
+              desc: "자동 안내 · 정해 둔 문구 · 응답 목표 · 사용량",
             },
             "request.delete_any": {
               label: "요청 — 남의 것 삭제",
@@ -22256,6 +22286,9 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
             "complaint.manage": "クレームの状態を変え（解決・再オープン）、他の人が書いたクレームも編集・削除します。",
             "complaint.comment": "クレームにコメントして対応状況を共有します。",
             "property_info.edit": "建物ごとの運営情報（入り方・ドアロックの暗証番号・案内事項など）を編集します。",
+            "guest_messages.view": "Airbnb · Booking.com などのゲストメッセージ受信箱と会話を見ます。返信はできません。",
+            "guest_messages.reply": "ゲストに返信し、内部メモを残し、会話を「対応済み」「あとで」にします。直接予約には返信できません。",
+            "guest_messages.manage": "自動案内のルール、定型文、応答目標時間、Beds24 の使用量と受信の状態を管理します。",
             "ops_admin.access": "販売カレンダー・稼働率・売上・伝票・自動化の画面を見ます（PC・アプリ）。価格を変えるには「販売カレンダー — 変更」も必要です。",
             "ops_calendar.write": "販売カレンダーで価格・最低泊数・ブロック・手入力予約、予約の修正・移動・取消をします。変更は Airbnb・Booking.com にすぐ反映されます。",
             "room_links.access": "客室ごとの Airbnb・Booking.com のリスティングリンクを見て、連結・編集します。",
@@ -22469,6 +22502,18 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
             "complaint.comment": {
               label: "ゲストフィードバック — コメント",
               desc: "ゲストフィードバックにコメント",
+            },
+            "guest_messages.view": {
+              label: "ゲストメッセージ — 閲覧",
+              desc: "OTA のゲストメッセージ受信箱を見る",
+            },
+            "guest_messages.reply": {
+              label: "ゲストメッセージ — 返信",
+              desc: "返信 · 内部メモ · 対応済み · あとで",
+            },
+            "guest_messages.manage": {
+              label: "ゲストメッセージ — 管理",
+              desc: "自動案内 · 定型文 · 応答目標 · 使用量",
             },
             "request.delete_any": {
               label: "リクエスト — 他の人の分を削除",

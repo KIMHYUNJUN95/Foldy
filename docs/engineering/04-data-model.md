@@ -2493,3 +2493,33 @@ INSERT · UPDATE 신호만, DELETE 는 오지 않는다. 대신 `task_occurrence
 - 함수 `checkin.notify_staff(p_organization_id, p_capability, p_type, p_dedupe_key, p_href, p_payload) returns integer`: 받는 사람을 계산해 알림을 넣고 받는 사람 수를 돌려준다. `callId` · `stayId` 가 둘 다 없으면 오류(`22023`).
 - 함수 `checkin.member_can_receive(org, user, capability)`(받는 사람 규칙) · `checkin.can_take_call(org, user)`(통화를 이어 가도 되는가).
 - `audit_log.action` 추가: `staff_call_started` · `staff_call_accepted` · `staff_call_no_answer` · `staff_call_canceled` · `staff_call_ended`. `meta` 는 `call_id` · `property_key` 만.
+
+## 2026-11-12 손님 메시지 — `guest_conversations` · `guest_messages` · `guest_message_outbox` · `guest_message_channel_state` (`202611120002`, 운영 미적용)
+
+기준 문서: `docs/product/47-guest-messaging.md` §4 · §7. 메시지의 원본은 이 표들이고 Beds24 는 통로(`provider = 'beds24'`) 하나다. 모두 조직 범위 + RLS(05 「손님 메시지」). 하드 삭제 — 조직 · 대화가 지워지면 따라 지워지고, 보관 기간(Q7)이 정해지기 전에는 지우는 작업이 없다.
+
+- `guest_conversations` — 예약(통로 예약 번호) 하나 = 대화 하나. 고유 `(organization_id, provider, provider_booking_id)`.
+  칸: `provider_booking_id`(Beds24 자기 예약 번호 v2 `id`) · `reservation_id` → `reservations`(set null — 예약 행은 웹훅이 다시 만들 수 있다) ·
+  `property_id` → `properties` · `room_id` → `rooms`(set null) · 표시용 `property_name` · `room_label`(정본 이름) · `channel`(airbnb · booking · expedia · agoda · vrbo · direct · other, check 없음) ·
+  `booking_status`(통로 상태 원문) · `check_in_date` · `check_out_date` · `guest_name` · `guest_language` ·
+  `status`(`awaiting` · `done` · `snoozed`, 기본 `done`) · `snooze_until`(`snoozed` 면 필수) · `last_guest_at` · `last_reply_at`(host 메시지만) · `last_message_at`.
+  인덱스: (조직, status, last_guest_at desc) · (조직, last_message_at desc) · reservation · property · room(부분). `(id, organization_id)` 고유 — 하위 표 복합 외래 키 대상.
+- `guest_messages` — 원본. `(conversation_id, organization_id)` → 대화(cascade, 조직 어긋남 막음). `provider` · `external_id`(내부 메모 · 번호 모르는 보낸 줄은 null) ·
+  `provider_source`(통로 출처 원문) · `direction`(`guest` · `host` · `internal` · `system`) · `body`(기본 '') · `body_translated` · `translated_lang` · `sent_at` · `read_at` ·
+  `author_user_id` → `auth.users`(set null) · `attachments` jsonb 배열(`[{ name, mimeType, url, inline }]`, base64 는 저장 안 함) · `outbox_id` → 발송 큐(set null).
+  **고유 제약 `(organization_id, provider, external_id)`**(부분 인덱스가 아니라 제약 — PostgREST upsert 대상, null 끼리는 겹쳐도 됨) · **`outbox_id` 고유**(발송 큐 한 줄 = 메시지 한 줄).
+  인덱스: (대화, sent_at) · (조직, sent_at desc) · author.
+  - **발송 계약**: 2단계 발송 작업은 `sent` 를 저장할 때 메시지 줄을 `outbox_id` 로 upsert 한다 — 되돌아옴 합치기(웹훅이 먼저 옴)가 만든 줄에 잇고 새로 넣지 않는다.
+- `guest_message_outbox` — 발송 큐. `(conversation_id, organization_id)` → 대화(cascade). `kind`(`reply` · `auto`) · `rule_id`(외래 키는 5단계 `auto_message_rules` 때) · `body`(빈 글 금지) ·
+  `status`(`queued` · `sending` · `sent` · `uncertain` · `failed` · `cancelled` — `uncertain` = 요청은 나갔는데 결과를 모름, 다시 보내지 않고 되돌아옴으로 `sent` 확정) · `attempts` · `next_try_at` · `error_code` · `external_id` · `idempotency_key`(고유 `(organization_id, idempotency_key)`) ·
+  `created_by` → `auth.users` · `sent_at`(`sent` 면 필수). 인덱스: 보낼 차례(`status in ('queued','sending')` 부분, next_try_at) · (대화, created_at desc) · external_id(부분) · (조직, status).
+- `guest_message_channel_state` — 조직마다 한 줄(PK `organization_id`). `provider` · `last_webhook_at` · `last_message_webhook_at` · `last_reconcile_at`(한 페이지라도 읽었을 때만) · `last_reconcile_error` ·
+  `last_credit_remaining` · `last_credit_reset_at` · `last_request_cost`(마지막 Beds24 응답 헤더 — **이 기능 화면용 사본**. 계정 전체 기준은 `beds24_sync_locks` 의 `account_credit` 줄: `expires_at` = 리셋 시각, `metadata` = `{ remaining, resetsAt, requestCost, recordedAt, source }`) · `settings` jsonb(기본 `{"responseTargetMinutes": {"inquiry": 30, "request": 30, "staying": 60, "other": 120}}`) ·
+  `night_pause`(기본 false) · `credit_reserve`(기본 20, 0~1000) · `stall_hours`(기본 3, 1~72).
+- 네 표 모두 `updated_at` 트리거(`set_updated_at`).
+- 함수 `guest_conversation_apply_messages(p_conversation_id, p_organization_id, p_guest_at, p_unread_guest_at, p_reply_at, p_message_at, p_now)`: 대화 상태를 한 문장으로 바꾼다
+  (시각은 `greatest` 로만 앞으로, 「답장 기다림」은 새 안 읽은 손님 말이 기존 손님 말 · 답장보다 모두 나중일 때만, 「나중에」 유지 · 해제, 답장 → done). `security definer` · `search_path=''` · 실행 service_role 만. 규칙 문서: 47 §4-0.
+- `beds24_webhook_events.raw_payload` 칸 설명에 손님 메시지 임시 원문 기록(`messages_capture`) 예외를 적었다(47 §3-4).
+- 권한 키 시드: 새 마이그레이션의 insert + `202609100001` 자동 생성 구간(레지스트리 사본, 기존 키 추가 때와 같은 방식).
+- 미룬 표: `auto_message_rules` · `auto_message_runs` · `guest_message_links` · `property_operation_infos` 손님용 칸(47 §10 의 4~6단계).
+- 타입: `src/types/database.ts` 손으로 맞춤(생성 명령은 `npx supabase gen types typescript --linked`, 운영 적용 뒤).

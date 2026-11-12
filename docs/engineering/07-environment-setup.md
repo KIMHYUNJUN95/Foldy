@@ -257,6 +257,7 @@ Usage:
 
 - `BEDS24_WEBHOOK_SECRET`: verify incoming webhook requests if supported/configured
 - `BEDS24_PRICE_WEBHOOK_FORWARD_URL`: 선택. 받은 Beds24 배달을 그대로 넘길 주소(줄바꿈/쉼표로 여러 개). **미설정이 기본이고 그때는 아무 데도 넘기지 않는다.** 전환기에만 쓴다 — 아래 「Beds24 재고(가격) 웹훅 전환」 참고
+- `BEDS24_WEBHOOK_CAPTURE_MESSAGES`: 선택 · **임시**(2026-11-12, `docs/product/47-guest-messaging.md` §3-4 V1). `1` 이면 손님 메시지(`messages` 배열)가 실린 예약 웹훅 원문을 `beds24_webhook_events.raw_payload` 에 남긴다(모드 `messages_capture`, 첨부는 길이만 · 6만 자 상한). 기본 꺼짐. **끄는 법**: 이 환경변수를 지우고 재배포 → 사용자 컨펌 뒤 SQL Editor 에서 `delete from public.beds24_webhook_events where 'messages_capture' = any(modes) and failed_count = 0;`(원문에 손님 개인정보가 있다 — 47 §3-4)
 - `BEDS24_API_BASE_URL`: Beds24 API base URL
 - `BEDS24_API_TOKEN`: short-lived Beds24 access token for direct inventory/property calls
 - `BEDS24_API_REFRESH_TOKEN`: long-lived Beds24 refresh token used to mint access tokens when `BEDS24_API_TOKEN` is unset or expired

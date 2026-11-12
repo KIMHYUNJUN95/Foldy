@@ -1064,4 +1064,4 @@ FBManual-Phone · FBCx-Phone · FBNew-Phone · FBNewConfirm-Phone · FBRooms-Pho
 ## 손님 메시지에서 만들기 (2026-11-13, 커밋 전)
 
 - 손님 메시지 대화의 「업무 만들기 → 게스트 피드백」이 피드백을 만든다 — 기존 `createComplaint` 그대로(`complaint.write` 를 스스로 확인, `submissionId` 중복 막기). 메시지를 보려면 `guest_messages.view` 도 필요. 플랫폼 = 대화 채널(Airbnb · Booking.com · 직접, 그 밖 = 기타), 건물 · 방 · 예약 · 손님 이름 = 대화 값. 손님 사진은 옮기지 않는다.
-- 상세(PC 패널 · 모바일)에 「손님 메시지에서」 링크(`guest_messages.view` 가 있을 때만). PC 패널 `ComplaintDetailPanel` 이 `locale` 을 받는다. 해결(`resolved`)되면 그 대화에 「해결됐어요」 초안(보내지 않음). 문서 47 §6-4 · §5-7. 링크는 `guest_message_links`(202611130005, 미적용).
+- 상세(PC 패널 · 모바일)에 「손님 메시지에서」 링크(`guest_messages.view` 가 있을 때만). PC 패널 `ComplaintDetailPanel` 이 `locale` 을 받는다. 해결(`resolved`)되면 그 대화에 「해결됐어요」 초안(보내지 않음). 문서 47 §6-4 · §5-7. 링크는 `guest_message_links`(202611130005, 운영 적용 2026-11-13).

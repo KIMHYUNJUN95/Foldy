@@ -1,7 +1,7 @@
 # 47. 손님 메시지 (Beds24 CS) — 기획
 
 > 상태: **1단계 커밋 · 운영 DB 적용(2026-11-12) · 2~6단계(메시지함 · 답장 · 번역 · 정해 둔 문구 · 건물 정보 · 자동 안내 · 메시지 → 업무) 구현 — 커밋 전**(2026-11-13). **실제 Beds24 발송은 `GUEST_MESSAGES_SEND_ENABLED=1` 일 때만(기본 꺼짐).** 정기 실행(보정 조회 15분 · 발송 5분 · 자동 안내 5분)은 Supabase pg_cron 마이그레이션 `202611130006` 으로 준비만(미적용). 과거 메시지 가져오기는 정기 실행 없음.
-> 2~6단계 마이그레이션 `202611130001` → `0002` → `0003` → `0004` → `0005`(이 순서로, 코드 배포보다 먼저) · 정기 실행 `202611130006`(코드 배포 뒤) — **모두 어디에도 적용 안 함**(운영 적용은 사용자 허락 뒤). 202611120002(운영 적용됨)는 고치지 않는다.
+> 2~6단계 마이그레이션 `202611130001` → `0002` → `0003` → `0004` → `0005`(이 순서로, 코드 배포보다 먼저) · 정기 실행 `202611130006`(코드 배포 뒤) — `0001`~`0005` **운영 적용 2026-11-13**(사용자 SQL Editor) · `0006` 은 아직 미적용(코드 배포 뒤, 사용자 허락 뒤). 202611120002(운영 적용됨)는 고치지 않는다.
 > 마이그레이션 `supabase/migrations/202611120002_guest_messages_foundation.sql` — **운영 적용 2026-11-12**(Dashboard SQL Editor, 표 4 · RLS 4 · 정책 6 · 함수 1 · 권한 8행 확인)
 > 시안 캔버스: https://claude.ai/artifact/EPUHqKjNJKC5ezeqG5WuVn (PC 메시지함 · 답장 칸 상태 · 폰/폴드/태블릿 · 자동 안내 규칙 · ja/en)
 > 관련 문서: 15 예약 캘린더(건물 정보) · 08 수리 · 09 분실물 · 25 게스트 피드백 · 28 할 일 · 43~46 셀프 체크인 · 33 Beds24 쓰기 · 05 RLS · 04 데이터 모델
@@ -155,7 +155,7 @@ Beds24 예약 웹훅 ──▶ /api/beds24/webhook (기존) ──▶ 메시지 
   `GET /bookings/messages?maxAge=999&page=N`(거르지 않음 — 읽음 · 안 읽음 · 모든 채널), 한 번 실행에 최대 10페이지(라우트는 20까지) · **시간 예산 240초**. 다시 부르면 이어 받는다.
 - **조직 하나 기준**으로 계정 전체를 훑는다. 예약 → 조직은 **매핑 · 그 예약의 기존 대화로만** 정한다 — 보정 조회와 달리 **`BEDS24_DEFAULT_ORGANIZATION_ID` 기본값은 쓰지 않는다**
   (몇 년치를 엉뚱한 조직에 넣지 않게). 매핑 없음 · 다른 조직 · 엇갈림은 넣지 않고 `unrouted_count` 로만 센다(로그에는 예약 번호만). 조직이 둘 이상이면 조직마다 따로 돌린다(크레딧도 따로 든다).
-- 진행: `guest_message_backfill_state`(조직마다 한 줄 — 마이그레이션 `202611130002`, **운영 미적용**). `status` idle · running · paused · done · failed,
+- 진행: `guest_message_backfill_state`(조직마다 한 줄 — 마이그레이션 `202611130002`, 운영 적용 2026-11-13). `status` idle · running · paused · done · failed,
   `next_page` 커서, 페이지 · 가져옴 · 이미 있음 · 못 넣음 · 실패 예약 수, `page_attempts` · `failed_booking_ids`, 시작 · 끝 · 마지막 실행 시각, `last_error`, `resume_after`(429 · 저크레딧 때 리셋 시각).
 - **실행 소유**: DB 함수 `guest_message_backfill_claim()` 이 한 문장으로 잡고 새 `run_id` 를 준다. 모든 상태 쓰기는 `status = 'running' and run_id = 내 번호` 조건이고,
   페이지마다 lease(120초, 함수 쪽 상한 300초)를 늘린다. lease 가 지나 다른 실행이 잡으면 앞 실행의 쓰기는 0행 → 그 실행은 바로 멈춘다(`lost_lease`). 끝난 것은 `restart` 일 때만 1페이지부터 다시.
@@ -306,7 +306,7 @@ Beds24 예약 웹훅 ──▶ /api/beds24/webhook (기존) ──▶ 메시지 
 
 | 파일 | 하는 일 |
 | --- | --- |
-| `supabase/migrations/202611130004_guest_messages_auto.sql`(**미적용**) | 표 `auto_message_rules`(규칙) · `auto_message_runs`(규칙 × 예약 한 줄, `UNIQUE(rule_id, provider, provider_booking_id)`) · 발송 큐 `rule_id` 외래 키 · 서버 전용 함수 `guest_message_enqueue_auto`(줄 잠금 → `scheduled` 일 때만 큐 + 대기 줄, 멱등 키 `auto:<run id>`) |
+| `supabase/migrations/202611130004_guest_messages_auto.sql`(운영 적용 2026-11-13) | 표 `auto_message_rules`(규칙) · `auto_message_runs`(규칙 × 예약 한 줄, `UNIQUE(rule_id, provider, provider_booking_id)`) · 발송 큐 `rule_id` 외래 키 · 서버 전용 함수 `guest_message_enqueue_auto`(줄 잠금 → `scheduled` 일 때만 큐 + 대기 줄, 멱등 키 `auto:<run id>`) |
 | `src/lib/guest-messages/auto-model.ts` | 순수 — 보낼 시각(도쿄 `+09:00`, 달 · 해 · 윤년) · 규칙 검사 · 대상 판정 · 변수 채우기(손님 언어, 그 밖 = 영어) · 계획 `planAutoRun()` · 화면 상태 |
 | `src/lib/guest-messages/auto-scheduler.ts` | 계획 바퀴 `runAutoMessagePlanner()`(오늘 ± 32일 예약 × 켜진 규칙) · 보낼 시각이 된 줄 큐에 넣기 · 웹훅 뒤 계획만 `planAutoMessagesAfterWebhook()`(켜 둔 규칙이 있는 조직만 — 하나도 없으면 예약을 읽지 않고 끝남) |
 | `src/lib/guest-messages/auto-rules-server.ts` · `src/app/admin/messages/auto-actions.ts` | 규칙 만들기 · 고치기(버전 충돌) · 켜기 · 지우기 · 미리 보기 · 보낼 예정 목록 · 예약 하나 멈추기 |
@@ -346,7 +346,7 @@ Beds24 예약 웹훅 ──▶ /api/beds24/webhook (기존) ──▶ 메시지 
 
 | 파일 | 하는 일 |
 | --- | --- |
-| `supabase/migrations/202611130005_guest_message_links.sql`(**미적용**) | 표 `guest_message_links`(대화 ↔ 업무, `unique (organization_id, target_type, target_id)` · 대화 · 메시지 · 업무가 같은 조직인지 보는 트리거) · `guest_message_saved_replies.purpose`(`'resolved'`, 조직마다 하나 — 부분 고유 인덱스) · 서버 전용 함수 `guest_message_set_resolved_reply` |
+| `supabase/migrations/202611130005_guest_message_links.sql`(운영 적용 2026-11-13) | 표 `guest_message_links`(대화 ↔ 업무, `unique (organization_id, target_type, target_id)` · 대화 · 메시지 · 업무가 같은 조직인지 보는 트리거) · `guest_message_saved_replies.purpose`(`'resolved'`, 조직마다 하나 — 부분 고유 인덱스) · 서버 전용 함수 `guest_message_set_resolved_reply` |
 | `src/lib/guest-messages/task-link-model.ts` | 순수 — 만들 수 있는 종류(`creatableKinds`) · 미리 채움(`buildTaskPrefill`) · 업무 상태 → 줄(`linkTargetState`) · 「해결됐어요」 고르기(`pickResolvedLink`) · 상세 주소(`linkTargetHref`) |
 | `src/lib/guest-messages/task-link-server.ts` · `reply-context-server.ts` | 대화를 열 때 링크 + 업무 상태 읽기(트리거 · 알림 없음) · 링크 넣기(같은 대화로 다시 오면 그대로 성공, 다른 대화면 `conflict`) · 업무 → 대화 · 「해결됐어요」 초안 글 |
 | `src/actions/guest-message-tasks.ts` | 공용 서버 액션 — `getTaskFormContext` · `createTaskFromGuestMessage` · `getGuestMessageLinkForTarget`(거부는 `forbidden`, redirect 없음) |
@@ -427,9 +427,9 @@ Beds24 예약 웹훅 ──▶ /api/beds24/webhook (기존) ──▶ 메시지 
 - 발송 큐 상태에 `uncertain`(나갔는지 모름 — 다시 보내지 않음)을 더했다. 연결 상태에 `last_reconcile_error` 를 더했다.
 - 대화 상태는 DB 함수 `guest_conversation_apply_messages` 로만 바꾼다(서버 경로).
 - 설정은 새 표 `guest_message_channel_state`(조직마다 한 줄)에: 응답 목표는 `settings.responseTargetMinutes`(jsonb, 기본 문의 30 · 요청 30 · 숙박 중 60 · 그 밖 120), `night_pause` · `credit_reserve`(20) · `stall_hours`(3) 은 칸.
-- **6단계**(`202611130005_guest_message_links.sql`, **미적용**): `guest_message_links`(organization_id · conversation_id → 대화 cascade · message_id → 메시지 set null · target_type maintenance/lost_found/task/complaint · target_id(외래 키 없음 — 업무 표가 여럿, 지워지면 화면이 「지워짐」) · created_by · created_at, `unique (organization_id, target_type, target_id)`, 트리거 `guest_message_links_check` 가 대화 · 메시지의 조직을 다시 봄, 읽기 = `guest_messages.view`, 쓰기 = 서버만) · `guest_message_saved_replies.purpose`(`resolved` 하나, 조직마다 하나).
-- **5단계**(`202611130004_guest_messages_auto.sql`, **미적용**): `auto_message_rules`(읽기 = `guest_messages.manage`, 쓰기 = 서버만, 글이 바뀔 때만 `updated_at` · 켤 때 `enabled_at`) · `auto_message_runs`(읽기 = `guest_messages.view`, 쓰기 = 서버만, 상태 scheduled/skipped/paused/queued/sent/failed/cancelled + `skip_reason` · `missing_variables`) · `guest_message_outbox.rule_id` 외래 키(set null) · 서버 전용 함수 `guest_message_enqueue_auto`. 칸 목록은 04 「손님 메시지」.
-- **3 · 4단계**(`202611130003_guest_messages_stage3_4.sql`, **미적용**): `property_operation_infos.guest_info` jsonb(기본 `{}`, 객체 · 64KB 이하) + `guest_info_updated_at` + `staff_info_saved` · 트리거 `property_operation_infos_touch()`(직원 칸이 바뀌면 `updated_at` + `staff_info_saved = true`, 손님 칸이 바뀌면 `guest_info_updated_at` 만) · 새 표 `guest_message_saved_replies`(제목 · 언어별 본문 · 순서 · 만든 사람, 읽기 = `guest_messages.view`, 쓰기 = 서버만, 글이 바뀔 때만 `updated_at`) · 서버 전용 함수 `guest_message_claim_manual_check` · `guest_message_save_settings` · `guest_message_saved_replies_reorder`.
+- **6단계**(`202611130005_guest_message_links.sql`, 운영 적용 2026-11-13): `guest_message_links`(organization_id · conversation_id → 대화 cascade · message_id → 메시지 set null · target_type maintenance/lost_found/task/complaint · target_id(외래 키 없음 — 업무 표가 여럿, 지워지면 화면이 「지워짐」) · created_by · created_at, `unique (organization_id, target_type, target_id)`, 트리거 `guest_message_links_check` 가 대화 · 메시지의 조직을 다시 봄, 읽기 = `guest_messages.view`, 쓰기 = 서버만) · `guest_message_saved_replies.purpose`(`resolved` 하나, 조직마다 하나).
+- **5단계**(`202611130004_guest_messages_auto.sql`, 운영 적용 2026-11-13): `auto_message_rules`(읽기 = `guest_messages.manage`, 쓰기 = 서버만, 글이 바뀔 때만 `updated_at` · 켤 때 `enabled_at`) · `auto_message_runs`(읽기 = `guest_messages.view`, 쓰기 = 서버만, 상태 scheduled/skipped/paused/queued/sent/failed/cancelled + `skip_reason` · `missing_variables`) · `guest_message_outbox.rule_id` 외래 키(set null) · 서버 전용 함수 `guest_message_enqueue_auto`. 칸 목록은 04 「손님 메시지」.
+- **3 · 4단계**(`202611130003_guest_messages_stage3_4.sql`, 운영 적용 2026-11-13): `property_operation_infos.guest_info` jsonb(기본 `{}`, 객체 · 64KB 이하) + `guest_info_updated_at` + `staff_info_saved` · 트리거 `property_operation_infos_touch()`(직원 칸이 바뀌면 `updated_at` + `staff_info_saved = true`, 손님 칸이 바뀌면 `guest_info_updated_at` 만) · 새 표 `guest_message_saved_replies`(제목 · 언어별 본문 · 순서 · 만든 사람, 읽기 = `guest_messages.view`, 쓰기 = 서버만, 글이 바뀔 때만 `updated_at`) · 서버 전용 함수 `guest_message_claim_manual_check` · `guest_message_save_settings` · `guest_message_saved_replies_reorder`.
 
 기획 때의 초안 표(칸 이름 · 상태 목록)는 **위 실제 마이그레이션으로 대체됐다** — 초안과 달라진 곳: 발송 큐 상태에 `uncertain`, 자동 안내 트리거는 `day_of_checkin`, `auto_message_runs` 는 `(rule_id, provider, provider_booking_id)` 고유(방 나눔 사본이 있어도 예약 하나에 한 번), 설정 · 연결 상태는 `guest_message_channel_state` 한 표. 칸 목록의 기준은 `docs/engineering/04-data-model.md` 「손님 메시지」.
 
@@ -467,9 +467,9 @@ Beds24 예약 웹훅 ──▶ /api/beds24/webhook (기존) ──▶ 메시지 
 | 1 | 수신(웹훅 추출 · 보정 조회 · 중복 막기) + 데이터 모델 + 어댑터 골격 — **구현 2026-11-12**(§4-0, 화면 없음 · 운영 DB 적용 2026-11-12 · 보정 조회 정기 실행은 `202611130006` pg_cron 15분(미적용)) |
 | 2 | PC 메시지함 · 모바일 3폭 · 답장 · 발송 큐 · 429 대기 · 내부 메모 · 처리 끝 — **구현 2026-11-13**(§5-4, 커밋 전 · 발송 플래그 기본 꺼짐 · `translation_usage` 마이그레이션 미적용) |
 | 3 | 응답 목표 시간 · 사용량 표시 — **구현 2026-11-13**(§5-5, 커밋 전) |
-| 4 | 건물별 정보 카드 · 정해 둔 문구 — **구현 2026-11-13**(§5-5, 커밋 전 · 마이그레이션 `202611130003` 미적용) |
-| 5 | 자동 안내 규칙 · 보낼 예정 목록 — **구현 2026-11-13**(§5-6, 마이그레이션 `202611130004` 미적용 · 정기 실행은 `202611130006` pg_cron 5분(미적용)) |
-| 6 | 메시지 → 업무 한 번에 — **구현 2026-11-13**(§5-7, 마이그레이션 `202611130005` 미적용) |
+| 4 | 건물별 정보 카드 · 정해 둔 문구 — **구현 2026-11-13**(§5-5, 커밋 전 · 마이그레이션 `202611130003` 운영 적용 2026-11-13) |
+| 5 | 자동 안내 규칙 · 보낼 예정 목록 — **구현 2026-11-13**(§5-6, 마이그레이션 `202611130004` 운영 적용 2026-11-13 · 정기 실행은 `202611130006` pg_cron 5분(미적용)) |
+| 6 | 메시지 → 업무 한 번에 — **구현 2026-11-13**(§5-7, 마이그레이션 `202611130005` 운영 적용 2026-11-13) |
 | 정기 실행 | 보정 조회 · 발송 · 자동 안내 pg_cron — **준비 2026-11-13**(`202611130006` 미적용, `src/lib/guest-messages/cron-auth.ts`) |
 | 운영 반영 | **확정 (2026-11-12 사용자)** 순서: ① 마이그레이션 `202611130001` → `0005` 운영 적용(코드보다 먼저) ② 코드 배포 ③ 정기 실행 `202611130006` 적용(라우트가 pg_cron 토큰을 받는 코드가 나간 뒤 — Supabase pg_cron: 보정 조회 15분 · 발송 5분 · 자동 안내 5분) ④ 과거 가져오기 재기 모드 → 실제 가져오기는 밤에(동기화와 크레딧을 나눠 씀) ⑤ 실제 OTA 예약 하나로 답장 시험 뒤에만 `GUEST_MESSAGES_SEND_ENABLED=1`. 알고 둔 점: 발송 플래그는 SQL 이 모르므로, 꺼져 있는 동안에도 보낼 시각이 된 queued 줄이 있으면 발송 잡이 5분마다 라우트를 부르고 라우트는 202 로 끝난다(크레딧 안 씀, 07). 모두 사용자 허락 뒤 |
 | 나중 | AI 답장 초안(AI 기능 때) · 푸시 알림(알림 일괄 구현 때) · 이메일 어댑터(직접 예약 손님) · OTA 직접 연동 |

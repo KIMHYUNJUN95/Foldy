@@ -1821,7 +1821,7 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
   상태 함수(새 손님 말 → awaiting · 같은 말 다시 와도 직원 done 유지 · 시각 뒤로 안 감 · 더 새 말이면 다시 엶 · 답장 → done · 「나중에」 유지/해제 · 다른 조직 id 면 0행), `raw_payload` 칸 설명.
   Supabase 실제 프로젝트에서는 아직 안 돌려 봤다. 운영 미적용 — 적용은 사용자 컨펌.
 
-## 2026-11-13 손님 메시지 2단계 — 서버 액션 권한 · 새 표 · 함수 (`202611130001_guest_messages_stage2`, 적용 안 함)
+## 2026-11-13 손님 메시지 2단계 — 서버 액션 권한 · 새 표 · 함수 (`202611130001_guest_messages_stage2`, 운영 적용 2026-11-13)
 
 - 화면 쓰기는 모두 서버 액션 `src/actions/guest-messages.ts`(service_role + `organization_id` 조건). 읽기 · 번역 = `guest_messages.view`, 답장 · 내부 메모 · 처리 끝 · 나중에 · 큐 고치기/취소/다시 보내기 = `view` **와** `reply`. 관리자 웹 권한은 따로 요구하지 않는다(알바 개인 부여 — 47 §8). 다른 조직 대화 id 는 `not_found`. 읽기(목록 · 대화)는 발송 작업을 걸지 않는다(부작용 없음).
 - 대화의 작성자 이름은 그 조직 `memberships` 에 있는 사람만 profiles 에서 읽는다.
@@ -1831,7 +1831,7 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 - 메뉴 숫자(`countAwaitingConversations`)는 RLS 서버 클라이언트로 센다 — 볼 권한이 없으면 0.
 - 발송 작업 경로 `/api/guest-messages/outbox` 는 `CRON_SECRET` 또는 pg_cron 토큰(Vault `guest_messages_cron_token` — 라우트는 `guest_messages_cron_token_ok()` 로 맞는지만 묻는다, `src/lib/guest-messages/cron-auth.ts`) Bearer 만(둘 다 없으면 404).
 
-## 2026-11-13 손님 메시지 3 · 4단계 — 정해 둔 문구 · 건물 손님용 정보 · 설정 (`202611130003_guest_messages_stage3_4`, 적용 안 함)
+## 2026-11-13 손님 메시지 3 · 4단계 — 정해 둔 문구 · 건물 손님용 정보 · 설정 (`202611130003_guest_messages_stage3_4`, 운영 적용 2026-11-13)
 
 - `guest_message_saved_replies`: RLS 켬. `anon` · `authenticated` 권한을 모두 거두고 `authenticated` 에 SELECT 만. 정책은 읽기 하나 「guest saved replies: viewers can read」 — `(select is_platform_admin()) or has_capability(organization_id, (select auth.uid()), 'guest_messages.view')`. 넣기 · 고치기 · 지우기 정책 없음 — 서버(service_role)만.
 - `property_operation_infos.guest_info` · `guest_info_updated_at`: 표의 기존 RLS · 권한 그대로(읽기 · 쓰기 규칙 바뀌지 않음). 화면 저장은 서버 액션 `saveBuildingGuestInfoAction`(`src/app/admin/calendar/actions.ts`, `property_info.edit`) → service_role + `organization_id` 조건 + 본 버전(`guest_info_updated_at`) 조건.
@@ -1840,7 +1840,7 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 - 답장 칸 넣기 목록의 **출입 코드**는 `guest_messages.manage` 또는 `property_info.edit` 만(확정 2026-11-12 — 47 §6-3 · Q9). 건물 손님용 정보 패널 액션(읽기 · 저장 · 충돌)은 코드 값을 돌려주지 않고 개수만.
 - 확인(로컬 Postgres, 2026-11-13): owner · cs · pt 세 계정 모두 `authenticated` 로 넣기 거부(42501), 본문 없는 줄 거부(23514), pt(보기 권한 없음) 읽기 0행. 트리거: 손님 칸만 바꾸면 `updated_at` 그대로 · 직원 칸만 바꾸면 `guest_info_updated_at` 그대로. 운영 미적용.
 
-## 2026-11-13 손님 메시지 5단계 자동 안내 — `auto_message_rules` · `auto_message_runs` (`202611130004_guest_messages_auto`, 적용 안 함)
+## 2026-11-13 손님 메시지 5단계 자동 안내 — `auto_message_rules` · `auto_message_runs` (`202611130004_guest_messages_auto`, 운영 적용 2026-11-13)
 
 - 두 표 모두 RLS 켬. `anon` · `authenticated` 권한을 거두고 `authenticated` 에 SELECT 만. 넣기 · 고치기 · 지우기 정책 없음 — 서버(service_role)만.
   - `auto_message_rules` 읽기: `(select is_platform_admin()) or has_capability(organization_id, (select auth.uid()), 'guest_messages.manage')`(규칙 글에 출입 코드 변수가 들어가므로 관리만).
@@ -1852,7 +1852,7 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 - 대화 · 목록의 자동 안내 출입 코드(확정 2026-11-12 — 47 Q10): `guest_messages.manage` 또는 `property_info.edit` 가 없으면 서버가 「••••」로 가려서 싣는다. 자동 안내 큐 줄 고치기 · 취소 · 다시 보내기(`src/actions/guest-messages.ts`)는 `guest_messages.manage` 만, 아니면 `forbidden`.
 - 확인(로컬 Postgres, 2026-11-13): owner = 규칙 · 실행 줄 읽음, cs(보기 · 답장) = 실행 줄만(규칙 0행), pt = 둘 다 0행. 세 계정 모두 `authenticated` 로 넣기 · 고치기 · 함수 실행 거부(42501). 함수 두 번 = 큐 한 줄, 다른 조직 id = false, 고유 키 23505, 트리거별 날 수 검사 23514. 운영 미적용.
 
-## 2026-11-13 손님 메시지 과거 가져오기 — `guest_message_backfill_state` (`202611130002_guest_messages_backfill`, 적용 안 함)
+## 2026-11-13 손님 메시지 과거 가져오기 — `guest_message_backfill_state` (`202611130002_guest_messages_backfill`, 운영 적용 2026-11-13)
 
 - RLS 켬. `anon` · `authenticated` 권한을 모두 거두고 `authenticated` 에 SELECT 만 준다. 정책은 읽기 하나:
   `(select is_platform_admin()) or has_capability(organization_id, (select auth.uid()), 'guest_messages.manage')`. 넣기 · 고치기 · 지우기 정책 · 권한 없음 — 서버(service_role)만 쓴다.
@@ -1865,7 +1865,7 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 - 확인: 로컬 PGlite 에 `202611120002` + 이 파일을 적용(두 번 돌려도 됨)하고 `SET ROLE` 로 26가지 — service_role 잡기 · `run_id` 받기 · lease 300초 상한 · lease 중 다시 잡기 빈 결과 · lease 지난 뒤 잡기(새 `run_id`) · 앞 실행 `run_id` 쓰기 0행 · done 은 restart 만 · restart 커서 · 실패 기록 초기화,
   owner 자기 조직 줄만 읽기, cs_staff(관리 없음) 0행, 다른 조직 owner 는 자기 줄만, authenticated 의 넣기 · 고치기 · 지우기 · 함수 실행 거부, anon 읽기 · 함수 거부, status 체크. 운영 미적용.
 
-## 2026-11-13 손님 메시지 6단계 — `guest_message_links` (`202611130005_guest_message_links`, 적용 안 함)
+## 2026-11-13 손님 메시지 6단계 — `guest_message_links` (`202611130005_guest_message_links`, 운영 적용 2026-11-13)
 
 - RLS 켬. 읽기 정책 하나: `is_platform_admin()` 또는 `has_capability(organization_id, auth.uid(), 'guest_messages.view')`. 넣기 · 고치기 · 지우기 정책 없음 — `authenticated` 는 `select` 만 GRANT, 쓰기는 service_role(서버 액션 `createTaskFromGuestMessage`)만. 로컬 Postgres 확인: 대표 · CS 읽기 4줄, 알바 0줄, 셋 다 넣기 42501.
 - 트리거 `guest_message_links_check`(security invoker, `search_path = ''`, 실행 권한 회수)가 대화 · 메시지 · 업무(종류마다 그 표)의 조직을 다시 본다 — 서비스 키 경로의 실수로 다른 조직 대화 · 업무에 붙지 않게(23514).

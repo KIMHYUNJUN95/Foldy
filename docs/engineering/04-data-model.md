@@ -1931,7 +1931,7 @@ Constraints / behavior:
   (42P01 · PGRST205). Other read errors surface as `loadFailed` (no stale seed codes). Saves are conditional on the
   `updated_at` seen when editing started (`null` = insert only if absent); a mismatch returns `conflict` + the current row.
   Rules: `src/lib/property-operation-info-rules.ts`.
-- **2026-11-13 (`202611130003`, 미적용):** `guest_info jsonb` + `guest_info_updated_at` — guest-facing building info for guest messages (doc 47 §6-3). Separate version column so staff-field saves and guest-info saves never conflict with each other; see 「손님 메시지 3 · 4단계」 below.
+- **2026-11-13 (`202611130003`, 운영 적용 2026-11-13):** `guest_info jsonb` + `guest_info_updated_at` — guest-facing building info for guest messages (doc 47 §6-3). Separate version column so staff-field saves and guest-info saves never conflict with each other; see 「손님 메시지 3 · 4단계」 below.
 
 ## 2026-08-03 `attendance_correction_requests` — 철회 상태 추가
 
@@ -2522,10 +2522,10 @@ INSERT · UPDATE 신호만, DELETE 는 오지 않는다. 대신 `task_occurrence
   (시각은 `greatest` 로만 앞으로, 「답장 기다림」은 새 안 읽은 손님 말이 기존 손님 말 · 답장보다 모두 나중일 때만, 「나중에」 유지 · 해제, 답장 → done). `security definer` · `search_path=''` · 실행 service_role 만. 규칙 문서: 47 §4-0.
 - `beds24_webhook_events.raw_payload` 칸 설명에 손님 메시지 임시 원문 기록(`messages_capture`) 예외를 적었다(47 §3-4).
 - 권한 키 시드: 새 마이그레이션의 insert + `202609100001` 자동 생성 구간(레지스트리 사본, 기존 키 추가 때와 같은 방식).
-- 1단계 뒤에 더한 것(모두 **미적용**, 아래 날짜 구역): 2단계 `202611130001` · 건물 손님 칸 · 정해 둔 문구 `202611130003` · 자동 안내 `auto_message_rules` · `auto_message_runs` `202611130004` · 메시지 → 업무 `guest_message_links` `202611130005` · 정기 실행 함수 · pg_cron 잡 `202611130006`(표 없음 — Vault 시크릿 2개 · 함수 `guest_messages_cron_token_ok` · `guest_messages_cron_fire` · 잡 `guest-messages-reconcile` 15분 · `guest-messages-outbox` 5분 · `guest-messages-auto` 5분, 07 「손님 메시지 정기 실행」).
+- 1단계 뒤에 더한 것(`202611130001`~`0005` 운영 적용 2026-11-13, `202611130006` 미적용, 아래 날짜 구역): 2단계 `202611130001` · 건물 손님 칸 · 정해 둔 문구 `202611130003` · 자동 안내 `auto_message_rules` · `auto_message_runs` `202611130004` · 메시지 → 업무 `guest_message_links` `202611130005` · 정기 실행 함수 · pg_cron 잡 `202611130006`(표 없음 — Vault 시크릿 2개 · 함수 `guest_messages_cron_token_ok` · `guest_messages_cron_fire` · 잡 `guest-messages-reconcile` 15분 · `guest-messages-outbox` 5분 · `guest-messages-auto` 5분, 07 「손님 메시지 정기 실행」).
 - 타입: `src/types/database.ts` 손으로 맞춤(생성 명령은 `npx supabase gen types typescript --linked`, 운영 적용 뒤).
 
-## 2026-11-13 손님 메시지 2단계 (`202611130001_guest_messages_stage2.sql`, **어디에도 적용 안 함**)
+## 2026-11-13 손님 메시지 2단계 (`202611130001_guest_messages_stage2.sql`, 운영 적용 2026-11-13)
 
 기준 문서: `docs/product/47-guest-messaging.md` §5-4 · §9. 202611120002(운영 적용됨)는 고치지 않고, 바뀌는 것은 모두 이 파일에 둔다.
 
@@ -2539,7 +2539,7 @@ INSERT · UPDATE 신호만, DELETE 는 오지 않는다. 대신 `task_occurrence
 - 함수 `guest_conversation_apply_messages` 다시 정의 — 끝난 「나중에」(`snoozed` · `snooze_until <= p_now`)에 답장이 오면 `awaiting` 처럼 `done` + `snooze_until` 비움.
 - 새 표 · 함수는 모두 service_role 만(RLS 켬 · 정책 없음 · anon/authenticated 권한 없음, 05).
 
-## 2026-11-13 손님 메시지 과거 가져오기 — `guest_message_backfill_state` (`202611130002_guest_messages_backfill.sql`, **어디에도 적용 안 함**)
+## 2026-11-13 손님 메시지 과거 가져오기 — `guest_message_backfill_state` (`202611130002_guest_messages_backfill.sql`, 운영 적용 2026-11-13)
 
 기준 문서: `docs/product/47-guest-messaging.md` §4-0-2(2026-11-12 결정: 과거 메시지 999일 전부).
 
@@ -2552,7 +2552,7 @@ INSERT · UPDATE 신호만, DELETE 는 오지 않는다. 대신 `task_occurrence
 - 하드 삭제 — 조직이 지워지면 따라 지워진다. 보관 기간(Q7)은 아직 열려 있다.
 - 타입: `src/types/database.ts` 손으로 맞춤(표 + 함수).
 
-## 2026-11-13 손님 메시지 3 · 4단계 (`202611130003_guest_messages_stage3_4.sql`, **어디에도 적용 안 함**)
+## 2026-11-13 손님 메시지 3 · 4단계 (`202611130003_guest_messages_stage3_4.sql`, 운영 적용 2026-11-13)
 
 기준 문서: `docs/product/47-guest-messaging.md` §5-5 · §6-3.
 
@@ -2564,7 +2564,7 @@ INSERT · UPDATE 신호만, DELETE 는 오지 않는다. 대신 `task_occurrence
 - `guest_message_saved_replies` — 정해 둔 문구. `id` · `organization_id`(→ organizations, cascade) · `title`(1~80) · `body_ko` · `body_ja` · `body_en`(각 ≤ 2,000, 하나 이상 비어 있지 않음) · `sort_order`(0~100000) · `created_by`(→ auth.users, set null) · `created_at` · `updated_at`(트리거 `guest_message_saved_replies_touch` — 제목 · 본문이 바뀔 때만, 순서만 바뀌면 그대로; 앱은 고치기 저장을 이 값 조건으로). 인덱스 `(organization_id, sort_order)`. 조직마다 200개(앱). 하드 삭제.
 - 타입: `src/types/database.ts` 손으로 맞춤.
 
-## 2026-11-13 손님 메시지 5단계 자동 안내 — `auto_message_rules` · `auto_message_runs` (`202611130004_guest_messages_auto.sql`, **어디에도 적용 안 함**)
+## 2026-11-13 손님 메시지 5단계 자동 안내 — `auto_message_rules` · `auto_message_runs` (`202611130004_guest_messages_auto.sql`, 운영 적용 2026-11-13)
 
 기준 문서: `docs/product/47-guest-messaging.md` §5-3 · §5-6. 적용 순서: `202611130001` → `0002` → `0003` → `0004`.
 
@@ -2574,7 +2574,7 @@ INSERT · UPDATE 신호만, DELETE 는 오지 않는다. 대신 `task_occurrence
 - 함수 `guest_message_enqueue_auto(org, run_id, conversation_id, provider, body, now)` → `(outbox_id, enqueued)`: `security definer` · `search_path = ''` · 실행 service_role 만. 실행 줄을 잠그고 `scheduled` 이고 `paused_at` 이 비었을 때만 발송 큐(`kind = 'auto'`, 멱등 키 `auto:<run id>`) + 대기 메시지 줄을 넣고 실행 줄을 `queued` 로. 다른 조직 · 다른 상태면 `enqueued = false`.
 - 타입: `src/types/database.ts` 손으로 맞춤.
 
-## 2026-11-13 손님 메시지 6단계 — `guest_message_links` · `guest_message_saved_replies.purpose` (`202611130005_guest_message_links.sql`, **어디에도 적용 안 함**)
+## 2026-11-13 손님 메시지 6단계 — `guest_message_links` · `guest_message_saved_replies.purpose` (`202611130005_guest_message_links.sql`, 운영 적용 2026-11-13)
 
 기준 문서: `docs/product/47-guest-messaging.md` §5-7 · §6-4.
 

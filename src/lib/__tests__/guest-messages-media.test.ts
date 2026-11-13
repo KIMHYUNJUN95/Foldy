@@ -29,6 +29,23 @@ const SIGNED = `${CANON}?X-Amz-Security-Token=FAKE%2Ftoken&amp;X-Amz-Expires=360
 const anchor = (href: string, inner = href) => `<a href="${href}">${inner}</a>`;
 
 describe("parseMessageBody", () => {
+  it("운영 모양 — 앵커 안에 <img> (2026-11-13 운영 본문 그대로의 구조)", () => {
+    const longSigned = `${CANON}?X-Amz-Security-Token=${"A".repeat(1500)}&X-Amz-Expires=3600&im_w=1200`;
+    const body = `<a href="${longSigned}" target="_blank"><img src="${longSigned}" style="height:100px"></a>`;
+    expect(parseMessageBody(body)).toEqual([{ type: "image", url: CANON, index: 0 }]);
+    expect(planMediaCopy(body, [])).toEqual([{ sourceUrl: CANON, index: 0 }]);
+    expect(messagePlainText(body)).not.toContain("<img");
+    const mixed = `봐 주세요\n${body}\n${body.replace("fa4d40a1", "fb4d40a1")}`;
+    expect(parseMessageBody(mixed).filter((s) => s.type === "image")).toHaveLength(2);
+  });
+
+  it("앵커 안 <img> 도 이상한 입력에서 빠르게 끝난다", () => {
+    const evil = `<a href="x">${"<img a ".repeat(40000)}`;
+    const started = performance.now();
+    parseMessageBody(evil);
+    expect(performance.now() - started).toBeLessThan(200);
+  });
+
   it("Airbnb 사진 앵커 → 사진 조각(쿼리 버린 정본)", () => {
     expect(parseMessageBody(anchor(SIGNED))).toEqual([{ type: "image", url: CANON, index: 0 }]);
   });

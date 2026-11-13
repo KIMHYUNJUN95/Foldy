@@ -394,6 +394,8 @@ Beds24 예약 웹훅 ──▶ /api/beds24/webhook (기존) ──▶ 메시지 
 - 번역: DeepL 에는 **글 + 링크 글**을 문장 그대로 보낸다(`messageTextForTranslation()` — 링크 글은 문장 안, 사진 자리만 줄바꿈, 주소는 빼고). 사진만 있는 말은 번역 단추가 없고 서버도 `invalid`. 번역문을 보일 때는 번역문(링크 글 포함 — 링크를 끝에 다시 붙이지 않음, 누르려면 「원문 보기」) + 원문의 사진을 뒤에 그린다(예전 캐시에 앵커가 섞여 있어도 사진 조각은 버림).
 - 알림: 손님 메시지 알림은 아직 없다(D6 — 알림 일괄 구현 때 `messagePlainText()` 를 쓴다).
 
+> 2026-11-13 운영에서 확인: 실제 Airbnb 본문은 `<a href="사진" target="_blank"><img src="사진" style="height:100px"></a>` — 앵커 안에 `<img>` 가 있다. 처음 해석기는 안쪽에 글만 허용해 사진을 못 찾고 45건을 사본 없이 `done` 으로 표시했다(고침: 안쪽 `<img …>` 허용 + 운영 모양 시험, 잘못된 `done` 은 `pending` 으로 되돌림).
+
 **② 사본(Foldy 저장소)** — 마이그레이션 `202611130007_guest_message_media.sql`(**운영 적용 2026-11-13** — 사용자 SQL Editor, 칸 4 · 버킷 · 정책 · 트리거 확인, pending 5,441줄)
 - 비공개 버킷 `guest-message-media`(10MB · jpeg/png/webp/gif), 경로 `<organization_id>/<conversation_id>/<message_id>/<사진 번호>.<ext>`. 읽기 정책 = 그 조직의 `guest_messages.view`, 쓰기는 service_role 만. 화면은 서버가 만든 짧은 서명 URL 로만 본다.
 - 표시: `guest_messages.media_state`(null 사진 없음 · `pending` · `done` · `failed`) · `media_attempts` · `media_next_try_at` · `media_claim_id`(잡은 실행). 들어올 때 트리거 `guest_messages_mark_media` 가 본문에 `a0.muscache.com/im/pictures` 가 있으면 `pending`. 마이그레이션이 이미 있는 줄도 한 번 표시한다.

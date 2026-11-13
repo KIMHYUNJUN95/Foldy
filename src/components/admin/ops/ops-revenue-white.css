@@ -10,7 +10,8 @@
 @media (min-width: 1101px) {
   .adm .rvw .rvw-kpis { grid-template-columns: 1.3fr 1.15fr 1.3fr .9fr .95fr .95fr; column-gap: 8px; }
 }
-.adm .rvw .rvw-kpis .v { font-size: 26px; letter-spacing: -0.02em; }
+.adm .rvw .rvw-kpis .v { font-size: 22px; letter-spacing: 0; }
+.adm .rvw .rvw-kpis .ocw-kpi:first-child .v { font-size: 32px; }
 .adm .rvw .rvw-kpis .ocw-kpi { cursor: default; }
 
 /* ── 위: 월별 매출(왼쪽 2/3) · 남는 돈 + 채널(오른쪽) ── */
@@ -46,12 +47,12 @@
 .adm .rvw-months b { font-size: 11px; font-weight: 400; color: var(--ocw-faint); }
 .adm .rvw-months b.y { color: var(--ocw-v-ink); }
 .adm .rvw-months small { font-size: 10px; color: var(--ocw-faint); }
-.adm .rvw-months > span.on b { color: var(--ocw-ink); font-weight: 700; }
+.adm .rvw-months > span.on b { color: var(--ocw-ink); font-weight: 600; }
 
 .adm .rvw-side { min-width: 0; display: flex; flex-direction: column; gap: 22px; }
 .adm .rvw-flow { display: flex; flex-direction: column; gap: 4px; }
 .adm .rvw-flow .l, .adm .rvw-chan .l { font-size: 13px; color: var(--ocw-mute); }
-.adm .rvw-flow .v { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.25; color: var(--ocw-ink); }
+.adm .rvw-flow .v { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.25; color: var(--ocw-ink); }
 .adm .rvw-flow .s { font-size: 12px; line-height: 1.5; color: var(--ocw-faint); }
 .adm .rvw-chan { display: flex; flex-direction: column; gap: 10px; }
 .adm .rvw-stack {
@@ -116,7 +117,7 @@
 .adm .rvw-mc.na { background: transparent; box-shadow: inset 0 0 0 1px #ececf0; cursor: default; }
 .adm .rvw-mc.off { opacity: .45; }
 .adm .rvw-sm { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; min-width: 0; white-space: nowrap; }
-.adm .rvw-sm b { font-size: 13px; font-weight: 700; color: var(--ocw-ink); }
+.adm .rvw-sm b { font-size: 13px; font-weight: 600; color: var(--ocw-ink); }
 .adm .rvw-sm span { font-size: 11px; color: var(--ocw-faint); }
 .adm .rvw-sm.off { opacity: .45; }
 
@@ -126,7 +127,7 @@
 .adm .rvw-dhead { display: flex; flex-direction: column; gap: 6px; }
 .adm .rvw-dhead .eyebrow { font-size: 13px; color: var(--ocw-mute); }
 .adm .rvw-dhead .eyebrow em { font-style: normal; font-weight: 600; color: var(--ocw-v-ink); }
-.adm .rvw-dhead h2 { margin: 0; font-size: 19px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.35; color: var(--ocw-ink); }
+.adm .rvw-dhead h2 { margin: 0; font-size: 19px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.35; color: var(--ocw-ink); }
 .adm .rvw-dhead .sub { font-size: 13px; color: var(--ocw-mute); }
 .adm .rvw-dl { margin: 0; padding-top: 14px; border-top: 0.5px solid var(--separator); display: grid; grid-template-columns: 96px minmax(0, 1fr); row-gap: 10px; font-size: 13px; }
 .adm .rvw-dl dt { color: var(--ocw-faint); }
@@ -143,7 +144,7 @@
 }
 .adm .rvw-rr .n { flex: 1; min-width: 0; font-family: var(--mono, "Geist Mono", monospace); font-weight: 600; color: var(--ocw-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .adm .rvw-rr .a { color: var(--ocw-faint); white-space: nowrap; }
-.adm .rvw-rr b { width: 44px; text-align: right; font-weight: 700; color: var(--ocw-ink); }
+.adm .rvw-rr b { width: 44px; text-align: right; font-weight: 600; color: var(--ocw-ink); }
 .adm .rvw-dnote { margin: 0; padding-top: 14px; border-top: 0.5px solid var(--separator); font-size: 12px; line-height: 1.5; color: var(--ocw-faint); }
 
 @media (max-width: 1280px) {

@@ -23,7 +23,7 @@
 .adm .ocw-body { transition: opacity 200ms ease; }
 .adm .ocw.is-pending .ocw-body { opacity: .55; }
 .adm .ocw .is-red { color: var(--ocw-red) !important; }
-.adm .ocw .is-bold { font-weight: 700; }
+.adm .ocw .is-bold { font-weight: 600; }
 .adm .ocw-empty { padding: 80px 0; text-align: center; font-size: 14px; color: var(--ocw-faint); }
 
 /* ── 도구 줄 ── */
@@ -51,7 +51,7 @@
 .adm .ocw-period .amp { gap: 2px; }
 .adm .ocw-period .amp__label {
   min-width: 0; height: 34px; padding: 0 26px 0 10px; border: 0; border-radius: 9px; background: transparent;
-  font-size: 15px; font-weight: 700; color: var(--ocw-ink); position: relative;
+  font-size: 15px; font-weight: 600; color: var(--ocw-ink); position: relative;
   transition: background-color 160ms ease;
 }
 .adm .ocw-period .amp__label::after {
@@ -59,7 +59,7 @@
   border-right: 1.5px solid var(--ocw-faint); border-bottom: 1.5px solid var(--ocw-faint); transform: rotate(45deg);
 }
 .adm .ocw-period .amp__label:hover { background: #f4f4f7; border: 0; }
-.adm .ocw-plabel { padding: 0 8px; font-size: 15px; font-weight: 700; white-space: nowrap; }
+.adm .ocw-plabel { padding: 0 8px; font-size: 15px; font-weight: 600; white-space: nowrap; }
 .adm .ocw-period .datepick { height: 34px; border: 0; background: transparent; padding: 0 8px; font-size: 14px; font-weight: 600; color: var(--ocw-ink); }
 .adm .ocw-period .datepick:hover { background: #f4f4f7; }
 /* 덩어리는 「진행 · 합계 · 내보내기 + 비교 96px」보다 줄지 않는다 — 그보다 좁으면 덩어리째 다음 줄로.
@@ -115,7 +115,8 @@
 .adm .ocw-kpis { margin-top: 18px; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); border-bottom: 0.5px solid var(--separator); }
 .adm .ocw-kpi { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px 18px; min-width: 0; }
 .adm .ocw-kpi .l { font-size: 13px; color: var(--ocw-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.adm .ocw-kpi .v { display: flex; align-items: baseline; font-size: 28px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.15; color: var(--ocw-ink); white-space: nowrap; }
+.adm .ocw-kpi .v { display: flex; align-items: baseline; font-size: 22px; font-weight: 500; letter-spacing: 0; line-height: 1.15; color: var(--ocw-ink); white-space: nowrap; }
+.adm .ocw-kpi:first-child .v { font-size: 32px; font-weight: 600; }
 .adm .ocw-kpi .v small { margin-left: 4px; font-size: 14px; font-weight: 500; letter-spacing: 0; color: var(--ocw-faint); }
 .adm .ocw-kpi .s { font-size: 12px; line-height: 1.4; color: var(--ocw-faint); overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; } /* 두 줄까지 — 영어 · 일본어 보조 글이 한 줄에 안 들어간다(2026-10-23) */
 
@@ -125,7 +126,7 @@
 
 /* 구역 제목 */
 .adm .ocw-sec { margin-top: 26px; display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 10px; }
-.adm .ocw-sec > b { font-size: 15px; font-weight: 700; }
+.adm .ocw-sec > b { font-size: 15px; font-weight: 600; }
 .adm .ocw-sec .hint, .adm .ocw-lgs .hint { font-size: 12px; color: var(--ocw-faint); }
 .adm .ocw-lgs { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font-size: 12px; color: var(--ocw-mute); }
 .adm .ocw-lgs > span { display: inline-flex; align-items: center; gap: 5px; }
@@ -171,7 +172,7 @@
 .adm .ocw-months { display: flex; gap: 10px; padding: 6px 4px 0; }
 .adm .ocw-months span { flex: 1; min-width: 0; text-align: center; font-size: 11px; color: var(--ocw-faint); white-space: nowrap; }
 .adm .ocw-months span.y { color: var(--ocw-v-ink); }
-.adm .ocw-months span.on { color: var(--ocw-ink); font-weight: 700; }
+.adm .ocw-months span.on { color: var(--ocw-ink); font-weight: 600; }
 
 /* ── 건물별 표 ── */
 .adm .ocw-tablewrap { margin-top: 8px; overflow-x: auto; }
@@ -212,7 +213,7 @@
 }
 .adm .ocw-obar .rail i.low { background: var(--ocw-red-bar); }
 .adm .ocw-obar .track b { position: absolute; top: -3px; bottom: -3px; width: 1.5px; background: var(--ocw-red-bar); }
-.adm .ocw-obar .p { width: 44px; flex: none; text-align: right; font-weight: 700; color: var(--ocw-ink); }
+.adm .ocw-obar .p { width: 44px; flex: none; text-align: right; font-weight: 600; color: var(--ocw-ink); }
 @keyframes ocw-fill { from { transform: scaleX(0); } }
 .adm .ocw-grade { font-weight: 600; }
 .adm .ocw-grade.is-excellent { color: #1f7a4d; }
@@ -232,7 +233,7 @@
 .adm .ocw-heat { display: grid; grid-template-columns: 124px repeat(12, minmax(44px, 1fr)) 60px; gap: 4px; align-items: stretch; min-width: 820px; }
 .adm .ocw-mh { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding-bottom: 4px; font-size: 11px; color: var(--ocw-faint); white-space: nowrap; }
 .adm .ocw-mh .yy { font-size: 10px; color: #b4b1bf; }
-.adm .ocw-mh.on { color: var(--ocw-ink); font-weight: 700; }
+.adm .ocw-mh.on { color: var(--ocw-ink); font-weight: 600; }
 .adm .ocw-mh.avg { align-items: flex-end; }
 .adm .ocw-rl { display: flex; flex-direction: column; justify-content: center; min-width: 0; padding-right: 8px; }
 .adm .ocw-rl b { font-family: var(--mono, "Geist Mono", monospace); font-size: 13px; font-weight: 600; color: var(--ocw-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -250,13 +251,13 @@
 .adm .ocw-hc.low { color: #a3202a; }
 .adm .ocw-hc.na { background: transparent; box-shadow: inset 0 0 0 1px #ececf0; }
 .adm .ocw-hc.off { opacity: .45; }
-.adm .ocw-avg { display: flex; align-items: center; justify-content: flex-end; font-size: 13px; font-weight: 700; color: var(--ocw-ink); }
+.adm .ocw-avg { display: flex; align-items: center; justify-content: flex-end; font-size: 13px; font-weight: 600; color: var(--ocw-ink); }
 .adm .ocw-avg.off { opacity: .45; }
 
 .adm .ocw-side { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 .adm .ocw-sum { display: flex; flex-direction: column; gap: 4px; }
 .adm .ocw-sum .l { font-size: 13px; color: var(--ocw-mute); }
-.adm .ocw-sum .v { font-size: 30px; font-weight: 700; letter-spacing: -0.03em; }
+.adm .ocw-sum .v { font-size: 30px; font-weight: 600; letter-spacing: 0; }
 .adm .ocw-sum .s { font-size: 12px; color: var(--ocw-faint); line-height: 1.5; }
 .adm .ocw-sidesec { display: flex; flex-direction: column; gap: 6px; padding-top: 14px; border-top: 0.5px solid var(--separator); }
 .adm .ocw-sidesec .h { font-size: 12px; font-weight: 600; color: var(--ocw-faint); margin-bottom: 4px; }
@@ -270,7 +271,7 @@
 .adm .ocw-sr .n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .adm .ocw-sr .n b { font-family: var(--mono, "Geist Mono", monospace); font-weight: 600; }
 .adm .ocw-sr .n span { color: var(--ocw-faint); }
-.adm .ocw-sr .p { flex: none; font-weight: 700; }
+.adm .ocw-sr .p { flex: none; font-weight: 600; }
 
 /* ── 앞으로 ── */
 .adm .ocw-fcols { margin-top: 20px; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 28px; }
@@ -278,7 +279,7 @@
 /* 이번 달은 상자 없이 「진행 중」 보라 글자로만(시안 OccFwd-PC). */
 .adm .ocw-fcol .l { font-size: 13px; color: var(--ocw-mute); white-space: nowrap; }
 .adm .ocw-fcol .l b { color: var(--ocw-v-ink); font-weight: 600; }
-.adm .ocw-fcol .v { font-size: 26px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.2; }
+.adm .ocw-fcol .v { font-size: 26px; font-weight: 600; letter-spacing: 0; line-height: 1.2; }
 .adm .ocw-fcol .track { display: block; height: 6px; border-radius: 3px; background: #efeff3; overflow: hidden; }
 .adm .ocw-fcol .track i { display: block; height: 100%; border-radius: 3px; background: var(--ocw-v); transform-origin: left; animation: ocw-fill 600ms var(--ocw-ease) both; animation-delay: calc(120ms + var(--i, 0) * 40ms); }
 .adm .ocw-fcol .s { font-size: 12px; color: var(--ocw-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -298,7 +299,7 @@
 }
 .adm a.ocw-fc:hover { box-shadow: inset 0 0 0 1.5px rgba(90, 48, 207, .55); color: var(--ocw-ink); }
 .adm a.ocw-fc:active { transform: scale(.97); }
-.adm .ocw-fc b { font-size: 14px; font-weight: 700; }
+.adm .ocw-fc b { font-size: 14px; font-weight: 600; }
 .adm .ocw-fc span { font-size: 11px; color: #4c4958; }
 .adm .ocw-fc.off { opacity: .45; }
 .adm .ocw-fc.tot { animation: none; border-radius: 0; height: 52px; border-top: 0.5px solid var(--separator); margin-top: 6px; }
@@ -326,7 +327,7 @@
 .adm .ocw-wr:active { transform: scale(.99); }
 .adm .ocw-wr > b { font-weight: 600; }
 .adm .ocw-wr .m { color: var(--ocw-faint); }
-.adm .ocw-wr .v { margin-left: auto; font-weight: 700; }
+.adm .ocw-wr .v { margin-left: auto; font-weight: 600; }
 .adm .ocw-wr .s { width: 120px; text-align: right; color: var(--ocw-faint); }
 .adm .ocw-more { display: inline-block; margin-top: 12px; font-size: 13px; font-weight: 600; color: var(--ocw-v-ink); text-decoration: none; }
 

@@ -20,6 +20,16 @@ export function occupancyGrade(pct: number): OccupancyGrade {
 /** 저쪽 비수기 판정 · 화면 기준선. */
 export const OCCUPANCY_LINE = 60;
 
+/** 「낮다(빨강)」 판정 — 화면에 보이는 정수 값이 60 미만일 때만. 히트맵 농도 단계와는 별개다. */
+export function isLowOccupancy(pct: number): boolean {
+  return Number.isFinite(pct) && Math.round(pct) < OCCUPANCY_LINE;
+}
+
+/** 가동률 표기 — 화면 어디서나 정수. */
+export function occupancyPctText(pct: number): string {
+  return Number.isFinite(pct) ? `${Math.round(pct)}%` : "—";
+}
+
 /**
  * 「많이 빈 객실」 — 기간의 **절반 넘게** 빈 방(빨강). 저쪽은 한 달 기준 「15일 넘게」(`vacantDays > 15`)였다 —
  * 우리 기간은 주 · 연 · 직접도 되므로 같은 뜻을 비율로 쓴다(30일 달이면 15일 넘게와 같다).

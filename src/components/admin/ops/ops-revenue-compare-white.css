@@ -16,7 +16,7 @@
 .adm .rcw-headl { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1 1 520px; }
 .adm .rcw-live { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ocw-mute); }
 .adm .rcw-live i { width: 6px; height: 6px; border-radius: 50%; background: var(--ocw-v); }
-.adm .rcw-h1 { margin: 0; font-family: inherit; font-size: 26px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.3; color: var(--ocw-ink); text-wrap: balance; }
+.adm .rcw-h1 { margin: 0; font-family: inherit; font-size: 22px; font-weight: 600; letter-spacing: 0; line-height: 1.3; color: var(--ocw-ink); text-wrap: balance; }
 .adm .rcw-n { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .adm .rcw-n.up { color: var(--ocw-v-ink); }
 .adm .rcw-n.dn { color: var(--ocw-red); }
@@ -33,7 +33,7 @@
 /* ── A vs B 한 줄 ── */
 .adm .rcw-periods { margin-top: 16px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; }
 .adm .rcw-pick { position: relative; display: inline-flex; align-items: center; gap: 6px; }
-.adm .rcw-side { font-size: 13px; font-weight: 700; }
+.adm .rcw-side { font-size: 13px; font-weight: 600; }
 .adm .rcw-pick.is-a .rcw-side { color: var(--ocw-v-ink); }
 .adm .rcw-pick.is-b .rcw-side { color: var(--ocw-faint); }
 .adm .rcw-pick__btn {
@@ -66,14 +66,15 @@
 /* ── 총매출 · 증감 두 칸 ── */
 .adm .rcw-hero { margin-top: 20px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 40px; }
 .adm .rcw-col { display: flex; flex-direction: column; gap: 14px; padding: 22px 0; min-width: 0; }
-.adm .rcw-k { font-size: 12px; font-weight: 600; letter-spacing: 0.02em; color: var(--ocw-faint); }
+.adm .rcw-k { font-size: 12px; font-weight: 600; color: var(--ocw-faint); }
 .adm .rcw-k.is-a { color: var(--ocw-v-ink); }
 .adm .rcw-big { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 14px; }
-.adm .rcw-big > b, .adm .rcw-gv { font-size: 34px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.15; color: var(--ocw-ink); white-space: nowrap; }
+.adm .rcw-big > b, .adm .rcw-gv { font-size: 28px; font-weight: 600; letter-spacing: 0; line-height: 1.15; color: var(--ocw-ink); white-space: nowrap; }
 .adm .rcw-big .b { font-size: 14px; color: var(--ocw-mute); white-space: nowrap; }
 .adm .rcw-gv.up { color: var(--ocw-v-ink); }
 .adm .rcw-gv.dn { color: var(--ocw-red); }
 .adm .rcw-gv.z { color: var(--ocw-mute); }
+.adm .rcw-nb { margin-top: -6px; font-size: 13px; color: var(--ocw-faint); }
 
 /* 눈금 선 — 표식은 선 폭 전체를 쓰는 칸을 --x 만큼 옮겨서(transform 만으로 미끄러져 들어온다) */
 .adm .rcw-scale { position: relative; height: 34px; }
@@ -91,20 +92,20 @@
 .adm .rcw-figs { display: flex; flex-wrap: wrap; gap: 12px 32px; font-size: 12px; color: var(--ocw-mute); }
 .adm .rcw-figs > span { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .adm .rcw-figs .k { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.adm .rcw-figs b { font-size: 14px; font-weight: 700; color: var(--ocw-ink); white-space: nowrap; }
+.adm .rcw-figs b { font-size: 14px; font-weight: 600; color: var(--ocw-ink); white-space: nowrap; }
 
 /* 기여 막대 — 0 선(--z)에서 + 는 오른쪽 보라, − 는 왼쪽 빨강으로 자란다 */
 .adm .rcw-drv { display: flex; flex-direction: column; gap: 10px; }
 .adm .rcw-dr { display: grid; grid-template-columns: minmax(120px, 160px) minmax(0, 1fr) 64px; align-items: center; gap: 12px; font-size: 13px; color: var(--ocw-ink2); }
 .adm .rcw-dr .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.adm .rcw-dr > b:last-child { text-align: right; font-weight: 700; color: var(--ocw-ink); white-space: nowrap; }
+.adm .rcw-dr > b:last-child { text-align: right; font-weight: 600; color: var(--ocw-ink); white-space: nowrap; }
 .adm .rcw-dr .tr { position: relative; height: 10px; border-radius: 5px; background: #f4f4f7; }
 .adm .rcw-dr .tr em { position: absolute; left: var(--z, 50%); top: -3px; bottom: -3px; width: 1.5px; margin-left: -0.75px; background: #b4b1bf; }
 .adm .rcw-dr .tr i { position: absolute; top: 0; bottom: 0; animation: ocw-fill 600ms var(--ocw-ease) both; animation-delay: calc(160ms + var(--i, 0) * 40ms); }
 .adm .rcw-dr .tr i.up { border-radius: 0 5px 5px 0; background: var(--ocw-v); transform-origin: left center; }
 .adm .rcw-dr .tr i.dn { border-radius: 5px 0 0 5px; background: var(--ocw-red-bar); transform-origin: right center; }
 .adm .rcw-dr.is-total { padding-top: 10px; border-top: 0.5px solid var(--separator); }
-.adm .rcw-dr.is-total .nm { font-weight: 700; color: var(--ocw-ink); }
+.adm .rcw-dr.is-total .nm { font-weight: 600; color: var(--ocw-ink); }
 .adm .rcw-dr.is-total .y { text-align: right; font-size: 12px; color: var(--ocw-faint); white-space: nowrap; }
 .adm .rcw-dr.is-total .rcw-n.z { color: var(--ocw-ink); }
 .adm .rcw-ins { margin: 4px 0 0; padding-left: 18px; list-style: disc; font-size: 13px; line-height: 1.7; color: var(--ocw-ink2); }
@@ -112,9 +113,9 @@
 /* ── 지표 넷 ── */
 .adm .rcw-kpis { margin-top: 20px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px; }
 .adm .rcw-kpi { display: flex; flex-direction: column; gap: 8px; padding-top: 16px; border-top: 0.5px solid var(--separator); min-width: 0; }
-.adm .rcw-kpi .l { font-size: 12px; font-weight: 600; letter-spacing: 0.02em; color: var(--ocw-faint); }
+.adm .rcw-kpi .l { font-size: 12px; font-weight: 600; color: var(--ocw-faint); }
 .adm .rcw-kpi .v { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 8px; }
-.adm .rcw-kpi .v b { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; white-space: nowrap; }
+.adm .rcw-kpi .v b { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; white-space: nowrap; }
 .adm .rcw-kpi .d { font-size: 13px; font-weight: 600; white-space: nowrap; }
 .adm .rcw-kpi .d.up { color: var(--ocw-v-ink); }
 .adm .rcw-kpi .d.dn { color: var(--ocw-red); }
@@ -141,7 +142,7 @@
 .adm .rcw-dhd { padding-bottom: 4px; font-size: 12px; color: var(--ocw-faint); }
 .adm .rcw-dhd .r, .adm .rcw-drow .va, .adm .rcw-drow .vb, .adm .rcw-drow .dl { text-align: right; white-space: nowrap; }
 .adm .rcw-drow { padding: 12px 0; border-top: 0.5px solid var(--separator); animation: ocw-fade 300ms ease both; animation-delay: calc(var(--i, 0) * 30ms); }
-.adm .rcw-drow .nm { font-size: 14px; font-weight: 700; color: var(--ocw-ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm .rcw-drow .nm { font-size: 14px; font-weight: 600; color: var(--ocw-ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .adm .rcw-drow .bars { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .adm .rcw-drow .bars i {
   display: block; height: 8px; border-radius: 4px; max-width: 100%; transform-origin: left;
@@ -150,9 +151,9 @@
 }
 .adm .rcw-drow .bars i.a { background: var(--ocw-v); }
 .adm .rcw-drow .bars i.b { background: var(--rcw-b); }
-.adm .rcw-drow .va { font-size: 14px; font-weight: 700; color: var(--ocw-ink); }
+.adm .rcw-drow .va { font-size: 14px; font-weight: 600; color: var(--ocw-ink); }
 .adm .rcw-drow .va .na, .adm .rcw-drow .vb { font-size: 13px; font-weight: 400; color: var(--ocw-mute); }
-.adm .rcw-drow .dl { font-size: 13px; font-weight: 700; }
+.adm .rcw-drow .dl { font-size: 13px; font-weight: 600; }
 .adm .rcw-drow .dl.up { color: var(--ocw-v-ink); }
 .adm .rcw-drow .dl.dn { color: var(--ocw-red); }
 .adm .rcw-drow .dl.z { color: var(--ocw-faint); }

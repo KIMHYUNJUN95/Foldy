@@ -89,6 +89,18 @@ export function changePct(current: number, previous: number): number | null {
   return previous > 0 ? ((current - previous) / previous) * 100 : null;
 }
 
+/** 몫(%)을 정수로 — 내림 뒤 나머지가 큰 순서로 1씩 더해 합이 100 이 되게 한다. 합이 0 이면 전부 0. */
+export function wholeShares(values: readonly number[]): number[] {
+  const total = values.reduce((sum, v) => sum + v, 0);
+  if (total <= 0) return values.map(() => 0);
+  const raw = values.map((v) => (v / total) * 100);
+  const out = raw.map(Math.floor);
+  const order = raw.map((r, i) => ({ i, rem: r - Math.floor(r) })).sort((a, b) => b.rem - a.rem || a.i - b.i);
+  const rest = 100 - out.reduce((sum, v) => sum + v, 0);
+  for (let k = 0; k < rest; k += 1) out[order[k].i] += 1;
+  return out;
+}
+
 // ── 기간 ────────────────────────────────────────────────────────────────
 
 export type RevenueMode = "month" | "fiscal" | "year" | "week" | "custom";

@@ -23,7 +23,8 @@ import {
   type RevenueMode,
   type RevenueRange,
 } from "@/lib/ops-revenue";
-import { changePctOrNull, findNewRooms, groupProperties, growthDrivers, newRoomShare, topMover, totalOf } from "@/lib/ops-revenue-compare";
+import { occupancyPctText } from "@/lib/ops-occupancy";
+import { changePctOrNull, findNewRooms, hasComparisonRecord, groupProperties, growthDrivers, newRoomShare, topMover, totalOf } from "@/lib/ops-revenue-compare";
 import type { OpsRevenueCompareData, OpsRevenueComparePeriod } from "@/lib/ops-revenue-server";
 import { IncludePicker } from "./ops-include-picker";
 import "./ops-occupancy-white.css";
@@ -109,7 +110,7 @@ export function OpsRevenueCompareConsole({
   const yen = (v: number) => `¥${Math.round(v).toLocaleString(localeTag)}`;
   const signedYen = (v: number) => (Math.round(v) === 0 ? yen(0) : `${v > 0 ? "+" : "−"}${yen(Math.abs(v))}`);
   const n = (v: number) => Math.round(v).toLocaleString(localeTag);
-  const pct = (v: number) => `${v.toFixed(1)}%`;
+  const pct = occupancyPctText;
   const signedPct = (v: number | null) => (v === null ? rcopy.newLabel : `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(1)}%`);
   const signedPoint = (v: number) => `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(1)}${rcopy.pointSuffix}`;
   const tone = (v: number | null): Tone => (v === null ? "z" : v > 0.05 ? "up" : v < -0.05 ? "dn" : "z");
@@ -140,6 +141,7 @@ export function OpsRevenueCompareConsole({
   const aTot = totalOf(inNames, data.aCells);
   const bTot = totalOf(inNames, data.bCells);
   const delta = aTot.revenue - bTot.revenue;
+  const hasB = hasComparisonRecord(bTot.revenue);
   const growth = changePctOrNull(aTot.revenue, bTot.revenue);
   // 기존 건물의 새 객실(첫 판매일이 B 뒤) — 건물 숫자는 그대로, 차이 분해에서만 몫을 떼어 낸다(2026-10-08).
   const newRooms = findNewRooms(groups.existing, data.rooms, data.roomFirstSale, data.b.range.to, data.a.range.to);
@@ -173,7 +175,7 @@ export function OpsRevenueCompareConsole({
         : fill(w.includeCount, { n: inNames.length });
 
   const insights = [
-    ...(groups.fresh.length > 0 ? [fill(copy.insNew, { d: signedYen(delta), n: yen(freshSum), names: groups.fresh.join(" · ") })] : []),
+    ...(groups.fresh.length > 0 ? [fill(copy.insNew, { d: signedYen(delta), n: yen(freshSum), names: groups.fresh.map(bName).join(" · ") })] : []),
     ...(roomShare && newRoomsDelta !== 0 ? [fill(copy.insNewRooms, { names: roomShare.labels.map(bRoom).join(" · "), v: signedYen(newRoomsDelta) })] : []),
     ...(groups.existing.length > 0 && (mixChanged || roomShare)
       ? [fill(copy.insExisting, { adr: signedPct(exAdr), n: groups.existing.length, occ: exOcc === null ? "—" : signedPoint(exOcc) })]
@@ -224,8 +226,14 @@ export function OpsRevenueCompareConsole({
               {w.live}
             </span>
             <h1 className="rcw-h1">
-              {headline} <span className={`rcw-n ${tone(growth)}`}><RollNumber delay={80} text={signedPct(growth)} /></span>
-              {mixChanged && groups.existing.length > 0 && (
+              {hasB ? (
+                <>
+                  {headline} <span className={`rcw-n ${tone(growth)}`}><RollNumber delay={80} text={signedPct(growth)} /></span>
+                </>
+              ) : (
+                fill(w.headlineNoBase, { a: aLabel, v: yen(aTot.revenue) })
+              )}
+              {hasB && mixChanged && groups.existing.length > 0 && (
                 <>
                   {w.headlineExisting} <span className={`rcw-n ${tone(exGrowth)}`}><RollNumber delay={160} text={signedPct(exGrowth)} /></span>
                 </>
@@ -287,6 +295,7 @@ export function OpsRevenueCompareConsole({
                 existingCount={groups.existing.length}
                 existingDelta={same.a.revenue - same.b.revenue}
                 freshSum={freshSum}
+                hasB={hasB}
                 newRoomsDelta={newRoomsDelta}
                 signedYen={signedYen}
                 w={w}
@@ -299,7 +308,9 @@ export function OpsRevenueCompareConsole({
                 copy={copy}
                 drivers={drivers}
                 freshNames={groups.fresh.map(bName)}
+                bLabel={bLabel}
                 growth={growth}
+                hasB={hasB}
                 insights={insights}
                 n={n}
                 newRoomLabels={(roomShare?.labels ?? []).map(bRoom)}
@@ -342,7 +353,7 @@ export function OpsRevenueCompareConsole({
                   bBar: bTot.adr,
                   delta: signedPct(changePctOrNull(aTot.adr, bTot.adr)),
                   key: "adr",
-                  label: rcopy.metricAdr,
+                  label: rcopy.kpiAdr,
                   note: copy.kpiAdrNote,
                   tone: tone(changePctOrNull(aTot.adr, bTot.adr)),
                 },
@@ -353,7 +364,7 @@ export function OpsRevenueCompareConsole({
                   bBar: bTot.revpar,
                   delta: signedPct(changePctOrNull(aTot.revpar, bTot.revpar)),
                   key: "revpar",
-                  label: rcopy.metricRevpar,
+                  label: rcopy.kpiRevpar,
                   note: copy.kpiRevparNote,
                   tone: tone(changePctOrNull(aTot.revpar, bTot.revpar)),
                 },
@@ -366,8 +377,9 @@ export function OpsRevenueCompareConsole({
                     <span className="l">{kpi.label}</span>
                     <div className="v">
                       <b>{kpi.a === "—" ? kpi.a : <RollNumber delay={200 + index * 60} text={kpi.a} />}</b>
-                      <span className={`d ${kpi.tone}`}>{kpi.delta}</span>
+                      {hasB && <span className={`d ${kpi.tone}`}>{kpi.delta}</span>}
                     </div>
+                    {hasB && (
                     <div className="bars">
                       <span>
                         <em>A</em>
@@ -378,7 +390,8 @@ export function OpsRevenueCompareConsole({
                         <span className="tr"><i className="b" style={{ width: width(kpi.bBar) }} /></span>
                       </span>
                     </div>
-                    <span className="s">B {kpi.b}</span>
+                    )}
+                    {hasB && <span className="s">B {kpi.b}</span>}
                   </div>
                 );
               })}
@@ -562,6 +575,7 @@ function TotalColumn({
   bTotal,
   freshSum,
   closedSum,
+  hasB,
   existingDelta,
   newRoomsDelta,
   existingCount,
@@ -573,6 +587,7 @@ function TotalColumn({
   bTotal: number;
   freshSum: number;
   closedSum: number;
+  hasB: boolean;
   existingDelta: number;
   newRoomsDelta: number;
   existingCount: number;
@@ -582,7 +597,7 @@ function TotalColumn({
   const top = Math.max(aTotal, bTotal, 1) * 1.1;
   const at = (v: number) => `${Math.max(0, Math.min(100, (v / top) * 100))}%`;
   const figs: Array<{ key: string; label: string; value: string; neg?: boolean }> = [
-    { key: "b", label: w.splitB, value: yen(bTotal) },
+    ...(hasB ? [{ key: "b", label: w.splitB, value: yen(bTotal) }] : []),
     { key: "ex", label: w.splitExisting, neg: existingDelta < 0, value: existingCount > 0 ? signedYen(existingDelta) : "—" },
     ...(newRoomsDelta !== 0 ? [{ key: "rooms", label: w.splitNewRooms, neg: newRoomsDelta < 0, value: signedYen(newRoomsDelta) }] : []),
     { key: "fresh", label: w.splitNew, value: signedYen(freshSum) },
@@ -595,7 +610,7 @@ function TotalColumn({
         <b>
           <RollNumber delay={80} text={yen(aTotal)} />
         </b>
-        <span className="b">B {yen(bTotal)}</span>
+        {hasB && <span className="b">B {yen(bTotal)}</span>}
       </div>
       <div aria-hidden="true" className="rcw-scale">
         <span className="ln" />
@@ -619,6 +634,8 @@ function TotalColumn({
 function GrowthColumn({
   copy,
   growth,
+  hasB,
+  bLabel,
   insights,
   signedPct,
   tone,
@@ -635,6 +652,8 @@ function GrowthColumn({
 }: {
   copy: Copy;
   growth: number | null;
+  hasB: boolean;
+  bLabel: string;
   insights: string[];
   signedPct: (v: number | null) => string;
   tone: (v: number | null) => Tone;
@@ -672,9 +691,8 @@ function GrowthColumn({
       <span className="rcw-k" title={copy.driverNote}>
         {w.secGrowth}
       </span>
-      <b className={`rcw-gv ${tone(growth)}`}>
-        <RollNumber delay={140} text={signedPct(growth)} />
-      </b>
+      <b className={`rcw-gv ${tone(growth)}`}>{hasB ? <RollNumber delay={140} text={signedPct(growth)} /> : w.noBaseTitle}</b>
+      {!hasB && <span className="rcw-nb">{fill(w.noBaseSub, { b: bLabel })}</span>}
       <div className="rcw-drv" style={{ "--z": `${zero * 100}%` } as CSSProperties}>
         {drivers.drivers.map((d, index) => {
           const t = label(d.key);
@@ -693,7 +711,7 @@ function GrowthColumn({
         <div className="rcw-dr is-total">
           <b className="nm">{w.driverTotal}</b>
           <span className="y">{signedYen(drivers.total)}</span>
-          <b className={`rcw-n ${tone(drivers.totalPoints)}`}>{signedPct(drivers.totalPoints)}</b>
+          <b className={`rcw-n ${tone(drivers.totalPoints)}`}>{drivers.totalPoints === null ? "—" : signedPct(drivers.totalPoints)}</b>
         </div>
       </div>
       <ul className="rcw-ins">

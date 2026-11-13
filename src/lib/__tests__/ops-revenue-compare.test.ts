@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { emptyCell, type RevenueCell } from "@/lib/ops-revenue";
-import { bridgeScale, buildBridge, findNewRooms, groupProperties, growthDrivers, newRoomShare, niceUnit, topMover } from "@/lib/ops-revenue-compare";
+import { hasComparisonRecord, bridgeScale, buildBridge, findNewRooms, groupProperties, growthDrivers, newRoomShare, niceUnit, topMover } from "@/lib/ops-revenue-compare";
 
 const cell = (revenue: number, occupied = revenue > 0 ? 10 : 0): RevenueCell => ({ ...emptyCell(), availableNights: 30, occupiedNights: occupied, revenue });
 
@@ -124,5 +124,12 @@ describe("새 객실(기존 건물) — 건물 숫자는 그대로, 몫만 떼�
     expect(d.drivers.map((x) => x.key)).toEqual(["price", "newRooms"]); // 802 판매 박 같음(40) → 판매 박 효과 0
     expect(d.drivers.reduce((sum, x) => sum + x.value, 0)).toBe(300_000);
     expect(d.total).toBe(300_000);
+  });
+});
+
+describe("hasComparisonRecord — B 기간 기록 있음", () => {
+  it("매출 0 이면 기록 없음", () => {
+    expect(hasComparisonRecord(0)).toBe(false);
+    expect(hasComparisonRecord(1)).toBe(true);
   });
 });

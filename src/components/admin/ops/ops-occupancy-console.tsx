@@ -15,9 +15,11 @@ import type { Dictionary } from "@/lib/i18n";
 import {
   OCCUPANCY_LINE,
   heatLevel,
+  isLowOccupancy,
   isMostlyVacant,
   mostVacantCells,
   occupancyGrade,
+  occupancyPctText,
   roomsBelowUsual,
   seriesAverage,
   vacancyLevel,
@@ -122,7 +124,7 @@ export function OpsOccupancyConsole({
   const go = (href: string) => startNav(() => router.push(href));
 
   const n = (value: number) => value.toLocaleString(localeTag);
-  const pct = (value: number) => `${value.toFixed(1)}%`;
+  const pct = occupancyPctText;
   const pointText = (current: number, previous: number) => {
     const d = current - previous;
     return `${d >= 0 ? "+" : "−"}${Math.abs(d).toFixed(1)}${rcopy.pointSuffix}`;
@@ -267,7 +269,7 @@ export function OpsOccupancyConsole({
     .flatMap((p) => p.rooms)
     .filter((room) => {
       const cell = data.rangeRoomCells[room.key];
-      return !!cell && cell.availableNights > 0 && (cell.occupiedNights / cell.availableNights) * 100 < OCCUPANCY_LINE;
+      return !!cell && cell.availableNights > 0 && isLowOccupancy((cell.occupiedNights / cell.availableNights) * 100);
     }).length;
   const thisMonth = data.forwardMonths[0];
   const thisMonthTotal = thisMonth ? totalOf(data.forwardCells[thisMonth]) : null;
@@ -286,9 +288,9 @@ export function OpsOccupancyConsole({
       label: w.kpiOccupancy,
       sub: hasPrev
         ? `${fill(w.vsLastYear, { d: pointText(current.occupancyPct, previous.occupancyPct) })} · ${fill(rcopy.lastYearValue, { v: pct(previous.occupancyPct) })}`
-        : rcopy.newLabel,
+        : rcopy.noLastYear,
       unit: current.availableNights > 0 ? "%" : "",
-      value: current.availableNights > 0 ? current.occupancyPct.toFixed(1) : "—",
+      value: current.availableNights > 0 ? String(Math.round(current.occupancyPct)) : "—",
     },
     {
       key: "sold",
@@ -311,14 +313,14 @@ export function OpsOccupancyConsole({
     {
       key: "lowest",
       label: copy.kpiLowest,
-      red: !!lowest,
+      red: !!lowest && isLowOccupancy(lowest.cur.occupancyPct),
       sub: lowest
         ? lowest.prev.availableNights > 0
           ? `${lowest.name} · ${fill(w.vsLastYear, { d: pointText(lowest.cur.occupancyPct, lowest.prev.occupancyPct) })}`
           : lowest.name
         : "",
       unit: lowest ? "%" : "",
-      value: lowest ? lowest.cur.occupancyPct.toFixed(1) : "—",
+      value: lowest ? String(Math.round(lowest.cur.occupancyPct)) : "—",
     },
     {
       key: "under",
@@ -333,7 +335,7 @@ export function OpsOccupancyConsole({
       label: thisMonth ? fill(w.kpiBooked, { month: monthShort(thisMonth) }) : copy.kpiThisMonth,
       sub: w.kpiBookedSub,
       unit: thisMonthTotal && thisMonthTotal.availableNights > 0 ? "%" : "",
-      value: thisMonthTotal && thisMonthTotal.availableNights > 0 ? thisMonthTotal.occupancyPct.toFixed(1) : "—",
+      value: thisMonthTotal && thisMonthTotal.availableNights > 0 ? String(Math.round(thisMonthTotal.occupancyPct)) : "—",
     },
   ];
 
@@ -676,7 +678,7 @@ function ReportTab({
             const has = cur.availableNights > 0;
             const value = has ? cur.occupancyPct : 0;
             const sel = selectedMonths.has(month);
-            const low = has && value < OCCUPANCY_LINE && p === "past";
+            const low = has && isLowOccupancy(value) && p === "past";
             const tone = low ? "low" : p === "future" ? "fut" : p === "current" ? "cur" : sel ? "sel" : "past";
             return (
               <button
@@ -688,7 +690,7 @@ function ReportTab({
                 type="button"
               >
                 <span className="ocw-col__v" style={{ bottom: `calc(${Math.min(100, value)}% + 6px)` }}>
-                  {has ? cur.occupancyPct.toFixed(0) : "—"}
+                  {has ? Math.round(cur.occupancyPct) : "—"}
                 </span>
                 <span
                   className={`ocw-col__b is-${tone}`}
@@ -815,14 +817,13 @@ function ReportTab({
           </tbody>
         </table>
       </div>
-      <p className="ocw-foot">{copy.tableFoot}</p>
     </>
   );
 }
 
 function OccBar({ value }: { value: number | null }) {
   if (value === null) return <span className="ocw-faint">—</span>;
-  const low = value < OCCUPANCY_LINE;
+  const low = isLowOccupancy(value);
   return (
     <span className="ocw-obar">
       <span className="track">
@@ -971,7 +972,7 @@ function RoomsTab({
                         </Link>
                       );
                     })}
-                    <div className={`ocw-avg${avg !== null && avg < 75 ? " is-red" : ""}${off ? " off" : ""}`}>
+                    <div className={`ocw-avg${avg !== null && isLowOccupancy(avg) ? " is-red" : ""}${off ? " off" : ""}`}>
                       {avg === null ? "—" : `${Math.round(avg)}%`}
                     </div>
                   </Fragment>
@@ -1013,7 +1014,7 @@ function RoomsTab({
                 <span className="n">
                   <b>{bRoom(room.label)}</b> <span>{bName(room.property)}</span>
                 </span>
-                <b className={`p${value < 75 ? " is-red" : ""}`}>{Math.round(value)}%</b>
+                <b className={`p${isLowOccupancy(value) ? " is-red" : ""}`}>{Math.round(value)}%</b>
               </Link>
             );
           })}
@@ -1087,7 +1088,7 @@ function ForwardTab({
         }),
       ),
   );
-  const whole = (value: number) => `${value.toFixed(0)}%`;
+  const whole = occupancyPctText;
 
   return (
     <>

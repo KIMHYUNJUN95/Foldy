@@ -11,6 +11,7 @@ import { AdminMonthPicker } from "@/components/admin/shared/admin-month-picker";
 import { shiftMonthKey } from "@/components/admin/shared/admin-month-key";
 import { RollNumber } from "@/components/shared/roll-number";
 import type { Dictionary } from "@/lib/i18n";
+import { isLowOccupancy, occupancyPctText } from "@/lib/ops-occupancy";
 import {
   REVENUE_MODES,
   changePct,
@@ -21,6 +22,7 @@ import {
   quintileLevel,
   shiftRange,
   sumMetrics,
+  wholeShares,
   yoyLevel,
   type RevenueCell,
   type RevenueMetrics,
@@ -222,7 +224,7 @@ export function OpsRevenueConsole({
 
   // ── 숫자 6개 ── 아래 줄은 진짜 전년 대비(줄었으면 그 부분만 빨강).
   const vs = (delta: number | null): ReactNode =>
-    delta === null ? copy.newLabel : <span className={delta <= -0.05 ? "is-red" : undefined}>{fill(w.vsLastYear, { d: deltaText(delta) })}</span>;
+    delta === null ? copy.noLastYear : <span className={delta <= -0.05 ? "is-red" : undefined}>{fill(w.vsLastYear, { d: deltaText(delta) })}</span>;
   const hasPrevOcc = previous.availableNights > 0 && current.availableNights > 0;
   const occDelta = current.occupancyPct - previous.occupancyPct;
   const kpis: Array<{ key: string; label: string; value: string; unit?: string; sub: ReactNode; title: string }> = [
@@ -261,20 +263,20 @@ export function OpsRevenueConsole({
           )}
         </>
       ),
-      title: previous.availableNights > 0 ? fill(copy.lastYearValue, { v: pct(previous.occupancyPct) }) : copy.noLastYear,
+      title: previous.availableNights > 0 ? fill(copy.lastYearValue, { v: occupancyPctText(previous.occupancyPct) }) : copy.noLastYear,
       unit: current.availableNights > 0 ? "%" : undefined,
-      value: current.availableNights > 0 ? current.occupancyPct.toFixed(1) : "—",
+      value: current.availableNights > 0 ? String(Math.round(current.occupancyPct)) : "—",
     },
     {
       key: "adr",
-      label: copy.colAdr,
+      label: copy.kpiAdr,
       sub: vs(previous.occupiedNights > 0 && current.occupiedNights > 0 ? changePct(current.adr, previous.adr) : null),
       title: `${copy.kpiAdr} · ${fill(copy.lastYearValue, { v: yen(previous.adr) })}`,
       value: current.occupiedNights > 0 ? yen(current.adr) : "—",
     },
     {
       key: "revpar",
-      label: copy.colRevpar,
+      label: copy.kpiRevpar,
       sub: vs(previous.availableNights > 0 && current.availableNights > 0 ? changePct(current.revpar, previous.revpar) : null),
       title: `${copy.kpiRevpar} · ${fill(copy.lastYearValue, { v: yen(previous.revpar) })}`,
       value: current.availableNights > 0 ? yen(current.revpar) : "—",
@@ -566,7 +568,7 @@ function ReportTab({
   const selectedMonths = new Set(data.months.filter((month) => month >= data.range.from.slice(0, 7) && month <= data.range.to.slice(0, 7)));
 
   const channels = CHANNELS.map((key) => ({ key, value: current[key] })).filter((c) => c.value > 0);
-  const share = (value: number, total: number) => (value / Math.max(1, total)) * 100;
+  const channelShares = wholeShares(channels.map((c) => c.value));
 
   const line = (cur: RevenueMetrics, prev: RevenueMetrics, isNew: boolean) => {
     const delta = changePct(cur.revenue, prev.revenue);
@@ -577,7 +579,7 @@ function ReportTab({
         <td className={`r num${prev.revenue > 0 && delta !== null && delta <= -0.05 ? " is-red" : ""}`}>
           {prev.revenue > 0 ? deltaText(delta) : isNew && cur.revenue > 0 ? copy.newLabel : "—"}
         </td>
-        <td className="r num">{cur.availableNights > 0 ? `${cur.occupancyPct.toFixed(0)}%` : "—"}</td>
+        <td className="r num">{cur.availableNights > 0 ? occupancyPctText(cur.occupancyPct) : "—"}</td>
         <td className="r num">{cur.occupiedNights > 0 ? yen(cur.adr) : "—"}</td>
         <td className="r num">{cur.availableNights > 0 ? yen(cur.revpar) : "—"}</td>
         <td className="r num">{cur.revenue > 0 ? yen(cur.net) : "—"}</td>
@@ -648,7 +650,7 @@ function ReportTab({
             {bars.map(({ cur, month }) => (
               <span className={selectedMonths.has(month) ? "on" : ""} key={month} title={month}>
                 <b className={month.endsWith("-01") ? "y" : undefined}>{monthShort(month)}</b>
-                <small>{cur.availableNights > 0 ? `${cur.occupancyPct.toFixed(0)}%` : "—"}</small>
+                <small>{cur.availableNights > 0 ? occupancyPctText(cur.occupancyPct) : "—"}</small>
               </span>
             ))}
           </div>
@@ -667,7 +669,7 @@ function ReportTab({
             <span className="l">{copy.channelTitle}</span>
             <span aria-hidden="true" className="rvw-stack">
               {channels.map(({ key, value }) => (
-                <i key={key} style={{ background: CHANNEL_COLOR[key], width: `${share(value, current.revenue)}%` }} />
+                <i key={key} style={{ background: CHANNEL_COLOR[key], width: `${(value / Math.max(1, current.revenue)) * 100}%` }} />
               ))}
             </span>
             {channels.map(({ key, value }, index) => (
@@ -675,7 +677,7 @@ function ReportTab({
                 <i style={{ background: CHANNEL_COLOR[key] }} />
                 <span className="n">{channelName[key]}</span>
                 <span className="a">{yen(value)}</span>
-                <b>{`${share(value, current.revenue).toFixed(0)}%`}</b>
+                <b>{`${channelShares[index]}%`}</b>
               </div>
             ))}
           </div>
@@ -830,7 +832,7 @@ function MatrixTab({
   const value = (m: RevenueMetrics) =>
     metric === "revenue" ? m.revenue : metric === "net" ? m.net : metric === "occupancy" ? m.occupancyPct : metric === "adr" ? m.adr : m.revpar;
   const short = (v: number) =>
-    metric === "occupancy" ? `${v.toFixed(0)}%` : metric === "adr" || metric === "revpar" ? `${Math.round(v / 1000)}K` : (v / 1e6).toFixed(1);
+    metric === "occupancy" ? occupancyPctText(v) : metric === "adr" || metric === "revpar" ? `${Math.round(v / 1000)}K` : (v / 1e6).toFixed(1);
   const unit = metric === "occupancy" ? copy.unitPercent : metric === "adr" || metric === "revpar" ? copy.unitThousand : copy.unitMillion;
   const perRow = metric === "revenue" || metric === "net";
   const isPast = (month: string) => monthPhase(month, data.today) === "past";
@@ -917,13 +919,14 @@ function MatrixTab({
         .sort((a, b) => a.m.occupancyPct - b.m.occupancyPct)
     : [];
   const pickChannels = CHANNELS.map((key) => ({ key, value: pickCur[key] })).filter((c) => c.value > 0);
+  const pickShares = wholeShares(pickChannels.map((c) => c.value));
   const change = (text: string, delta: number | null) => (
     <span className={delta !== null && delta <= -0.05 ? "is-red" : "rvw-up"}>{text}</span>
   );
   const adrDelta = pickPrev.occupiedNights > 0 && pickCur.occupiedNights > 0 ? changePct(pickCur.adr, pickPrev.adr) : null;
   const revparDelta = pickPrev.availableNights > 0 && pickCur.availableNights > 0 ? changePct(pickCur.revpar, pickPrev.revpar) : null;
   const revDelta = pickPrev.revenue > 0 ? changePct(pickCur.revenue, pickPrev.revenue) : null;
-  const arrow = (delta: number | null) => (delta === null ? "" : `${delta >= 0 ? "▲" : "▼"}${Math.abs(delta).toFixed(1)}%`);
+  const arrow = (delta: number | null) => (delta === null ? "" : deltaText(delta));
   const metricName: Record<Metric, string> = {
     adr: copy.metricAdr,
     net: copy.metricNet,
@@ -1028,7 +1031,7 @@ function MatrixTab({
             </dd>
             <dt>{copy.colOccupancy}</dt>
             <dd>
-              {pickCur.availableNights > 0 ? `${pickCur.occupancyPct.toFixed(0)}%` : "—"}
+              {pickCur.availableNights > 0 ? occupancyPctText(pickCur.occupancyPct) : "—"}
               {pickPrev.availableNights > 0 && pickCur.availableNights > 0 && (
                 <> · {change(pointText(pickCur.occupancyPct, pickPrev.occupancyPct), pickCur.occupancyPct - pickPrev.occupancyPct)}</>
               )}
@@ -1057,10 +1060,10 @@ function MatrixTab({
                 ))}
               </span>
               <span className="rvw-dlg">
-                {pickChannels.map(({ key, value: v }) => (
+                {pickChannels.map(({ key }, index) => (
                   <span key={key}>
                     <i style={{ background: CHANNEL_COLOR[key] }} />
-                    {channelName[key]} {((v / Math.max(1, pickCur.revenue)) * 100).toFixed(0)}
+                    {channelName[key]} {pickShares[index]}
                   </span>
                 ))}
               </span>
@@ -1075,7 +1078,7 @@ function MatrixTab({
                     <div className="rvw-rr" key={room.label} style={{ "--i": index } as CSSProperties}>
                       <span className="n">{bRoom(room.label)}</span>
                       <span className="a">{yen(room.m.revenue)}</span>
-                      <b className={room.m.occupancyPct < 60 ? "is-red" : undefined}>{room.m.occupancyPct.toFixed(0)}%</b>
+                      <b className={isLowOccupancy(room.m.occupancyPct) ? "is-red" : undefined}>{occupancyPctText(room.m.occupancyPct)}</b>
                     </div>
                   ))}
                 </div>

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  OCCUPANCY_LINE,
   heatLevel,
+  isLowOccupancy,
+  occupancyPctText,
   isMostlyVacant,
   mostVacantCells,
   occupancyGrade,
@@ -66,5 +69,25 @@ describe("mostVacantCells", () => {
       { available: 300, id: "c", vacant: 277 },
     ];
     expect(mostVacantCells(cells, 2).map((c) => c.id)).toEqual(["c", "a"]);
+  });
+});
+
+describe("isLowOccupancy — 표시(정수) 60 미만만 빨강", () => {
+  it("화면에 60% 로 보이면 빨강이 아니다", () => {
+    expect(OCCUPANCY_LINE).toBe(60);
+    expect(isLowOccupancy(66.7)).toBe(false);
+    expect(isLowOccupancy(60)).toBe(false);
+    expect(isLowOccupancy(59.5)).toBe(false);
+    expect(isLowOccupancy(59.4)).toBe(true);
+    expect(isLowOccupancy(Number.NaN)).toBe(false);
+  });
+});
+
+describe("occupancyPctText — 가동률은 정수", () => {
+  it("반올림 · NaN", () => {
+    expect(occupancyPctText(71.1)).toBe("71%");
+    expect(occupancyPctText(66.7)).toBe("67%");
+    expect(occupancyPctText(0)).toBe("0%");
+    expect(occupancyPctText(Number.NaN)).toBe("—");
   });
 });

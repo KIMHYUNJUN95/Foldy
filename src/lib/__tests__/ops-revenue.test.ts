@@ -10,6 +10,7 @@ import {
   quintileCuts,
   quintileLevel,
   shiftRange,
+  wholeShares,
   splitByMonth,
   sumMetrics,
   weekStart,
@@ -103,5 +104,28 @@ describe("matrix levels", () => {
     expect(yoyLevel(0)).toBe(2);
     expect(yoyLevel(10)).toBe(3);
     expect(yoyLevel(40)).toBe(4);
+  });
+});
+
+describe("wholeShares — 비율 합이 100", () => {
+  it("나머지 큰 순서로 1씩", () => {
+    const out = wholeShares([1, 1, 1]);
+    expect(out.reduce((a, b) => a + b, 0)).toBe(100);
+    expect(out).toEqual([34, 33, 33]);
+    expect(wholeShares([50.5, 30.2, 19.3]).reduce((a, b) => a + b, 0)).toBe(100);
+  });
+  it("입력이 많아도 합이 100", () => {
+    const sum = (v: number[]) => v.reduce((a, b) => a + b, 0);
+    expect(sum(wholeShares(Array(7).fill(1)))).toBe(100);
+    expect(sum(wholeShares(Array(13).fill(1)))).toBe(100);
+    expect(sum(wholeShares([12.34, 23.45, 19.99, 30.01, 14.21]))).toBe(100);
+    expect(sum(wholeShares([0, 0, 0, 0, 0, 0, 0]))).toBe(0);
+  });
+  it("0 건 · 하나뿐 · 동률", () => {
+    expect(wholeShares([0, 0])).toEqual([0, 0]);
+    expect(wholeShares([])).toEqual([]);
+    expect(wholeShares([7])).toEqual([100]);
+    expect(wholeShares([1, 1])).toEqual([50, 50]);
+    expect(wholeShares([2, 1, 0])).toEqual([67, 33, 0]);
   });
 });

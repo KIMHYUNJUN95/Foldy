@@ -151,6 +151,11 @@ export function bridgeScale(steps: readonly BridgeStep[]): { base: number; top: 
   return { base, ticks, top, unit };
 }
 
+/** B 기간에 판매 기록이 있나 — 없으면 증감 대신 「비교할 기록 없음」 로 보인다. */
+export function hasComparisonRecord(bRevenue: number): boolean {
+  return bRevenue > 0;
+}
+
 /** 0 이 아니면 증감률(%), B 가 0 이면 `null`. */
 export function changePctOrNull(a: number, b: number): number | null {
   return b !== 0 ? ((a - b) / Math.abs(b)) * 100 : null;

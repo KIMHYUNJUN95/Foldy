@@ -60,7 +60,7 @@ const VALUE_BG = ["#FAF8FF", "#EFEAFB", "#DCD0FA", "#C2AEF6", "#A688F0"];
 const YOY_BG = ["#FBE3E4", "#FDF1F1", "#F5F5F7", "#E8F4EC", "#D3EBDD"];
 const YOY_FG = ["#a3202a", "#c5282e", "#6b6878", "#1f7a4d", "#17603c"];
 /** 채널은 보라로 바꾸지 않고 각 회사 색 그대로(시안 Rev-PC). */
-const CHANNEL_COLOR: Record<ChannelKey, string> = { airbnb: "#FF5A5F", booking: "#003B95", direct: "#8B8898", other: "#D9D7E0" };
+const CHANNEL_COLOR: Record<ChannelKey, string> = { airbnb: "#FF385C", booking: "#003B95", direct: "#8B8898", other: "#D9D7E0" };
 const CHANNELS: readonly ChannelKey[] = ["airbnb", "booking", "direct", "other"];
 
 /** 기간 → 주소. 월은 공용 월 선택기(`?ym=`)와 같은 키를 쓴다. */

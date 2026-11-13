@@ -18,7 +18,7 @@ import { messagePlainText } from "@/lib/guest-messages/message-body";
 export type GmCopy = Dictionary["guestMessages"];
 
 export const CHANNEL_DOT: Record<GuestChannelKey | "none", string> = {
-  airbnb: "#FF5A5F",
+  airbnb: "#FF385C",
   booking: "#003B95",
   expedia: "#8B8898",
   agoda: "#8B8898",

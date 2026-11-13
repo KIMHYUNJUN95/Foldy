@@ -145,7 +145,7 @@
 .adm .dh-turn__in .dh-turn__name { font-weight: 600; color: var(--ink); }
 .adm .dh-turn__none { font-size: 13px; color: #c9c7d1; }
 .adm .dh-ch-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: #d9d7e0; }
-.adm .dh-ch-dot--airbnb { background: #ff5a5f; }
+.adm .dh-ch-dot--airbnb { background: #ff385c; }
 .adm .dh-ch-dot--booking { background: #003b95; }
 .adm .dh-ch-dot--direct { background: #8b8898; }
 .adm .dh-ch-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12px; color: var(--adm-muted); }

@@ -43,7 +43,7 @@ function calendarHref(property: string, month: string): string {
 }
 
 const CHANNEL_COLOR: Record<RevenueChannelKey, string> = {
-  airbnb: "#ff5a5f",
+  airbnb: "#ff385c",
   booking: "#003b95",
   direct: "#8b8898",
   other: "#d9d7e0",

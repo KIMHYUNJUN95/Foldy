@@ -80,7 +80,7 @@
 .mrl-ch { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; white-space: nowrap; }
 .mrl-ch i { width: 7px; height: 7px; border-radius: 50%; }
 .mrl-ch.is-a { color: #e0484d; }
-.mrl-ch.is-a i { background: #ff5a5f; }
+.mrl-ch.is-a i { background: #ff385c; }
 .mrl-ch.is-b { color: #003b95; }
 .mrl-ch.is-b i { background: #003b95; }
 

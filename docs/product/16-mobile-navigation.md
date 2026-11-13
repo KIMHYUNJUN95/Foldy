@@ -360,6 +360,13 @@ All previous functionality is preserved; only the layout/visual style changed.
 - Scoped styles live in `src/components/mobile/home-screen.css` (every selector is
   prefixed with `.hm` so it never leaks into other screens). The page markup is in
   `src/app/mobile/page.tsx` and still does all server-side data fetching.
+- **홈 다듬기 (2026-11-13, 시안 승인):** 큰 제목은 인사말 대신 **도쿄 오늘 날짜**(ko 「11월 13일 금요일」 · ja 「11月13日(金)」 · en 「Friday, November 13」,
+  `src/lib/home-date-title.ts`, 작은 날짜 줄 없음 · 인사말 `GreetingLine` 은 홈에서 안 씀). 큰 제목 · 「아직 출근 전이에요」 · 체크인/아웃 숫자는 굵기 600.
+  「GPS+QR」 표시 제거. 체크인/아웃 구역 제목 「체크인 · 체크아웃」(위 큰 제목이 이미 오늘 날짜라 「오늘」 뺌 — ja 「チェックイン・アウト」 · en 「Check-ins · check-outs」), 칸 이름은 「체크인」 「체크아웃」 — 폴드 · 태블릿도 이름 아래 숫자.
+  진행 중 작업 빈 상태는 왼쪽 정렬 한 줄 「진행 중인 청소 없음」. 빠른 실행은 홈 전용 짧은 라벨(`mobile.homeQuickLabels`, 한 줄 고정 · 폴드 12px)이고 비품 주문 아이콘은
+  `Package`. 오늘 기록은 두 줄(위 무슨 일 `mobile.homeActivityWhat` · 아래 어디 13px 말줄임) + 종류 아이콘 18px 회색(`src/lib/home-activity.ts`), 행 60px.
+  비품 주문 장소의 꼬리 「-」(방 없음)는 `joinBuildingRoom` 으로 건물만. 공지 알약의 홀로 남는 「·」 제거(폰 줄만 「공지 · 중요」). 태블릿(≥ 1000)은 **2칸** —
+  왼쪽 5fr(근태 → 체크인/체크아웃 → 빠른 실행 → 진행 중 작업) · 오른쪽 6fr 오늘 기록, 폴드는 위 2칸 + 아래 오늘 기록 전체 폭 그대로. 테스트 `src/lib/__tests__/home-mobile.test.ts`.
 - The warm ivory chrome contract is unchanged: cards/sheets stay cream/white, the
   brand accent stays deep ink navy.
 

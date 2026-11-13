@@ -1,3 +1,4 @@
+import { joinBuildingRoom } from "@/lib/home-activity";
 import type { AppSession } from "@/lib/session";
 import { getCleaningOperatingDateKey } from "@/lib/cleaning";
 import {
@@ -319,7 +320,7 @@ export async function getHomeTodayActivity(
       events.push({
         id: `order-${row.id}`,
         // 건물 + 방으로 두어 홈 로그가 다른 이벤트와 같은 방식으로 현지화하게 한다.
-        room: `${row.building_name} ${row.room_label}`.trim(),
+        room: joinBuildingRoom(row.building_name, row.room_label),
         timestamp: row.created_at,
         type: "order_requested",
       });

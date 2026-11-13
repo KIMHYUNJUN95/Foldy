@@ -2,7 +2,6 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
-  Bell,
   ChevronRight,
   Package,
   QrCode,
@@ -20,8 +19,9 @@ import { groupByBuilding } from "@/lib/home-reservation-groups";
 import { HomeElapsedTimer } from "@/components/mobile/home-elapsed-timer";
 import { HomeRefreshButton } from "@/components/mobile/home-refresh-button";
 import { MobileShell } from "@/components/shell/mobile-shell";
-import { getCurrentOpenSession, getTodayWorkState } from "@/lib/attendance-sessions";
-import { GreetingLine } from "@/components/shared/greeting-line";
+import { getCurrentOpenSession } from "@/lib/attendance-sessions";
+import { cleanActivityPlace, getActivityWhat } from "@/lib/home-activity";
+import { formatTokyoDateTitle } from "@/lib/home-date-title";
 import { getDictionary } from "@/lib/i18n";
 import { getMobileNotificationBadge } from "@/lib/nav-badges";
 import {
@@ -39,7 +39,7 @@ import {
   getDisplayRoomLabel,
 } from "@/lib/room-label-normalization";
 import { getCurrentAppSession, hasOrganizationContext, type AppSession } from "@/lib/session";
-import type { Dictionary, Locale } from "@/lib/i18n";
+import type { Dictionary } from "@/lib/i18n";
 import "@/components/mobile/home-screen.css";
 import { Beds24LiveRefresh } from "@/components/shared/beds24-live-refresh";
 import { LiveRefresh } from "@/components/shared/live-refresh";
@@ -77,20 +77,10 @@ function localizeRoomLabel(rawRoom: string, buildingLabels: Record<string, strin
   if (!buildingKey) return rawRoom;
   const localizedBuilding = buildingLabels[buildingKey];
   if (!localizedBuilding) return rawRoom;
-  const roomPart = rawRoom.slice(canonicalProperty.length).trim();
+  const roomPart = rawRoom.slice(canonicalProperty.length).trim().replace(/^-$/, "");
   // Arakicho 하위 호실(201_2 → 201)을 합쳐서 다른 방 화면들과 라벨이 같게 한다.
   const displayRoom = roomPart ? getDisplayRoomLabel(canonicalProperty, roomPart) : "";
   return displayRoom ? `${localizedBuilding} ${displayRoom}` : localizedBuilding;
-}
-
-// 활동 이벤트 → 로그 행 아이콘 강조색(이전 홈의 타임라인 점 의미를
-// 그대로 이어받아 리디자인 뒤에도 이벤트 종류가 구분되게 한다).
-function getActivityLogClass(event: HomeActivityEvent): string {
-  if (event.type === "lost_item_reported") return "lost";
-  if (event.type === "maintenance_reported") return "maint";
-  if (event.type === "order_requested") return "order";
-  if (event.type === "linen_returned") return "linen";
-  return "cleaning";
 }
 
 function getActivityLogIcon(event: HomeActivityEvent) {
@@ -108,44 +98,6 @@ function resolveCleaningTaskLabel(
   if (!rawTaskLabel) return undefined;
   if (!taskOptions) return rawTaskLabel;
   return taskOptions[rawTaskLabel] ?? rawTaskLabel;
-}
-
-function getActivityLabel(
-  event: HomeActivityEvent,
-  dict: Dictionary["mobile"],
-  taskOptions: Record<string, string> | undefined,
-): string {
-  switch (event.type) {
-    case "cleaning_completed":
-      return dict.homeActivityCleaningCompleted(
-        event.room,
-        resolveCleaningTaskLabel(event.taskLabel, taskOptions),
-      );
-    case "lost_item_reported":
-      return dict.homeActivityLostItemReported(event.room);
-    case "maintenance_reported":
-      return dict.homeActivityMaintenanceReported(event.room);
-    case "order_requested":
-      return dict.homeActivityOrderRequested(event.room);
-    case "linen_returned":
-      return dict.homeActivityLinenReturned(event.room);
-  }
-}
-
-const GREETING_LOCALE_TAG: Record<Locale, string> = {
-  ko: "ko-KR",
-  ja: "ja-JP",
-  en: "en-US",
-};
-
-function formatGreetingDate(locale: Locale): string {
-  return new Intl.DateTimeFormat(GREETING_LOCALE_TAG[locale] ?? "ko-KR", {
-    timeZone: "Asia/Tokyo",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    weekday: "long",
-  }).format(new Date());
 }
 
 /**
@@ -181,30 +133,30 @@ async function HomeBody({
   const quickActionItems: QuickActionItem[] = [
     {
       id: "cleaning",
-      label: m.quickActions.cleaning,
+      label: m.homeQuickLabels.cleaning,
       href: "/mobile/cleaning",
       Icon: Sparkles,
       colorClass: "a",
     },
     {
       id: "maintenance",
-      label: m.quickActions.maintenance,
+      label: m.homeQuickLabels.maintenance,
       href: "/mobile/maintenance/new",
       Icon: Wrench,
       colorClass: "b",
     },
     {
       id: "lostItem",
-      label: m.quickActions.lostItem,
+      label: m.homeQuickLabels.lostItem,
       href: "/mobile/lost-found/new",
       Icon: Search,
       colorClass: "c",
     },
     {
       id: "order",
-      label: m.quickActions.order,
+      label: m.homeQuickLabels.order,
       href: "/mobile/orders/new",
-      Icon: Bell,
+      Icon: Package,
       colorClass: "d",
     },
   ];
@@ -231,7 +183,6 @@ async function HomeBody({
                 ? (openAttendanceSession.openBreakStartedAt ? a.ringOnBreak : a.ringWorking)
                 : m.homeClockBefore}
             </span>
-            <span className="hm__ch-tag">{m.homeClockMethodQr}</span>
           </div>
           {openAttendanceSession?.clockInAt ? (
             <div className="hm__ch-big hm__ch-big--timer mono">
@@ -294,6 +245,8 @@ async function HomeBody({
             <HomeCheckInOut
               checkInLabel={dictionary.admin.stats.checkIns}
               checkOutLabel={dictionary.admin.stats.checkOuts}
+              checkInTile={m.homeStatsCheckIn}
+              checkOutTile={m.homeStatsCheckOut}
               checkIns={toReservationGroups(checkInOut.data.checkIns, buildingLabels)}
               checkOuts={toReservationGroups(checkInOut.data.checkOuts, buildingLabels)}
               emptyCheckIn={m.homeCheckInEmpty}
@@ -341,7 +294,6 @@ async function HomeBody({
           ) : (
             <div className="hm__taskempty">
               <div className="hm__taskempty-t">{m.homeActiveTaskNone}</div>
-              <div className="hm__taskempty-s">{m.homeActiveTaskNoneBody}</div>
             </div>
           )}
         </section>
@@ -386,27 +338,21 @@ async function HomeBody({
           ) : (
             <div className="hm__log">
               {todayActivity.data.map((event) => {
-                const localizedRoom = localizeRoomLabel(
-                  event.room,
-                  dictionary.cleaning.buildingLabels,
+                const place = cleanActivityPlace(localizeRoomLabel(event.room, buildingLabels));
+                const what = getActivityWhat(
+                  event.type,
+                  m.homeActivityWhat,
+                  event.taskLabel,
+                  resolveCleaningTaskLabel(event.taskLabel, dictionary.cleaning?.taskOptions),
                 );
                 return (
                   <div className="hm__log-r" key={event.id}>
-                    <span className={`hm__log-ic ${getActivityLogClass(event)}`}>
-                      {getActivityLogIcon(event)}
-                    </span>
+                    <span className="hm__log-ic">{getActivityLogIcon(event)}</span>
                     <div className="hm__log-b">
-                      <div className="hm__log-t">
-                        {getActivityLabel(
-                          { ...event, room: localizedRoom },
-                          m,
-                          dictionary.cleaning?.taskOptions,
-                        )}
-                      </div>
+                      <div className="hm__log-t">{what}</div>
+                      {place ? <div className="hm__log-s">{place}</div> : null}
                     </div>
-                    <span className="hm__log-time">
-                      {formatActivityTimeJst(event.timestamp)}
-                    </span>
+                    <span className="hm__log-time">{formatActivityTimeJst(event.timestamp)}</span>
                   </div>
                 );
               })}
@@ -418,12 +364,6 @@ async function HomeBody({
   );
 }
 
-
-/** 인사말 — 오늘 근무 상태(쿼리 하나)를 기다리는 동안은 예전 문구로 자리만 잡는다(첫 화면은 막지 않음). */
-async function HomeGreeting({ session, locale, name, fallback }: { session: AppSession; locale: Locale; name: string; fallback: string }) {
-  const work = await getTodayWorkState(session.organization.id, session.user.id).catch(() => "none" as const);
-  return <GreetingLine surface="home" locale={locale} name={name} work={work} fallback={fallback} />;
-}
 
 export default async function MobileHomePage() {
   const session = await getCurrentAppSession();
@@ -442,8 +382,7 @@ export default async function MobileHomePage() {
 
   const navBadges = await getMobileNotificationBadge();
 
-  const greetDate = formatGreetingDate(locale);
-  const userName = session.user.name?.trim() || "";
+  const dateTitle = formatTokyoDateTitle(locale);
 
   return (
     // 넓은 화면(폴드 · 태블릿)은 카드를 열로 나눠 쓴다(`home-screen.css` `.hm__grid` — 2026-10-05 시안 6b · 6c).
@@ -453,19 +392,12 @@ export default async function MobileHomePage() {
       <LiveRefresh sources={requestLiveSources(session.organization.id)} />
       {/* 앱을 켤 때(세션당 한 번) 스플래시 — 시안 Motion-B-Splash-Phone */}
       <div className="hm pb-2">
-        {/* 인사말 — 셸과 함께 바로 렌더된다(데이터 읽기 없음). */}
+        {/* 큰 제목 = 도쿄 오늘 날짜(2026-11-13) — 스크롤해 사라지면 셸 위 줄에 「홈」이 작게 뜬다(data-compact-title). */}
         <div className="hm__greet">
-          <div>
-            <div className="hm__greet-d">{greetDate}</div>
-            {/* 큰 제목(HIG 다듬기 2차) — 스크롤해 사라지면 셸 위 줄에 「홈」이 작게 뜬다(data-compact-title). */}
-            <h1 className="hm__greet-n" data-compact-title={m.homeTitle} data-large-title="">
-              <Suspense fallback={<span className="gl" aria-hidden="true">{m.homeGreeting(userName)}</span>}>
-                <HomeGreeting session={session} locale={locale} name={userName} fallback={m.homeGreeting(userName)} />
-              </Suspense>
-            </h1>
-          </div>
+          <h1 className="hm__greet-n" data-compact-title={m.homeTitle} data-large-title="">
+            {dateTitle}
+          </h1>
         </div>
-
 
         {/* 데이터가 많은 섹션은 스켈레톤 뒤에서 스트리밍되어 첫 페인트가 빠르게 유지된다. */}
         <Suspense fallback={<FoldyLoader />}>

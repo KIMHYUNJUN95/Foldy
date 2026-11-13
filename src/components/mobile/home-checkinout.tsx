@@ -21,6 +21,8 @@ export type HomeReservationGroup = {
 type Props = {
   checkInLabel: string;
   checkOutLabel: string;
+  checkInTile: string;
+  checkOutTile: string;
   checkIns: HomeReservationGroup[];
   checkOuts: HomeReservationGroup[];
   emptyCheckIn: string;
@@ -37,6 +39,8 @@ function countItems(groups: HomeReservationGroup[]): number {
 export function HomeCheckInOut({
   checkInLabel,
   checkOutLabel,
+  checkInTile,
+  checkOutTile,
   checkIns,
   checkOuts,
   emptyCheckIn,
@@ -66,14 +70,14 @@ export function HomeCheckInOut({
             <CalendarCheck2 aria-hidden="true" />
           </span>
           <div className="hm__stat-v">{inCount}</div>
-          <div className="hm__stat-k">{checkInLabel}</div>
+          <div className="hm__stat-k">{checkInTile}</div>
         </button>
         <button className="hm__stat" onClick={() => openSheet("out")} type="button">
           <span className="hm__stat-ic hm__stat-ic--alt">
             <Home aria-hidden="true" />
           </span>
           <div className="hm__stat-v">{outCount}</div>
-          <div className="hm__stat-k">{checkOutLabel}</div>
+          <div className="hm__stat-k">{checkOutTile}</div>
         </button>
       </div>
 

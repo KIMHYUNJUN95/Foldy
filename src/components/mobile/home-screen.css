@@ -45,16 +45,12 @@
   justify-content: space-between;
   margin: 2px 0 18px;
 }
-.hm__greet-d {
-  font-size: 15px;
-  color: var(--text-3);
-}
-/* 큰 제목(iOS Large Title 34/41, HIG 다듬기 2차). 인사말이 길면 두 줄로 고르게 나눈다. */
+/* 큰 제목(iOS Large Title 34/41, HIG 다듬기 2차) = 도쿄 오늘 날짜(2026-11-13). */
 .hm__greet-n {
   margin: 2px 0 0;
   font-size: 34px;
   line-height: 41px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.02em;
   text-wrap: balance;
 }
@@ -99,13 +95,9 @@
   background: var(--hm-primary);
   box-shadow: 0 0 0 4px #f1ecfd;
 }
-.hm__ch-tag {
-  font-size: 12px;
-  color: var(--text-3);
-}
 .hm__ch-big {
   font-size: 26px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.03em;
   margin-top: 4px;
 }
@@ -210,7 +202,7 @@
 }
 .hm__stat-v {
   font-size: 34px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.03em;
   line-height: 1.1;
 }
@@ -358,11 +350,13 @@
   font-weight: 600;
   color: #c5282e;
 }
+@media (max-width: 599px) {
 .hm__notice-cat + .hm__notice-badge::before {
   content: "·";
   margin-right: 7px;
   font-weight: 400;
   color: #c9c6d3;
+}
 }
 .hm__notice-t {
   font-size: 15px;
@@ -432,12 +426,11 @@
   margin-top: 2px;
 }
 .hm__taskempty {
-  padding: 14px 0 6px;
-  text-align: center;
+  padding: 4px 0;
 }
 .hm__taskempty-t {
   font-size: 14px;
-  font-weight: 600;
+  color: var(--hm-muted);
 }
 .hm__taskempty-s {
   font-size: 13px;
@@ -498,44 +491,50 @@
   font-weight: 500;
   color: var(--hm-ink-soft);
   text-align: center;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* 오늘의 활동 — 점 · 텍스트 · 시간, 헤어라인 */
+/* 오늘 기록 — 종류 아이콘 · 두 줄(무슨 일 / 어디) · 시각, 헤어라인(2026-11-13 시안) */
 .hm__log-r {
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 52px;
+  min-height: 60px;
 }
 .hm__log-r + .hm__log-r {
   border-top: 0.5px solid var(--separator);
-  border-image: linear-gradient(90deg, transparent 20px, var(--separator) 20px) 1;
+  border-image: linear-gradient(90deg, transparent 30px, var(--separator) 30px) 1;
 }
 .hm__log-ic {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #d0cfd8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
   flex: 0 0 auto;
-}
-.hm__log-r:first-child .hm__log-ic {
-  background: var(--hm-primary);
+  color: var(--text-3);
 }
 .hm__log-ic svg {
-  display: none;
+  width: 18px;
+  height: 18px;
 }
 .hm__log-b {
   flex: 1;
   min-width: 0;
 }
 .hm__log-t {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 400;
 }
 .hm__log-s {
   font-size: 13px;
   color: var(--hm-muted);
   margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .hm__log-time {
   font-family: var(--hm-mono);
@@ -654,10 +653,6 @@
   .hm__notice-b { display: flex; align-items: center; gap: 10px; }
   .hm__notice-badge { flex: none; font-size: 13px; }
   .hm__notice-cat { display: none; }
-  .hm__blk--stats .hm__stats { grid-template-columns: 1fr; gap: 18px; }
-  .hm__blk--stats .hm__stat { display: grid; grid-template-columns: 1fr auto; align-items: center; }
-  .hm__blk--stats .hm__stat-k { grid-row: 1; }
-  .hm__blk--stats .hm__stat-v { grid-row: 1; grid-column: 2; font-size: 34px; }
   .hm__blk--log { margin-top: 22px; padding-top: 4px; border-top: 0.5px solid var(--separator); }
 }
 
@@ -668,13 +663,25 @@
    * 셋째 줄 = 바로가기 · 진행 중 작업. 전에는 공지 자리가 비면 체크인/아웃 제목이 혼자 내려가고, 출근 카드는 제목이 없어 윗선이 달랐다.
    */
   .hm__grid {
-    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
     grid-template-areas:
-      "hero stats log"
-      "qa task log";
-    grid-template-rows: auto 1fr;
-    column-gap: 48px;
+      "hero log"
+      "stats log"
+      "qa log"
+      "task log";
+    grid-template-rows: auto auto auto 1fr;
+    column-gap: 56px;
   }
+  /* 왼쪽 칸은 내용 높이만큼만(카드 늘리기는 폴드 전용). */
+  .hm__blk--hero > .hm__clockhero { flex: none; }
+  .hm__blk--stats > section,
+  .hm__blk--stats .hm__stats { flex: none; }
+  .hm__blk--qa > .hm__qa { flex: none; }
+  .hm__blk--task > section,
+  .hm__blk--task > section > * { flex: none; }
+  .hm__blk--stats,
+  .hm__blk--qa,
+  .hm__blk--task { margin-top: 28px; }
   /* 공지는 인사 줄 오른쪽 끝(시안) — 칸 줄에서 빼서 위에 띄운다. */
   .hm { position: relative; }
   .hm__blk--notice { position: absolute; top: 14px; right: 0; max-width: 360px; }
@@ -682,8 +689,14 @@
   .hm__blk--log { margin-top: 0; padding-top: 0; border-top: 0; }
   /* 둘째 줄 칸 제목은 모두 같은 높이에서 시작한다. */
   .hm__blk--hero > .hm__sectt:first-child,
-  .hm__blk--stats > .hm__sectt:first-child,
   .hm__blk--log > .hm__sectt-row:first-child { margin-top: 6px; }
+  .hm__blk--stats > .hm__sectt:first-child,
+  .hm__blk--qa > .hm__sectt-row:first-child { margin-top: 0; }
+}
+
+/* 폴드 폭에서 빠른 실행 칸이 좁다 — 한 줄 유지(2026-11-13). */
+@media (min-width: 600px) and (max-width: 999px) {
+  .hm__qa-lbl { font-size: 12px; letter-spacing: -0.02em; }
 }
 
 /* 출근 현장 · 출근 시각 — 로그인 칸과 같은 모양(2026-10-13 시안 컨펌): 흰 바탕 · 옅은 테두리, 이름은 왼쪽 위 테두리에 겹친다. */
@@ -709,4 +722,4 @@
   color: #6b6878;
   white-space: nowrap;
 }
-.hm__ch-meta-v { font-size: 15px; font-weight: 700; }
+.hm__ch-meta-v { font-size: 15px; font-weight: 600; }

@@ -10,6 +10,8 @@ import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { haptic } from "@/lib/haptics";
 import type { Dictionary } from "@/lib/i18n";
 import { localizeBuildingName } from "@/lib/room-label-normalization";
+import { occupancyPctText } from "@/lib/ops-occupancy";
+import { wholeShares } from "@/lib/ops-revenue";
 import type { RevenueChannelKey, RevenueSummary } from "@/lib/ops-revenue-summary";
 import "./mobile-revenue.css";
 
@@ -155,7 +157,7 @@ export function MobileRevenue({
     );
   }
 
-  /** 증감 한 줄 — 오르면 보라, 내리면 빨강, 전년 없으면 흐리게. */
+  /** 증감 한 줄 — 오르면 보라, 내리면 빨강, 전년 기록 없으면 흐리게. */
   const deltaLine = (delta: number | null) => (
     <span className={`mrv-d${delta === null ? " is-none" : isDown(delta) ? " is-down" : ""}`}>
       {delta === null ? copy.lastYearNone : fill(copy.vsLastYear, { d: signed(delta) })}
@@ -194,6 +196,7 @@ export function MobileRevenue({
     direct: copy.channelDirect,
     other: copy.channelOther,
   };
+  const channelShares = wholeShares(summary.channels.map((channel) => channel.amount));
   const topBuilding = Math.max(1, ...summary.buildings.map((building) => building.revenue));
 
   return (
@@ -211,7 +214,7 @@ export function MobileRevenue({
             {summary.occupancyPct !== null && (
               <>
                 {" · "}
-                {fill(copy.occupancy, { v: pct1(summary.occupancyPct) })}
+                {fill(copy.occupancy, { v: occupancyPctText(summary.occupancyPct) })}
               </>
             )}
           </span>
@@ -246,7 +249,7 @@ export function MobileRevenue({
                   [`--p${size}`, `${(month.previous / maxima[w]) * 100}%`],
                 ]),
               );
-              const occ = month.occupancyPct === null ? "—" : `${Math.round(month.occupancyPct)}%`;
+              const occ = month.occupancyPct === null ? "—" : occupancyPctText(month.occupancyPct);
               return (
                 <button
                   aria-label={fill(copy.barAria, { month: monthName(month.month, true), o: occ, v: yen(month.revenue) })}
@@ -287,12 +290,12 @@ export function MobileRevenue({
                 ))}
               </span>
               <ul>
-                {summary.channels.map((channel) => (
+                {summary.channels.map((channel, index) => (
                   <li key={channel.key}>
                     <i style={{ background: CHANNEL_COLOR[channel.key] }} />
                     <span className="mrv-ch__n">{channelName[channel.key]}</span>
                     <span className="mrv-ch__v num">{yen(channel.amount)}</span>
-                    <b className="num">{Math.round(channel.pct)}%</b>
+                    <b className="num">{channelShares[index]}%</b>
                   </li>
                 ))}
               </ul>

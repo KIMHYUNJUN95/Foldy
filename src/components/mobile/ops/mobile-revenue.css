@@ -25,7 +25,7 @@
 /* ── 머리 ── */
 .mrv-h { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
 .mrv-h__t { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.mrv-h__t h1 { margin: 0; font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: -0.02em; }
+.mrv-h__t h1 { margin: 0; font-size: 34px; line-height: 41px; font-weight: 600; letter-spacing: 0; }
 .mrv-h__t > span { font-size: 13px; color: var(--mrv-faint); }
 .mrv-mnav { display: flex; align-items: center; gap: 2px; flex: none; }
 .mrv-arrow, .mrv-mlabel {
@@ -43,24 +43,24 @@
 /* ── 총매출 ── */
 .mrv-hero { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .mrv-hero__l { font-size: 13px; color: var(--mrv-soft); }
-.mrv-hero__v { display: block; font-size: 34px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; }
+.mrv-hero__v { display: block; font-size: 34px; font-weight: 600; letter-spacing: 0; line-height: 1.1; }
 .mrv-hero__s { font-size: 13px; color: var(--mrv-soft); }
 .mrv-hero__s .mrv-d { font-size: 13px; font-weight: 600; }
 .mrv-d { font-size: 12px; color: var(--mrv-pri-ink); }
 .mrv-d.is-down { color: var(--mrv-red); }
-.mrv-d.is-none { color: var(--mrv-faint); }
+.mrv-d.is-none { color: var(--mrv-faint); font-weight: 400; }
 
 /* 숫자 넷(2×2) */
 .mrv-nums { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 16px; column-gap: 16px; margin: 0; }
 .mrv-nums > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 /* 큰 글씨에서도 잘리지 않게 줄바꿈(2026-10-22, 가동률과 같게). */
 .mrv-nums dt { font-size: 12px; line-height: 1.3; color: var(--mrv-soft); overflow-wrap: anywhere; }
-.mrv-nums dd { margin: 0; font-size: 19px; font-weight: 700; letter-spacing: -0.01em; white-space: nowrap; }
+.mrv-nums dd { margin: 0; font-size: 19px; font-weight: 600; letter-spacing: 0; white-space: nowrap; }
 .mrv-nums dd.mrv-nums__s { font-size: 12px; font-weight: 400; letter-spacing: 0; }
 
 /* ── 섹션 ── */
 .mrv-sec { display: flex; flex-direction: column; gap: 12px; padding-top: 18px; border-top: 0.5px solid var(--separator); min-width: 0; }
-.mrv-sec h2 { margin: 0; font-size: 15px; font-weight: 700; }
+.mrv-sec h2 { margin: 0; font-size: 15px; font-weight: 600; }
 .mrv-sec__h { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .mrv-sec__h > span { font-size: 12px; color: var(--mrv-faint); text-align: right; }
 .mrv-none, .mrv-empty { margin: 0; font-size: 13px; color: var(--mrv-soft); }
@@ -98,7 +98,7 @@
 .mrv-col.is-sel:not(.is-past) .mrv-col__b { box-shadow: inset 0 0 0 1.5px var(--mrv-pri); }
 .mrv-col__m { font-size: 11px; color: var(--mrv-faint); white-space: nowrap; }
 .mrv-col__o { font-size: 10px; color: var(--mrv-faint); }
-.mrv-col.is-sel .mrv-col__m { color: var(--mrv-ink); font-weight: 700; }
+.mrv-col.is-sel .mrv-col__m { color: var(--mrv-ink); font-weight: 600; }
 @keyframes mrv-grow { from { transform: scaleY(0); } }
 
 /* 채널 구성 */
@@ -132,7 +132,7 @@
 .mrv-row__d { width: 56px; flex: none; text-align: right; font-size: 12px; font-weight: 600; }
 .mrv-row__d.is-up { color: var(--mrv-green); }
 .mrv-row__d.is-down { color: var(--mrv-red); }
-.mrv-row__d.is-new { color: var(--mrv-pri-ink); }
+.mrv-row__d.is-new { color: var(--mrv-soft); font-weight: 400; }
 .mrv-row__bar { display: block; height: 6px; border-radius: 3px; background: var(--mrv-track); overflow: hidden; }
 .mrv-row__bar i {
   display: block; height: 100%; border-radius: 3px; background: var(--mrv-pri);

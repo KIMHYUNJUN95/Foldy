@@ -11,7 +11,7 @@
  * 서버가 부르고 결과만 클라이언트로 넘긴다(칸 전부를 넘기지 않는다 — 폰에 보낼 양을 줄이려고).
  */
 
-import { OCCUPANCY_LINE } from "@/lib/ops-occupancy";
+import { isLowOccupancy } from "@/lib/ops-occupancy";
 import { lastDayOfMonth, monthPhase, sumMetrics, type MonthPhase, type RevenueCell } from "@/lib/ops-revenue";
 import type { OpsRevenueData } from "@/lib/ops-revenue-server";
 
@@ -68,7 +68,7 @@ export function buildOccupancySummary(data: OpsRevenueData, included: readonly s
     .flatMap((property) => property.rooms)
     .filter((room) => {
       const cell = data.rangeRoomCells[room.key];
-      return !!cell && cell.availableNights > 0 && (cell.occupiedNights / cell.availableNights) * 100 < OCCUPANCY_LINE;
+      return !!cell && cell.availableNights > 0 && isLowOccupancy((cell.occupiedNights / cell.availableNights) * 100);
     }).length;
 
   const thisMonthKey = data.forwardMonths[0];

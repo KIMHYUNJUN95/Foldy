@@ -10,7 +10,7 @@ import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { haptic } from "@/lib/haptics";
 import type { Dictionary } from "@/lib/i18n";
 import { localizeBuildingName } from "@/lib/room-label-normalization";
-import { OCCUPANCY_LINE } from "@/lib/ops-occupancy";
+import { OCCUPANCY_LINE, isLowOccupancy, occupancyPctText } from "@/lib/ops-occupancy";
 import type { OccupancySummary } from "@/lib/ops-occupancy-summary";
 import "./mobile-occupancy.css";
 
@@ -69,7 +69,7 @@ export function MobileOccupancy({
   };
 
   const n = (value: number) => value.toLocaleString(localeTag);
-  const whole = (value: number) => `${Math.round(value)}%`;
+  const whole = occupancyPctText;
   const monthName = (month: string, withYear: boolean) =>
     new Intl.DateTimeFormat(localeTag, { month: "long", timeZone: "UTC", ...(withYear ? { year: "numeric" } : {}) }).format(
       new Date(`${month}-15T00:00:00Z`),
@@ -158,7 +158,7 @@ export function MobileOccupancy({
         <section className="moc-hero">
           <div className="moc-ring">
             <svg
-              aria-label={fill(copy.ringAria, { month: monthLabel(summary.month), v: hasMonth ? `${ringPct.toFixed(1)}%` : "—" })}
+              aria-label={fill(copy.ringAria, { month: monthLabel(summary.month), v: hasMonth ? occupancyPctText(ringPct) : "—" })}
               role="img"
               viewBox="0 0 152 152"
             >
@@ -176,7 +176,7 @@ export function MobileOccupancy({
             </svg>
             <span className="moc-ring__c">
               <b className="num">
-                {hasMonth ? <RollNumber text={ringPct.toFixed(1)} /> : "—"}
+                {hasMonth ? <RollNumber text={String(Math.round(ringPct))} /> : "—"}
                 {hasMonth && <small>%</small>}
               </b>
               {hasMonth && <span className={delta !== null && delta < 0 ? "is-down" : delta === null ? "is-none" : ""}>{deltaText}</span>}
@@ -213,7 +213,7 @@ export function MobileOccupancy({
           ) : (
             <ul>
               {summary.buildings.map((building, index) => {
-                const low = building.pct < OCCUPANCY_LINE;
+                const low = isLowOccupancy(building.pct);
                 return (
                   <li key={building.name}>
                     <Link
@@ -280,7 +280,7 @@ export function MobileOccupancy({
             <span aria-hidden="true" className="moc-chart__line" style={{ "--h": OCCUPANCY_LINE } as CSSProperties} />
             {summary.trend.map((month, index) => {
               const selected = month.month === summary.month;
-              const low = month.pct !== null && month.pct < OCCUPANCY_LINE && month.phase === "past";
+              const low = month.pct !== null && isLowOccupancy(month.pct) && month.phase === "past";
               const tone = month.phase === "future" ? "is-future" : month.phase === "current" ? "is-current" : low ? "is-low" : "";
               return (
                 <button

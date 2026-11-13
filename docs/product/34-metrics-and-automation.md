@@ -373,7 +373,7 @@ i18n `opsRevenueCompare` + `opsRevenue.tabCompare`(ko · ja · en).
 
 **PC 가동률 · 매출 · 매출 비교 다듬기 (2026-11-13 — 시안 승인)** — 계산식(분모 · 분배 · 집계)은 그대로, 표시 · 반올림 · 색 판정만:
 - **빨강 = 표시 값(정수) 60 미만 하나**(화면에 「60%」로 보이면 빨강 아님 · NaN 은 빨강 아님, 표기는 「—」)(`OCCUPANCY_LINE` · `isLowOccupancy`, `src/lib/ops-occupancy.ts`) — 가장 낮은 건물 KPI · 객실 × 월 평균 · 낮은 객실 목록 · 매출 건물 상세 객실 · 차트 막대 · 점선이 모두 같은 판정(예전 75 미만 · 「66.7% 인데 빨강」 버그). 히트맵 농도 단계(60–75 · 75–85 · 85–95 · 95+)는 그대로.
-- **가동률 퍼센트는 정수**(`occupancyPctText`) — KPI · 표 · 히트맵 · 비교 지표. 증감 p 는 소수 첫째 자리 그대로. 화면은 정수 · 내보내기(Excel/PDF)는 소수 1자리 그대로. 모바일 링(소수 1자리)은 이번에 안 건드림.
+- **가동률 퍼센트는 정수**(`occupancyPctText`) — KPI · 표 · 히트맵 · 비교 지표. 증감 p 는 소수 첫째 자리 그대로. 화면은 정수 · 내보내기(Excel/PDF)는 소수 1자리 그대로. 모바일은 아래 「모바일 다듬기」.
 - **KPI 위계**: 첫 칸(가동률 · 매출은 총매출)만 32px · 600, 나머지 22px · 500, 음수 자간 없음. ADR · RevPAR 라벨은 「ADR · 1박 평균」 · 「RevPAR · 방당 평균」(`opsRevenue.kpiAdr` · `kpiRevpar`). 전년 기록이 없으면 보조줄은 「전년 기록 없음」(`opsRevenue.noLastYear`).
 - **채널 비율 합 100%** — `wholeShares()`(`src/lib/ops-revenue.ts`, 내림 뒤 나머지 큰 순서로 1씩, 테스트 7경우 — 7 · 13개 동률 · 소수 5채널 · 운영 채널 4개 · 전부 0 포함). 막대 폭은 실제 비율 그대로, 글자만 정수 몫.
 - 건물 상세 증감은 다른 곳과 같은 `+12.3%` 표기(▲/▼ 없앰). 아래 설명은 한 줄 — 가동률 화면은 「빨강 = 60% 아래 · 판매한 날짜 수 ÷ …」(`opsOccupancy.basisNote`, 표 아래 `tableFoot` 삭제).
@@ -391,6 +391,12 @@ i18n `opsRevenueCompare` + `opsRevenue.tabCompare`(ko · ja · en).
 `ops-occupancy-white.css`(화면 전용 `.ocw-*` — 매출 화면의 `ops-revenue.css` · `.orv__*` 는 더 쓰지 않는다, 옛 `ops-occupancy.css` 삭제) ·
 `src/lib/ops-occupancy.ts` · `src/lib/ops-revenue-server.ts`(`forward`) · i18n `opsOccupancy`(+ 화이트 문구 `opsOccupancy.white`, ko · ja · en —
 기간 · 비교 · 정렬 문구는 `opsRevenue` 를 같이 쓴다).
+
+**모바일 가동률 · 매출 다듬기 (2026-11-13 — 시안 승인)** — PC 와 같은 헬퍼 · 같은 말(`mobile-occupancy.tsx` · `mobile-revenue.tsx` · i18n `opsOccupancy.mobile` · `opsRevenue.mobile`):
+- 가동률 퍼센트는 두 화면 모두 정수 `occupancyPctText`(링 가운데 · 건물 줄 · 앞으로 3달 · 월별 · 매출 hero 아래 「가동률 71%」). 빨강 = `isLowOccupancy`(정수 60 미만) 하나 — 「60% 미만」 객실 수(`underLine`, `ops-occupancy-summary.ts`)도 같은 판정(59.6% 는 세지 않음, 모바일만 사용). 증감 p · 수수료 비중 · 전년 대비 % 는 소수 1자리 그대로.
+- 채널 구성 비율 합 100%(`wholeShares`, 글자만 · 막대 폭은 실제 비율). 전에는 각자 반올림이라 43+32+26=101%.
+- 「전년 없음」→「전년 기록 없음」(ja 前年の記録なし · en No last-year data). 보통 굵기 400. ADR · RevPAR 라벨 = PC 와 같은 풀이(「ADR · 1박 평균」 · 「RevPAR · 방당 평균」), 채널 「직접 · 수기」.
+- 굵기 700→600: 화면 제목 · 링 숫자 · 숫자 · 건물 줄 · 앞으로 3달 · 섹션 제목(h2) · 고른 달 표시(월별 막대 숫자 · 달 이름). **700 으로 남긴 것**: 달 고르기 시트(`.moc-sheet__h` · `.moc-sheet__m.on` · `.mrv-sheet__h` · `.mrv-sheet__m.on`) — 공용 시트 계약. 음수 자간 0. 가동률 건물 이름은 한 줄 말줄임(en · ja 에서 두 줄로 꺾이던 것 제거). 매출 건물 줄의 「신규」는 보라 → 회색 글씨 400.
 
 ### 모바일 가동률 (2026-10-15 구현 — 시안 Occ-Phone · Occ-Fold · Occ-Tablet)
 

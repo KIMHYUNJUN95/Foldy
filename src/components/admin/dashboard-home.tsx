@@ -151,7 +151,9 @@ function OpsBlock({ ops, c, locale, buildingLabels }: { ops: DashboardOpsBlock; 
   const prevDiff = Math.round(s.occupancyPct) - Math.round(s.previousOccupancyPct);
   const r = 44;
   const circ = 2 * Math.PI * r;
-  const mMax = niceMax(Math.max(...s.months.map((m) => m.revenue), 1));
+  // 6개월 막대엔 눈금이 없고 금액을 막대 위에 쓰므로 보기 좋은 눈금(niceMax)으로 올리지 않는다 — 가장 큰 달이 칸의 86%
+  // (위 금액 글자 자리만 남김)까지 차게. 눈금으로 올리면 위쪽이 비어 막대가 짧아 보였다(2026-11-13 사용자 지적).
+  const mMax = Math.max(...s.months.map((m) => m.revenue), 1) / 0.86;
   const thisMonth = s.today.slice(0, 7);
   // 이번 달만 실적(아래)과 예약 확정(위)을 쌓는다 — 고른 달과 상관없이. 지난 달은 전부 실적, 앞 달은 전부 예약 확정.
   const thisMonthActual = s.month === thisMonth ? s.actualToDate : s.thisMonthActual;

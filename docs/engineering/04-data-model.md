@@ -2522,7 +2522,7 @@ INSERT · UPDATE 신호만, DELETE 는 오지 않는다. 대신 `task_occurrence
   (시각은 `greatest` 로만 앞으로, 「답장 기다림」은 새 안 읽은 손님 말이 기존 손님 말 · 답장보다 모두 나중일 때만, 「나중에」 유지 · 해제, 답장 → done). `security definer` · `search_path=''` · 실행 service_role 만. 규칙 문서: 47 §4-0.
 - `beds24_webhook_events.raw_payload` 칸 설명에 손님 메시지 임시 원문 기록(`messages_capture`) 예외를 적었다(47 §3-4).
 - 권한 키 시드: 새 마이그레이션의 insert + `202609100001` 자동 생성 구간(레지스트리 사본, 기존 키 추가 때와 같은 방식).
-- 1단계 뒤에 더한 것(`202611130001`~`0005` 운영 적용 2026-11-13, `202611130006` 미적용, 아래 날짜 구역): 2단계 `202611130001` · 건물 손님 칸 · 정해 둔 문구 `202611130003` · 자동 안내 `auto_message_rules` · `auto_message_runs` `202611130004` · 메시지 → 업무 `guest_message_links` `202611130005` · 정기 실행 함수 · pg_cron 잡 `202611130006`(표 없음 — Vault 시크릿 2개 · 함수 `guest_messages_cron_token_ok` · `guest_messages_cron_fire` · 잡 `guest-messages-reconcile` 15분 · `guest-messages-outbox` 5분 · `guest-messages-auto` 5분, 07 「손님 메시지 정기 실행」).
+- 1단계 뒤에 더한 것(`202611130001`~`0005` 운영 적용 2026-11-13, `202611130006` 운영 적용 2026-11-13, 아래 날짜 구역): 2단계 `202611130001` · 건물 손님 칸 · 정해 둔 문구 `202611130003` · 자동 안내 `auto_message_rules` · `auto_message_runs` `202611130004` · 메시지 → 업무 `guest_message_links` `202611130005` · 정기 실행 함수 · pg_cron 잡 `202611130006`(표 없음 — Vault 시크릿 2개 · 함수 `guest_messages_cron_token_ok` · `guest_messages_cron_fire` · 잡 `guest-messages-reconcile` 15분 · `guest-messages-outbox` 5분 · `guest-messages-auto` 5분, 07 「손님 메시지 정기 실행」).
 - 타입: `src/types/database.ts` 손으로 맞춤(생성 명령은 `npx supabase gen types typescript --linked`, 운영 적용 뒤).
 
 ## 2026-11-13 손님 메시지 2단계 (`202611130001_guest_messages_stage2.sql`, 운영 적용 2026-11-13)

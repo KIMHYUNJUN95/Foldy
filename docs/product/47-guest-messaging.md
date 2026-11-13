@@ -1,7 +1,7 @@
 # 47. 손님 메시지 (Beds24 CS) — 기획
 
-> 상태: **1단계 커밋 · 운영 DB 적용(2026-11-12) · 2~6단계(메시지함 · 답장 · 번역 · 정해 둔 문구 · 건물 정보 · 자동 안내 · 메시지 → 업무) 구현 — 커밋 전**(2026-11-13). **실제 Beds24 발송은 `GUEST_MESSAGES_SEND_ENABLED=1` 일 때만(기본 꺼짐).** 정기 실행(보정 조회 15분 · 발송 5분 · 자동 안내 5분)은 Supabase pg_cron 마이그레이션 `202611130006` 으로 준비만(미적용). 과거 메시지 가져오기는 정기 실행 없음.
-> 2~6단계 마이그레이션 `202611130001` → `0002` → `0003` → `0004` → `0005`(이 순서로, 코드 배포보다 먼저) · 정기 실행 `202611130006`(코드 배포 뒤) — `0001`~`0005` **운영 적용 2026-11-13**(사용자 SQL Editor) · `0006` 은 아직 미적용(코드 배포 뒤, 사용자 허락 뒤). 202611120002(운영 적용됨)는 고치지 않는다.
+> 상태: **1단계 커밋 · 운영 DB 적용(2026-11-12) · 2~6단계(메시지함 · 답장 · 번역 · 정해 둔 문구 · 건물 정보 · 자동 안내 · 메시지 → 업무) 구현 · 커밋 · 배포(2026-11-13)**. **실제 Beds24 발송은 `GUEST_MESSAGES_SEND_ENABLED=1` 일 때만(기본 꺼짐).** 정기 실행(보정 조회 15분 · 발송 5분 · 자동 안내 5분)은 Supabase pg_cron 마이그레이션 `202611130006` — 운영 적용 2026-11-13. 과거 메시지 가져오기는 정기 실행 없음.
+> 2~6단계 마이그레이션 `202611130001` → `0002` → `0003` → `0004` → `0005`(이 순서로, 코드 배포보다 먼저) · 정기 실행 `202611130006`(코드 배포 뒤) — `0001`~`0005` **운영 적용 2026-11-13**(사용자 SQL Editor) · `0006` 도 운영 적용 2026-11-13(배포 뒤 · 첫 보정 조회 성공). 202611120002(운영 적용됨)는 고치지 않는다.
 > 마이그레이션 `supabase/migrations/202611120002_guest_messages_foundation.sql` — **운영 적용 2026-11-12**(Dashboard SQL Editor, 표 4 · RLS 4 · 정책 6 · 함수 1 · 권한 8행 확인)
 > 시안 캔버스: https://claude.ai/artifact/EPUHqKjNJKC5ezeqG5WuVn (PC 메시지함 · 답장 칸 상태 · 폰/폴드/태블릿 · 자동 안내 규칙 · ja/en)
 > 관련 문서: 15 예약 캘린더(건물 정보) · 08 수리 · 09 분실물 · 25 게스트 피드백 · 28 할 일 · 43~46 셀프 체크인 · 33 Beds24 쓰기 · 05 RLS · 04 데이터 모델
@@ -143,7 +143,7 @@ Beds24 예약 웹훅 ──▶ /api/beds24/webhook (기존) ──▶ 메시지 
 - `last_reconcile_at` 은 **한 페이지라도 읽었을 때만** 고친다. 실패 · 건너뜀 이유는 `last_reconcile_error`(성공하면 null).
 - 라우트 `/api/beds24/messages-reconcile`(GET · POST, `?organizationId=` 선택) — 인가는 **`Authorization: Bearer <CRON_SECRET>` 만**(Beds24 웹훅 시크릿은 받지 않음, 없으면 404).
   `http_error` · `request_error` 로 멈췄거나 토큰이 없거나 예약 넣기 실패(`failedBookings`)가 있으면 207 · `ok: false`.
-- 정기 실행은 Supabase pg_cron 15분(`202611130006`, **미적용** — `vercel.json` · GitHub Actions 없음). 라우트는 `CRON_SECRET` 또는 pg_cron 토큰(Vault, `guest_messages_cron_token_ok()`)을 받는다.
+- 정기 실행은 Supabase pg_cron 15분(`202611130006`, **운영 적용 2026-11-13** — `vercel.json` · GitHub Actions 없음). 라우트는 `CRON_SECRET` 또는 pg_cron 토큰(Vault, `guest_messages_cron_token_ok()`)을 받는다.
 
 ### 4-0-2. 과거 메시지 가져오기 (2026-11-12 결정)
 
@@ -169,7 +169,7 @@ Beds24 예약 웹훅 ──▶ /api/beds24/webhook (기존) ──▶ 메시지 
 - **과거 메시지는 「답장 기다림 · 늦음」을 만들지 않는다.** `ingestConversationMessages({ history: true })` 가 「48시간 넘은 안 읽은 손님 말은 열지 않기」를
   새 대화뿐 아니라 이미 있는 대화에도 적용한다. **48시간 안의 안 읽은 손님 말에 답장이 없으면 답장 기다림으로 연다**(진짜로 기다리는 손님이라 — 전부 막으면
   뒤에 오는 보정 조회는 이미 있는 메시지라 다시 열 수 없다). 예약이 없어도 대화를 만든다(건물 · 객실은 매핑, 예약 날짜는 예약 캐시에 있으면). 첨부는 메타데이터만.
-- 라우트 `/api/beds24/messages-backfill`(GET · POST) — **인가 먼저**(`Authorization: Bearer <CRON_SECRET>` 만, 없으면 404, 틀리면 403), 그다음 동기화 멈춤이면 202.
+- 라우트 `/api/beds24/messages-backfill`(GET · POST) — **인가 먼저**(`Authorization: Bearer <CRON_SECRET 또는 pg_cron Vault 토큰>` — 2026-11-13 부터 다른 손님 메시지 정기 라우트와 같은 `authorizeGuestMessagesCron`, 둘 다 없으면 404, 틀리면 403). 운영에서는 CRON_SECRET 이 Sensitive 라 꺼낼 수 없어, 전체 가져오기는 SQL Editor 에서 잠깐 건 pg_cron 잡(`guest-messages-backfill-once`, 3분마다 20페이지)으로 돌리고 끝나면 잡을 지운다, 그다음 동기화 멈춤이면 202.
   `organizationId`(필수) · `mode=measure` · `restart=1` · `pages=1~20`. `maxDuration = 300`. **정기 실행에 넣지 않는다**(한 번만 하는 일). 토큰 없음 · 설정 없음 · `http_error` · `request_error` · 예약 실패로 멈추면 207.
 - 서버 액션(`src/actions/guest-messages-backfill.ts`, `guest_messages.manage` 만 — 아니면 `forbidden`, 조직은 세션에서):
   - `startGuestMessageBackfill({ mode?: "run" | "measure", restart?: boolean })` → `{ ok: true, status }` | `{ ok: false, errorKey: "forbidden" | "busy" | "done" | "too_soon" | "failed" }`.
@@ -243,7 +243,7 @@ Beds24 예약 웹훅 ──▶ /api/beds24/webhook (기존) ──▶ 메시지 
 | `src/lib/guest-messages/inbox-model.ts` | 순수 — 목록 상태(끝난 「나중에」 = 답장 기다림) · 정렬(목표 넘음 → 목표 비율 → 오래 기다림) · 「나중에」 시각(도쿄, 미래 · 30일 안 · 없는 날짜 거절) · 보낼 수 있는 채널(어댑터 `outboundChannelRefusal` 과 같음) · 번역 언어 |
 | `src/lib/guest-messages/inbox-server.ts` | 목록(열린 대화 ≤500 + 처리 끝 ≤200, 미리 보기 한 줄은 DB 함수 `guest_conversation_last_lines` — 대화마다 한 줄) · 대화(메시지 ≤300 · 큐 상태 · 작성자 이름(**이 조직 구성원만**) · 보는 사람 언어 번역 · 예약 인원) 읽기 · 메뉴 숫자(RLS 서버 클라이언트) |
 | `src/lib/guest-messages/outbox-runner.ts` | 발송 작업 — ① 10분 넘게 `sending` 인 줄(`claimed_at`)은 `uncertain`(`stuck`, 다시 안 보냄) ② 줄 잡기(`queued → sending` + `claimed_at`, **보낼 글은 잡을 때 돌려받은 값** — 읽은 뒤 고친 글이 옛 글로 나가지 않게) ③ `processOutboxBatch` ④ 결과 저장(`status = sending` 조건, 저장 실패 → `uncertain`(`save_failed`), 맞는 줄 0개 → 로그) ⑤ `sent` 면 대기 메시지 줄에 번호 잇기 → `guest_conversation_apply_messages`. 어댑터가 던지면 잡은 줄을 `uncertain` |
-| `src/app/api/guest-messages/outbox/route.ts` | 발송 작업 수동/예약 실행용(`CRON_SECRET` 또는 pg_cron 토큰 Bearer, 둘 다 없으면 404, 플래그 꺼지면 202). 보내기 · 다시 보내기 뒤 `after()` 로 돌고, 정기 실행은 `202611130006`(pg_cron 5분, 보낼 시각이 된 queued 줄 · 멈춘 sending 줄이 있을 때만 부름 — **미적용**). 읽기는 부작용 없음 |
+| `src/app/api/guest-messages/outbox/route.ts` | 발송 작업 수동/예약 실행용(`CRON_SECRET` 또는 pg_cron 토큰 Bearer, 둘 다 없으면 404, 플래그 꺼지면 202). 보내기 · 다시 보내기 뒤 `after()` 로 돌고, 정기 실행은 `202611130006`(pg_cron 5분, 보낼 시각이 된 queued 줄 · 멈춘 sending 줄이 있을 때만 부름 — 운영 적용 2026-11-13). 읽기는 부작용 없음 |
 | `src/lib/review-translate.ts` | `deeplTranslate()` 를 꺼내 리뷰 · 손님 메시지가 같은 키 · 같은 월 한도를 쓴다. 한도 = 리뷰 번역 글자 + `translation_usage` 합(DB 함수 `translation_usage_since` 한 번). 그 합을 못 읽으면 리뷰 번역은 **예전처럼 리뷰 글자만**, 손님 메시지(`strict`)는 번역 안 함 |
 | `src/lib/nav-badges.ts` · `src/app/admin/layout.tsx` · `src/config/navigation.ts` | 메뉴 「손님 메시지」(모바일 사이드 메뉴 · PC 운영 묶음) + 숫자 = 답장 기다림(볼 권한 있을 때만) |
 | `scripts/dev/seed-guest-messages.mjs` | 시험 데이터 8개 대화(Airbnb · Booking.com · 직접 예약 · 문의 · 숙박 중 · 목표 넘음 · 나중에 · 처리 끝 · 내부 메모 · 보내지 못한 답장). **운영 ref 면 멈춘다.** `--org <uuid>`(계획만) · `--apply` · `--reset` |
@@ -260,7 +260,7 @@ Beds24 예약 웹훅 ──▶ /api/beds24/webhook (기존) ──▶ 메시지 
 - 보낸 답장 취소(`queued` · `failed`)는 아직 안 나간 대기 메시지 줄을 **지운다**(hard delete — 기본 삭제 정책). 큐 줄은 `cancelled` 로 남는다.
 - **어느 OTA 인지 글자로 보인다**(2026-11-13 사용자 요청 — 점만으로는 모름). 목록 줄 아래 줄 맨 앞에 「● Airbnb」 · 「● Booking.com」 · 「● 직접 예약」(점은 채널 색 #FF5A5F · #003B95 · #8B8898, 글자는 진한 회색 — 칩 · 테두리 없음, 색 글자는 흰 바탕 대비가 4.5:1 이 안 돼 쓰지 않는다). 대화 머리(PC 이름 밑 · 폰 제목 밑 한 줄)와 예약 정보(PC 패널 · 폰 시트 「채널」 줄)에도 채널 이름. Airbnb · Booking.com · Expedia · Agoda · Vrbo 는 상표라 번역하지 않고, 「직접 예약 · 그 밖 · 모든 채널」은 사전(ko · ja · en).
 - **채널 필터**(PC `AdmDropdown` · 모바일 드롭다운, 상태 · 건물 옆): 모든 채널 / Airbnb / Booking.com / 직접 예약 / 그 밖(Expedia · Agoda · Vrbo · 모르는 채널 · 비어 있음). 주소 `?channel=airbnb|booking|direct|other`(모르는 값 = 모든 채널). 머리 숫자(답장 기다림 · 목표 넘음)도 채널 · 건물 필터를 따른다. 판정 `matchesChannelFilter()`(`inbox-model.ts`).
-- 아직 안 한 것: 읽음 표시(`markRead`) · 사진 첨부 보내기 · 그룹 예약 묶어 보기. 발송 작업 정기 실행은 `202611130006`(pg_cron 5분, 미적용 — §10). (정해 둔 문구 · 건물 정보 넣기는 3 · 4단계에 붙였다 — §5-5.)
+- 아직 안 한 것: 읽음 표시(`markRead`) · 사진 첨부 보내기 · 그룹 예약 묶어 보기. 발송 작업 정기 실행은 `202611130006`(pg_cron 5분, 운영 적용 2026-11-13 — §10). (정해 둔 문구 · 건물 정보 넣기는 3 · 4단계에 붙였다 — §5-5.)
 
 ### 5-5. 구현 (3 · 4단계, 2026-11-13)
 
@@ -311,7 +311,7 @@ Beds24 예약 웹훅 ──▶ /api/beds24/webhook (기존) ──▶ 메시지 
 | `src/lib/guest-messages/auto-model.ts` | 순수 — 보낼 시각(도쿄 `+09:00`, 달 · 해 · 윤년) · 규칙 검사 · 대상 판정 · 변수 채우기(손님 언어, 그 밖 = 영어) · 계획 `planAutoRun()` · 화면 상태 |
 | `src/lib/guest-messages/auto-scheduler.ts` | 계획 바퀴 `runAutoMessagePlanner()`(오늘 ± 32일 예약 × 켜진 규칙) · 보낼 시각이 된 줄 큐에 넣기 · 웹훅 뒤 계획만 `planAutoMessagesAfterWebhook()`(켜 둔 규칙이 있는 조직만 — 하나도 없으면 예약을 읽지 않고 끝남) |
 | `src/lib/guest-messages/auto-rules-server.ts` · `src/app/admin/messages/auto-actions.ts` | 규칙 만들기 · 고치기(버전 충돌) · 켜기 · 지우기 · 미리 보기 · 보낼 예정 목록 · 예약 하나 멈추기 |
-| `src/app/api/guest-messages/auto/route.ts` | 정기 작업 입구(`CRON_SECRET` 또는 pg_cron 토큰 Bearer — `cron-auth.ts`). 계획 → (발송 플래그 켜졌을 때만) 큐 넣기 → 발송 작업. 정기 실행은 `202611130006`(pg_cron 5분, 켜 둔 규칙이 있을 때만 부름 — **미적용**) |
+| `src/app/api/guest-messages/auto/route.ts` | 정기 작업 입구(`CRON_SECRET` 또는 pg_cron 토큰 Bearer — `cron-auth.ts`). 계획 → (발송 플래그 켜졌을 때만) 큐 넣기 → 발송 작업. 정기 실행은 `202611130006`(pg_cron 5분, 켜 둔 규칙이 있을 때만 부름 — 운영 적용 2026-11-13) |
 | `src/components/admin/messages/auto-messages-manager.tsx` · `src/components/guest-messages/auto-runs-list.tsx` · `auto-format.ts` | PC 「자동 안내」 탭(목록 + 켜기 · 보낼 예정 목록 + 규칙 고르기 · 편집 = 보내는 때 `AdmDropdown` + 날 수 + `AdminTimePicker` · 대상 드롭다운 3개 · 언어 탭 · 변수 넣기(출입 코드 묶음 따로) · 미리 보기(빈 변수 빨강)) · 대화 오른쪽 패널 「보낼 자동 안내」(멈추기 · 다시 보내기) · 모바일 예약 정보 시트(읽기만) |
 
 결정(확정 (2026-11-12 사용자)):
@@ -465,13 +465,13 @@ Beds24 예약 웹훅 ──▶ /api/beds24/webhook (기존) ──▶ 메시지 
 | 단계 | 내용 |
 | --- | --- |
 | 0 | V1~V4 확인(코드는 웹훅 원문 임시 기록만) — **임시 기록 구현 2026-11-12**(§3-4), 확인은 배포 · 적용 뒤 |
-| 1 | 수신(웹훅 추출 · 보정 조회 · 중복 막기) + 데이터 모델 + 어댑터 골격 — **구현 2026-11-12**(§4-0, 화면 없음 · 운영 DB 적용 2026-11-12 · 보정 조회 정기 실행은 `202611130006` pg_cron 15분(미적용)) |
+| 1 | 수신(웹훅 추출 · 보정 조회 · 중복 막기) + 데이터 모델 + 어댑터 골격 — **구현 2026-11-12**(§4-0, 화면 없음 · 운영 DB 적용 2026-11-12 · 보정 조회 정기 실행은 `202611130006` pg_cron 15분(운영 적용 2026-11-13)) |
 | 2 | PC 메시지함 · 모바일 3폭 · 답장 · 발송 큐 · 429 대기 · 내부 메모 · 처리 끝 — **구현 2026-11-13**(§5-4, 커밋 전 · 발송 플래그 기본 꺼짐 · `translation_usage` 마이그레이션 미적용) |
 | 3 | 응답 목표 시간 · 사용량 표시 — **구현 2026-11-13**(§5-5, 커밋 전) |
 | 4 | 건물별 정보 카드 · 정해 둔 문구 — **구현 2026-11-13**(§5-5, 커밋 전 · 마이그레이션 `202611130003` 운영 적용 2026-11-13) |
-| 5 | 자동 안내 규칙 · 보낼 예정 목록 — **구현 2026-11-13**(§5-6, 마이그레이션 `202611130004` 운영 적용 2026-11-13 · 정기 실행은 `202611130006` pg_cron 5분(미적용)) |
+| 5 | 자동 안내 규칙 · 보낼 예정 목록 — **구현 2026-11-13**(§5-6, 마이그레이션 `202611130004` 운영 적용 2026-11-13 · 정기 실행은 `202611130006` pg_cron 5분(운영 적용 2026-11-13)) |
 | 6 | 메시지 → 업무 한 번에 — **구현 2026-11-13**(§5-7, 마이그레이션 `202611130005` 운영 적용 2026-11-13) |
-| 정기 실행 | 보정 조회 · 발송 · 자동 안내 pg_cron — **준비 2026-11-13**(`202611130006` 미적용, `src/lib/guest-messages/cron-auth.ts`) |
+| 정기 실행 | 보정 조회 · 발송 · 자동 안내 pg_cron — **운영 적용 2026-11-13**(`202611130006`, `src/lib/guest-messages/cron-auth.ts`) |
 | 운영 반영 | **확정 (2026-11-12 사용자)** 순서: ① 마이그레이션 `202611130001` → `0005` 운영 적용(코드보다 먼저) ② 코드 배포 ③ 정기 실행 `202611130006` 적용(라우트가 pg_cron 토큰을 받는 코드가 나간 뒤 — Supabase pg_cron: 보정 조회 15분 · 발송 5분 · 자동 안내 5분) ④ 과거 가져오기 재기 모드 → 실제 가져오기는 밤에(동기화와 크레딧을 나눠 씀) ⑤ 실제 OTA 예약 하나로 답장 시험 뒤에만 `GUEST_MESSAGES_SEND_ENABLED=1`. 알고 둔 점: 발송 플래그는 SQL 이 모르므로, 꺼져 있는 동안에도 보낼 시각이 된 queued 줄이 있으면 발송 잡이 5분마다 라우트를 부르고 라우트는 202 로 끝난다(크레딧 안 씀, 07). 모두 사용자 허락 뒤 |
 | 나중 | AI 답장 초안(AI 기능 때) · 푸시 알림(알림 일괄 구현 때) · 이메일 어댑터(직접 예약 손님) · OTA 직접 연동 |
 
@@ -503,5 +503,5 @@ Beds24 예약 웹훅 ──▶ /api/beds24/webhook (기존) ──▶ 메시지 
 | Q9 | 답장 칸에서 출입 코드를 넣을 수 있는 사람 — **확정 (2026-11-12 사용자)**: 관리(`guest_messages.manage`) 또는 건물 정보 고치기(`property_info.edit`)만, 답장 권한만 있는 사람은 못 봄(§6-3) |
 | Q10 | 대화에 보이는 자동 안내의 출입 코드 — **확정 (2026-11-12 사용자)**: Q9 와 같은 사람만 보이고, 나머지는 「••••」로 가림(손님에게 나간 글은 그대로). 자동 안내 큐 줄 고치기 · 취소 · 다시 보내기는 관리만(§5-6) |
 | Q11 | 묶음 예약(Beds24 `masterId`, 방 여러 개)의 자동 안내 — **확정 (2026-11-12 사용자)**: 묶음마다 한 번, 대표 예약으로 보내고 `{room}` · `{entry_code_room}` 에 묶음의 방 전부(「201 / 202」 · 「201 코드 / 202 코드」, 한 방이라도 코드가 없으면 막힘)(§5-6) |
-| Q12 | 정기 실행 간격 — **확정 (2026-11-12 사용자): 보정 조회 15분 · 발송 5분 · 자동 안내 5분.** Vercel 요금제가 확인되지 않아(Hobby 는 하루보다 짧은 크론을 거절) `vercel.json` 이 아니라 Supabase pg_cron `202611130006`(미적용 — 적용은 사용자 허락 뒤) |
+| Q12 | 정기 실행 간격 — **확정 (2026-11-12 사용자): 보정 조회 15분 · 발송 5분 · 자동 안내 5분.** Vercel 요금제가 Hobby 라( 는 하루보다 짧은 크론을 거절) `vercel.json` 이 아니라 Supabase pg_cron `202611130006`(운영 적용 2026-11-13) |
 | Q13 | ~~폰에서 손님 말을 꾹 눌러 고르기~~ — **확정 (2026-11-12 사용자): 넣지 않음**(글자 복사와 겹친다). 「더 보기 → 업무 만들기 → 손님 말 고르기」 그대로, 직원이 원하면 다시 본다 |

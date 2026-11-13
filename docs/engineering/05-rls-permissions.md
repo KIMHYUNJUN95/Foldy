@@ -1858,7 +1858,7 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
   `(select is_platform_admin()) or has_capability(organization_id, (select auth.uid()), 'guest_messages.manage')`. 넣기 · 고치기 · 지우기 정책 · 권한 없음 — 서버(service_role)만 쓴다.
 - 함수 `guest_message_backfill_claim`: `security definer` · `search_path = ''`, public · anon · authenticated 실행 권한 회수, service_role 만.
 - 서버 액션 `src/actions/guest-messages-backfill.ts`(`startGuestMessageBackfill` · `getGuestMessageBackfillStatus`): `guest_messages.manage` 만, 아니면 `forbidden`(redirect 없음). 조직 id 는 세션에서만.
-- 라우트 `/api/beds24/messages-backfill`: `CRON_SECRET`(Bearer)만, `organizationId` 필수(실수로 모든 조직을 훑지 않게). 정기 실행 없음.
+- 라우트 `/api/beds24/messages-backfill`: `CRON_SECRET` 또는 pg_cron Vault 토큰(Bearer, `authorizeGuestMessagesCron`, 2026-11-13), `organizationId` 필수(실수로 모든 조직을 훑지 않게). 정기 실행 없음.
 - 조직 섞임 막기: 예약마다 매핑 · 기존 대화로만 조직을 정하고(**`BEDS24_DEFAULT_ORGANIZATION_ID` 기본값은 쓰지 않음**), 실행한 조직이 아니면 넣지 않는다(세기만). 로그 · `failed_booking_ids` 에는 예약 번호만(손님 이름 · 본문 없음).
 - 실행 소유: claim 이 준 `run_id` 로만 상태를 쓴다(`status = 'running' and run_id = ...`) — lease 가 지난 앞 실행이 뒤 실행의 커서를 덮지 못한다.
 - 라우트는 인가를 먼저 본다(인가 없이 동기화 멈춤 여부를 알려 주지 않음). `pages` 상한 20.

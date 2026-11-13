@@ -1,24 +1,20 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { requestMatchesSecret } from "@/lib/api-secret";
 import { isBeds24SyncPaused } from "@/lib/beds24/sync-control";
 import { BACKFILL_MAX_PAGES_PER_CALL, backfillGuestMessageHistory, isBackfillFailure } from "@/lib/guest-messages/backfill";
+import { authorizeGuestMessagesCron } from "@/lib/guest-messages/cron-auth";
+import { getSupabaseServiceClient } from "@/lib/supabase/service";
 
 // 손님 메시지 과거 가져오기 — docs/product/47-guest-messaging.md 「과거 메시지 가져오기」.
 //
 // 한 번 부르면 그 조직 기준으로 최대 `pages` 페이지(기본 10)를 읽고 커서를 남긴다. 다시 부르면 이어 받는다.
 // **정기 실행에 넣지 않는다** — 사람이(또는 관리 화면의 서버 액션이) 필요할 때 부른다.
-// 인가: `Authorization: Bearer <CRON_SECRET>` 만. CRON_SECRET 이 없으면 닫힌 채(404).
+// 인가: `Authorization: Bearer <CRON_SECRET 또는 pg_cron 토큰>`(`authorizeGuestMessagesCron` — 다른 손님 메시지 정기 라우트와 같다).
+// 2026-11-13: CRON_SECRET 이 Vercel 에서 Sensitive 라 꺼낼 수 없어, 운영 가져오기는 SQL Editor 에서 잠깐 거는 pg_cron 잡(Vault 토큰)으로 부른다.
+// 둘 다 없으면 닫힌 채(404), 틀린 값은 403.
 // 쿼리: organizationId(필수 — 실수로 모든 조직을 훑지 않게) · mode=measure(재기만) · restart=1(1페이지부터 다시) · pages=1~20.
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
-
-function authorize(request: NextRequest): { ok: true } | { ok: false; status: number } {
-  const cronSecret = process.env.CRON_SECRET?.trim();
-  if (!cronSecret) return { ok: false, status: 404 };
-  if (requestMatchesSecret(request, [cronSecret])) return { ok: true };
-  return { ok: false, status: 403 };
-}
 
 function isUuid(value: string | null) {
   return !!value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
@@ -26,7 +22,7 @@ function isUuid(value: string | null) {
 
 async function handle(request: NextRequest) {
   // 인가가 먼저 — 멈춤 여부도 인가된 호출에만 알려 준다.
-  const auth = authorize(request);
+  const auth = await authorizeGuestMessagesCron(request, getSupabaseServiceClient);
   if (!auth.ok) {
     return NextResponse.json(
       { ok: false, error: auth.status === 404 ? "not_found" : "forbidden" },

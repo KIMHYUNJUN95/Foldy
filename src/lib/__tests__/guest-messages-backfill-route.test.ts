@@ -15,15 +15,23 @@ vi.mock("@/lib/guest-messages/backfill", () => ({
   isBackfillFailure: () => false,
 }));
 
+const PG_TOKEN = "p".repeat(48);
+vi.mock("@/lib/supabase/service", () => ({
+  getSupabaseServiceClient: () => ({
+    rpc: async (_fn: string, args: { p_token: string }) => ({ data: args.p_token === PG_TOKEN, error: null }),
+  }),
+}));
+
 import { NextRequest } from "next/server";
 import { GET } from "@/app/api/beds24/messages-backfill/route";
 
 const ORG = "11111111-1111-4111-8111-111111111111";
 const SECRET = "test-cron-secret";
 
-function request(query: string, auth = true) {
+function request(query: string, auth: boolean | string = true) {
+  const token = auth === true ? SECRET : auth || null;
   return new NextRequest(`https://app.test/api/beds24/messages-backfill?${query}`, {
-    headers: auth ? { authorization: `Bearer ${SECRET}` } : {},
+    headers: token ? { authorization: `Bearer ${token}` } : {},
   });
 }
 
@@ -51,5 +59,13 @@ describe("/api/beds24/messages-backfill", () => {
     const ok = await GET(request(`organizationId=${ORG}&pages=20&restart=1`));
     expect(ok.status).toBe(200);
     expect(calls.list).toEqual([[ORG, { mode: "run", restart: true }, { maxPages: 20 }]]);
+  });
+
+  it("accepts the pg_cron Vault token, rejects a wrong one, and stays closed without either", async () => {
+    expect((await GET(request(`organizationId=${ORG}&pages=20`, PG_TOKEN))).status).toBe(200);
+    expect((await GET(request(`organizationId=${ORG}`, "w".repeat(48)))).status).toBe(403);
+    delete process.env.CRON_SECRET;
+    expect((await GET(request(`organizationId=${ORG}`, false))).status).toBe(404);
+    expect((await GET(request(`organizationId=${ORG}&pages=20`, PG_TOKEN))).status).toBe(200);
   });
 });

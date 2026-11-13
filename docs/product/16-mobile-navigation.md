@@ -587,7 +587,7 @@ Current rules:
   화면의 큰 제목(`[data-large-title]` 또는 첫 `h1`)이 위 줄 아래로 스크롤돼 사라지면 위 줄 가운데에 그 제목(`data-compact-title` 이 있으면 그 값 — 홈은
   「홈」)이 17px 반굵게 떠오르고, 맨 위로 돌아오면 숨는다(`IntersectionObserver`, `.shell-title`). 큰 제목이 없는 화면은 위 줄 가운데가 비어 있다.
   목록 첫 화면 제목은 모두 **34/41 · 700**(iOS Large Title — 투두 · 알림 · 청소 · 요청 · 공지 · 게시판 · 직원 · 제안 · 버그 · 게스트 피드백 · 연차 · 근태 홈 ·
-  가동률 · 매출 · 룸 링크 · 자동화 · 홈 인사말). 상세 · 작성 화면 제목은 그대로(20~24px).
+  가동률 · 매출 · 룸 링크 · 자동화 · 홈 인사말; 2026-11-13 근태 홈은 600 — `24-attendance-workflow.md` 「모바일 근태 다듬기」). 상세 · 작성 화면 제목은 그대로(20~24px).
   하단 탭 · 레일 · 사이드바는 같은 아이콘 모음(`src/components/shell/nav-glyphs.tsx`)을 쓰고, **고른 항목은 채운 아이콘**(`[data-fill]` 채움 ·
   `[data-knock]` 바탕색으로 비움 · `[data-on]` 고른 때만 — `globals.css`). 사이드바 줄은 44px · 15px.
 - **Top chrome surface**: the header bar is flat/borderless — no capsule outline, ring, glass blur, or shadow. Menu, notification, profile controls and the centered wordmark sit over the shared ivory chrome.

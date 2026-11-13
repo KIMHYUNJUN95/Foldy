@@ -873,6 +873,7 @@
 .lv .exwrap__ic svg { width: 38px; height: 38px; }
 .lv .ic-danger { background: var(--danger-bg); color: var(--danger); }
 .lv .ic-warn { background: var(--warn-bg); color: var(--warn); }
+.lv .ic-soft { background: var(--primary-soft); color: #5a30cf; }
 .lv .ic-info { background: var(--info-bg); color: var(--info); }
 .lv .ic-done { background: var(--done-bg); color: var(--done); }
 .lv .exwrap__ey {
@@ -901,6 +902,8 @@
   border-radius: 15px;
   padding: 4px 15px;
 }
+/* 입력 칸만 두는 첫 설정 — 상자 없이(입력 칸 자체 테두리는 그대로) */
+.lv .exwrap__note--bare { background: none; border: 0; border-radius: 0; padding: 0; }
 .lv .exrow {
   display: flex;
   align-items: center;

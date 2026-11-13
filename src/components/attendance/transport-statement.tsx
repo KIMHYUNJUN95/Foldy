@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { Plus } from "lucide-react";
 import "./transport.css";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { CalendarPanel } from "./transport-date-sheet";
@@ -1263,6 +1264,7 @@ export function TransportStatement({
           </div>
           {isEditable ? (
             <button type="button" className="trnw-add" onClick={() => setShowAddSheet(true)}>
+              <Plus aria-hidden="true" />
               {t.addShort}
             </button>
           ) : null}
@@ -1288,7 +1290,7 @@ export function TransportStatement({
             </p>
           ) : null}
           {isEditable ? (
-            <button type="button" className="trnw-submit" disabled={submitting || items.length === 0} onClick={handleSubmit}>
+            <button type="button" className={`trnw-submit${submitting ? " is-busy" : ""}`} disabled={submitting || items.length === 0} onClick={handleSubmit}>
               {submitting ? <span className="trn-spin" /> : null}
               {sentBack ? t.resubmitBtn : t.submitMonthBtn.replace("{month}", monthShort)}
             </button>

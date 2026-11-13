@@ -166,9 +166,10 @@ export function ReviewDetail({
   }
 
   const translateLabel = t.wTranslate;
+  // 건물이 없으면 「— · 방」처럼 대시가 앞에 붙지 않게 빈 칸은 빼고 잇는다(아래 fbw-ctx).
   const building = review.propertyName
     ? localizePropertyName(getCanonicalPropertyName(review.propertyName), buildingLabels)
-    : "—";
+    : "";
   const room = roomPlaceLabel(review.displayRoomLabel ?? reviewRoomFallbackLabel(review, t));
   const risk = review.riskLevel === "risk";
 
@@ -188,7 +189,7 @@ export function ReviewDetail({
           </span>
           {headlineText ? <h1 className="fbw-dh__title is-md">{headlineText}</h1> : null}
           <span className="fbw-ctx">
-            {`${building} · ${room}${review.guestDisplayName ? ` · ${review.guestDisplayName}` : ""}`}
+            {[building, room, review.guestDisplayName].filter(Boolean).join(" · ")}
             {review.sourceReservationId ? (
               <>
                 <br />

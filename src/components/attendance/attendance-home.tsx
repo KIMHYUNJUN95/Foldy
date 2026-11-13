@@ -75,7 +75,6 @@ function Ring({
           {variant === "idle" ? (
             <>
               <span className="ring__idleicon">{AttIcon.qr}</span>
-              <span className="ring__state idle">{state}</span>
               <span className="ring__idletxt">{lbl}</span>
             </>
           ) : (
@@ -278,15 +277,6 @@ function ReminderPrompt({ sessionId, copy }: { sessionId: string; copy: Attendan
   );
 }
 
-function Methods({ copy }: { copy: AttendanceCopy }) {
-  // HIG 2차(2026-10-19): 색 알약 대신 링 아래 회색 글자 한 줄 — 「GPS+QR · Wi-Fi 준비 중」.
-  return (
-    <p className="methods">
-      {copy.methodGpsQr} · {copy.methodWifi} {copy.methodWifiSoon}
-    </p>
-  );
-}
-
 /** 오늘 기록 — 출근 · 휴게(지금 있는 데이터만). 태블릿 가로의 빈 왼쪽 아래를 채운다(2026-10-13 시안 컨펌). */
 function TodayLog({ session, copy }: { session: OpenSessionView; copy: AttendanceCopy }) {
   const breakMin = Math.round(session.closedBreakSeconds / 60);
@@ -329,7 +319,6 @@ export type OpenSessionView = {
 };
 
 export function AttendanceHome({
-  userName,
   todayLabel,
   state = "idle",
   openSession = null,
@@ -342,8 +331,6 @@ export function AttendanceHome({
   idCardNotice = null,
   locale,
 }: {
-  userName: string;
-  userInitial: string;
   todayLabel: string;
   state?: HomeState;
   openSession?: OpenSessionView | null;
@@ -427,7 +414,7 @@ export function AttendanceHome({
     <div className="greet greet--title">
       <h1 className="greet__h">{copy.homeTitle}</h1>
       <div className="greet__d">
-        {todayLabel} · {copy.homeNameLine.replace("{name}", userName)}
+        {todayLabel}
       </div>
     </div>
   );
@@ -487,7 +474,7 @@ export function AttendanceHome({
             <div className="entryrow__s">{copy.homeHistSub}</div>
           </div>
           <div className="entryrow__r">
-            <span className="entryrow__val">{monthHours ?? "00:00"}</span>
+            {monthHours ? <span className="entryrow__val">{monthHours}</span> : null}
             {chev}
           </div>
         </Link>
@@ -576,7 +563,6 @@ export function AttendanceHome({
           ) : (
             <Ring variant="open" cls="open" state={copy.ringWorking} big="04:38" sec="12" lbl={`${copy.ringAccumLabel} · ${copy.ringScaleNote}`} pct={0.58} />
           )}
-          <Methods copy={copy} />
           <div className="infostrip">
             <div className="infocell">
               <div className="infocell__k">{copy.clockInSite}</div>
@@ -679,8 +665,7 @@ export function AttendanceHome({
       {greet}
       <div className="att-main">
         <div className="att-gap" />
-        <Ring variant="idle" state={copy.ringIdle} lbl={copy.ringIdleLabel} />
-        <Methods copy={copy} />
+        <Ring variant="idle" lbl={copy.ringIdleLabel} />
         <Link href="/mobile/attendance/capture" className="clockbtn clockbtn--in">
           <AIc>{AttIcon.qr}</AIc>{copy.clockIn}
         </Link>

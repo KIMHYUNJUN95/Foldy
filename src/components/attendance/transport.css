@@ -1204,17 +1204,20 @@
 
 /* 교통비 정산 화이트 리디자인 — 제목 · 합계 · 날짜 줄 · 제출(2026-10-13 시안 AttTransportM-Phone · Fold · Tablet) */
 .trnw .ptitle-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
-.trnw .ptitle { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.03em; color: #16141f; }
+.trnw .ptitle { margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.03em; color: #16141f; }
 .trnw .ptitle__sub { margin-top: 4px; font-size: 13px; color: var(--text-3); }
-.trnw .ptitle__sub b { font-weight: 600; color: #6b6878; }
+.trnw .ptitle__sub b { font-weight: inherit; color: inherit; }
 .trnw .ptitle__sub b.is-danger { color: #c5282e; }
-.trnw .trnw-add { height: 36px; padding: 0 2px; border: 0; background: none; font: inherit; font-size: 14px; font-weight: 600; color: #7a52e6; cursor: pointer; white-space: nowrap; }
+/* 제목 줄 오른쪽 작은 단추 36 — 터치 영역은 ::after 로 44 이상(2026-11-13 근태 다듬기) */
+.trnw .trnw-add { position: relative; flex: none; align-self: flex-start; margin-top: 2px; display: inline-flex; align-items: center; gap: 4px; height: 36px; padding: 0 12px 0 10px; border: 0; border-radius: 999px; background: #f4f1fd; font: inherit; font-size: 14px; font-weight: 600; color: #5a30cf; cursor: pointer; white-space: nowrap; }
+.trnw .trnw-add svg { width: 16px; height: 16px; }
+.trnw .trnw-add::after { content: ""; position: absolute; inset: -4px -2px; }
 .trnw .trnw-note { display: flex; flex-direction: column; gap: 4px; margin-top: 14px; padding-bottom: 14px; border-bottom: 0.5px solid var(--separator); }
 .trnw .trnw-note span { font-size: 12px; color: var(--text-3); }
 .trnw .trnw-note p { margin: 0; font-size: 14px; line-height: 1.5; color: #16141f; overflow-wrap: anywhere; }
 .trnw .trnw-total { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 18px; }
 .trnw .trnw-total span { font-size: 13px; color: #6b6878; }
-.trnw .trnw-total b { font-size: 30px; font-weight: 700; letter-spacing: -0.03em; color: #16141f; font-variant-numeric: tabular-nums; }
+.trnw .trnw-total b { font-size: 28px; font-weight: 600; letter-spacing: -0.03em; color: #16141f; font-variant-numeric: tabular-nums; }
 .trnw .trnw-right { margin-top: 12px; }
 .trnw .trnw-right__h { display: none; }
 .trnw .trnw-empty { margin: 28px 0; text-align: center; font-size: 14px; color: var(--text-3); }
@@ -1232,7 +1235,8 @@
 .trnw .trnw-submit { width: 100%; height: 50px; margin-top: 14px; border: 0; border-radius: 14px; background: #7a52e6; color: #fff; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: background 150ms ease, transform 120ms ease; }
 .trnw .trnw-submit:hover { background: #6b40e0; }
 .trnw .trnw-submit:active { transform: scale(0.98); }
-.trnw .trnw-submit:disabled { opacity: .5; cursor: default; }
+.trnw .trnw-submit:disabled { background: #ecebef; color: #8b8898; cursor: default; }
+.trnw .trnw-submit:disabled.is-busy { background: #7a52e6; color: #fff; opacity: .5; }
 .trnw .trnw-locked { margin: 18px 0 0; font-size: 13px; color: var(--text-3); text-align: center; }
 .trnw .trnw-add-wide { display: none; }
 /* 폰 · 폴드: 제목 → 메모 → 합계 → 날짜 줄 → 안내 · 제출 순서(한 줄) */
@@ -1259,7 +1263,7 @@
    합계 · 안내 · 잠금 · 빈 화면 15 · 반려 메모 13/15 · 태블릿 「+ 교통비 추가」 50 · 오른쪽 제목 17/600 · 44 · 13. */
 .trnw .ptitle { font-size: 34px; line-height: 41px; letter-spacing: -0.02em; }
 .trnw .ptitle__sub { font-size: 15px; }
-.trnw .trnw-add { display: inline-flex; align-items: center; height: 44px; font-size: 15px; }
+.trnw .trnw-add { font-size: 15px; }
 .trnw .trnw-note span { font-size: 13px; }
 .trnw .trnw-note p { font-size: 15px; }
 .trnw .trnw-total span { font-size: 15px; }

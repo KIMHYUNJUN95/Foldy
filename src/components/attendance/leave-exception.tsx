@@ -93,12 +93,11 @@ export function LeaveException({ locale, variant }: { locale: string; variant: "
         </div>
       ) : variant === "missing" ? (
         <div className="exwrap">
-          <div className="exwrap__ic ic-danger">{AttIcon.warn}</div>
-          <p className="exwrap__ey">{c.exMissEy}</p>
+          <div className="exwrap__ic ic-soft">{AttIcon.calendar}</div>
           <h3 className="exwrap__t">{c.exMissT}</h3>
           <p className="exwrap__s">{c.exMissS}</p>
 
-          <div className="exwrap__note" style={{ textAlign: "left" }}>
+          <div className="exwrap__note exwrap__note--bare" style={{ textAlign: "left" }}>
             <div className="field" style={{ marginBottom: 14 }}>
               <div className="field__l">
                 {c.exSetupHire}

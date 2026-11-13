@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { MobileShell } from "@/components/shell/mobile-shell";
+import { formatTokyoDateTitle } from "@/lib/home-date-title";
 import { AttendanceHome } from "@/components/attendance/attendance-home";
 import { getMobileNavBadges } from "@/lib/nav-badges";
 import { getOnboardingState } from "@/lib/onboarding";
@@ -105,15 +106,7 @@ export default async function MobileAttendancePage({ searchParams }: PageProps) 
   const canSeeRoster = canViewRoster();
   const locale = session.user.preferredLanguage;
   const dict = getDictionary(locale);
-  const name = session.user.name?.trim() || dict.attendance.userFallback;
-  const localeTag = locale === "ko" ? "ko-KR" : locale === "ja" ? "ja-JP" : "en-US";
-  const todayLabel = new Intl.DateTimeFormat(localeTag, {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    weekday: "long",
-    timeZone: "Asia/Tokyo",
-  }).format(new Date());
+  const todayLabel = formatTokyoDateTitle(locale);
 
   return (
     // 넓은 화면(2026-10-05): 태블릿 가로는 폭을 풀고 화면이 두 칸(링 · 버튼 | 바로가기)을 그린다(`attendance.css` `.att--home`).
@@ -121,8 +114,6 @@ export default async function MobileAttendancePage({ searchParams }: PageProps) 
       <AttendanceHome
         state={homeState}
         todayLabel={todayLabel}
-        userInitial={name.slice(0, 1)}
-        userName={name}
         locale={locale}
         openSession={
           openSession

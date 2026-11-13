@@ -541,57 +541,6 @@
   opacity: 0.85;
 }
 
-.att .methods {
-  display: flex;
-  gap: 8px;
-  margin-top: 12px;
-}
-.att .methodchip {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 11px 12px;
-  border-radius: 14px;
-  border: 1px solid var(--line);
-  background: var(--card);
-}
-.att .methodchip.on {
-  border-color: color-mix(in oklab, var(--att-primary) 35%, transparent);
-  background: var(--primary-soft);
-}
-.att .methodchip.ghost {
-  opacity: 0.6;
-}
-.att .methodchip__ic {
-  width: 30px;
-  height: 30px;
-  border-radius: 10px;
-  background: var(--att-surface);
-  color: var(--att-primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-}
-.att .methodchip.on .methodchip__ic {
-  background: var(--att-primary);
-  color: #fff;
-}
-.att .methodchip.ghost .methodchip__ic {
-  color: var(--att-muted);
-}
-.att .methodchip__t b {
-  font-size: 12.5px;
-  font-weight: 800;
-  display: block;
-}
-.att .methodchip__t span {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--att-muted);
-}
-
 .att .breakbanner {
   display: flex;
   align-items: center;
@@ -3430,7 +3379,7 @@
 /* ══ 화이트 리디자인 (2026-10-13) — 근태 홈 (시안 Att-Phone · Att-Fold · Att-Tablet) ═══════════════════
    제목 「근태」 · 링(근무 중 보라) · 방법 두 글자 · 현장/시각 옅은 칸 · 휴게 | 퇴근 · 바로가기 줄(상자 없이 가는 줄). */
 .att.att--home .greet--title { margin: 2px 0 6px; }
-.att.att--home .greet__h { margin: 0; font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
+.att.att--home .greet__h { margin: 0; font-size: 34px; line-height: 41px; font-weight: 600; letter-spacing: -0.02em; color: var(--ink); }
 .att.att--home .greet--title .greet__d { margin-top: 4px; font-size: 13px; font-weight: 400; color: var(--text-3); }
 .att.att--home .att-gap { height: 18px; }
 .att.att--home .att-ring svg circle { stroke-width: 14; }
@@ -3440,7 +3389,7 @@
 .att.att--home .ring__big { font-size: 44px; font-weight: 600; letter-spacing: -0.02em; }
 .att.att--home .ring__big .sec { font-size: inherit; color: inherit; font-weight: inherit; opacity: 1; }
 .att.att--home .ring__lbl { font-size: 13px; font-weight: 400; color: var(--text-3); letter-spacing: 0; text-transform: none; }
-.att.att--home .methods { display: flex; justify-content: center; gap: 8px; margin: 10px 0 18px; }
+.att.att--home .hero:not(:has(.ring__prog.break)) { margin-bottom: 18px; }
 .att.att--home .infostrip { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 14px; padding: 0; border: 0; background: none; box-shadow: none; }
 .att.att--home .infocell { padding: 12px 14px; border: 0; border-radius: 14px; background: #f7f7f9; text-align: left; }
 .att.att--home .infocell__k { justify-content: flex-start; }
@@ -3502,7 +3451,7 @@
 .att.att--home .ring__big { font-size: 34px; line-height: 1; }
 .att.att--home .ring__big .sec { color: #8b8898; }
 .att.att--home .ring__lbl { margin-top: 0; }
-.att.att--home .methods { display: block; margin: 12px 0 22px; text-align: center; font-size: 13px; color: var(--text-3); }
+.att.att--home .hero:not(:has(.ring__prog.break)) { margin-bottom: 22px; }
 .att.att--home .infostrip { margin: 0 0 12px; gap: 10px; }
 .att.att--home .infocell { min-height: 54px; border-radius: 12px; }
 .att.att--home .infocell__v { font-size: 16px; font-weight: 600; }

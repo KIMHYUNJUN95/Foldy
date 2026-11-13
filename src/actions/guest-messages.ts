@@ -490,79 +490,10 @@ export async function previewReplyTranslation(input: {
   }
 }
 
-// ── 발송 큐 고치기 · 취소 · 다시 보내기 ──────────────────────────────────────
+// ── 발송 큐 다시 보내기 ──────────────────────────────────────
 
 function validOutboxId(value: unknown): value is string {
   return typeof value === "string" && UUID_RE.test(value);
-}
-
-/** 보낼 차례 기다리는 답장 고치기(아직 잡히지 않은 `queued` 만). */
-export async function editGuestOutbox(outboxId: string, body: string): Promise<Ok | Failure> {
-  const auth = await gate(true);
-  if (!auth.ok) return auth;
-  if (!validOutboxId(outboxId)) return { ok: false, errorKey: "invalid" };
-  const autoGuard = await guardAutoOutbox(auth.organizationId, outboxId, auth.capabilities);
-  if (autoGuard) return autoGuard;
-  const text = typeof body === "string" ? body.trim() : "";
-  if (!text) return { ok: false, errorKey: "invalid" };
-  if (Array.from(text).length > MAX_REPLY_CHARS) return { ok: false, errorKey: "too_long" };
-  const supabase = db();
-  try {
-    const updated = await supabase
-      .from("guest_message_outbox")
-      .update({ body: text })
-      .eq("organization_id", auth.organizationId)
-      .eq("id", outboxId)
-      .eq("status", "queued")
-      .select("id");
-    if (updated.error) throw new Error(updated.error.message);
-    if ((updated.data ?? []).length === 0) return { ok: false, errorKey: "stale" };
-    // 고친 글은 번역 원문과 더는 맞지 않는다 — 원문 표시는 지운다.
-    const message = await supabase
-      .from("guest_messages")
-      .update({ body: text, body_translated: null, translated_lang: null })
-      .eq("organization_id", auth.organizationId)
-      .eq("outbox_id", outboxId);
-    if (message.error) throw new Error(message.error.message);
-    revalidateInbox();
-    return { ok: true };
-  } catch (error) {
-    logFailure("edit outbox", error);
-    return { ok: false, errorKey: "failed" };
-  }
-}
-
-/** 보내기 취소 — 기다리는 줄 · 보내지 못한 줄만(나갔을 수도 있는 줄은 안 됨). 나가지 않은 대기 메시지 줄은 지운다(하드 삭제). */
-export async function cancelGuestOutbox(outboxId: string): Promise<Ok | Failure> {
-  const auth = await gate(true);
-  if (!auth.ok) return auth;
-  if (!validOutboxId(outboxId)) return { ok: false, errorKey: "invalid" };
-  const autoGuard = await guardAutoOutbox(auth.organizationId, outboxId, auth.capabilities);
-  if (autoGuard) return autoGuard;
-  const supabase = db();
-  try {
-    const updated = await supabase
-      .from("guest_message_outbox")
-      .update({ status: "cancelled" })
-      .eq("organization_id", auth.organizationId)
-      .eq("id", outboxId)
-      .in("status", ["queued", "failed"])
-      .select("id");
-    if (updated.error) throw new Error(updated.error.message);
-    if ((updated.data ?? []).length === 0) return { ok: false, errorKey: "stale" };
-    const removed = await supabase
-      .from("guest_messages")
-      .delete()
-      .eq("organization_id", auth.organizationId)
-      .eq("outbox_id", outboxId)
-      .is("external_id", null);
-    if (removed.error) throw new Error(removed.error.message);
-    revalidateInbox();
-    return { ok: true };
-  } catch (error) {
-    logFailure("cancel outbox", error);
-    return { ok: false, errorKey: "failed" };
-  }
 }
 
 /**

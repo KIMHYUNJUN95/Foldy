@@ -44,7 +44,6 @@ vi.mock("@/lib/guest-messages/adapter-server", () => ({
 import {
   addGuestInternalNote,
   getGuestConversation,
-  cancelGuestOutbox,
   listGuestConversations,
   previewReplyTranslation,
   retryGuestOutbox,
@@ -274,11 +273,10 @@ describe("답장 보내기", () => {
     expect(state.after).toHaveLength(1);
   });
 
-  it("보내지 못함 · 대기 줄 취소는 보내지 않은 메시지 줄도 지운다", async () => {
-    const outboxId = await sendOne();
-    expect(await cancelGuestOutbox(outboxId)).toEqual({ ok: true });
-    expect(fake.tables.guest_message_outbox[0].status).toBe("cancelled");
-    expect(fake.tables.guest_messages.some((row) => row.outbox_id === outboxId)).toBe(false);
+  it("대화에서 쓰던 답장 고치기 · 보내기 취소 액션은 없다(2026-11-13)", async () => {
+    const actions = await import("@/actions/guest-messages");
+    expect(actions).not.toHaveProperty("editGuestOutbox");
+    expect(actions).not.toHaveProperty("cancelGuestOutbox");
   });
 
   it("나갔는지 모르는 줄은 확인 없이 다시 보내지 않는다", async () => {
@@ -631,13 +629,12 @@ describe("자동 안내 출입 코드 — 5단계 리뷰(임시 결정, 47 §5-6
     fake.tables.guest_messages.push({ id: AUTO_MSG, organization_id: ORG, conversation_id: AIRBNB, direction: "host", body: "Door 5190 · room 2468*", sent_at: "2026-11-12T03:00:00.000Z", outbox_id: AUTO_OB });
   });
 
-  it("코드를 볼 권한이 없으면 자동 안내 글의 코드를 가리고 고치기 · 취소를 막는다(보낼 글은 그대로)", async () => {
+  it("코드를 볼 권한이 없으면 자동 안내 글의 코드를 가리고 다시 보내기를 막는다(보낼 글은 그대로)", async () => {
     const result = await getGuestConversation(AIRBNB);
     if (!result.ok) throw new Error(result.errorKey);
     const auto = result.thread.messages.find((m) => m.id === AUTO_MSG);
     expect(auto?.body).toBe("Door •••• · room ••••");
     expect(auto?.outbox).toMatchObject({ kind: "auto", locked: true });
-    expect(await cancelGuestOutbox(AUTO_OB)).toEqual({ ok: false, errorKey: "forbidden" });
     expect(await retryGuestOutbox(AUTO_OB)).toEqual({ ok: false, errorKey: "forbidden" });
     expect(fake.tables.guest_message_outbox.find((row) => row.id === AUTO_OB)).toMatchObject({ status: "queued", body: "Door 5190 · room 2468*" });
     const list = await listGuestConversations({ status: "all" });
@@ -645,7 +642,7 @@ describe("자동 안내 출입 코드 — 5단계 리뷰(임시 결정, 47 §5-6
     expect(list.rows.find((row) => row.id === AIRBNB)?.lastLine).toEqual({ direction: "host", body: "Door •••• · room ••••" });
   });
 
-  it("manage(또는 건물 정보 고치기)가 있으면 그대로 보이고, manage 면 취소할 수 있다", async () => {
+  it("manage(또는 건물 정보 고치기)가 있으면 그대로 보이고, manage 면 다시 보내기가 막히지 않는다", async () => {
     state.session!.capabilities = [...ALL, "property_info.edit"];
     let result = await getGuestConversation(AIRBNB);
     if (!result.ok) throw new Error(result.errorKey);
@@ -654,7 +651,8 @@ describe("자동 안내 출입 코드 — 5단계 리뷰(임시 결정, 47 §5-6
     result = await getGuestConversation(AIRBNB);
     if (!result.ok) throw new Error(result.errorKey);
     expect(result.thread.messages.find((m) => m.id === AUTO_MSG)?.outbox).toMatchObject({ locked: false });
-    expect(await cancelGuestOutbox(AUTO_OB)).toEqual({ ok: true });
+    const retried = await retryGuestOutbox(AUTO_OB);
+    expect(retried.ok ? null : retried.errorKey).not.toBe("forbidden");
   });
 
   it("코드를 읽지 못하면 숫자 묶음을 모두 가린다", async () => {

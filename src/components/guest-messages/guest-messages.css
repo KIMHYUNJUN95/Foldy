@@ -143,7 +143,6 @@
 /* 안내 글은 한 줄을 다 쓰고, 버튼 묶음(재시도 · 보내기 취소)은 서로 갈라지지 않는다. */
 .gm-msg__tools > .gm-hint { flex: 1 1 100%; text-align: right; }
 .gm-msg__buttons { display: inline-flex; flex-wrap: nowrap; gap: 6px; }
-.gm-edit { display: flex; flex-direction: column; gap: 8px; width: min(520px, 100%); }
 .gm-input {
   width: 100%;
   box-sizing: border-box;

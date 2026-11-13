@@ -19,8 +19,6 @@ import {
 } from "react";
 import {
   addGuestInternalNote,
-  cancelGuestOutbox,
-  editGuestOutbox,
   previewReplyTranslation,
   retryGuestOutbox,
   sendGuestReply,
@@ -650,8 +648,6 @@ function HostMessage({
   notify: GmNotify;
   onChanged: () => void;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(message.body);
   const [showWritten, setShowWritten] = useState(false);
   const [confirmRetry, setConfirmRetry] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -667,7 +663,6 @@ function HostMessage({
       if (result.ok) {
         haptic("success");
         notify(okText);
-        setEditing(false);
         onChanged();
       } else {
         haptic("error");
@@ -716,51 +711,18 @@ function HostMessage({
 
   return (
     <div className="gm-msg gm-msg--host" data-status={status}>
-      {editing ? (
-        <div className="gm-edit">
-          <textarea
-            className="gm-input"
-            aria-label={copy.edit}
-            value={draft}
-            maxLength={MAX_REPLY_CHARS}
-            onChange={(event) => setDraft(event.target.value)}
-            rows={3}
-          />
-          <div className="gm-actions">
-            <button
-              type="button"
-              className="gm-btn"
-              onClick={() => setEditing(false)}
-              disabled={pending}
-            >
-              {copy.editCancel}
-            </button>
-            <button
-              type="button"
-              className="gm-btn gm-btn--primary"
-              disabled={pending || !draft.trim()}
-              onClick={() =>
-                run(() => editGuestOutbox(outbox!.id, draft), copy.editedToast)
-              }
-            >
-              {copy.editSave}
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="gm-bubble gm-bubble--host">
-          {showWritten && message.bodyTranslated ? (
-            message.bodyTranslated
-          ) : (
-            <MessageBodyView body={message.body} images={message.images} copy={copy} emptyText={copy.attachmentOnly} />
-          )}
-        </div>
-      )}
+      <div className="gm-bubble gm-bubble--host">
+        {showWritten && message.bodyTranslated ? (
+          message.bodyTranslated
+        ) : (
+          <MessageBodyView body={message.body} images={message.images} copy={copy} emptyText={copy.attachmentOnly} />
+        )}
+      </div>
       {/* 항목 사이 「·」 는 CSS(`.gm-sep-list`) — 줄이 바뀌어도 줄 앞에 「·」 가 남지 않게. */}
       <span className="gm-msg__foot gm-sep-list gm-sep-list--end">
         <span>{foot}</span>
         {message.outbox?.kind === "auto" ? <span>{copy.autoMessageLabel}</span> : message.authorName ? <span>{message.authorName}</span> : null}
-        {message.bodyTranslated && !editing ? (
+        {message.bodyTranslated ? (
           <span>
             <button
               type="button"
@@ -775,28 +737,14 @@ function HostMessage({
       {canReply &&
       outbox &&
       !outbox.locked &&
-      !editing &&
-      (status === "queued" || status === "failed" || status === "uncertain") ? (
+      ((status === "failed" && outboxErrorKey(outbox.errorCode) === "rejected") ||
+        ((status === "failed" || status === "uncertain") && outbox.retryable)) ? (
         <div className="gm-msg__tools">
-          {status === "queued" ? (
-            <span className="gm-hint">{copy.queuedEditHint}</span>
-          ) : null}
-          {status === "failed" &&
-          outboxErrorKey(outbox.errorCode) === "rejected" ? (
+          {status === "failed" && outboxErrorKey(outbox.errorCode) === "rejected" ? (
             <span className="gm-hint">{copy.errCancelledHint}</span>
           ) : null}
-          <span className="gm-msg__buttons">
-            {status === "queued" ? (
-              <button
-                type="button"
-                className="gm-btn gm-btn--sm"
-                disabled={pending}
-                onClick={() => setEditing(true)}
-              >
-                {copy.edit}
-              </button>
-            ) : null}
-            {outbox.retryable ? (
+          {outbox.retryable && (status === "failed" || status === "uncertain") ? (
+            <span className="gm-msg__buttons">
               <button
                 type="button"
                 className="gm-btn gm-btn--sm"
@@ -809,21 +757,8 @@ function HostMessage({
               >
                 {copy.retry}
               </button>
-            ) : null}
-            {status === "queued" || status === "failed" ? (
-              <button
-                type="button"
-                className="gm-btn gm-btn--sm"
-                disabled={pending}
-                onClick={() => {
-                  haptic("light");
-                  run(() => cancelGuestOutbox(outbox.id), copy.cancelledToast);
-                }}
-              >
-                {copy.cancelSend}
-              </button>
-            ) : null}
-          </span>
+            </span>
+          ) : null}
         </div>
       ) : null}
       {confirmRetry && outbox ? (

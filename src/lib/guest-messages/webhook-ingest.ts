@@ -74,6 +74,8 @@ export type WebhookIngestSummary = {
   viaFallbackOrganization: number;
   assumedUtcTimes: number;
   failedBookings: number;
+  /** 조직 → 이번에 새로 들어간 메시지 id — 응답 뒤 사진 사본(47 §5-8)은 이 줄들만(밀린 것은 따라잡기 라우트). */
+  mediaMessageIds: Record<string, string[]>;
 };
 
 export async function ingestBeds24WebhookMessages(args: {
@@ -93,6 +95,7 @@ export async function ingestBeds24WebhookMessages(args: {
     viaFallbackOrganization: 0,
     assumedUtcTimes: 0,
     failedBookings: 0,
+    mediaMessageIds: {},
   };
   try {
     const now = args.now ?? new Date();
@@ -156,6 +159,9 @@ export async function ingestBeds24WebhookMessages(args: {
           now,
         });
         summary.inserted += result.inserted;
+        if (result.insertedIds?.length) {
+          summary.mediaMessageIds[organizationId] = [...(summary.mediaMessageIds[organizationId] ?? []), ...result.insertedIds];
+        }
         summary.merged += result.merged;
         summary.duplicates += result.duplicates;
       } catch (error) {

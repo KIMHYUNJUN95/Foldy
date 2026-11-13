@@ -34,6 +34,7 @@ import {
 import { maintenanceCategories } from "@/lib/maintenance-constants";
 import { lostItemCategories } from "@/lib/lost-found-constants";
 import { haptic } from "@/lib/haptics";
+import { messagePlainText } from "@/lib/guest-messages/message-body";
 
 export type TaskCategoryCopy = {
   maintenance: Record<string, string>;
@@ -233,6 +234,11 @@ function errorFor(key: TaskFromMessageErrorKey, copy: GmCopy): string {
   }
 }
 
+/** 말 하나의 사진 수 — 본문 사진 + 통로가 준 첨부. */
+export function messagePhotoCount(m: InboxMessage): number {
+  return m.images.length + m.attachmentCount;
+}
+
 /** 고른 손님 말(대화 순서). */
 export function pickedMessages(thread: InboxThread, pickedIds: ReadonlySet<string>): InboxMessage[] {
   return thread.messages.filter((m) => m.direction === "guest" && pickedIds.has(m.id));
@@ -242,9 +248,14 @@ export function pickedMessages(thread: InboxThread, pickedIds: ReadonlySet<strin
 export function pickedPreviewLine(messages: InboxMessage[], copy: GmCopy): string | null {
   if (messages.length === 0) return null;
   const first = messages[0];
-  const text = (first.bodyTranslated?.trim() || first.body.trim() || copy.attachmentOnly).replace(/\s+/g, " ");
+  const plain = messagePlainText(first.body);
+  const text = (
+    first.bodyTranslated?.trim() ||
+    plain.text ||
+    (plain.imageCount > 0 ? copy.photoLabel : copy.attachmentOnly)
+  ).replace(/\s+/g, " ");
   const short = Array.from(text).length > 36 ? `${Array.from(text).slice(0, 35).join("")}…` : text;
-  const photos = messages.reduce((n, m) => n + m.attachmentCount, 0);
+  const photos = messages.reduce((n, m) => n + messagePhotoCount(m), 0);
   return [
     copy.taskSelectedTag,
     `「${short}」`,
@@ -332,7 +343,8 @@ export function TaskCreateForm({
     () =>
       buildTaskPrefill(
         picked.map((m) => ({
-          body: m.body,
+          // 업무 글에는 앵커 · 사진 주소 대신 글만(47 §5-8).
+          body: messagePlainText(m.body).text,
           translated: m.translatedLang === locale ? m.bodyTranslated : null,
           timeLabel: formatTime(m.sentAt, locale),
         })),
@@ -403,7 +415,7 @@ export function TaskCreateForm({
   const needsPlace = kind === "maintenance" || kind === "lost_found";
   const urgentValue = urgent ?? Boolean(context?.stayingNow);
   const rooms = context?.places.find((p) => p.propertyName === building)?.rooms ?? [];
-  const photoCount = picked.reduce((n, m) => n + m.attachmentCount, 0);
+  const photoCount = picked.reduce((n, m) => n + messagePhotoCount(m), 0);
   const place = [row.propertyName ? buildingName(row.propertyName) : null, row.roomLabel ? roomPlace(row.roomLabel) : null]
     .filter((v, i, all) => v && all.indexOf(v) === i)
     .join(" · ");

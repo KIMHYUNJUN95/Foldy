@@ -278,6 +278,8 @@ export type IngestResult = {
   duplicates: number;
   markedRead: number;
   failedMerges: number;
+  /** 이번에 새로 들어간 메시지 줄 id — 웹훅 뒤 사진 사본(47 §5-8)을 이 줄들로만 좁힌다. */
+  insertedIds?: string[];
 };
 
 const ECHO_LOOKBACK_MS = 3 * 24 * 60 * 60 * 1000;
@@ -441,9 +443,10 @@ export async function ingestConversationMessages(
     const inserted = await supabase
       .from("guest_messages")
       .upsert(rows, { onConflict: "organization_id,provider,external_id", ignoreDuplicates: true })
-      .select("external_id");
+      .select("id, external_id");
     if (inserted.error) throw new Error(`message insert failed: ${inserted.error.message}`);
     result.inserted = (inserted.data ?? []).length;
+    result.insertedIds = ((inserted.data ?? []) as Array<{ id?: string }>).map((row) => row.id).filter((id): id is string => typeof id === "string");
     result.duplicates += plan.inserts.length - result.inserted;
   }
 

@@ -16,6 +16,8 @@ import { buildingBaseFor, loadBuildingGuestInfo, loadBuildingGuestInfos, type Bu
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { getReservationGuests } from "@/lib/reservation-guests";
+import { signGuestMessageMedia } from "@/lib/guest-messages/media-copy-server";
+import { imageViewsFor, providerAttachmentCount } from "@/lib/guest-messages/message-media";
 import {
   effectiveRowState,
   isRetryableOutbox,
@@ -427,9 +429,11 @@ export async function loadInboxThread(
 
   const authorIds = [...new Set(messageRows.map((row) => row.author_user_id).filter((id): id is string => !!id))];
   const guestIds = messageRows.filter((row) => row.direction === "guest").map((row) => row.id);
-  const [authors, translations] = await Promise.all([
+  // 사진 사본(47 §5-8) — 대화 하나 = 서명 한 번(service_role 저장소). 실패 · 사본 없음이면 Airbnb `?im_w=` 주소로 보인다.
+  const [authors, translations, signedMedia] = await Promise.all([
     loadMemberNames(db, organizationId, authorIds),
     options.locale ? loadTranslations(db, organizationId, guestIds, options.locale) : Promise.resolve(new Map<string, string>()),
+    signGuestMessageMedia(db, organizationId, messageRows),
   ]);
 
   // 자동 안내 글의 출입 코드 — 볼 권한이 없으면 가린다(코드를 못 읽으면 숫자 묶음을 모두 가린다).
@@ -458,7 +462,8 @@ export async function loadInboxThread(
       bodyLang: row.direction === "host" ? (row.body_lang ?? null) : null,
       sentAt: row.sent_at,
       authorName: row.author_user_id ? (authors.get(row.author_user_id) ?? null) : null,
-      attachmentCount: Array.isArray(row.attachments) ? row.attachments.length : 0,
+      attachmentCount: providerAttachmentCount(row.attachments),
+      images: imageViewsFor(row.body, signedMedia.get(row.id) ?? null),
       outbox: outbox
         ? {
             id: outbox.id,

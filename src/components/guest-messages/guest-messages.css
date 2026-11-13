@@ -1007,3 +1007,66 @@ html[data-pane] [data-shell-scroll]:has(.gm-mthread) { padding-bottom: 0 !import
 .gm-reply-row__tag { margin-left: 8px; padding: 1px 7px; border-radius: 999px; background: #F3EFFD; color: #4B3A8C; font-style: normal; font-size: 11px; font-weight: 600; vertical-align: 1px; white-space: nowrap; }
 .gm-resolved-toggle { display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; font-size: 13px; color: var(--gm-ink, #1f2430); line-height: 1.45; cursor: pointer; }
 .gm-resolved-toggle input { margin-top: 2px; width: 16px; height: 16px; flex: none; accent-color: var(--primary, #23285a); }
+
+/* ══ 사진 · 링크 (2026-11-13, 47 §5-8) — 본문 HTML 을 그대로 넣지 않고 조각으로 그린다 ═══════════════════ */
+/* 글 조각은 말풍선의 pre-wrap 을 그대로 받는다. 사진 묶음 앞뒤로는 한 줄을 띄운다. */
+.gm-body__text { display: inline; }
+.gm-body__link { color: var(--gm-primary); text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px; overflow-wrap: anywhere; }
+.gm-body__link:hover { color: var(--gm-primary-press); }
+/* 링크가 실제로 가는 호스트(글과 다를 때) — 옅게, 밑줄 없이. */
+.gm-body__host { color: var(--gm-muted); font-size: 0.9em; display: inline-block; text-decoration: none; }
+.gm-photos {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+  /* 고정 폭 + max-width — 퍼센트 폭은 말풍선(내용 맞춤)을 최대 폭까지 늘린다. */
+  width: 260px;
+  max-width: 100%;
+  margin: 2px 0;
+  white-space: normal;
+}
+.gm-photos[data-count="2"],
+.gm-photos[data-count="3"] { grid-template-columns: repeat(2, minmax(0, 1fr)); width: 300px; }
+.gm-body__text + .gm-photos,
+.gm-body__link + .gm-photos { margin-top: 8px; }
+.gm-photos + .gm-body__text,
+.gm-photos + .gm-body__link { display: block; margin-top: 8px; }
+/* 자리 고정(4:3) — 사진이 늦게 와도 말풍선 높이가 튀지 않는다. */
+.gm-photo {
+  position: relative;
+  display: block;
+  aspect-ratio: 4 / 3;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(22, 20, 31, 0.06);
+  cursor: zoom-in;
+  transition: transform 140ms var(--gm-ease);
+}
+button.gm-photo:active { transform: scale(0.97); }
+button.gm-photo:focus-visible { outline: 2px solid var(--gm-primary); outline-offset: 2px; }
+.gm-photo__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* 나타나기는 모바일 공용 `ImageFadeIn`(globals.css)이 맡는다 — 여기서 따로 움직이지 않는다. */
+.gm-photo--broken {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px;
+  cursor: default;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--gm-muted);
+}
+.gm-photo__msg { overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) {
+  .gm-photo { transition: none; }
+}

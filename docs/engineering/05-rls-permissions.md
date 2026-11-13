@@ -1872,3 +1872,13 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 - 함수 `guest_message_set_resolved_reply` — `service_role` 만 실행(일반 사용자 42501). 링크를 넣기 전 서버가 업무가 이 사람이 10분 안에 만든 것인지 본다(`isOwnFreshTarget`, 같은 요청 id 로 남의 업무를 끌어오지 않게).
 - 서버 액션 `src/actions/guest-message-tasks.ts`(PC · 모바일 공용): 모두 `guest_messages.view` 먼저, 거부는 redirect 없이 `forbidden`. 업무 종류는 **기존 권한 그대로**(`creatableKinds` — 수리 · 분실물 · 할 일 = 조직 구성원, 게스트 피드백 = `complaint.write`). 저장은 각 기능의 공용 만들기 함수(수리 · 분실물 = 그 사람의 RLS 클라이언트, 할 일 = 기존처럼 서비스 키 + 연결 id 조직 확인, 피드백 = `createComplaint` 의 `complaint.write` 확인). 대화 · 메시지 · 예약 · 링크 읽기는 모두 `organization_id` 로 거른다. 고른 메시지가 이 대화의 손님 말이 아니면 `invalid`.
 - 업무 상세의 「손님 메시지에서」(`getGuestMessageLinkForTarget`)는 `guest_messages.view` 가 없으면 아무것도 돌려주지 않는다. 할 일 제목은 대화 줄에서 참여자에게만(할 일 가시 범위 — 18 「각자의 개인 공간」).
+
+## 2026-11-13 손님 메시지 사진 사본 — 버킷 `guest-message-media` (`202611130007_guest_message_media`, **운영 적용 2026-11-13**)
+
+기준 문서: `docs/product/47-guest-messaging.md` §5-8.
+
+- `storage.objects` 읽기 정책 `guest message media: viewers can read`: `bucket_id = 'guest-message-media'` 이고 `is_platform_admin()` 또는 `has_capability(<경로 첫 칸 — uuid 일 때만, 아니면 null>, auth.uid(), 'guest_messages.view')`. 넣기 · 고치기 · 지우기 정책 없음 — 쓰기는 service_role(서버 복사 작업)만. 로컬 Postgres 확인: 대표 · CS = 자기 조직 경로만, 알바 · anon = 0줄, 다른 조직 · uuid 아닌 경로는 안 보임, 일반 사용자 넣기 42501.
+- 화면은 이 정책을 직접 쓰지 않는다 — 대화 읽기(`loadInboxThread`, 서버 액션이 `guest_messages.view` 확인 뒤)가 service_role 로 **이 조직 폴더 경로만**(`isOrgMediaPath`, 큰 사진 · 작은 사진) 30분 서명 URL 을 만든다.
+- 링크 글에 실제 호스트가 없으면 화면이 호스트를 옆에 같이 보인다(손님 · 채널 글의 피싱 링크, 47 §5-8).
+- `guest_messages.media_*`(`media_claim_id` 포함) 칸은 기존 GRANT 그대로(`authenticated` 는 표 읽기만, 쓰기는 service_role). 트리거 함수 `guest_messages_mark_media` 실행 권한 회수.
+- 따라잡기 라우트 `/api/guest-messages/media-backfill`: `authorizeGuestMessagesCron`(CRON_SECRET 또는 pg_cron Vault 토큰, 둘 다 없으면 404 · 틀리면 403), `organizationId` 필수. 받아 오기는 `a0.muscache.com` 사진 경로만(SSRF 허용 목록 · 넘김 거절 · 15초 · 10MB · 이미지 mime).

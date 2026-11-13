@@ -1,7 +1,8 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { after, NextResponse, type NextRequest } from "next/server";
 import { isBeds24SyncPaused } from "@/lib/beds24/sync-control";
 import { BACKFILL_MAX_PAGES_PER_CALL, backfillGuestMessageHistory, isBackfillFailure } from "@/lib/guest-messages/backfill";
 import { authorizeGuestMessagesCron } from "@/lib/guest-messages/cron-auth";
+import { copyGuestMessageMediaForOrganizations } from "@/lib/guest-messages/media-copy-server";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 
 // 손님 메시지 과거 가져오기 — docs/product/47-guest-messaging.md 「과거 메시지 가져오기」.
@@ -52,6 +53,12 @@ async function handle(request: NextRequest) {
       { maxPages: pages },
     );
     const failed = isBackfillFailure(result);
+    // 이번에 들어온 Airbnb 사진 일부를 복사(47 §5-8) — 응답 뒤, 40초 안(가져오기 240초 + 이것 < 300초). 나머지는 사진 가져오기 라우트.
+    if (result.imported > 0) {
+      after(() =>
+        copyGuestMessageMediaForOrganizations(getSupabaseServiceClient(), [organizationId as string], { limit: 20, budgetMs: 40_000 }),
+      );
+    }
     return NextResponse.json({ ok: !failed, result }, { status: failed ? 207 : 200 });
   } catch (error) {
     // 자세한 오류는 서버 로그에만 — 응답에는 정해진 코드만.

@@ -11,6 +11,7 @@ import { forwardBeds24Delivery, parseForwardTargets } from "@/lib/beds24/webhook
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { requestMatchesSecret } from "@/lib/api-secret";
 import { planAutoMessagesAfterWebhook } from "@/lib/guest-messages/auto-scheduler";
+import { copyPendingGuestMessageMedia } from "@/lib/guest-messages/media-copy-server";
 import {
   ingestBeds24WebhookMessages,
   prepareCapturedMessagesPayload,
@@ -316,13 +317,18 @@ export async function POST(request: NextRequest) {
   // 안에서 모든 오류를 삼킨다 — 예약 처리 결과 · 웹훅 응답에 영향이 없다. 바깥 try 는 혹시 모를 동기 예외까지 막는다.
   after(async () => {
     try {
-      await ingestBeds24WebhookMessages({
+      const ingest = await ingestBeds24WebhookMessages({
         supabase,
         body,
         bookingPayloads,
         results,
         organizationIdDefault,
       });
+      // 방금 들어온 메시지의 Airbnb 사진만 Foldy 저장소로 복사(47 §5-8) — 밀린 것은 건드리지 않는다(따라잡기 라우트 몫).
+      // 조직마다 6개 · 20초, 던지지 않음. Beds24 호출 없음.
+      for (const [organizationId, messageIds] of Object.entries(ingest.mediaMessageIds)) {
+        await copyPendingGuestMessageMedia(supabase, organizationId, { messageIds, limit: 6, budgetMs: 20_000 });
+      }
     } catch (error) {
       console.error("[beds24/webhook] guest message ingest failed", error instanceof Error ? error.message : "unknown");
     }

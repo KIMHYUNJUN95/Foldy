@@ -1,7 +1,8 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { after, NextResponse, type NextRequest } from "next/server";
 import { isBeds24SyncPaused } from "@/lib/beds24/sync-control";
 import { authorizeGuestMessagesCron } from "@/lib/guest-messages/cron-auth";
 import { isReconcileFailure, reconcileGuestMessages } from "@/lib/guest-messages/reconcile";
+import { copyGuestMessageMediaForOrganizations } from "@/lib/guest-messages/media-copy-server";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 
 // 손님 메시지 보정 조회 트리거 — docs/product/47-guest-messaging.md §4-0-1.
@@ -54,6 +55,15 @@ async function handle(request: NextRequest) {
   try {
     const result = await reconcileGuestMessages(organizationIds);
     const failed = isReconcileFailure(result);
+    // 새로 들어온 Airbnb 사진 복사(47 §5-8) — 응답 뒤, 작게. 밀린 것은 사진 가져오기 라우트가 맡는다.
+    const mediaOrgs = Object.entries(result.organizations)
+      .filter(([, bucket]) => bucket.inserted > 0)
+      .map(([id]) => id);
+    if (mediaOrgs.length > 0) {
+      after(() =>
+        copyGuestMessageMediaForOrganizations(getSupabaseServiceClient(), mediaOrgs, { limit: 10, budgetMs: 30_000 }),
+      );
+    }
     return NextResponse.json({ ok: !failed, result }, { status: failed ? 207 : 200 });
   } catch (error) {
     // 자세한 오류는 서버 로그에만 — 응답에는 정해진 코드만.

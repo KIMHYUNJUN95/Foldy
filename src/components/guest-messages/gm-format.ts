@@ -13,6 +13,7 @@ import {
 import { responseTargetCategory } from "@/lib/guest-messages/response-target";
 import type { GuestChannelKey } from "@/lib/guest-messages/types";
 import { tokyoDateOf } from "@/lib/tokyo-date";
+import { messagePlainText } from "@/lib/guest-messages/message-body";
 
 export type GmCopy = Dictionary["guestMessages"];
 
@@ -274,7 +275,9 @@ export function waitBadge(
 export function lastLineText(row: InboxConversationRow, copy: GmCopy): string {
   if (row.replyBlock === "direct_booking" && row.state !== "done" && !row.lastLine) return copy.directNoReply;
   if (!row.lastLine) return "";
-  const body = row.lastLine.body.replace(/\s+/g, " ").trim() || copy.attachmentOnly;
+  // 사진 · 링크 앵커는 글로 바꾼다(주소 대신 「사진」, 47 §5-8).
+  const plain = messagePlainText(row.lastLine.body);
+  const body = plain.text.replace(/\s+/g, " ").trim() || (plain.imageCount > 0 ? copy.photoLabel : copy.attachmentOnly);
   if (row.state === "awaiting" && row.lastLine.direction === "guest") return body;
   return fill(row.lastLine.direction === "guest" ? copy.prefixGuest : copy.prefixReply, { text: body });
 }

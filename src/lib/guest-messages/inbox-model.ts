@@ -20,6 +20,7 @@ import {
 } from "@/lib/guest-messages/types";
 import { tokyoDateOf, tokyoDayStart, ymdShift } from "@/lib/tokyo-date";
 import type { AutoRunView } from "@/lib/guest-messages/auto-model";
+import type { MessageImageView } from "@/lib/guest-messages/message-media";
 
 export type InboxStatusFilter = "awaiting" | "snoozed" | "done" | "all";
 export const INBOX_STATUS_FILTERS: readonly InboxStatusFilter[] = ["awaiting", "snoozed", "done", "all"];
@@ -363,7 +364,10 @@ export type InboxMessage = {
   bodyLang: string | null;
   sentAt: string;
   authorName: string | null;
+  /** 통로가 준 첨부 수(사진 사본 줄은 빼고). */
   attachmentCount: number;
+  /** 본문의 Airbnb 사진(본문 순서) — 사본이 있으면 서명 URL, 없으면 Airbnb `?im_w=`(47 §5-8). */
+  images: MessageImageView[];
   outbox: InboxMessageOutbox | null;
 };
 

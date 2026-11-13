@@ -41,6 +41,7 @@ import { isGuestMessageSendEnabled, runGuestOutbox } from "@/lib/guest-messages/
 import { createTranslationBudget, deeplTranslate } from "@/lib/review-translate";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { messageTextForTranslation } from "@/lib/guest-messages/message-body";
 
 export type GuestMessageErrorKey =
   | "forbidden"
@@ -411,8 +412,11 @@ export async function translateGuestMessage(messageId: string, lang?: string | n
     if (message.body_translated && message.translated_lang === viewLang) {
       return { ok: true, text: message.body_translated, cached: true };
     }
+    // 사진 · 링크 주소는 번역에 보내지 않는다(글 조각만, 47 §5-8). 글이 없으면(사진만) 번역할 것이 없다.
+    const text = messageTextForTranslation(message.body);
+    if (!text) return { ok: false, errorKey: "invalid" };
     const result = await deeplTranslate({
-      text: message.body,
+      text,
       targetLang: STAFF_DEEPL[viewLang],
       budget: createTranslationBudget({ strict: true }),
     });

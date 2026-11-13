@@ -4304,6 +4304,10 @@ export type Database = {
           direction: "guest" | "host" | "internal" | "system"
           external_id: string | null
           id: string
+          media_attempts: number
+          media_claim_id: string | null
+          media_next_try_at: string | null
+          media_state: "pending" | "done" | "failed" | null
           organization_id: string
           outbox_id: string | null
           provider: string
@@ -4324,6 +4328,10 @@ export type Database = {
           direction: "guest" | "host" | "internal" | "system"
           external_id?: string | null
           id?: string
+          media_attempts?: number
+          media_claim_id?: string | null
+          media_next_try_at?: string | null
+          media_state?: "pending" | "done" | "failed" | null
           organization_id: string
           outbox_id?: string | null
           provider: string
@@ -4344,6 +4352,10 @@ export type Database = {
           direction?: "guest" | "host" | "internal" | "system"
           external_id?: string | null
           id?: string
+          media_attempts?: number
+          media_claim_id?: string | null
+          media_next_try_at?: string | null
+          media_state?: "pending" | "done" | "failed" | null
           organization_id?: string
           outbox_id?: string | null
           provider?: string

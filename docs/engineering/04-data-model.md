@@ -2582,3 +2582,14 @@ INSERT · UPDATE 신호만, DELETE 는 오지 않는다. 대신 `task_occurrence
 - `guest_message_saved_replies.purpose` text null — `'resolved'` 면 이어진 업무가 끝났을 때 답장 칸에 띄울 「해결됐어요」 초안(보내지 않음). check `purpose in ('resolved')`, 부분 고유 인덱스 `guest_message_saved_replies_resolved_unique (organization_id) where purpose = 'resolved'`(조직마다 하나).
 - 업무 상태는 링크에 사본으로 두지 않는다 — 대화를 열 때 각 업무 표(`maintenance_reports.status/completed_at` · `lost_items.status/handled_at` · `tasks.status/completed_at/deleted_at` · `customer_complaints.status/resolved_at`)에서 읽는다.
 - 같이 바뀐 코드: 할 일 만들기에 선택 요청 id(같은 id 로 다시 오면 내가 10분 안에 만든 줄만 돌려줌, 되돌리기 지우기는 조직 필터 추가). 수리 · 분실물 · 할 일 만들기 검사 · 저장을 공용 함수(`src/lib/maintenance-create.ts` · `lost-item-create.ts` · `task-create.ts`)로 옮김(내용 그대로). `src/types/database.ts` 에 표 · 칸 추가.
+
+## 2026-11-13 손님 메시지 사진 사본 — `guest_messages.media_*` · 버킷 `guest-message-media` (`202611130007_guest_message_media.sql`, **운영 적용 2026-11-13**)
+
+기준 문서: `docs/product/47-guest-messaging.md` §5-8. Airbnb 사진은 본문에 서명 주소(1시간) 앵커로 와서, 사진을 Foldy 저장소에 한 번 복사해 둔다.
+
+- `guest_messages` 칸 4개: `media_state text null`(check `pending` · `done` · `failed`, null = 사진 없음) · `media_attempts smallint not null default 0`(check 0~100) · `media_next_try_at timestamptz null` · `media_claim_id uuid null`(복사 실행이 잡은 줄 — 저장은 이 번호일 때만). 검사 제약은 `not valid` → `validate constraint`(짧은 잠금, 운영 약 4.5만 줄). 부분 인덱스 `guest_messages_media_pending_idx (organization_id, media_next_try_at) where media_state = 'pending'`.
+- 트리거 `guest_messages_mark_media`(before insert, 함수 `search_path = ''` · 실행 권한 회수): `media_state` 가 비어 있고 본문에 `a0.muscache.com/im/pictures` 가 있으면 `pending`. 마이그레이션이 이미 있는 줄도 한 번 표시(멱등 update).
+- `guest_messages.attachments`(jsonb 배열) 안 사본 줄 모양(`StoredMediaAttachment`, `src/lib/guest-messages/message-media.ts`):
+  `{ kind: "image_copy", source: "airbnb", sourceUrl: "<정본 — https://a0.muscache.com/im/…, 쿼리 없음>", path: "<org>/<conversation>/<message>/<index>.<ext>", thumbPath: "<…>/<index>-t.<ext>" | null, index, mime, bytes, width: 1200, copiedAt }`.
+  예전 통로 첨부 줄 `{ name, mimeType, url, inline }`(kind 없음)과 섞일 수 있고 `kind` 로 가른다. 복사 작업만 덧붙인다(웹훅 다시 받기는 `ignoreDuplicates` 라 덮지 않음).
+- 저장소: 비공개 버킷 `guest-message-media`(10MB, jpeg · png · webp · gif). 경로 `<organization_id>/<conversation_id>/<message_id>/<사진 번호>.<ext>`(1200 폭) + `<사진 번호>-t.<ext>`(480 폭 작은 사진). 지우기 작업 없음(보관 기준 Q7 과 함께 정한다 — 메시지 · 대화가 지워져도 파일은 남으므로 그때 같이).

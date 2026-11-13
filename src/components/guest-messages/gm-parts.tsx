@@ -65,6 +65,8 @@ import {
   type GmCopy,
 } from "@/components/guest-messages/gm-format";
 import { InsertTools } from "@/components/guest-messages/composer-inserts";
+import { MessageBodyView } from "@/components/guest-messages/message-body-view";
+import { messagePlainText, messageTextForTranslation } from "@/lib/guest-messages/message-body";
 import { TaskLinkLine } from "@/components/guest-messages/task-create";
 import { insertLanguageFor } from "@/lib/guest-messages/guest-info-model";
 import type { LinkSurface, ThreadLinkView } from "@/lib/guest-messages/task-link-model";
@@ -352,7 +354,7 @@ export function ThreadMessages({
         if (
           m.direction !== "guest" ||
           cached[m.id] ||
-          !m.body.trim() ||
+          !messageTextForTranslation(m.body) ||
           requested.current.has(`${lang}:${m.id}`)
         )
           continue;
@@ -432,7 +434,9 @@ export function ThreadMessages({
             if (m.direction === "internal") {
               return (
                 <div className="gm-msg gm-msg--note" key={m.id}>
-                  <div className="gm-bubble gm-bubble--note">{m.body}</div>
+                  <div className="gm-bubble gm-bubble--note">
+                    <MessageBodyView body={m.body} images={m.images} copy={copy} />
+                  </div>
                   <span className="gm-msg__foot">
                     <LockGlyph />
                     {copy.internalNote}
@@ -453,9 +457,21 @@ export function ThreadMessages({
               const showingTranslation =
                 Boolean(translated) && wantsTranslation && !showOriginal[m.id];
               const picked = Boolean(pickedIds?.has(m.id));
-              const bubbleText = showingTranslation
-                ? translated
-                : m.body || copy.attachmentOnly;
+              // 본문은 조각(글 · 링크 · 사진)으로 그린다 — HTML 을 그대로 보이지 않게(47 §5-8).
+              const shownText = showingTranslation ? translated : null;
+              const ariaText =
+                messagePlainText(shownText ?? m.body).text ||
+                (m.images.length > 0 ? copy.photoLabel : copy.attachmentOnly);
+              const bubbleBody = (interactive: boolean) => (
+                <MessageBodyView
+                  body={m.body}
+                  textOverride={shownText}
+                  images={m.images}
+                  copy={copy}
+                  interactive={interactive}
+                  emptyText={copy.attachmentOnly}
+                />
+              );
               return (
                 <div
                   className="gm-msg gm-msg--guest"
@@ -468,16 +484,16 @@ export function ThreadMessages({
                       type="button"
                       className="gm-bubble gm-bubble--guest gm-bubble--pick"
                       aria-pressed={picked}
-                      aria-label={`${copy.taskSelectAria}: ${bubbleText ?? ""}`}
+                      aria-label={`${copy.taskSelectAria}: ${ariaText}`}
                       onClick={() => {
                         haptic("light");
                         onTogglePick(m.id);
                       }}
                     >
-                      {bubbleText}
+                      {bubbleBody(false)}
                     </button>
                   ) : (
-                    <div className="gm-bubble gm-bubble--guest">{bubbleText}</div>
+                    <div className="gm-bubble gm-bubble--guest">{bubbleBody(true)}</div>
                   )}
                   <span className="gm-msg__foot">
                     {picked ? (
@@ -518,7 +534,7 @@ export function ThreadMessages({
                             : copy.viewTranslation}
                         </button>
                       </>
-                    ) : state?.status !== "loading" && m.body.trim() ? (
+                    ) : state?.status !== "loading" && messageTextForTranslation(m.body) ? (
                       <>
                         {" · "}
                         <button
@@ -733,9 +749,11 @@ function HostMessage({
         </div>
       ) : (
         <div className="gm-bubble gm-bubble--host">
-          {showWritten && message.bodyTranslated
-            ? message.bodyTranslated
-            : message.body}
+          {showWritten && message.bodyTranslated ? (
+            message.bodyTranslated
+          ) : (
+            <MessageBodyView body={message.body} images={message.images} copy={copy} emptyText={copy.attachmentOnly} />
+          )}
         </div>
       )}
       {/* 항목 사이 「·」 는 CSS(`.gm-sep-list`) — 줄이 바뀌어도 줄 앞에 「·」 가 남지 않게. */}

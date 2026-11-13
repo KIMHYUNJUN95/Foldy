@@ -297,6 +297,8 @@ export type DashboardOpsSummary = {
   previousOccupancyPct: number;
   buildings: Array<{ name: string; pct: number }>;
   months: Array<{ month: string; revenue: number; occupancyPct: number }>;
+  /** 이번 달 1일 ~ 오늘 실적 — 최근 6개월 막대가 고른 달과 상관없이 이번 달을 실적 + 예약 확정으로 쌓는다. 이번 달이 6개월 밖이면 null. */
+  thisMonthActual: number | null;
 };
 
 /**
@@ -321,7 +323,11 @@ export async function getDashboardOpsSummary(session: AppSession, monthArg?: str
     : null;
 
   const pieces: Piece[] = [...months6.map(monthPiece), monthPiece(prevMonth)];
+  const thisMonthPiece: Piece | null = months6.includes(thisMonth)
+    ? { endExclusive: nextDay(today), start: `${thisMonth}-01` }
+    : null;
   if (toDatePiece) pieces.push(toDatePiece);
+  if (thisMonthPiece && month !== thisMonth) pieces.push(thisMonthPiece);
   if (prevToDatePiece) pieces.push(prevToDatePiece);
   const organizationId = session.organization.id;
   // 날짜별 막대용 그 달 예약 읽기는 요약기와 **동시에** 시작하고, 요약기의 「1일 ~ 오늘」 조각도 같은 읽기로 계산한다
@@ -391,6 +397,7 @@ export async function getDashboardOpsSummary(session: AppSession, monthArg?: str
     occupiedNights: current.occupiedNights,
     previousOccupancyPct: pct(previous),
     revenue: current.revenue,
+    thisMonthActual: thisMonthPiece ? total(thisMonthPiece).revenue : null,
     today,
   };
 }

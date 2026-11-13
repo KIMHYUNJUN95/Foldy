@@ -5,7 +5,8 @@ import {
   getCleaningOperatingDateKey,
   getCleaningSessionsForDate,
 } from "@/lib/cleaning";
-import { getDisplaySessionRoomLabel, localizeBuildingName, localizeRoomPlaceLabel } from "@/lib/room-label-normalization";
+import { getDisplaySessionRoomLabel, localizeRoomPlaceLabel } from "@/lib/room-label-normalization";
+import { joinPlace, resolveCleaningTaskLabel, splitSessionRoomLabel } from "@/lib/dashboard-format";
 import { getOrgMaintenanceReports } from "@/lib/maintenance-reports";
 import { getOrgLostItems } from "@/lib/lost-found";
 import { getOrgOrderRequests } from "@/lib/order-requests";
@@ -35,7 +36,11 @@ import {
 
 export type CleaningLive = {
   id: string;
+  /** 건물 + 방 전체(패널 제목). */
   room: string;
+  /** 방 번호 — 방이 하나뿐인 건물은 빈 글자. */
+  roomNo: string;
+  building: string;
   taskLabel: string;
   staff: string;
   startedAt: string | null;
@@ -136,7 +141,8 @@ export async function getAdminDashboard(session: AppSession): Promise<AdminDashb
   if (session.organization.id === "platform") return EMPTY;
 
   const today = getCleaningOperatingDateKey();
-  const buildingLabels = getDictionary(session.user.preferredLanguage).cleaning.buildingLabels;
+  const dictionary = getDictionary(session.user.preferredLanguage);
+  const buildingLabels = dictionary.cleaning.buildingLabels;
 
   const [
     cleaningSessions,
@@ -165,20 +171,24 @@ export async function getAdminDashboard(session: AppSession): Promise<AdminDashb
   // 진행 중 청소
   const cleaning: CleaningLive[] = cleaningSessions
     .filter((s) => s.status === "in_progress")
-    .map((s) => ({
-      id: s.id,
-      room: localizeRoomPlaceLabel(getDisplaySessionRoomLabel(s.room_label), buildingLabels),
-      taskLabel: s.task_label ?? "",
-      staff: s.staff_name || "",
-      startedAt: s.started_at ?? null,
-    }));
+    .map((s) => {
+      const displayLabel = getDisplaySessionRoomLabel(s.room_label);
+      const split = splitSessionRoomLabel(displayLabel, buildingLabels);
+      return {
+        id: s.id,
+        room: localizeRoomPlaceLabel(displayLabel, buildingLabels),
+        roomNo: split.room,
+        building: split.building,
+        // task_label 은 키(checkout)로 저장돼 있어 보는 사람 언어로 바꾼다.
+        taskLabel: resolveCleaningTaskLabel(s.task_label, dictionary.cleaning.taskOptions),
+        staff: s.staff_name || "",
+        startedAt: s.started_at ?? null,
+      };
+    });
 
   // 즉시 처리 큐 (정비 open/in_progress · 분실물 registered · 주문 requested/approved)
   // 위치의 건물 · 독채 이름은 한국어 정규 명칭으로 저장돼 있어 보는 사람 언어로 바꾼다(2026-10-23).
-  const place = (building: string | null, room: string | null) =>
-    [building ? localizeBuildingName(building, buildingLabels) : null, room ? localizeRoomPlaceLabel(room, buildingLabels) : null]
-      .filter(Boolean)
-      .join(" · ");
+  const place = (building: string | null, room: string | null) => joinPlace(building, room, buildingLabels);
   const maintenanceQueue: QueueEntry[] = maintenance
     .filter((m) => m.status === "open" || m.status === "in_progress")
     .map((m) => ({

@@ -20,7 +20,7 @@ function Ic({ children }: { children: React.ReactNode }) {
 
 function fmtTime(iso: string | null, locale: string): string {
   if (!iso) return "—";
-  return new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" }).format(
+  return new Intl.DateTimeFormat(locale, { hour: "2-digit", hourCycle: "h23", minute: "2-digit", timeZone: "Asia/Tokyo" }).format(
     new Date(iso),
   );
 }
@@ -35,8 +35,11 @@ function initial(name: string): string {
 export function CleaningLiveCard({
   cleaning,
   locale,
+  children,
 }: {
   cleaning: CleaningLive[];
+  /** 카드 아래 같은 칸에 이어 그릴 것(오늘 할 일). */
+  children?: React.ReactNode;
   /** 로케일 태그 (예: "ko-KR") — Intl 에 쓰이고 콘솔 사전으로 변환된다. */
   locale: string;
 }) {
@@ -58,6 +61,7 @@ export function CleaningLiveCard({
     <div className="dh-col7">
       <div className="dh-ch">
         <span className="dh-ct">{c.cleaningTitle}</span>
+        <span className="dh-cc">{cleaning.length}</span>
         <span className="dh-live"><i />{c.dhRealtime}</span>
         <Link href="/admin/cleaning" className="dh-link" style={{ marginLeft: "auto" }}>{c.dhCleaningLink} →</Link>
       </div>
@@ -68,25 +72,29 @@ export function CleaningLiveCard({
         <LiveWash sig={cleaning.map((row) => row.id).join(",")}>
         {cleaning.map((row) => (
           <button
-            className={`dh-row${row.id === selectedId ? " dh-sel" : ""}`}
+            className={`dh-row dh-row--btn${row.id === selectedId ? " dh-sel" : ""}`}
             data-live={row.id}
             key={row.id}
             onClick={() => setSelectedId(row.id)}
-            style={{ width: "100%", border: 0, borderTop: "1px solid #f3f3f6", background: row.id === selectedId ? "#f4f1fd" : "transparent", font: "inherit", textAlign: "left", padding: 0 }}
             type="button"
           >
-            <span className="dh-room">{row.room}</span>
+            <span className="dh-room">
+              <b>{row.roomNo || row.building}</b>
+              {row.roomNo ? <small>{row.building}</small> : null}
+            </span>
             <div className="dh-rb">
               <div className="dh-rt">{row.staff || c.unassigned}</div>
               <div className="dh-rs">
                 {row.taskLabel || c.taskOther} · {c.dhCleaningStarted.replace("{time}", fmtTime(row.startedAt, locale))}
               </div>
             </div>
-            <span className="dh-cc">{c.elapsedMin(elapsedMinutes(row.startedAt))}</span>
+            <span className="dh-cc">{c.dhElapsedShort.replace("{n}", String(elapsedMinutes(row.startedAt)))}</span>
           </button>
         ))}
         </LiveWash>
       )}
+
+      {children}
 
       {sel &&
         typeof document !== "undefined" &&

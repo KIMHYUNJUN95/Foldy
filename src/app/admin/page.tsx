@@ -9,7 +9,6 @@ import { getAdminDashboard } from "@/lib/admin-dashboard";
 import { Beds24LiveRefresh } from "@/components/shared/beds24-live-refresh";
 import { LiveRefresh } from "@/components/shared/live-refresh";
 import { attendanceQueueLiveSources, requestLiveSources, taskLiveSources } from "@/lib/live-sources";
-import { GreetingLine } from "@/components/shared/greeting-line";
 import { canAccessOpsAdmin } from "@/lib/ops-admin";
 import { getDashboardOpsSummary } from "@/lib/ops-revenue-server";
 
@@ -37,6 +36,13 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
   const localeTag = locale === "ko" ? "ko-KR" : locale === "ja" ? "ja-JP" : "en-US";
   // 운영 관리자는 시안대로 숫자 줄 + 매출 · 가동률 · 최근 6개월(화이트 리디자인 2026-10-09). 실패해도 홈은 열린다.
   const isOpsAdmin = Boolean(session.organization) && canAccessOpsAdmin(session);
+  // 제목은 인사말 대신 도쿄 오늘 날짜(2026-11-13) — ko 「11월 13일 목요일」 · en 「Thursday, November 13」 · ja 「11月13日(木)」.
+  const todayTitle = new Intl.DateTimeFormat(
+    localeTag,
+    locale === "en"
+      ? { weekday: "long", month: "long", day: "numeric", timeZone: "Asia/Tokyo" }
+      : { month: "long", day: "numeric", weekday: locale === "ja" ? "short" : "long", timeZone: "Asia/Tokyo" },
+  ).format(new Date());
   const { ym } = await searchParams;
   const [data, opsSummary] = await Promise.all([
     getAdminDashboard(session),
@@ -52,7 +58,7 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
   return (
     <AdminShell
       activeItem="dashboard"
-      title={<GreetingLine surface="admin" locale={locale} name={session.user.name ?? ""} fallback={dictionary.admin.console.headerToday} />}
+      title={todayTitle}
     >
       {/* 하루 첫 진입 모션(약 1.8초) — 시안 Motion-PC-Entry-PC */}
       {session.organization ? <Beds24LiveRefresh kinds={LIVE_KINDS} organizationId={session.organization.id} /> : null}

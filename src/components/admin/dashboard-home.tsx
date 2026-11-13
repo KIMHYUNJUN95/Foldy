@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Lock } from "lucide-react";
 import "./admin-console.css";
 import "./dashboard-home.css";
 import { CleaningLiveCard } from "./cleaning-live-card";
@@ -6,7 +7,7 @@ import { DashboardTodos } from "./dashboard-todos";
 import { DashboardBuildingMap, type MapCardCopy } from "./dashboard-building-map";
 import type { BuildingMapCopy } from "@/components/calendar/building-map/building-map";
 import { getPropertyLocation } from "@/lib/property-locations";
-import { groupByBuilding, pairByRoom } from "@/lib/home-reservation-groups";
+import { groupByBuilding, pairByRoom, type RoomTurnRow } from "@/lib/home-reservation-groups";
 import { normalizeReservationSource } from "@/lib/beds24/source-normalization";
 import type { HomeReservationRow } from "@/lib/home";
 import { localizeBuildingName, localizeRoomPlaceLabel } from "@/lib/room-label-normalization";
@@ -14,6 +15,8 @@ import { LiveWash } from "@/components/shared/live-wash";
 import { RollNumber } from "@/components/shared/roll-number";
 import { AdminMonthPicker, type AdminMonthPickerLabels } from "@/components/admin/shared/admin-month-picker";
 import type { AdminDashboardData, QueueKind } from "@/lib/admin-dashboard";
+import { niceMax, splitMonthRevenue } from "@/lib/chart-scale";
+import { formatRequestDate } from "@/lib/dashboard-format";
 import type { Dictionary } from "@/lib/i18n";
 import type { DashboardOpsSummary } from "@/lib/ops-revenue-server";
 
@@ -31,26 +34,15 @@ const I = {
   ),
 };
 
+const QUEUE_HREF: Record<QueueKind, string> = { maintenance: "/admin/maintenance", lost: "/admin/lost-found", order: "/admin/orders" };
 const QUEUE_ICON: Record<QueueKind, React.ReactNode> = { maintenance: I.wrench, lost: I.found, order: I.cart };
 
 function Ic({ children }: { children: React.ReactNode }) {
   return <span className="ic">{children}</span>;
 }
 
-function relDay(iso: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, { month: "numeric", day: "numeric", timeZone: "Asia/Tokyo" }).format(new Date(iso));
-}
-
 const yen = (value: number) => `¥${Math.round(value).toLocaleString("ja-JP")}`;
 const pct = (value: number) => `${Math.round(value)}%`;
-
-/** 축 눈금 — 가장 큰 막대보다 크고 보기 좋은 값(정확한 엔 표기, 줄이지 않는다). */
-function niceMax(value: number): number {
-  if (value <= 0) return 10000;
-  const step = 10 ** Math.floor(Math.log10(value));
-  for (const m of [1, 2, 3, 5, 10]) if (m * step >= value) return m * step;
-  return 10 * step;
-}
 
 function monthLabel(key: string, localeTag: string): string {
   const [y, m] = key.split("-").map(Number);
@@ -72,7 +64,8 @@ export type DashboardOpsBlock = {
 /**
  * 관리자 대시보드 홈(화이트 리디자인 2026-10-09, 시안 두 장 그대로 — 사용자 결정).
  * - 운영 관리자: 숫자 줄 → 매출 · 가동률(달 고르기) → 최근 6개월
- * - 그 밖: 숫자 줄 → 즉시 처리해야 하는 큐(진행 중 청소 · 즉시 처리 큐) → 오늘 할 일 · 예약 현황
+ * - 그 밖: 숫자 줄 → 지금 처리할 일(왼쪽 진행 중 청소 + 오늘 할 일 · 오른쪽 요청) → 오늘 체크인 · 체크아웃
+ * 2026-11-13 다듬기(시안 KWU2drTT…): 제목은 도쿄 오늘 날짜, 숫자 줄 문구 · 단위 정리, 최근 6개월은 막대 하나(이번 달만 실적 + 예약 확정 쌓기).
  * 「이상 근태 · 정정 요청」 · 「중요 공지」 구역은 두 시안 모두에 없어 뺐다(근태 · 공지 화면에 있다).
  * 「오늘의 건물」 지도 카드(2026-10-16, 시안 Motion-D-MapDash-PC)는 매출 · 가동률(없으면 숫자 줄) 바로 아래, 큐 위에 더했다 —
  * 위의 구역은 하나도 빼지 않는다(사용자 결정).
@@ -96,19 +89,22 @@ export function DashboardHome({
   const mCount = data.queue.filter((q) => q.kind === "maintenance").length;
   const lCount = data.queue.filter((q) => q.kind === "lost").length;
   const oCount = data.queue.filter((q) => q.kind === "order").length;
+  // 같은 방의 체크아웃 · 체크인은 한 줄(2026-10-28, 시안 18tu6H…) — 건물별 묶음 · 운영 순서 · 객실 번호순은 그대로.
+  const turnRows = pairByRoom(data.reservations.checkIns, data.reservations.checkOuts);
+  const turnovers = turnRows.filter((x) => x.checkIn && x.checkOut).length;
   const occPct = data.ops.totalRooms > 0 ? Math.round((data.ops.occupiedRooms / data.ops.totalRooms) * 100) : 0;
 
-  const kpis: { href: string; label: string; value: number; unit?: string; detail?: string }[] = [
-    { href: "/admin/calendar", label: c.opsOccupied, value: data.ops.occupiedRooms, unit: ` / ${data.ops.totalRooms}${c.unitRooms}`, detail: c.occupancyRate(occPct) },
-    { href: "/admin/calendar", label: c.opsCheckIn, value: data.ops.checkIns },
+  // 단위(실 · 건)는 숫자에 붙이지 않는다 — 라벨이 말해 주고, 영어에선 「33rooms」 처럼 붙어 보였다. 0 이어도 아래 줄 자리는 비워 둔다.
+  const kpis: { href: string; label: string; value: number; total?: number; detail?: string }[] = [
+    { href: "/admin/calendar", label: c.opsOccupied, value: data.ops.occupiedRooms, total: data.ops.totalRooms, detail: c.occupancyRate(occPct) },
+    { href: "/admin/calendar", label: c.opsCheckIn, value: data.ops.checkIns, detail: turnovers > 0 ? `${c.resvTurnover} ${turnovers}` : undefined },
     { href: "/admin/calendar", label: c.opsCheckOut, value: data.ops.checkOuts },
-    { href: "/admin/cleaning", label: c.opsCleaning, value: data.ops.cleaningInProgress, unit: c.unitRooms },
+    { href: "/admin/cleaning", label: c.opsCleaning, value: data.ops.cleaningInProgress },
     {
       href: "/admin/maintenance",
       label: c.opsRequests,
       value: data.ops.openRequests,
-      unit: c.unitCount,
-      detail: `${c.kindMaintenance} ${mCount} · ${c.kindLost} ${lCount} · ${c.kindOrder} ${oCount}`,
+      detail: `${c.kindMaintenanceShort} ${mCount} · ${c.kindLostShort} ${lCount} · ${c.kindOrderShort} ${oCount}`,
     },
   ];
 
@@ -123,9 +119,9 @@ export function DashboardHome({
             <span className="dh-kpi__k">{k.label}</span>
             <span className="dh-kpi__v">
               <RollNumber delay={150 + i * 70} delta text={String(k.value)} />
-              {k.unit ? <small>{k.unit}</small> : null}
+              {k.total !== undefined ? <small>/ {k.total}</small> : null}
             </span>
-            {k.detail ? <span className="dh-kpi__d">{k.detail}</span> : null}
+            <span className="dh-kpi__d">{k.detail}</span>
           </Link>
         ))}
       </div>
@@ -143,7 +139,7 @@ export function DashboardHome({
           </div>
         </>
       ) : null}
-      <QueueBlock buildingLabels={buildingLabels} c={c} data={data} divided={Boolean(ops) || showMap} locale={locale} />
+      <QueueBlock buildingLabels={buildingLabels} c={c} data={data} divided={Boolean(ops) || showMap} locale={locale} turnRows={turnRows} turnovers={turnovers} />
     </div>
   );
 }
@@ -157,13 +153,14 @@ function OpsBlock({ ops, c, locale, buildingLabels }: { ops: DashboardOpsBlock; 
   const circ = 2 * Math.PI * r;
   const mMax = niceMax(Math.max(...s.months.map((m) => m.revenue), 1));
   const thisMonth = s.today.slice(0, 7);
-  const linePoints = s.months.map((m, i) => ({ x: 40 + i * 80, y: 120 - (Math.min(m.occupancyPct, 100) / 100) * 100, v: m.occupancyPct }));
-
+  // 이번 달만 실적(아래)과 예약 확정(위)을 쌓는다 — 고른 달과 상관없이. 지난 달은 전부 실적, 앞 달은 전부 예약 확정.
+  const thisMonthActual = s.month === thisMonth ? s.actualToDate : s.thisMonthActual;
+  const monthBars = s.months.map((m) => ({ ...m, ...splitMonthRevenue(m.month, m.revenue, thisMonth, thisMonthActual) }));
   return (
     <>
       <div className="dh-sec">
         <b>{c.dhOpsTitle}</b>
-        <span className="dh-cc">{c.dhOpsNote}</span>
+        <span aria-label={c.dhOpsNote} className="dh-lock" role="img" title={c.dhOpsNote}><Lock aria-hidden="true" size={14} /></span>
         <div className="dh-sec__end">
           <AdminMonthPicker basePath="/admin" labels={ops.monthPickerLabels} localeTag={locale} ym={s.month} />
         </div>
@@ -255,7 +252,7 @@ function OpsBlock({ ops, c, locale, buildingLabels }: { ops: DashboardOpsBlock; 
             <p>
               {c.dhOccMonth.replace("{avail}", s.availableNights.toLocaleString("ja-JP")).replace("{occ}", s.occupiedNights.toLocaleString("ja-JP"))}
               <br />
-              {c.dhOccPrev} <b>{pct(s.previousOccupancyPct)}</b> → <b>{`${prevDiff >= 0 ? "+" : ""}${prevDiff}%p`}</b>
+              {c.dhOccPrev} <b>{pct(s.previousOccupancyPct)}</b> → <b>{`${prevDiff >= 0 ? "+" : "-"}${c.dhPointDiff.replace("{n}", String(Math.abs(prevDiff)))}`}</b>
             </p>
           </div>
           <div className="dh-bld">
@@ -270,72 +267,28 @@ function OpsBlock({ ops, c, locale, buildingLabels }: { ops: DashboardOpsBlock; 
         </div>
 
         <div className="dh-months">
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div className="dh-mhead">
             <span className="dh-ct">{c.dhMonthsTitle}</span>
             {s.months.some((m) => m.month === thisMonth) ? (
-              <span className="dh-cc">{c.dhMonthsNote.replace("{month}", monthLabel(thisMonth, locale))}</span>
+              <span className="dh-cc">
+                {c.dhMonthsNote.replace("{month}", monthLabel(thisMonth, locale)).replace("{day}", String(Number(s.today.slice(8, 10))))}
+              </span>
             ) : null}
           </div>
-          <div className="dh-months__grid">
-            <div className="dh-months__col">
-              <span className="dh-months__k">{c.dhMonthRevenue}</span>
-              <div className="dh-mbars">
-                {s.months.map((m, i) => (
-                  <div className="dh-mbar" key={m.month} style={{ "--i": i } as React.CSSProperties}>
-                    <span>{yen(m.revenue)}</span>
-                    <i className={m.month === thisMonth ? "is-current" : undefined} style={{ height: `${(m.revenue / mMax) * 100}%` }} />
+          <div aria-label={s.months.map((m) => c.dhMonthDesc.replace("{month}", monthLabel(m.month, locale)).replace("{amount}", yen(m.revenue)).replace("{pct}", String(Math.round(m.occupancyPct)))).join(", ")} className="dh-mcols" role="img">
+            {monthBars.map((m, i) => (
+              <div className={`dh-mcol${m.month === thisMonth ? " is-current" : ""}`} key={m.month} style={{ "--i": i } as React.CSSProperties}>
+                <div className="dh-mcol__plot">
+                  <span className="dh-mcol__v">{yen(m.revenue)}</span>
+                  <div className="dh-mcol__bar" style={{ height: `${(m.revenue / mMax) * 100}%` }}>
+                    {m.booked > 0 ? <i className="is-booked" style={{ flexGrow: m.booked }} /> : null}
+                    {m.actual > 0 ? <i className="is-actual" style={{ flexGrow: m.actual }} /> : null}
                   </div>
-                ))}
+                </div>
+                <span className="dh-mcol__m">{monthLabel(m.month, locale)}</span>
+                <span className="dh-mcol__o">{c.dhMonthOccN.replace("{pct}", String(Math.round(m.occupancyPct)))}</span>
               </div>
-              <div className="dh-mlbl">{s.months.map((m) => <span key={m.month}>{monthLabel(m.month, locale)}</span>)}</div>
-            </div>
-            <div className="dh-months__col">
-              <span className="dh-months__k">{c.dhMonthOcc}</span>
-              {/* 선 · 면만 칸 폭에 맞춰 늘이고, 점 · 숫자는 늘이지 않는다 — 함께 늘이면 동그라미가 옆으로 퍼진
-                  타원이 되고 글자가 뭉개져 흐려 보였다(2026-10-13 사용자 지적). */}
-              <div aria-label={c.dhMonthsDesc.replace("{list}", s.months.map((m) => pct(m.occupancyPct)).join(", "))} className="dh-line" role="img">
-                <svg aria-hidden="true" className="dh-line__svg" preserveAspectRatio="none" viewBox="0 0 480 130">
-                  <line stroke="#E6E6EB" vectorEffect="non-scaling-stroke" x1="0" x2="480" y1="129.5" y2="129.5" />
-                  <line stroke="#F1F1F4" vectorEffect="non-scaling-stroke" x1="0" x2="480" y1="70" y2="70" />
-                  {linePoints.length > 0 ? (
-                    <>
-                      <defs>
-                        <linearGradient id="dhOccArea" x1="0" x2="0" y1="0" y2="1">
-                          <stop offset="0" stopColor="#7A52E6" stopOpacity="0.12" />
-                          <stop offset="1" stopColor="#7A52E6" stopOpacity="0" />
-                        </linearGradient>
-                      </defs>
-                      <path
-                        d={`M${linePoints[0].x},129 ${linePoints.map((p) => `L${p.x},${p.y}`).join(" ")} L${linePoints[linePoints.length - 1].x},129 Z`}
-                        fill="url(#dhOccArea)"
-                      />
-                    </>
-                  ) : null}
-                  <polyline
-                    fill="none"
-                    points={linePoints.map((p) => `${p.x},${p.y}`).join(" ")}
-                    stroke="#7A52E6"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    vectorEffect="non-scaling-stroke"
-                  />
-                </svg>
-                {linePoints.map((p, i) => {
-                  const last = i === linePoints.length - 1;
-                  const pos = { left: `${(p.x / 480) * 100}%`, top: `${(p.y / 130) * 100}%` };
-                  return (
-                    <span aria-hidden="true" key={p.x} style={{ "--i": i } as React.CSSProperties}>
-                      <i className={`dh-line__dot${last ? " is-now" : ""}`} style={pos} />
-                      <b className={`dh-line__v${last ? " is-now" : ""}`} style={pos}>
-                        {pct(p.v)}
-                      </b>
-                    </span>
-                  );
-                })}
-              </div>
-              <div className="dh-mlbl">{s.months.map((m) => <span key={m.month}>{monthLabel(m.month, locale)}</span>)}</div>
-            </div>
+            ))}
           </div>
         </div>
       </div>
@@ -368,54 +321,29 @@ function QueueBlock({
   locale,
   divided,
   buildingLabels,
+  turnRows,
+  turnovers,
 }: {
   data: AdminDashboardData;
   c: Console;
   locale: string;
   divided: boolean;
   buildingLabels: Record<string, string>;
+  turnRows: RoomTurnRow<HomeReservationRow>[];
+  turnovers: number;
 }) {
-  // 같은 방의 체크아웃 · 체크인은 한 줄(2026-10-28, 시안 18tu6H…) — 건물별 묶음 · 운영 순서 · 객실 번호순은 그대로.
-  const turnRows = pairByRoom(data.reservations.checkIns, data.reservations.checkOuts);
   const resvGroups = groupByBuilding(turnRows, (x) => x.propertyName, (x) => x.roomLabel, buildingLabels);
-  const turnovers = turnRows.filter((x) => x.checkIn && x.checkOut).length;
+  const now = new Date();
+  const hiddenRequests = Math.max(0, data.queue.length - 5);
 
   return (
     <>
       <div className={divided ? "dh-sec dh-sec--line" : "dh-sec"}>
         <b>{c.sectQueueTitle}</b>
-        <span className="dh-cc">{data.queue.length + data.cleaning.length}</span>
       </div>
       <div className="dh-grid">
-        <CleaningLiveCard cleaning={data.cleaning} locale={locale} />
-        <div className="dh-col5">
-          <div className="dh-ch">
-            <span className="dh-ct">{c.queueTitle}</span>
-            <span className="dh-cc">{data.queue.length}{c.unitCount}</span>
-          </div>
-          {data.queue.length === 0 ? (
-            <div className="dh-empty">{c.queueEmpty}</div>
-          ) : (
-            <LiveWash sig={data.queue.slice(0, 5).map((q) => `${q.kind}-${q.id}`).join(",")}>
-            {data.queue.slice(0, 5).map((q) => {
-              const href = q.kind === "maintenance" ? "/admin/maintenance" : q.kind === "lost" ? "/admin/lost-found" : "/admin/orders";
-              const kindLabel = q.kind === "maintenance" ? c.kindMaintenance : q.kind === "lost" ? c.kindLost : c.kindOrder;
-              return (
-                <Link className="dh-row" data-live={`${q.kind}-${q.id}`} href={href} key={`${q.kind}-${q.id}`}>
-                  <span className="dh-qic"><Ic>{QUEUE_ICON[q.kind]}</Ic></span>
-                  <div className="dh-rb">
-                    <div className="dh-rt">{q.title}</div>
-                    <div className="dh-rs">{kindLabel}{q.location ? ` · ${q.location}` : ""}</div>
-                  </div>
-                  {q.urgent ? <span className="dh-urgent">{c.urgentTag}</span> : null}
-                  <span className="dh-cc">{relDay(q.createdAt, locale)}</span>
-                </Link>
-              );
-            })}
-            </LiveWash>
-          )}
-
-          {/* 오늘 할 일은 큐 아래로(2026-10-28) — 「해야 할 일」을 위에 모으고, 예약 현황이 아래에서 전체 폭을 쓴다. 누르면 바로 완료. */}
+        <CleaningLiveCard cleaning={data.cleaning} locale={locale}>
+          {/* 오늘 할 일은 진행 중 청소 아래 왼쪽 칸(2026-11-13) — 오른쪽은 요청만. 누르면 바로 완료. */}
           <DashboardTodos
             copy={{
               todoDoneToast: c.todoDoneToast,
@@ -428,6 +356,37 @@ function QueueBlock({
             }}
             todos={data.todos}
           />
+        </CleaningLiveCard>
+        <div className="dh-col5">
+          <div className="dh-ch">
+            <span className="dh-ct">{c.queueTitle}</span>
+            <span className="dh-cc">{data.queue.length}</span>
+          </div>
+          {data.queue.length === 0 ? (
+            <div className="dh-empty">{c.queueEmpty}</div>
+          ) : (
+            <LiveWash sig={data.queue.slice(0, 5).map((q) => `${q.kind}-${q.id}`).join(",")}>
+            {data.queue.slice(0, 5).map((q) => {
+              const href = QUEUE_HREF[q.kind];
+              const kindLabel = q.kind === "maintenance" ? c.kindMaintenance : q.kind === "lost" ? c.kindLost : c.kindOrder;
+              return (
+                <Link className="dh-row" data-live={`${q.kind}-${q.id}`} href={href} key={`${q.kind}-${q.id}`}>
+                  <span className="dh-qic"><Ic>{QUEUE_ICON[q.kind]}</Ic></span>
+                  <div className="dh-rb">
+                    <div className="dh-rt">{q.title}</div>
+                    <div className="dh-rs">{kindLabel}{q.location ? ` · ${q.location}` : ""}</div>
+                  </div>
+                  {q.urgent ? <span className="dh-urgent">{c.urgentTag}</span> : null}
+                  <span className="dh-cc">{formatRequestDate(q.createdAt, now, { today: c.dhDateToday, yesterday: c.dhDateYesterday })}</span>
+                </Link>
+              );
+            })}
+            </LiveWash>
+          )}
+
+          {hiddenRequests > 0 ? (
+            <Link className="dh-more" href={QUEUE_HREF[data.queue[5].kind]}>{c.dhMoreN.replace("{n}", String(hiddenRequests))}</Link>
+          ) : null}
         </div>
       </div>
 
@@ -436,7 +395,14 @@ function QueueBlock({
         <span className="dh-cc">
           {c.resvCheckIn} {data.reservations.checkIns.length} · {c.resvCheckOut} {data.reservations.checkOuts.length} · {c.resvTurnover} {turnovers}
         </span>
-        <div className="dh-sec__end">
+        <div className="dh-sec__end dh-sec__end--row">
+          {resvGroups.length > 0 ? (
+            <div className="dh-ch-legend">
+              <span><i aria-hidden="true" className="dh-ch-dot dh-ch-dot--airbnb" />Airbnb</span>
+              <span><i aria-hidden="true" className="dh-ch-dot dh-ch-dot--booking" />Booking.com</span>
+              <span><i aria-hidden="true" className="dh-ch-dot dh-ch-dot--direct" />{c.resvDirect}</span>
+            </div>
+          ) : null}
           <Link className="dh-link" href="/admin/calendar">{c.dhAllLink} →</Link>
         </div>
       </div>
@@ -481,11 +447,6 @@ function QueueBlock({
               })}
             </div>
           </LiveWash>
-          <div className="dh-ch-legend">
-            <span><i aria-hidden="true" className="dh-ch-dot dh-ch-dot--airbnb" />Airbnb</span>
-            <span><i aria-hidden="true" className="dh-ch-dot dh-ch-dot--booking" />Booking.com</span>
-            <span><i aria-hidden="true" className="dh-ch-dot dh-ch-dot--direct" />{c.resvDirect}</span>
-          </div>
         </>
       )}
     </>

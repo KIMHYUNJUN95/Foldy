@@ -1,6 +1,7 @@
 /*
- * 관리자 대시보드 홈 — 화이트 리디자인(2026-10-09, 시안 「관리자 대시보드 홈 · PC」 두 장).
+ * 관리자 대시보드 홈 — 화이트 리디자인(2026-10-09, 시안 「관리자 대시보드 홈 · PC」 두 장) + 다듬기(2026-11-13, 시안 KWU2drTT…).
  * 상자 없이 한 장: 숫자 줄은 아래 가로선 하나, 구역은 제목 줄 + 여백, 두 칸 사이에는 세로선 없이 여백만.
+ * 간격은 4px 격자 · 굵기는 600 까지 · 색은 admin-console 토큰(--ink · --adm-muted · --adm-primary · --primary-ink).
  */
 .adm .dh { display: flex; flex-direction: column; }
 
@@ -12,43 +13,50 @@
 .adm .dh-kpi {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 18px 22px 22px;
+  gap: 4px;
+  padding: 16px 24px 24px;
   text-decoration: none;
   color: inherit;
   border-radius: 12px;
+  transition: transform 160ms ease-out;
 }
 .adm .dh-kpi:first-child { padding-left: 0; }
-.adm .dh-kpi:hover .dh-kpi__v { color: #5a30cf; }
-.adm .dh-kpi__k { font-size: 13px; color: #6b6878; }
-.adm .dh-kpi__v { font-size: 28px; font-weight: 700; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; color: #16141f; }
+.adm .dh-kpi:hover .dh-kpi__v { color: var(--primary-ink); }
+.adm .dh-kpi:focus-visible { outline: 2px solid var(--adm-primary); outline-offset: -2px; }
+.adm .dh-kpi:active { transform: scale(.98); }
+.adm .dh-kpi__k { font-size: 13px; color: var(--adm-muted); }
+.adm .dh-kpi__v { font-size: 28px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--ink); }
 .adm .dh-kpi__v small { font-size: 14px; font-weight: 500; color: var(--text-3); margin-left: 4px; }
-.adm .dh-kpi__d { font-size: 12px; color: var(--text-3); }
+.adm .dh-kpi__d { min-height: 16px; font-size: 12px; color: var(--text-3); }
 
-.adm .dh-sec { display: flex; align-items: center; gap: 10px; margin-top: 32px; margin-bottom: 14px; }
-.adm .dh-sec b { font-size: 16px; font-weight: 700; color: #16141f; }
+.adm .dh-sec { display: flex; align-items: center; gap: 8px; margin-top: 32px; margin-bottom: 16px; }
+.adm .dh-sec b { font-size: 16px; font-weight: 600; color: var(--ink); }
 .adm .dh-sec--line { margin-top: 36px; padding-top: 24px; border-top: 0.5px solid var(--separator); }
 .adm .dh-cc { font-size: 13px; color: var(--text-3); }
 .adm .dh-sec__end { margin-left: auto; }
+.adm .dh-sec__end--row { display: flex; align-items: center; gap: 24px; }
+.adm .dh-lock { display: inline-flex; color: #8b8898; cursor: help; }
 
 .adm .dh-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); row-gap: 8px; }
-.adm .dh-ct { font-size: 15px; font-weight: 600; color: #16141f; }
-.adm .dh-link { font-size: 13px; font-weight: 500; color: #7a52e6; white-space: nowrap; text-decoration: none; }
-.adm .dh-link:hover { color: #5a30cf; }
-.adm .dh-ch { display: flex; align-items: center; gap: 10px; padding: 4px 0 12px; }
-.adm .dh-live { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #6b6878; }
-.adm .dh-live i { width: 6px; height: 6px; border-radius: 50%; background: #7a52e6; }
+.adm .dh-ct { font-size: 15px; font-weight: 600; color: var(--ink); }
+.adm .dh-link { font-size: 13px; font-weight: 500; color: var(--adm-primary); white-space: nowrap; text-decoration: none; }
+.adm .dh-link:hover { color: var(--primary-ink); }
+.adm .dh-ch { display: flex; align-items: center; gap: 8px; padding: 4px 0 12px; }
+.adm .dh-live { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--adm-muted); }
+/* 「실시간」 점 — 지도 카드(.dhm-live)와 같은 초록 점. */
+.adm .dh-live i { width: 7px; height: 7px; border-radius: 50%; background: #2bb673; box-shadow: 0 0 0 3px rgba(43, 182, 115, 0.18); animation: dh-live 1.6s ease-in-out infinite; }
+@keyframes dh-live { 50% { box-shadow: 0 0 0 6px rgba(43, 182, 115, 0); } }
 
 /* 매출 */
-.adm .dh-rev { grid-column: span 8; padding: 4px 28px 18px 0; display: flex; flex-direction: column; gap: 14px; }
+.adm .dh-rev { grid-column: span 8; padding: 4px 28px 16px 0; display: flex; flex-direction: column; gap: 16px; }
 .adm .dh-rev__top { display: flex; align-items: flex-start; gap: 16px; }
-.adm .dh-rev__v { font-size: 30px; font-weight: 700; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; color: #16141f; }
-.adm .dh-rev__note { font-size: 13px; color: #6b6878; }
-.adm .dh-rev__note b { color: #16141f; font-weight: 600; }
-.adm .dh-legend { margin-left: auto; display: flex; gap: 14px; font-size: 12px; color: #6b6878; }
-.adm .dh-legend span { display: flex; align-items: center; gap: 6px; }
-.adm .dh-legend i { width: 10px; height: 10px; border-radius: 3px; }
-.adm .dh-chart { display: flex; gap: 10px; }
+.adm .dh-rev__v { font-size: 28px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--ink); }
+.adm .dh-rev__note { font-size: 13px; color: var(--adm-muted); }
+.adm .dh-rev__note b { color: var(--ink); font-weight: 600; }
+.adm .dh-legend { margin-left: auto; display: flex; gap: 16px; font-size: 12px; color: var(--adm-muted); }
+.adm .dh-legend span { display: flex; align-items: center; gap: 8px; }
+.adm .dh-legend i { width: 8px; height: 8px; border-radius: 2px; }
+.adm .dh-chart { display: flex; gap: 8px; }
 .adm .dh-axis { display: flex; flex-direction: column; justify-content: space-between; height: 160px; width: 72px; font-size: 11px; color: var(--text-done); text-align: right; font-variant-numeric: tabular-nums; }
 .adm .dh-plot { flex: 1; position: relative; height: 160px; }
 .adm .dh-plot__lines { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: space-between; }
@@ -58,35 +66,38 @@
 .adm .dh-bar { flex: 1; min-height: 2px; border-radius: 4px 4px 0 0; background: #cdbbfb; }
 .adm .dh-bar.is-actual { background: #7a52e6; }
 .adm .dh-bar.is-today { box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px #7a52e6; }
-.adm .dh-xlabels { display: flex; gap: 10px; margin-top: -6px; }
+.adm .dh-xlabels { display: flex; gap: 8px; margin-top: -4px; }
 .adm .dh-xlabels > div { flex: 1; display: flex; gap: 4px; font-size: 11px; color: var(--text-done); }
 .adm .dh-xlabels span { flex: 1; text-align: center; white-space: nowrap; }
-.adm .dh-xlabels span.is-today { color: #5a30cf; font-weight: 600; }
+.adm .dh-xlabels span.is-today { color: var(--primary-ink); font-weight: 600; }
 
 /* 가동률 */
-.adm .dh-occ { grid-column: span 4; padding: 4px 0 18px 28px; display: flex; flex-direction: column; gap: 16px; }
-.adm .dh-occ__ring { display: flex; align-items: center; gap: 18px; }
-.adm .dh-occ__ring p { margin: 0; font-size: 13px; color: #6b6878; line-height: 1.7; }
-.adm .dh-occ__ring b { color: #16141f; font-weight: 600; }
-.adm .dh-bld { display: flex; flex-direction: column; gap: 10px; }
-.adm .dh-bld__row { display: flex; align-items: center; gap: 10px; font-size: 13px; }
-.adm .dh-bld__n { width: 96px; color: #3a3746; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm .dh-occ { grid-column: span 4; padding: 4px 0 16px 28px; display: flex; flex-direction: column; gap: 16px; }
+.adm .dh-occ__ring { display: flex; align-items: center; gap: 16px; }
+.adm .dh-occ__ring p { margin: 0; font-size: 13px; color: var(--adm-muted); line-height: 1.7; }
+.adm .dh-occ__ring b { color: var(--ink); font-weight: 600; }
+.adm .dh-bld { display: flex; flex-direction: column; gap: 8px; }
+.adm .dh-bld__row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.adm .dh-bld__n { width: 132px; flex: none; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .adm .dh-meter { flex: 1; height: 6px; border-radius: 3px; background: #efeff3; overflow: hidden; }
 .adm .dh-meter i { display: block; height: 100%; border-radius: 3px; background: #7a52e6; }
-.adm .dh-bld__v { width: 40px; text-align: right; font-variant-numeric: tabular-nums; color: #16141f; font-weight: 600; }
+.adm .dh-bld__v { width: 40px; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink); font-weight: 600; }
 
-/* 최근 6개월 */
-.adm .dh-months { grid-column: span 12; padding-top: 24px; border-top: 0.5px solid var(--separator); display: flex; flex-direction: column; gap: 14px; }
-.adm .dh-months__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px; }
-.adm .dh-months__col { display: flex; flex-direction: column; gap: 10px; }
-.adm .dh-months__k { font-size: 13px; color: #6b6878; }
-.adm .dh-mbars { height: 150px; display: flex; align-items: flex-end; gap: 14px; border-bottom: 0.5px solid var(--separator); }
-.adm .dh-mbar { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; }
-.adm .dh-mbar span { font-size: 11px; color: #6b6878; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.adm .dh-mbar i { width: 100%; max-width: 56px; border-radius: 6px 6px 0 0; background: #7a52e6; }
-.adm .dh-mbar i.is-current { background: #cdbbfb; }
-.adm .dh-mlbl { display: flex; gap: 14px; font-size: 11px; color: var(--text-done); }
-.adm .dh-mlbl span { flex: 1; text-align: center; }
+/* 최근 6개월 — 막대 하나(2026-11-13): 막대 위 금액 · 아래 달 + 가동률. 이번 달만 실적(진한 보라, 아래) + 예약 확정(옅은 보라, 위). */
+.adm .dh-months { grid-column: span 12; padding-top: 24px; border-top: 0.5px solid var(--separator); display: flex; flex-direction: column; gap: 16px; }
+.adm .dh-mhead { display: flex; align-items: center; gap: 8px; }
+.adm .dh-mcols { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); column-gap: 24px; }
+.adm .dh-mcol { display: flex; flex-direction: column; align-items: center; min-width: 0; }
+.adm .dh-mcol__plot { width: 100%; height: 176px; box-sizing: border-box; padding-top: 24px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; border-bottom: 0.5px solid var(--separator); }
+.adm .dh-mcol__v { flex: none; padding-bottom: 4px; font-size: 12px; color: var(--adm-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.adm .dh-mcol.is-current .dh-mcol__v { color: var(--ink); font-weight: 600; }
+.adm .dh-mcol__bar { flex: none; width: 100%; max-width: 72px; min-height: 2px; display: flex; flex-direction: column; border-radius: 8px 8px 0 0; overflow: hidden; background: var(--adm-primary); transform-origin: 50% 100%; }
+.adm .dh-mcol__bar i { display: block; flex-basis: 0; min-height: 0; }
+.adm .dh-mcol__bar .is-actual { background: var(--adm-primary); }
+.adm .dh-mcol__bar .is-booked { background: #cdbbfb; }
+.adm .dh-mcol__m { margin-top: 8px; font-size: 13px; color: var(--adm-muted); }
+.adm .dh-mcol.is-current .dh-mcol__m { color: var(--primary-ink); font-weight: 600; }
+.adm .dh-mcol__o { margin-top: 4px; font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums; }
 
 /* 큐 · 할 일 · 예약 — 줄 목록 */
 .adm .dh-col7 { grid-column: span 7; padding-right: 28px; }
@@ -102,37 +113,43 @@
   cursor: pointer;
 }
 .adm .dh-row:hover { background: #fafafb; }
-.adm .dh-room { font-family: var(--mono); font-size: 13px; font-weight: 600; width: 64px; flex: none; color: #16141f; }
-.adm .dh-rt { font-size: 14px; font-weight: 600; color: #16141f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.adm .dh-rs { font-size: 12px; color: var(--text-3); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm .dh-row--btn { width: 100%; border: 0; border-top: 0.5px solid var(--separator); background: transparent; font: inherit; text-align: left; padding: 0; }
+/* 진행 중 청소 방 칸 — 위 방 번호(mono) · 아래 건물 이름. 단일 객실 건물은 건물 이름만 위에. */
+.adm .dh-room { display: flex; flex-direction: column; width: 96px; flex: none; min-width: 0; }
+.adm .dh-room b { font-family: var(--mono); font-size: 14px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm .dh-room small { font-size: 12px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm .dh-rt { font-size: 14px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm .dh-rs { font-size: 12px; color: var(--text-3); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .adm .dh-rb { flex: 1; min-width: 0; }
-.adm .dh-qic { width: 32px; height: 32px; flex: none; border-radius: 9px; background: #f4f4f7; color: #6b6878; display: flex; align-items: center; justify-content: center; }
+.adm .dh-qic { width: 32px; height: 32px; flex: none; border-radius: 8px; background: #f4f4f7; color: var(--adm-muted); display: flex; align-items: center; justify-content: center; }
 .adm .dh-qic .ic { font-size: 16px; }
 .adm .dh-urgent { font-size: 12px; font-weight: 600; color: #c5282e; }
 /* 오늘 체크인 · 체크아웃(2026-10-28, 시안 18tu6H…) — 방 하나 한 줄 「객실 · 체크아웃 · 체크인」, 건물 묶음을 여러 단으로.
    단 수는 폭이 정한다(한 단 최소 360px — 1440 은 3단, 1280 은 2단). 묶음은 단을 넘어 쪼개지지 않는다. 세로선 없음. */
 .adm .dh-ch--next { margin-top: 28px; }
+.adm .dh-more { display: block; padding: 12px 0; border-top: 0.5px solid var(--separator); font-size: 13px; font-weight: 500; color: var(--adm-primary); text-decoration: none; }
+.adm .dh-more:hover { color: var(--primary-ink); }
 .adm .dh-turns { columns: 3 360px; column-gap: 48px; }
 .adm .dh-turn { break-inside: avoid; padding-bottom: 24px; }
-.adm .dh-turn__h { display: flex; align-items: baseline; gap: 10px; padding-bottom: 8px; }
-.adm .dh-turn__t { margin: 0; font-size: 14px; font-weight: 700; color: #16141f; }
+.adm .dh-turn__h { display: flex; align-items: baseline; gap: 8px; padding-bottom: 8px; }
+.adm .dh-turn__t { margin: 0; font-size: 14px; font-weight: 600; color: var(--ink); }
 .adm .dh-turn__cols, .adm .dh-turn__row { display: grid; grid-template-columns: 64px minmax(0, 1fr) minmax(0, 1fr); column-gap: 12px; align-items: center; }
-.adm .dh-turn__cols { height: 26px; font-size: 12px; color: #6b6878; }
+.adm .dh-turn__cols { height: 24px; font-size: 12px; color: var(--adm-muted); }
 .adm .dh-turn__row { min-height: 40px; border-top: 0.5px solid var(--separator); }
-.adm .dh-turn__room { font-size: 13px; font-weight: 700; color: #16141f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm .dh-turn__room { font-size: 13px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .adm .dh-turn__out, .adm .dh-turn__in { min-width: 0; }
-.adm .dh-turn__guest { display: flex; align-items: center; gap: 7px; min-width: 0; }
-.adm .dh-turn__name { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #3a3746; }
-.adm .dh-turn__in .dh-turn__name { font-weight: 600; color: #16141f; }
+.adm .dh-turn__guest { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.adm .dh-turn__name { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-soft); }
+.adm .dh-turn__in .dh-turn__name { font-weight: 600; color: var(--ink); }
 .adm .dh-turn__none { font-size: 13px; color: #c9c7d1; }
-.adm .dh-ch-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: #d9d7e0; }
+.adm .dh-ch-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: #d9d7e0; }
 .adm .dh-ch-dot--airbnb { background: #ff5a5f; }
 .adm .dh-ch-dot--booking { background: #003b95; }
 .adm .dh-ch-dot--direct { background: #8b8898; }
-.adm .dh-ch-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 4px; font-size: 12px; color: #6b6878; }
-.adm .dh-ch-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.adm .dh-ch-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12px; color: var(--adm-muted); }
+.adm .dh-ch-legend span { display: inline-flex; align-items: center; gap: 8px; }
 .adm .dh-empty { padding: 28px 0; text-align: center; font-size: 13px; color: var(--text-3); border-top: 0.5px solid var(--separator); }
-.adm .dh-todo { display: flex; align-items: center; gap: 12px; min-height: 46px; border-top: 0.5px solid var(--separator); font-size: 14px; color: #16141f; }
+.adm .dh-todo { display: flex; align-items: center; gap: 12px; min-height: 46px; border-top: 0.5px solid var(--separator); font-size: 14px; color: var(--ink); }
 .adm .dh-todo__box { width: 20px; height: 20px; flex: none; box-sizing: border-box; border-radius: 6px; border: 1.5px solid #d0cfd8; display: flex; align-items: center; justify-content: center; color: #fff; }
 /* 대시보드에서 바로 체크(2026-10-28) — 진짜 체크 칸은 안 보이게 두고 모양은 dh-todo__box. 키보드 초점은 상자에 링. */
 .adm .dh-todo--action { position: relative; cursor: pointer; }
@@ -144,88 +161,68 @@
 .adm .dh-todo__box .ic { font-size: 12px; }
 .adm .dh-todo.is-done { color: var(--text-done); text-decoration: line-through; }
 .adm .dh-todo.is-done .dh-todo__box { background: #7a52e6; border-color: #7a52e6; }
-.adm .dh-sel { background: #f4f1fd; }
+.adm .dh-sel { background: var(--primary-soft); }
 
 /* 디테일 다듬기(2026-10-13 시안 컨펌): 증감 화살표 · 체크인 보라 글자 */
 .adm .dh-trend { white-space: nowrap; }
 .adm .dh-trend__up, .adm .dh-trend__down { font-size: 9px; vertical-align: 1px; }
-.adm .dh-trend__up { color: #7a52e6; }
+.adm .dh-trend__up { color: var(--adm-primary); }
 .adm .dh-trend__down { color: #c5282e; }
 
-/* 월 가동률 — 선 · 면은 SVG(가로로 늘어남), 점 · 숫자는 HTML(늘어나지 않아 또렷하다) */
-.adm .dh-line { position: relative; height: 150px; }
-.adm .dh-line__svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-.adm .dh-line__dot { position: absolute; width: 10px; height: 10px; box-sizing: border-box; border: 2px solid #7a52e6; border-radius: 50%; background: #fff; transform: translate(-50%, -50%); }
-.adm .dh-line__dot.is-now { background: #7a52e6; box-shadow: 0 0 0 3px #ede7fc; }
-.adm .dh-line__v { position: absolute; transform: translate(-50%, calc(-100% - 10px)); font-size: 12px; font-weight: 500; color: var(--text-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.adm .dh-line__v.is-now { color: #16141f; font-weight: 700; }
-
-/* 대시보드 모션(2026-10-14, 시안 Motion-Dash-D1~D4 · Motion-B-Chart-PC) — 처음 그릴 때 한 번(실시간 새로 고침 땐 다시 안 함).
-   막대 스프링 차례 · 오늘 막대 테두리 그리기 · 막대 위에 올리면 머리선 + 금액 · 가동률 고리 그리기 + 끝 빛 점 · 건물 막대 채움 ·
-   월 막대 · 선 왼→오 그리기 + 점 차례 · 이번 달 점 숨 · 새로 생긴 줄 / 상태 바뀐 줄 보라 빛 · 할 일 완료 줄 긋기. */
-.adm .dh-bar { position: relative; transform-origin: 50% 100%; animation: dh-grow 900ms linear(0.000,0.034,0.123,0.247,0.390,0.536,0.677,0.804,0.912,0.999,1.064,1.109,1.136,1.147,1.146,1.135,1.119,1.098,1.077,1.055,1.036,1.019,1.005,0.994,0.986,0.981,0.979,0.978,0.979,0.981,0.984,0.987,0.991,0.994,0.996,0.999,1.000,1.002,1.003,1.003,1.000) both; animation-delay: calc(260ms + var(--i, 0) * 18ms); }
-.adm .dh-bar.is-today { animation: dh-grow 900ms linear(0.000,0.034,0.123,0.247,0.390,0.536,0.677,0.804,0.912,0.999,1.064,1.109,1.136,1.147,1.146,1.135,1.119,1.098,1.077,1.055,1.036,1.019,1.005,0.994,0.986,0.981,0.979,0.978,0.979,0.981,0.984,0.987,0.991,0.994,0.996,0.999,1.000,1.002,1.003,1.003,1.000) both, dh-today 700ms cubic-bezier(.23, 1, .32, 1) both; animation-delay: calc(260ms + var(--i, 0) * 18ms), 1300ms; }
+/* 대시보드 모션(2026-10-14, 시안 Motion-Dash-D1~D4 · Motion-B-Chart-PC, 2026-11-13 다듬기) — 처음 그릴 때 한 번(실시간 새로 고침 땐 다시 안 함).
+   처음 그리기 전체가 0.9~1초 안에 끝나고, 막대는 튀지 않는 ease-out(.23, 1, .32, 1). 무한 반복은 「실시간」 초록 점만(지도 카드와 같은 맥박).
+   막대 차례 · 오늘 막대 테두리 · 막대 위에 올리면 머리선 + 금액 · 가동률 고리 + 끝 점 · 건물 막대 채움 · 월 막대 · 새 줄 보라 물들기 · 할 일 줄 긋기. */
+.adm .dh-bar { position: relative; transform-origin: 50% 100%; animation: dh-grow 560ms cubic-bezier(.23, 1, .32, 1) both; animation-delay: calc(80ms + var(--i, 0) * 10ms); }
+.adm .dh-bar.is-today { animation: dh-grow 560ms cubic-bezier(.23, 1, .32, 1) both, dh-today 420ms cubic-bezier(.23, 1, .32, 1) both; animation-delay: calc(80ms + var(--i, 0) * 10ms), 520ms; }
 @keyframes dh-grow { from { transform: scaleY(.03); } }
-@keyframes dh-today { from { box-shadow: 0 0 0 2px #fff, 0 0 0 2px rgba(122, 82, 230, 0), 0 0 0 0 rgba(122, 82, 230, .35); } 60% { box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px #7a52e6, 0 0 0 9px rgba(122, 82, 230, 0); } to { box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px #7a52e6, 0 0 0 9px rgba(122, 82, 230, 0); } }
+@keyframes dh-today { from { box-shadow: 0 0 0 2px #fff, 0 0 0 2px rgba(122, 82, 230, 0), 0 0 0 0 rgba(122, 82, 230, .35); } 60% { box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px #7a52e6, 0 0 0 8px rgba(122, 82, 230, 0); } to { box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px #7a52e6, 0 0 0 8px rgba(122, 82, 230, 0); } }
 .adm .dh-bars:hover .dh-bar { opacity: .55; transition: opacity 160ms ease; }
 .adm .dh-bars .dh-bar:hover { opacity: 1; }
 .adm .dh-bar::before { content: ""; position: absolute; left: 50%; bottom: 100%; width: 1px; height: 400px; max-height: calc(160px - 100%); background: linear-gradient(180deg, rgba(122, 82, 230, 0), rgba(122, 82, 230, .45)); opacity: 0; pointer-events: none; transition: opacity 140ms ease; }
-.adm .dh-bar::after { content: attr(data-tip); position: absolute; left: 50%; bottom: calc(100% + 10px); z-index: 3; padding: 5px 9px; border-radius: 8px; background: #16141f; color: #fff; font-size: 12px; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; opacity: 0; transform: translate(-50%, 4px) scale(.96); transform-origin: 50% 100%; pointer-events: none; transition: opacity 140ms ease, transform 160ms cubic-bezier(.23, 1, .32, 1); }
+.adm .dh-bar::after { content: attr(data-tip); position: absolute; left: 50%; bottom: calc(100% + 8px); z-index: 3; padding: 4px 8px; border-radius: 8px; background: var(--ink); color: #fff; font-size: 12px; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; opacity: 0; transform: translate(-50%, 4px) scale(.96); transform-origin: 50% 100%; pointer-events: none; transition: opacity 140ms ease, transform 160ms cubic-bezier(.23, 1, .32, 1); }
 .adm .dh-bar:hover::before { opacity: 1; }
 .adm .dh-bar:hover::after { opacity: 1; transform: translate(-50%, 0) scale(1); }
 .adm .dh-bars .dh-bar:nth-last-child(-n + 4)::after { left: auto; right: -4px; transform: translate(0, 4px) scale(.96); transform-origin: 100% 100%; }
 .adm .dh-bars .dh-bar:nth-last-child(-n + 4):hover::after { transform: none; }
 .adm .dh-bars .dh-bar:nth-child(-n + 4)::after { left: -4px; transform: translate(0, 4px) scale(.96); transform-origin: 0 100%; }
 .adm .dh-bars .dh-bar:nth-child(-n + 4):hover::after { transform: none; }
-.adm .dh-trend { display: inline-block; animation: dh-pop 520ms linear(0.000,0.034,0.123,0.247,0.390,0.536,0.677,0.804,0.912,0.999,1.064,1.109,1.136,1.147,1.146,1.135,1.119,1.098,1.077,1.055,1.036,1.019,1.005,0.994,0.986,0.981,0.979,0.978,0.979,0.981,0.984,0.987,0.991,0.994,0.996,0.999,1.000,1.002,1.003,1.003,1.000) 1100ms both; }
+.adm .dh-trend { display: inline-block; animation: dh-pop 400ms cubic-bezier(.23, 1, .32, 1) 560ms both; }
 @keyframes dh-pop { from { opacity: 0; transform: translateY(4px) scale(.85); } }
 
 .adm .dh-occ__dial { position: relative; flex: none; display: block; width: 104px; height: 104px; }
 .adm .dh-occ__dial svg { display: block; }
-.adm .dh-occ__arc { animation: dh-arc 1300ms cubic-bezier(.23, 1, .32, 1) 300ms both; }
+.adm .dh-occ__arc { animation: dh-arc 800ms cubic-bezier(.23, 1, .32, 1) 200ms both; }
 @keyframes dh-arc { from { stroke-dasharray: 0 calc(var(--circ) * 1px); } }
-.adm .dh-occ__cap { transform-box: view-box; transform-origin: 52px 52px; transform: rotate(var(--deg)); animation: dh-cap 1300ms cubic-bezier(.23, 1, .32, 1) 300ms both, dh-capglow 2200ms cubic-bezier(.37, 0, .63, 1) 1700ms 2; filter: drop-shadow(0 0 3px rgba(255, 255, 255, .9)); }
+.adm .dh-occ__cap { transform-box: view-box; transform-origin: 52px 52px; transform: rotate(var(--deg)); animation: dh-cap 800ms cubic-bezier(.23, 1, .32, 1) 200ms both; }
 @keyframes dh-cap { from { transform: rotate(0deg); opacity: 0; } 12% { opacity: 1; } }
-@keyframes dh-capglow { 50% { filter: drop-shadow(0 0 6px rgba(255, 255, 255, 1)); } }
-.adm .dh-occ__pct { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 700; letter-spacing: -0.03em; color: #16141f; font-variant-numeric: tabular-nums; }
-.adm .dh-meter i { transform-origin: 0 50%; animation: dh-fill 1000ms cubic-bezier(.23, 1, .32, 1) both; animation-delay: calc(500ms + var(--i, 0) * 90ms); }
+.adm .dh-occ__pct { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.adm .dh-meter i { transform-origin: 0 50%; animation: dh-fill 560ms cubic-bezier(.23, 1, .32, 1) both; animation-delay: calc(160ms + var(--i, 0) * 40ms); }
 @keyframes dh-fill { from { transform: scaleX(0); } }
 
-.adm .dh-mbar i { transform-origin: 50% 100%; animation: dh-grow 900ms linear(0.000,0.034,0.123,0.247,0.390,0.536,0.677,0.804,0.912,0.999,1.064,1.109,1.136,1.147,1.146,1.135,1.119,1.098,1.077,1.055,1.036,1.019,1.005,0.994,0.986,0.981,0.979,0.978,0.979,0.981,0.984,0.987,0.991,0.994,0.996,0.999,1.000,1.002,1.003,1.003,1.000) both; animation-delay: calc(450ms + var(--i, 0) * 80ms); }
-.adm .dh-mbar span { animation: dh-fade 400ms ease-out both; animation-delay: calc(900ms + var(--i, 0) * 80ms); }
-@keyframes dh-fade { from { opacity: 0; transform: translateY(3px); } }
-@keyframes dh-vfade { from { opacity: 0; transform: translate(-50%, calc(-100% - 6px)); } }
-.adm .dh-line__svg { animation: dh-draw 1400ms cubic-bezier(.65, 0, .35, 1) 500ms both; }
-@keyframes dh-draw { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
-.adm .dh-line__dot { animation: dh-dot 500ms linear(0.000,0.034,0.123,0.247,0.390,0.536,0.677,0.804,0.912,0.999,1.064,1.109,1.136,1.147,1.146,1.135,1.119,1.098,1.077,1.055,1.036,1.019,1.005,0.994,0.986,0.981,0.979,0.978,0.979,0.981,0.984,0.987,0.991,0.994,0.996,0.999,1.000,1.002,1.003,1.003,1.000) both; animation-delay: calc(560ms + var(--i, 0) * 260ms); }
-.adm .dh-line__v { animation: dh-vfade 400ms ease-out both; animation-delay: calc(640ms + var(--i, 0) * 260ms); }
-.adm .dh-line__dot.is-now { animation: dh-dot 500ms linear(0.000,0.034,0.123,0.247,0.390,0.536,0.677,0.804,0.912,0.999,1.064,1.109,1.136,1.147,1.146,1.135,1.119,1.098,1.077,1.055,1.036,1.019,1.005,0.994,0.986,0.981,0.979,0.978,0.979,0.981,0.984,0.987,0.991,0.994,0.996,0.999,1.000,1.002,1.003,1.003,1.000) both, dh-breathe 2400ms cubic-bezier(.37, 0, .63, 1) infinite; animation-delay: calc(560ms + var(--i, 0) * 260ms), 2400ms; }
-@keyframes dh-dot { from { opacity: 0; transform: translate(-50%, -50%) scale(.3); } }
-@keyframes dh-breathe { 50% { box-shadow: 0 0 0 7px rgba(122, 82, 230, .12); } }
+.adm .dh-mcol__bar { animation: dh-grow 560ms cubic-bezier(.23, 1, .32, 1) both; animation-delay: calc(120ms + var(--i, 0) * 60ms); }
+.adm .dh-mcol__v { animation: dh-fade 320ms ease-out both; animation-delay: calc(360ms + var(--i, 0) * 60ms); }
+@keyframes dh-fade { from { opacity: 0; transform: translateY(4px); } }
 
 .adm .dh-row.is-fresh, .adm .dh-todo.is-fresh, .adm .dh-turn__row.is-fresh { animation: dh-wash 1800ms cubic-bezier(.23, 1, .32, 1) both; }
-@keyframes dh-wash { 0% { background-color: rgba(122, 82, 230, 0); transform: translateY(-6px); opacity: 0; } 14% { background-color: rgba(122, 82, 230, .12); transform: none; opacity: 1; } 100% { background-color: rgba(122, 82, 230, 0); } }
+@keyframes dh-wash { 0% { background-color: rgba(122, 82, 230, 0); transform: translateY(-4px); opacity: 0; } 14% { background-color: rgba(122, 82, 230, .12); transform: none; opacity: 1; } 100% { background-color: rgba(122, 82, 230, 0); } }
 .adm .dh-todo__t { position: relative; }
 .adm .dh-todo.is-done { text-decoration: none; }
 .adm .dh-todo.is-done .dh-todo__t::after { content: ""; position: absolute; left: 0; right: 0; top: 52%; height: 1px; background: currentColor; }
 .adm .dh-todo.is-done.is-fresh .dh-todo__t::after { transform-origin: 0 50%; animation: dh-fill 500ms cubic-bezier(.23, 1, .32, 1) 160ms both; }
-.adm .dh-todo.is-done.is-fresh .dh-todo__box { animation: dh-pop 460ms linear(0.000,0.034,0.123,0.247,0.390,0.536,0.677,0.804,0.912,0.999,1.064,1.109,1.136,1.147,1.146,1.135,1.119,1.098,1.077,1.055,1.036,1.019,1.005,0.994,0.986,0.981,0.979,0.978,0.979,0.981,0.984,0.987,0.991,0.994,0.996,0.999,1.000,1.002,1.003,1.003,1.000) both; }
+.adm .dh-todo.is-done.is-fresh .dh-todo__box { animation: dh-pop 320ms cubic-bezier(.23, 1, .32, 1) both; }
 
 /* 새로고침 때 PC 진입 화면(admin-entry)이 덮고 있는 동안 위 모션이 밑에서 끝나 버리지 않게 — 진입 화면이 걷히는 시점만큼
    html 의 --entry-d0 으로 미룬다(admin-entry.tsx 가 넣고 몇 초 뒤 뺀다). 앱 안에서 대시보드로 올 땐 0. */
-.adm .dh-bar { animation-delay: calc(var(--entry-d0, 0ms) + 260ms + var(--i, 0) * 18ms); }
-.adm .dh-bar.is-today { animation-delay: calc(var(--entry-d0, 0ms) + 260ms + var(--i, 0) * 18ms), calc(var(--entry-d0, 0ms) + 1300ms); }
-.adm .dh-trend { animation-delay: calc(var(--entry-d0, 0ms) + 1100ms); }
-.adm .dh-occ__arc { animation-delay: calc(var(--entry-d0, 0ms) + 300ms); }
-.adm .dh-occ__cap { animation-delay: calc(var(--entry-d0, 0ms) + 300ms), calc(var(--entry-d0, 0ms) + 1700ms); }
-.adm .dh-meter i { animation-delay: calc(var(--entry-d0, 0ms) + 500ms + var(--i, 0) * 90ms); }
-.adm .dh-mbar i { animation-delay: calc(var(--entry-d0, 0ms) + 450ms + var(--i, 0) * 80ms); }
-.adm .dh-mbar span { animation-delay: calc(var(--entry-d0, 0ms) + 900ms + var(--i, 0) * 80ms); }
-.adm .dh-line__svg { animation-delay: calc(var(--entry-d0, 0ms) + 500ms); }
-.adm .dh-line__dot { animation-delay: calc(var(--entry-d0, 0ms) + 560ms + var(--i, 0) * 260ms); }
-.adm .dh-line__v { animation-delay: calc(var(--entry-d0, 0ms) + 640ms + var(--i, 0) * 260ms); }
-.adm .dh-line__dot.is-now { animation-delay: calc(var(--entry-d0, 0ms) + 560ms + var(--i, 0) * 260ms), calc(var(--entry-d0, 0ms) + 2400ms); }
+.adm .dh-bar { animation-delay: calc(var(--entry-d0, 0ms) + 80ms + var(--i, 0) * 10ms); }
+.adm .dh-bar.is-today { animation-delay: calc(var(--entry-d0, 0ms) + 80ms + var(--i, 0) * 10ms), calc(var(--entry-d0, 0ms) + 520ms); }
+.adm .dh-trend { animation-delay: calc(var(--entry-d0, 0ms) + 560ms); }
+.adm .dh-occ__arc { animation-delay: calc(var(--entry-d0, 0ms) + 200ms); }
+.adm .dh-occ__cap { animation-delay: calc(var(--entry-d0, 0ms) + 200ms); }
+.adm .dh-meter i { animation-delay: calc(var(--entry-d0, 0ms) + 160ms + var(--i, 0) * 40ms); }
+.adm .dh-mcol__bar { animation-delay: calc(var(--entry-d0, 0ms) + 120ms + var(--i, 0) * 60ms); }
+.adm .dh-mcol__v { animation-delay: calc(var(--entry-d0, 0ms) + 360ms + var(--i, 0) * 60ms); }
 
 @media (prefers-reduced-motion: reduce) {
-  .adm .dh-bar, .adm .dh-trend, .adm .dh-occ__arc, .adm .dh-occ__cap, .adm .dh-meter i, .adm .dh-mbar i, .adm .dh-mbar span, .adm .dh-line__svg, .adm .dh-line__dot, .adm .dh-line__v, .adm .dh-row.is-fresh, .adm .dh-todo.is-fresh, .adm .dh-turn__row.is-fresh, .adm .dh-todo__t::after, .adm .dh-todo__box { animation: none !important; }
+  .adm .dh-bar, .adm .dh-trend, .adm .dh-occ__arc, .adm .dh-occ__cap, .adm .dh-meter i, .adm .dh-mcol__bar, .adm .dh-mcol__v, .adm .dh-live i, .adm .dh-row.is-fresh, .adm .dh-todo.is-fresh, .adm .dh-turn__row.is-fresh, .adm .dh-todo__t::after, .adm .dh-todo__box { animation: none !important; }
+  .adm .dh-kpi { transition: none; }
 }

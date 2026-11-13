@@ -312,7 +312,7 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
                                     scanError = null
                                     // 못 찾음 화면에 같은 이름이 보이도록 찾기 칸에도 넣어 둔다(날짜는 오늘).
                                     form = FindForm(byCode = false, lastName = mrz.surname, firstName = mrz.givenNames)
-                                    when (val result = model.find(PassportQuery(mrz.surname, mrz.givenNames))) {
+                                    when (val result = model.find(PassportQuery(mrz.surname, mrz.givenNames, mrz.raw))) {
                                         is FindResult.Found -> {
                                             foundStay(result, state.contract?.languages.orEmpty(), shot)
                                             true
@@ -330,6 +330,11 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
                                             blocked = result
                                             screen = Screen.Blocked
                                             true
+                                        }
+                                        // 여권 번호가 명부와 다르다 — 직원 호출 창을 연다(같은 여권은 다시 보내지 않게 카메라 결과는 버림).
+                                        FindResult.StaffNeeded -> {
+                                            openCall()
+                                            false
                                         }
                                         FindResult.Network -> {
                                             scanError = networkError
@@ -397,6 +402,12 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
                                             proofHeld = true
                                             false
                                         }
+                                        ProveResult.StaffNeeded -> {
+                                            lastProofRaw = mrz.raw
+                                            proofHeld = true
+                                            openCall()
+                                            false
+                                        }
                                         ProveResult.SessionGone -> {
                                             reset()
                                             true
@@ -449,6 +460,7 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
                                             blocked = result
                                             screen = Screen.Blocked
                                         }
+                                        FindResult.StaffNeeded -> openCall()
                                         FindResult.Network -> findError = networkError
                                         FindResult.Server -> findError = serverError
                                     }
@@ -600,6 +612,7 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
                     step = staff,
                     pin = state.contract?.staffPin,
                     guard = model.pinGuard,
+                    checkPin = model::checkPin,
                     device = state.device,
                     locked = locked,
                     deviceOwner = Kiosk.isDeviceOwner(activity),

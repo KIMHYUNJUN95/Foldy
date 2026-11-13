@@ -1395,8 +1395,9 @@ service-role 로 읽으므로 **조직을 쿼리에 직접 건다**(`organizatio
 - `beds24_tick_token_ok(text)` · `beds24_tick_if_needed()`: `SECURITY DEFINER`(Vault 읽기) ·
   `search_path = ''` · `revoke all … from public, anon, authenticated` + `grant execute … to service_role`.
   토큰 대조 함수는 **값을 돌려주지 않고** 일치 여부만 돌려준다.
-- `/api/beds24/tick` 은 사람 세션이 아니라 토큰으로 연다 — Vault 토큰(pg_net 호출), 또는 워커와 같은
-  `CRON_SECRET` / `BEDS24_WEBHOOK_SECRET`. 토큰은 헤더로만 받는다(쿼리 문자열은 접근 로그에 남는다).
+- `/api/beds24/tick` 은 사람 세션이 아니라 토큰으로 연다 — Vault 토큰(pg_net 호출), 또는 `CRON_SECRET`.
+  `Authorization: Bearer` 로만 받는다(쿼리 문자열은 접근 로그에 남는다). `BEDS24_WEBHOOK_SECRET` 은 2026-11-13 부터
+  받지 않는다 — Beds24 웹훅 설정 화면에 보이는 값이라(라우트별 표: `docs/engineering/07-environment-setup.md` 「API 라우트별 비밀값」).
 
 ## 2026-09-30 판매 캘린더 작업·이력 표 — 읽기도 `ops_admin.access`
 
@@ -1739,7 +1740,7 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 | `src/lib/auth-invite.ts` 가 `"use server"` 라 service role 가입 함수가 공개 액션 | `"use server"` → `server-only` |
 | 로그아웃 뒤 PWA 화면 저장본에 앞사람 화면이 남음 | 로그인 화면(`AuthFrame`)이 뜨면 `stayops-nav-*` 캐시 삭제(`NavCachePurge`) |
 
-남은 것: Beds24 웹훅은 `BEDS24_WEBHOOK_SECRET` 이 없으면 통과(fail-open) — 운영 값 확인 뒤 닫는다.
+남은 것 없음: Beds24 웹훅의 fail-open(`BEDS24_WEBHOOK_SECRET` 미설정 시 통과)은 2026-11-13 닫았다 — 미설정이면 503 `not_configured`.
 
 ## 2026-10-29 Realtime `postgres_changes` — 할 일 · 요청 · 알림 · 근태 대기열
 
@@ -1882,3 +1883,15 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 - 링크 글에 실제 호스트가 없으면 화면이 호스트를 옆에 같이 보인다(손님 · 채널 글의 피싱 링크, 47 §5-8).
 - `guest_messages.media_*`(`media_claim_id` 포함) 칸은 기존 GRANT 그대로(`authenticated` 는 표 읽기만, 쓰기는 service_role). 트리거 함수 `guest_messages_mark_media` 실행 권한 회수.
 - 따라잡기 라우트 `/api/guest-messages/media-backfill`: `authorizeGuestMessagesCron`(CRON_SECRET 또는 pg_cron Vault 토큰, 둘 다 없으면 404 · 틀리면 403), `organizationId` 필수. 받아 오기는 `a0.muscache.com` 사진 경로만(SSRF 허용 목록 · 넘김 거절 · 15초 · 10MB · 이미지 mime).
+
+## 2026-11-13 SECURITY DEFINER 함수 익명 실행 권한 회수 (`202611130100_security_function_grants`, **운영 적용 전**)
+
+Supabase advisor `anon_security_definer_function_executable` 정리. 운영 `pg_policies` 확인 기준.
+
+- 회수(public · anon, authenticated · service_role 유지): `can_manage_transport` · `has_permission_override` · `is_leave_approver` — PUBLIC/anon 정책에서 안 쓰임.
+  (`has_permission_override` 는 202609040002 때 properties/rooms 정책 때문에 회수 대신 가드로 막았으나 지금은 PUBLIC 정책에서 안 쓰여 회수.)
+- 트리거 함수 `ops_stats_mark_property` · `_reservation` · `_room`: public · anon · authenticated 모두 회수(트리거는 발동 때 EXECUTE 검사 안 함).
+- `default_team_kind_for_role(text)`: `search_path = ''` 고정.
+- **일부러 남긴 9개**(anon EXECUTE 유지): `can_manage_attendance_payroll` · `can_view_payroll` · `can_view_staff_suggestion` ·
+  `current_user_active_organization_ids` · `has_active_membership` · `has_org_role` · `is_platform_admin` · `is_project_participant` · `is_task_participant`.
+  역할 미지정(PUBLIC) 정책에서 쓰이며, 익명은 `auth.uid()` 가 null 이라 false/빈 값뿐이라 피해가 없다. 회수하면 anon 이 그 표를 읽을 때 42501 로 깨진다.

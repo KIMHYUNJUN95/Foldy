@@ -57,28 +57,14 @@ const ROUTINE_SINCE_DAYS = 30;
 const FULL_SINCE_DAYS = 180;
 
 /**
- * 리뷰 수집 호출 인가. /api/beds24/reconcile 와 같은 규약:
- * - Vercel Cron 의 `Authorization: Bearer <CRON_SECRET>` 헤더, 또는
- * - Beds24 웹훅 시크릿 (`x-beds24-webhook-secret` 헤더로 수동 실행 — 쿼리는 받지 않는다).
- * 서버에 둘 다 설정돼 있지 않으면 엔드포인트는 닫힌 채(404) 유지한다.
+ * 리뷰 수집 호출 인가 — /api/beds24/reconcile 와 같다: `Authorization: Bearer <CRON_SECRET>` 하나.
+ * `BEDS24_WEBHOOK_SECRET` 은 받지 않는다(2026-11-13) — Beds24 웹훅 설정 화면에 보이는 값이라. 쿼리(`?secret=`)도 안 받는다.
+ * `CRON_SECRET` 이 없으면 닫힌 채(404).
  */
 function authorize(request: NextRequest): { ok: true } | { ok: false; status: number } {
   const cronSecret = process.env.CRON_SECRET?.trim();
-  const webhookSecret = process.env.BEDS24_WEBHOOK_SECRET?.trim();
-  if (!cronSecret && !webhookSecret) {
-    return { ok: false, status: 404 };
-  }
-
-  // 상수 시간 비교 · 보낸 후보(Bearer / 헤더 / 쿼리) 중 하나라도 맞으면 통과(2026-10-26, api-secret).
-  if (
-    requestMatchesSecret(request, [cronSecret, webhookSecret], {
-      // 쿼리(`?secret=`)로는 받지 않는다(2026-11-10) — 주소는 접속 기록 · 프록시 로그에 남는다. 워크플로는 헤더로 보낸다.
-      headers: ["x-beds24-webhook-secret"],
-    })
-  ) {
-    return { ok: true };
-  }
-  return { ok: false, status: 403 };
+  if (!cronSecret) return { ok: false, status: 404 };
+  return requestMatchesSecret(request, [cronSecret]) ? { ok: true } : { ok: false, status: 403 };
 }
 
 function isUuid(value: string | null) {

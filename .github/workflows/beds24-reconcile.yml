@@ -18,10 +18,11 @@ name: Beds24 reconcile safety net
 # cron stays broken. vercel.json's cron is kept as a redundant second trigger
 # (reconcile is idempotent — a double run is harmless).
 #
-# SETUP (one-time): add a repository secret named BEDS24_WEBHOOK_SECRET
+# SETUP (one-time): add a repository secret named CRON_SECRET
 #   (GitHub → repo Settings → Secrets and variables → Actions → New repository secret)
-#   whose value matches BEDS24_WEBHOOK_SECRET on the Vercel production project.
-#   The reconcile endpoint accepts that secret via the x-beds24-webhook-secret header.
+#   whose value matches CRON_SECRET on the Vercel production project.
+#   The endpoint accepts it only as `Authorization: Bearer` (2026-11-13 — BEDS24_WEBHOOK_SECRET
+#   is visible in the Beds24 webhook settings, so it no longer opens cron routes).
 
 on:
   schedule:
@@ -43,16 +44,16 @@ jobs:
       - name: Trigger Beds24 reconciliation
         env:
           RECONCILE_URL: https://stay-ops-two.vercel.app/api/beds24/reconcile
-          WEBHOOK_SECRET: ${{ secrets.BEDS24_WEBHOOK_SECRET }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           set -euo pipefail
-          if [ -z "${WEBHOOK_SECRET}" ]; then
-            echo "::error::BEDS24_WEBHOOK_SECRET repository secret is not set — add it in repo Settings → Secrets → Actions."
+          if [ -z "${CRON_SECRET}" ]; then
+            echo "::error::CRON_SECRET repository secret is not set — add it in repo Settings → Secrets → Actions (same value as Vercel production CRON_SECRET)."
             exit 1
           fi
           code=$(curl -sS -o /tmp/reconcile.json -w '%{http_code}' \
             -X POST "${RECONCILE_URL}" \
-            -H "x-beds24-webhook-secret: ${WEBHOOK_SECRET}" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
             --max-time 120)
           echo "HTTP ${code}"
           cat /tmp/reconcile.json || true
@@ -75,12 +76,16 @@ jobs:
         if: always()
         env:
           HEALTH_URL: https://stay-ops-two.vercel.app/api/beds24/reviews-sync/health
-          WEBHOOK_SECRET: ${{ secrets.BEDS24_WEBHOOK_SECRET }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           set -uo pipefail
+          if [ -z "${CRON_SECRET}" ]; then
+            echo "::error::CRON_SECRET repository secret is not set — add it in repo Settings → Secrets → Actions (same value as Vercel production CRON_SECRET)."
+            exit 1
+          fi
           code=$(curl -sS -o /tmp/reviews-health.json -w '%{http_code}' \
             -X POST "${HEALTH_URL}" \
-            -H "x-beds24-webhook-secret: ${WEBHOOK_SECRET}" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
             --max-time 60)
           echo "HTTP ${code}"
           cat /tmp/reviews-health.json || true

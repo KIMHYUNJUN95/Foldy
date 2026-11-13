@@ -44,8 +44,9 @@ export default async function GuestPage({ params }: { params: Promise<{ token: s
   // 새 사람이나 주소가 비어 있던 사람이면 저장 뒤에도 주소 화면이 남는다(화면을 그린 뒤라 서버 값이 아직 옛것).
   const nextHref = nextEntry ? nextEntry.href : afterPeopleHref(token, needsAddress(stay) || isNew, stay.consented);
 
+  // 체크인 뒤에는 여권 사진을 다시 내려주지 않는다(링크가 새도 사진은 안 나가게) — 있다는 표시만.
   let photoUrl: string | null = null;
-  if (guest?.hasPassportPhoto) {
+  if (guest?.hasPassportPhoto && stay.editable) {
     const db = createCheckinServiceClient();
     const path = await currentPassportPath(db, guest.id);
     if (path) {
@@ -93,6 +94,7 @@ export default async function GuestPage({ params }: { params: Promise<{ token: s
           : null
       }
       photoUrl={photoUrl}
+      photoOnFile={!!guest?.hasPassportPhoto}
       countries={countries}
       editable={stay.editable}
       nextHref={nextHref}

@@ -24,28 +24,14 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**
- * 보정 호출 인증. 아래 둘 중 하나를 허용한다:
- *   - Vercel Cron 의 `Authorization: Bearer <CRON_SECRET>` 헤더, 또는
- *   - Beds24 웹훅 시크릿(헤더/쿼리로 수동 실행).
- * 서버에 두 시크릿이 모두 설정되지 않았으면 엔드포인트는 닫혀 있다(404).
+ * 보정 호출 인증 — `Authorization: Bearer <CRON_SECRET>` 하나(Vercel Cron 자동 · GitHub Actions · 수동).
+ * `BEDS24_WEBHOOK_SECRET` 은 받지 않는다(2026-11-13) — Beds24 웹훅 설정 화면에 보이는 값이라. 쿼리(`?secret=`)도 안 받는다.
+ * `CRON_SECRET` 이 서버에 없으면 닫혀 있다(404).
  */
 function authorize(request: NextRequest): { ok: true } | { ok: false; status: number } {
   const cronSecret = process.env.CRON_SECRET?.trim();
-  const webhookSecret = process.env.BEDS24_WEBHOOK_SECRET?.trim();
-  if (!cronSecret && !webhookSecret) {
-    return { ok: false, status: 404 };
-  }
-
-  // 상수 시간 비교 · 보낸 후보(Bearer / 헤더 / 쿼리) 중 하나라도 맞으면 통과(2026-10-26, api-secret).
-  if (
-    requestMatchesSecret(request, [cronSecret, webhookSecret], {
-      headers: ["x-beds24-webhook-secret"],
-      query: true,
-    })
-  ) {
-    return { ok: true };
-  }
-  return { ok: false, status: 403 };
+  if (!cronSecret) return { ok: false, status: 404 };
+  return requestMatchesSecret(request, [cronSecret]) ? { ok: true } : { ok: false, status: 403 };
 }
 
 function isUuid(value: string | null) {

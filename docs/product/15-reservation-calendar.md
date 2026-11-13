@@ -842,7 +842,7 @@ Reservation ingestion is webhook-first (`docs/planning/01-decision-log.md` → "
 2. **Prevention — daily reconciliation safety net** (`src/app/api/beds24/reconcile/route.ts`):
    - Production-safe, idempotent endpoint that re-pulls the operational window (current month + next month) from the Beds24 `/bookings` API and upserts anything missing — the production counterpart to the dev-only `backfill-reservations` route.
    - Driven daily by **Vercel Cron** (`vercel.json`, `0 19 * * *` UTC = 04:00 Asia/Tokyo), within the free Hobby plan's once-per-day cron limit.
-   - Authorized by `CRON_SECRET` (Vercel Cron Bearer header) or `BEDS24_WEBHOOK_SECRET` (manual trigger).
+   - Authorized by `CRON_SECRET` only (Bearer — Vercel Cron, GitHub Actions and manual triggers; `BEDS24_WEBHOOK_SECRET` no longer accepted since 2026-11-13).
    - A webhook dropped today is healed by the next morning's reconciliation run.
 
 ### Policy note

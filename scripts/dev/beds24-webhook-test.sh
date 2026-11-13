@@ -5,7 +5,9 @@
 #
 # Requirements:
 #   - Next.js dev server running on localhost:3000 (npm run dev)
-#   - BEDS24_WEBHOOK_SECRET env var set (or empty to skip auth)
+#   - BEDS24_WEBHOOK_SECRET env var set — must match the dev server. If the server has no secret
+#     the webhook answers 503 {"error":"not_configured"} (fail-closed since 2026-11-13); a missing or
+#     wrong secret answers 403 {"error":"forbidden"}.
 #   - BEDS24_DEFAULT_ORGANIZATION_ID env var set to a valid org UUID
 #
 # The response JSON shows:
@@ -21,10 +23,12 @@ SECRET="${BEDS24_WEBHOOK_SECRET:-}"
 URL="http://localhost:3000/api/beds24/webhook"
 
 if [ -z "$SECRET" ]; then
-  echo "[warn] BEDS24_WEBHOOK_SECRET is empty — sending without auth header"
+  echo "[warn] BEDS24_WEBHOOK_SECRET is empty — sending without auth header."
+  echo "[warn] Expected: 403 forbidden (server has a secret) or 503 not_configured (server has none). Nothing is stored."
   curl -s -X POST "$URL" \
     -H "Content-Type: application/json" \
-    -d @"$SAMPLE" | jq .
+    -w '\nHTTP %{http_code}\n' \
+    -d @"$SAMPLE"
 else
   curl -s -X POST "$URL" \
     -H "Content-Type: application/json" \

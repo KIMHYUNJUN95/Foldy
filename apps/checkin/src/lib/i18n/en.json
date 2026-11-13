@@ -50,9 +50,10 @@
   },
   "locked": {
     "title": "Paused for a moment",
-    "body": "5 tries didn't match, so finding is paused for 10 minutes. This keeps others from peeking at bookings.",
+    "body": "Several tries didn't match, so finding is paused for a while. This keeps others from peeking at bookings.",
     "until": "You can try again after {time}",
-    "arrived": "If you're already at the building, don't wait — check in on the tablet inside."
+    "arrived": "If you're already at the building, don't wait — check in on the tablet inside.",
+    "staff": "If you can't wait, message our staff through your booking, or tap “Call staff” on the tablet inside the building."
   },
   "guests": {
     "title": "{name}'s booking",

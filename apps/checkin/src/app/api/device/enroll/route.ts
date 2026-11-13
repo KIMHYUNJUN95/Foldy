@@ -1,12 +1,14 @@
 import { z } from "zod";
 
-import { attemptKeys } from "@/lib/guest/limits";
+import { discardAttempts, markSucceeded, priorCount, recordPending } from "@/lib/guest/attempts";
+import { attemptKeys, ENROLL_GLOBAL_MAX_FAILURES, ENROLL_GLOBAL_WINDOW_MS, NO_IP_HASH, scopeKey } from "@/lib/guest/limits";
 import { clientIp, json, readJson, serverError } from "@/lib/guest/request";
 import { newGuestToken } from "@/lib/guest/token";
 import { createCheckinServiceClient } from "@/lib/supabase/service";
 
 // POST /api/device/enroll — 직원이 관리자 화면에서 만든 8자리 등록 코드(10분 · 1회)로 태블릿을 건물 하나에 등록한다(FR-D01, 16 §4).
-// 기기 토큰 원문은 여기서 한 번만 돌려준다. 같은 IP 는 1분에 5번까지(잘못된 코드 마구 넣기 막기).
+// 기기 토큰 원문은 여기서 한 번만 돌려준다. 같은 IP 는 1분에 5번까지, IP 와 무관하게 10분 안 전체 실패 100번이면 잠시 모두 거절
+// (IP 를 바꿔 가며 코드 마구 넣기 막기). 둘 다 같은 429 `rate_limited`. 시도는 먼저 실패로 적고 판정한다(동시 요청이 서로를 세게).
 export const dynamic = "force-dynamic";
 
 const ENROLL_PER_MINUTE = 5;
@@ -30,13 +32,19 @@ export async function POST(request: Request) {
     const now = new Date();
     // 시도 기록은 「예약 찾기」와 같은 표 — 키 자리에 건물 대신 "device-enroll".
     const { keyHash, ipHash } = attemptKeys(clientIp(request), "device-enroll", secret);
-    const { count, error: countError } = await db
-      .from("claim_attempts")
-      .select("id", { count: "exact", head: true })
-      .eq("key_hash", keyHash)
-      .gte("attempted_at", new Date(now.getTime() - 60_000).toISOString());
-    if (countError) throw new Error(countError.message);
-    if ((count ?? 0) >= ENROLL_PER_MINUTE) return json({ ok: false, error: "rate_limited" }, 429);
+    const globalKey = scopeKey("device-enroll", secret);
+    const own = await recordPending(db, [
+      { key_hash: keyHash, ip_hash: ipHash },
+      { key_hash: globalKey, ip_hash: NO_IP_HASH },
+    ]);
+    const [ipCount, globalCount] = await Promise.all([
+      priorCount(db, "key_hash", keyHash, 60_000, now, 1),
+      priorCount(db, "key_hash", globalKey, ENROLL_GLOBAL_WINDOW_MS, now, 1),
+    ]);
+    if (ipCount >= ENROLL_PER_MINUTE || globalCount >= ENROLL_GLOBAL_MAX_FAILURES) {
+      await discardAttempts(db, own.ids);
+      return json({ ok: false, error: "rate_limited" }, 429);
+    }
 
     // 코드 쓰기를 한 번의 조건부 update 로 — 두 기기가 같은 코드를 동시에 넣어도 한쪽만 된다.
     const { data: code, error: codeError } = await db
@@ -48,9 +56,11 @@ export async function POST(request: Request) {
       .select("organization_id, property_key, device_name, created_by")
       .maybeSingle();
     if (codeError) throw new Error(codeError.message);
-    await db.from("claim_attempts").insert({ key_hash: keyHash, ip_hash: ipHash, succeeded: !!code });
-    // 없는 코드 · 지난 코드 · 쓴 코드를 구별하지 않는다.
+    // 없는 코드 · 지난 코드 · 쓴 코드를 구별하지 않는다. 실패 줄은 그대로 남는다.
     if (!code) return json({ ok: false, error: "invalid_code" }, 404);
+    // 맞았다 — IP 줄은 성공으로, 전체 줄은 실패만 세므로 지운다.
+    await markSucceeded(db, [own.idOf(keyHash)]);
+    await discardAttempts(db, [own.idOf(globalKey)]);
 
     const token = newGuestToken();
     const { data: device, error: deviceError } = await db

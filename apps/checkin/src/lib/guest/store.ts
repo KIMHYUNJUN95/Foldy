@@ -2,6 +2,7 @@ import "server-only";
 
 import type { CheckinServiceClient } from "../supabase/service";
 import { missingFields, type MissingField, type StoredGuest } from "./fields";
+import { guestLinkOpen, maskPassportNumber } from "./link";
 import type { ClaimCandidate } from "./match";
 import { hashGuestToken, isTokenShaped } from "./token";
 
@@ -134,7 +135,11 @@ async function ensureRepresentative(db: CheckinServiceClient, stay: { id: string
   if (error && error.code !== "23505") throw new Error(`대표자 만들기 실패: ${error.message}`);
 }
 
-export async function loadStayByToken(db: CheckinServiceClient, rawToken: string): Promise<StayView | null> {
+/**
+ * 손님 링크로 stay 를 읽는다. 체크아웃 다음 날(도쿄)이 지나면 닫힌 링크(null — 없는 링크와 같게).
+ * 체크인 뒤(고칠 수 없음)에는 여권 번호를 가린 값으로 바꾼다 — 사진은 `hasPassportPhoto` 표시만 남고 화면이 서명 URL 을 만들지 않는다.
+ */
+export async function loadStayByToken(db: CheckinServiceClient, rawToken: string, now: Date = new Date()): Promise<StayView | null> {
   if (!isTokenShaped(rawToken)) return null;
   const { data: link, error: linkError } = await db
     .from("stay_tokens")
@@ -143,7 +148,10 @@ export async function loadStayByToken(db: CheckinServiceClient, rawToken: string
     .maybeSingle();
   if (linkError) throw new Error(`stay_tokens 읽기 실패: ${linkError.message}`);
   if (!link) return null;
-  return loadStayById(db, link.stay_id as string);
+  const stay = await loadStayById(db, link.stay_id as string);
+  if (!stay || !guestLinkOpen(stay.checkOutDate, now)) return null;
+  if (stay.editable) return stay;
+  return { ...stay, guests: stay.guests.map((guest) => ({ ...guest, passport_number: maskPassportNumber(guest.passport_number) })) };
 }
 
 /** stay 하나를 명부까지 읽는다(사전 등록 웹 · 태블릿 공용). 취소 · 기간 지남은 null. */

@@ -142,16 +142,21 @@ function parseWebhookBody(raw: string): { body: unknown; parsed: boolean } {
   return { body: trimmed, parsed: false };
 }
 
-function isAuthorized(request: NextRequest): boolean {
+/**
+ * 비밀값이 서버에 없으면 닫는다(503, 2026-11-13) — 예전엔 열린 채 통과해 누구나 가짜 예약을 upsert 할 수 있었다.
+ * 상수 시간 비교 · 헤더 / Bearer / `?secret=` 중 하나라도 맞으면 통과(api-secret). 쿼리는 Beds24 배달 호환으로 유지.
+ */
+function authorize(request: NextRequest): NextResponse | null {
   const requiredSecret = process.env.BEDS24_WEBHOOK_SECRET?.trim();
-  // TODO(2026-10-26, 운영 환경변수 미확인): 시크릿이 설정되지 않으면 통과(fail-open)한다 — 설정 전 배포를 견디려는
-  // 기존 동작이라 바꾸지 않았다. 운영에 BEDS24_WEBHOOK_SECRET 이 확실히 있음을 확인한 뒤 닫을 것.
-  if (!requiredSecret) return true;
-  // 상수 시간 비교 · 헤더 / Bearer / 쿼리 중 하나라도 맞으면 통과(api-secret). 쿼리 시크릿은 기존 배달 호환으로 유지.
-  return requestMatchesSecret(request, [requiredSecret], {
+  if (!requiredSecret) {
+    console.error("[beds24/webhook] BEDS24_WEBHOOK_SECRET is not configured — rejecting delivery");
+    return NextResponse.json({ ok: false, error: "not_configured" }, { status: 503 });
+  }
+  const ok = requestMatchesSecret(request, [requiredSecret], {
     headers: ["x-beds24-webhook-secret"],
     query: true,
   });
+  return ok ? null : NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
 }
 
 /**
@@ -169,9 +174,8 @@ export async function GET(request: NextRequest) {
   if (isBeds24SyncPaused()) {
     return NextResponse.json({ ok: true, paused: true }, { status: 202 });
   }
-  if (!isAuthorized(request)) {
-    return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
-  }
+  const denied = authorize(request);
+  if (denied) return denied;
 
   // 질의 파라미터가 곧 페이로드다. 우리 시크릿은 배달 내용이 아니므로 뺀다.
   const body: Record<string, string> = {};
@@ -209,9 +213,8 @@ export async function POST(request: NextRequest) {
   if (isBeds24SyncPaused()) {
     return NextResponse.json({ ok: true, paused: true }, { status: 202 });
   }
-  if (!isAuthorized(request)) {
-    return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
-  }
+  const denied = authorize(request);
+  if (denied) return denied;
 
   const contentType = request.headers.get("content-type");
   const rawText = await request.text();

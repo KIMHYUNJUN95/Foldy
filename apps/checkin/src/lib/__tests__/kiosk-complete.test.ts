@@ -154,8 +154,12 @@ describe("다시 보기 · 경쟁 · 이름으로 찾은 경우", () => {
   const good = `${L1}\n${L2}`;
   const names = ["Anna Eriksson"];
   it("서버가 띠를 읽는다 — 좋은 띠는 증명, 증명 판정은 이름으로 찾은 세션에서 나온다", () => {
-    expect(parseMrzStrip(good)).toEqual({ surname: "ERIKSSON", givenNames: "ANNA MARIA" });
+    expect(parseMrzStrip(good)).toEqual({ surname: "ERIKSSON", givenNames: "ANNA MARIA", documentNumber: "L898902C3" });
     expect(proveOutcome(freshProof("name"), good, names)).toBe("proven");
+  });
+  it("이름이 맞아도 명부의 같은 이름 여권 번호가 띠와 다르면 staff_needed", () => {
+    expect(proveOutcome(freshProof("name"), good, names, [{ name_roman: "ERIKSSON ANNA", passport_number: "X1234567" }])).toBe("staff_needed");
+    expect(proveOutcome(freshProof("name"), good, names, [{ name_roman: "ERIKSSON ANNA", passport_number: "L898902C3" }])).toBe("proven");
   });
   it("검사 숫자가 하나라도 틀리면 읽을 수 없는 띠", () => {
     const bad = `${L1}\n${L2.slice(0, 13)}740813${L2.slice(19)}`;
@@ -165,7 +169,7 @@ describe("다시 보기 · 경쟁 · 이름으로 찾은 경우", () => {
   });
   it("다른 사람의 좋은 띠는 이름이 달라 name_mismatch", () => {
     const other = `${"P<UTOSMITH<<JOHN".padEnd(44, "<")}\n${L2}`;
-    expect(parseMrzStrip(other)).toEqual({ surname: "SMITH", givenNames: "JOHN" });
+    expect(parseMrzStrip(other)).toEqual({ surname: "SMITH", givenNames: "JOHN", documentNumber: "L898902C3" });
     expect(proveOutcome(freshProof("name"), other, names)).toBe("name_mismatch");
   });
   it("띠가 없거나 깨졌으면 unreadable", () => {

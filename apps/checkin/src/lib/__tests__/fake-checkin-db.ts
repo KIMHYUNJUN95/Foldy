@@ -7,16 +7,21 @@ export type FakeDb = ReturnType<typeof fakeCheckinDb>;
 export function fakeCheckinDb(seed: Record<string, Row[]> = {}) {
   const tables: Record<string, Row[]> = Object.fromEntries(Object.entries(seed).map(([name, rows]) => [name, rows.map((row) => ({ ...row }))]));
   const rpcCalls: { name: string; args: Row }[] = [];
+  let nextId = 1;
   const hooks = {
     rpc: (() => ({ data: 1, error: null })) as (name: string, args: Row) => { data: unknown; error: { message: string } | null },
     beforeUpdate: null as null | ((table: string) => void),
     selectError: null as null | ((table: string, columns: string) => { code: string; message: string } | null),
+    insertError: null as null | ((table: string) => { code: string; message: string } | null),
   };
 
   function query(table: string) {
     const rows = () => (tables[table] ??= []);
     const filters: Filter[] = [];
-    let action: { kind: "select" } | { kind: "update"; values: Row } | { kind: "insert"; values: Row[] } = { kind: "select" };
+    let action: { kind: "select" } | { kind: "update"; values: Row } | { kind: "insert"; values: Row[] } | { kind: "delete" } = { kind: "select" };
+    let sort: { column: string; ascending: boolean } | null = null;
+    let slice: { from: number; to: number } | null = null;
+    let headCount = false;
     let insertError: { code: string; message: string } | null = null;
     let selectFailure: { code: string; message: string } | null = null;
 
@@ -26,6 +31,11 @@ export function fakeCheckinDb(seed: Record<string, Row[]> = {}) {
         return [];
       }
       if (action.kind === "insert") {
+        const failed = hooks.insertError?.(table) ?? null;
+        if (failed) {
+          insertError = failed;
+          return [];
+        }
         for (const value of action.values) {
           const active = value.status === "ringing" || value.status === "accepted";
           if (table === "staff_calls" && active && rows().some((row) => row.device_id === value.device_id && (row.status === "ringing" || row.status === "accepted"))) {
@@ -33,11 +43,24 @@ export function fakeCheckinDb(seed: Record<string, Row[]> = {}) {
             return [];
           }
         }
-        const created = action.values.map((value) => ({ ...value }));
+        const created = action.values.map((value) =>
+          table === "claim_attempts"
+            ? { id: value.id ?? nextId++, ...value, attempted_at: value.attempted_at ?? new Date().toISOString() }
+            : { ...value },
+        );
         rows().push(...created);
         return created;
       }
-      const matched = rows().filter((row) => filters.every((filter) => filter(row)));
+      let matched = rows().filter((row) => filters.every((filter) => filter(row)));
+      if (action.kind === "delete") {
+        tables[table] = rows().filter((row) => !matched.includes(row));
+        return matched;
+      }
+      if (sort) {
+        const { column, ascending } = sort;
+        matched = [...matched].sort((a, b) => String(a[column]).localeCompare(String(b[column])) * (ascending ? 1 : -1));
+      }
+      if (slice) matched = matched.slice(slice.from, slice.to + 1);
       if (action.kind === "update") {
         hooks.beforeUpdate?.(table);
         const stillMatched = rows().filter((row) => filters.every((filter) => filter(row)));
@@ -48,8 +71,21 @@ export function fakeCheckinDb(seed: Record<string, Row[]> = {}) {
     };
 
     const builder = {
-      select(columns = "*") {
+      select(columns = "*", options?: { count?: string; head?: boolean }) {
         if (action.kind === "select") selectFailure = hooks.selectError?.(table, columns) ?? null;
+        if (options?.head) headCount = true;
+        return builder;
+      },
+      delete() {
+        action = { kind: "delete" };
+        return builder;
+      },
+      gt(column: string, value: unknown) {
+        filters.push((row) => String(row[column]) > String(value));
+        return builder;
+      },
+      gte(column: string, value: unknown) {
+        filters.push((row) => String(row[column]) >= String(value));
         return builder;
       },
       insert(values: Row | Row[]) {
@@ -72,8 +108,18 @@ export function fakeCheckinDb(seed: Record<string, Row[]> = {}) {
         filters.push((row) => (row[column] ?? null) === value);
         return builder;
       },
-      order: () => builder,
-      limit: () => builder,
+      order(column: string, options?: { ascending?: boolean }) {
+        sort = { column, ascending: options?.ascending ?? true };
+        return builder;
+      },
+      limit(count: number) {
+        slice = { from: 0, to: count - 1 };
+        return builder;
+      },
+      range(from: number, to: number) {
+        slice = { from, to };
+        return builder;
+      },
       async maybeSingle() {
         const data = run();
         return { data: data[0] ?? null, error: insertError };
@@ -82,8 +128,9 @@ export function fakeCheckinDb(seed: Record<string, Row[]> = {}) {
         const data = run();
         return { data: data[0] ?? null, error: insertError ?? (data[0] ? null : { message: "no rows" }) };
       },
-      then(resolve: (value: { data: Row[]; error: unknown }) => unknown) {
+      then(resolve: (value: { data: Row[] | null; count?: number; error: unknown }) => unknown) {
         const data = run();
+        if (headCount) return Promise.resolve(resolve({ data: null, count: data.length, error: insertError }));
         return Promise.resolve(resolve({ data, error: insertError }));
       },
     };

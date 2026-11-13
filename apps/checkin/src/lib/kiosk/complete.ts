@@ -1,5 +1,5 @@
 // 태블릿 「체크인 완료」 판정(DB 없음 — 테스트로 덮는다). 44 FR-K04 · K13 · K16, 16 §5-4.
-import { nameMatchesProve, heldByOther } from "./find";
+import { nameMatchesProve, heldByOther, passportNumberConflict } from "./find";
 import { parseMrzStrip } from "./mrz";
 import { roomForm } from "./rooms";
 
@@ -162,16 +162,23 @@ export function identityProven(payload: unknown): boolean {
   return foundBy === "name" && passportProof === true;
 }
 
-export type ProveOutcome = "proven" | "already" | "unreadable" | "name_mismatch";
+export type ProveOutcome = "proven" | "already" | "unreadable" | "name_mismatch" | "staff_needed";
 
 /**
  * `prove` 판정. 이름 · 검사 결과는 태블릿이 보낸 값이 아니라 서버가 `mrz_raw` 띠를 직접 읽어(검사 숫자 전부 통과 + 줄1 의 성 · 이름) 얻는다.
  * 이미 증명된 세션(코드 · 여권으로 찾음, 또는 이미 증명)은 `already`. 띠가 없거나 못 읽으면 `unreadable`, 읽혔는데 예약 이름과 다르면 `name_mismatch`.
  */
-export function proveOutcome(payload: unknown, mrzRaw: unknown, reservationNames: string[]): ProveOutcome {
+export function proveOutcome(
+  payload: unknown,
+  mrzRaw: unknown,
+  reservationNames: string[],
+  roster: { name_roman: string | null; passport_number: string | null }[] = [],
+): ProveOutcome {
   if (identityProven(payload)) return "already";
   const strip = parseMrzStrip(mrzRaw);
   if (!strip) return "unreadable";
+  // 명부에 같은 이름의 여권 번호가 있는데 띠의 번호와 다르면 이름이 맞아도 통과하지 않는다 — 다시 찍어도 같으므로 직원 확인으로.
+  if (passportNumberConflict(roster, strip)) return "staff_needed";
   return reservationNames.some((name) => nameMatchesProve(name, strip.surname, strip.givenNames)) ? "proven" : "name_mismatch";
 }
 

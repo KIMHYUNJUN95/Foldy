@@ -17,7 +17,7 @@ import { requestMatchesSecret } from "@/lib/api-secret";
  *
  * 크레딧: `apiReference` 40개를 한 요청에 실을 수 있어 실측 128건 = 4요청 = 4크레딧이었다.
  *
- * 인증은 `/api/beds24/reviews-sync` 와 같은 규약이다.
+ * 인증은 `CRON_SECRET` 만 — 아래 `authorize`.
  */
 
 export const dynamic = "force-dynamic";
@@ -26,21 +26,14 @@ export const maxDuration = 60;
 /** 일회성 백필의 요청 상한. 40건/요청이라 1,600건까지 한 번에 덮는다. */
 const MAX_LOOKUP_REQUESTS = 40;
 
+/**
+ * `CRON_SECRET`(`Authorization: Bearer`)만 받는다. 정기 호출자가 없는 일회성 라우트라 Beds24 웹훅 비밀값은
+ * 받지 않는다(2026-11-13) — 그 값은 Beds24 웹훅 설정 화면에 보인다. 쿼리로도 받지 않는다(접속 기록에 남는다).
+ */
 function authorize(request: NextRequest): { ok: true } | { ok: false; status: number } {
   const cronSecret = process.env.CRON_SECRET?.trim();
-  const webhookSecret = process.env.BEDS24_WEBHOOK_SECRET?.trim();
-  if (!cronSecret && !webhookSecret) return { ok: false, status: 404 };
-
-  // 상수 시간 비교 · 후보 중 하나라도 맞으면 통과(2026-10-26, api-secret).
-  if (
-    requestMatchesSecret(request, [cronSecret, webhookSecret], {
-      // 쿼리(`?secret=`)로는 받지 않는다(2026-11-10) — 주소는 접속 기록 · 프록시 로그에 남는다. 워크플로는 헤더로 보낸다.
-      headers: ["x-beds24-webhook-secret"],
-    })
-  ) {
-    return { ok: true };
-  }
-  return { ok: false, status: 403 };
+  if (!cronSecret) return { ok: false, status: 404 };
+  return requestMatchesSecret(request, [cronSecret]) ? { ok: true } : { ok: false, status: 403 };
 }
 
 function isUuid(value: string | null) {

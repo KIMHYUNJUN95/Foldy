@@ -42,6 +42,8 @@ type Props = {
   representativeName: string;
   sharedFromRep: { prevStay: string; nextDest: string } | null;
   photoUrl: string | null;
+  /** 체크인 뒤라 사진 URL 은 없지만 사진은 올라가 있다. */
+  photoOnFile?: boolean;
   countries: { code: string; name: string }[];
   editable: boolean;
   nextHref: string;
@@ -231,6 +233,10 @@ export function PersonForm(props: Props) {
                     {dict.person.retake}
                   </button>
                 </div>
+              ) : !editable && props.photoOnFile ? (
+                <p className="flex h-28 w-full items-center justify-center gap-2 rounded-md border border-[var(--line)] bg-[var(--surface)] text-[15px] text-[var(--sage)]">
+                  <CheckIcon /> {dict.person.photoAdded}
+                </p>
               ) : (
                 <button
                   type="button"

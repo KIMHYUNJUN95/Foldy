@@ -22,9 +22,10 @@ name: Beds24 rates sync
 # 40분~3시간 40분 뒤에 돈 적이 있다(recruit-sync 실측). 그래서 15분으로 적어 두되 실제로는
 # 그보다 늦게 도는 것을 전제한다 — 동기화가 멱등하므로 늦거나 겹쳐도 해가 없다.
 #
-# SETUP (one-time): repository secret `BEDS24_WEBHOOK_SECRET`
+# SETUP (one-time): repository secret `CRON_SECRET`
 #   (GitHub → repo Settings → Secrets and variables → Actions)
-#   값은 Vercel 프로덕션의 BEDS24_WEBHOOK_SECRET 과 같아야 한다.
+#   값은 Vercel 프로덕션의 CRON_SECRET 과 같아야 한다. `Authorization: Bearer` 로만 보낸다(2026-11-13 —
+#   BEDS24_WEBHOOK_SECRET 은 Beds24 웹훅 설정 화면에 보이는 값이라 크론 라우트를 더 열지 않는다).
 
 on:
   schedule:
@@ -46,16 +47,16 @@ jobs:
       - name: Trigger Beds24 rates sync
         env:
           RATES_URL: https://stay-ops-two.vercel.app/api/beds24/rates-sync
-          WEBHOOK_SECRET: ${{ secrets.BEDS24_WEBHOOK_SECRET }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           set -euo pipefail
-          if [ -z "${WEBHOOK_SECRET}" ]; then
-            echo "::error::BEDS24_WEBHOOK_SECRET repository secret is not set — add it in repo Settings → Secrets → Actions."
+          if [ -z "${CRON_SECRET}" ]; then
+            echo "::error::CRON_SECRET repository secret is not set — add it in repo Settings → Secrets → Actions (same value as Vercel production CRON_SECRET)."
             exit 1
           fi
           code=$(curl -sS -o /tmp/rates-sync.json -w '%{http_code}' \
             -X POST "${RATES_URL}" \
-            -H "x-beds24-webhook-secret: ${WEBHOOK_SECRET}" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
             --max-time 120)
           echo "HTTP ${code}"
           cat /tmp/rates-sync.json || true

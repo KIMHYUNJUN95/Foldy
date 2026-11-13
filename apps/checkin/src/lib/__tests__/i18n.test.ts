@@ -17,6 +17,13 @@ describe("checkin i18n", () => {
     for (const dict of [en, zhHans, ko]) expect(keys(dict).sort()).toEqual(base);
   });
 
+  it("잠금 화면은 잠긴 이유 · 길이를 말하지 않고 직원 문의 안내를 보인다(2026-11-13)", () => {
+    for (const dict of [ja, en, zhHans, ko]) {
+      expect(dict.locked.body).not.toMatch(/[0-9０-９]/);
+      expect(dict.locked.staff.length).toBeGreaterThan(0);
+    }
+  });
+
   it("Accept-Language 에서 언어를 고른다", () => {
     expect(pickLocale("ko-KR,ko;q=0.9")).toBe("ko");
     expect(pickLocale("zh-CN,zh;q=0.9")).toBe("zh-Hans");

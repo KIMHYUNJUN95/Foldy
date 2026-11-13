@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { parseStaffPin } from "../device/pin";
+import { devicePin } from "../device/pin";
 import { getDictionary, LOCALES, type Locale } from "../i18n";
 
 import { ADDRESS_MAX, ADDRESS_MIN_FOREIGN, ADDRESS_MIN_JAPAN } from "../guest/address";
@@ -94,10 +94,12 @@ function contacts(value: unknown): Contract["supportContacts"] {
  * 직원 통화 켜기는 폼 동시 저장 검사 때문에 `updated_at` 을 바꾸지 않으므로 값에 함께 넣는다.
  */
 export function settingsVersionOf(row: { updated_at?: string | null; staff_call_enabled?: boolean | null } | null): string {
-  return `${row?.updated_at ?? "default"}|call:${row?.staff_call_enabled ?? false}`;
+  // 계약 버전도 넣는다 — 계약 모양이 바뀌면 설정 줄이 그대로여도 값이 달라져 태블릿이 다시 받는다(옛 앱은 다시 받은 뒤 「업데이트 필요」).
+  return `${row?.updated_at ?? "default"}|call:${row?.staff_call_enabled ?? false}|contract:${CONTRACT_VERSION}`;
 }
 
-export function buildContract(row: PropertySettingsRow | null): Contract {
+/** `device` 가 없으면 PIN 을 싣지 않는다 — PIN 값은 기기마다 달라 기기 토큰으로 부를 때만 만든다. */
+export function buildContract(row: PropertySettingsRow | null, device?: { id: string; secret: string }): Contract {
   const languages = (row?.languages ?? []).filter((value): value is Locale => (LOCALES as readonly string[]).includes(value));
   return {
     contractVersion: CONTRACT_VERSION,
@@ -113,7 +115,7 @@ export function buildContract(row: PropertySettingsRow | null): Contract {
     mrzAutofill: row?.mrz_autofill ?? true,
     addressRules: { maxLength: ADDRESS_MAX, minLengthForeign: ADDRESS_MIN_FOREIGN, minLengthJapan: ADDRESS_MIN_JAPAN, foreignScript: "latin" },
     supportContacts: contacts(row?.support_contacts),
-    staffPin: parseStaffPin(row?.staff_pin_hash),
+    staffPin: device ? devicePin(row?.staff_pin_hash, device.id, device.secret) : null,
     staffCallEnabled: row?.staff_call_enabled ?? false,
   };
 }

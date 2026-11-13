@@ -63,10 +63,13 @@ data class CodeQuery(val code: String) : FindQuery
 @SerialName("name")
 data class NameQuery(val lastName: String, val firstName: String, val checkInDate: String) : FindQuery
 
-/** 여권 MRZ 의 성 · 이름으로 오늘 예약 찾기(빠른 체크인 F1). 이름은 비어 있을 수 있다. 몸통: {"mode":"passport","lastName":…,"firstName":…} */
+/**
+ * 여권 MRZ 로 오늘 예약 찾기(빠른 체크인 F1). 이름은 비어 있을 수 있다. 몸통: {"mode":"passport","lastName":…,"firstName":…,"mrz_raw":…}
+ * 서버는 `mrz_raw`(두 줄을 \n 으로 이은 원문, prove 와 같은 값)를 직접 읽어 검사 숫자 · 이름 · 명부 여권 번호를 확인한다 — 이름 칸은 참고용(2026-11-13).
+ */
 @Serializable
 @SerialName("passport")
-data class PassportQuery(val lastName: String, val firstName: String) : FindQuery
+data class PassportQuery(val lastName: String, val firstName: String, @SerialName("mrz_raw") val mrzRaw: String? = null) : FindQuery
 
 /** 찾기 결과 — 화면이 갈 곳을 정한다. */
 sealed interface FindResult {
@@ -76,6 +79,8 @@ sealed interface FindResult {
     data class NotFound(val remaining: Int) : FindResult
     data class Locked(val untilMillis: Long) : FindResult
     data class Blocked(val reason: BlockReason, val checkInDate: String?) : FindResult
+    /** 여권 번호가 명부와 다르다 — 직원 확인이 필요하다(직원 호출 창으로). 이유는 손님에게 보이지 않는다. */
+    data object StaffNeeded : FindResult
     data object Network : FindResult
     data object Server : FindResult
 }
@@ -91,6 +96,7 @@ fun findResultOf(response: FindResponse?): FindResult {
     if (response.ok && response.result == "proof_needed" && response.sessionId != null) return FindResult.ProofNeeded(response.sessionId, response.language)
     return when (response.error) {
         "not_found" -> FindResult.NotFound(response.remaining ?: 0)
+        "staff_needed" -> FindResult.StaffNeeded
         "locked" -> FindResult.Locked(lockedUntilOf(response.lockedUntil))
         "blocked" -> FindResult.Blocked(
             when (response.reason) {
@@ -119,6 +125,8 @@ sealed interface ProveResult {
     data class Matched(val found: FindResult.Found) : ProveResult
     data object Unreadable : ProveResult
     data object NameMismatch : ProveResult
+    /** 명부 여권 번호와 다른 여권 — 직원 호출로. */
+    data object StaffNeeded : ProveResult
 
     /** 예약이 닫혔다(session_gone) — 처음으로. */
     data object SessionGone : ProveResult
@@ -140,6 +148,7 @@ fun proveResultOf(status: Int, response: FindResponse?): ProveResult {
         status == 409 && response.error == "session_gone" -> ProveResult.SessionGone
         status == 400 && response.error == "unreadable" -> ProveResult.Unreadable
         status == 403 && response.error == "name_mismatch" -> ProveResult.NameMismatch
+        status == 403 && response.error == "staff_needed" -> ProveResult.StaffNeeded
         status == 429 && response.error == "locked" -> ProveResult.Locked(lockedUntilOf(response.lockedUntil))
         else -> ProveResult.Server
     }

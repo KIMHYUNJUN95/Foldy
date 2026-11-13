@@ -1041,7 +1041,7 @@ FBManual-Phone · FBCx-Phone · FBNew-Phone · FBNewConfirm-Phone · FBRooms-Pho
   재연결은 1,000행씩 범위를 정해 읽는다(최대 5,000). «도는 중» 잠금은 조각을 가져갈 때마다(수동) · 정기 수집이 이어 쓸 때마다
   (`extendReviewSyncRun`, 내 lockId 일 때만) 5분 뒤로 늘린다 — 한 바퀴가 5분을 넘겨도 중간에 풀리지 않는다. 정기 수집은 사람이 도는 중(busy)일
   때만 그 조직을 건너뛰고, 잠금 함수 자체가 실패하면 207 `organization_lock_failed` 로 드러낸다. 「지금 가져오기」는 끝날 때 받은 다시 누를 수 있는
-  시각(`availableAt`)으로 바로 잠근다 — 화면은 위치(offset)를 보내지 않는다. 수집 · 점검 · 재연결 주소는 비밀값을 **헤더로만** 받는다(`x-beds24-webhook-secret`,
+  시각(`availableAt`)으로 바로 잠근다 — 화면은 위치(offset)를 보내지 않는다. 수집 · 점검 · 재연결 주소는 `Authorization: Bearer <CRON_SECRET>` 만 받는다(2026-11-13 — `x-beds24-webhook-secret` ·
   쿼리 `?secret=` 은 안 받음). 수집 실패 응답(207)은 정해진 코드만(`organization_sync_failed`), 자세한 건 서버 로그. 수집 점검(health)은
   **조직마다** 마지막 수집을 본다(응답에 `organizations` 추가, 기존 `stale` · `ageDays` 는 가장 오래 멈춘 조직 기준).
 - **목록** — 수기 컴플레인 목록 · 내보내기는 1,000건씩 끝까지 읽는다. 읽기가 실패하면(첫 쪽 · 중간 쪽 모두) 빈 목록이나 앞 1,000건만

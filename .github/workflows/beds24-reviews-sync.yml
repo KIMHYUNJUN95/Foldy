@@ -18,9 +18,9 @@ name: Beds24 external review sync
 # The endpoint is idempotent (UPSERT on organization_id + provider +
 # external_review_id), so a duplicate or retried run is harmless.
 #
-# SETUP (one-time): the repository secret BEDS24_WEBHOOK_SECRET must already exist
+# SETUP (one-time): the repository secret CRON_SECRET must already exist
 #   for the reconcile workflow; this job reuses it. The reviews-sync endpoint
-#   accepts it via the x-beds24-webhook-secret header, exactly like reconcile.
+#   accepts it only as `Authorization: Bearer`, exactly like reconcile.
 
 on:
   schedule:
@@ -53,12 +53,12 @@ jobs:
       - name: Trigger external review collection
         env:
           SYNC_URL: https://stay-ops-two.vercel.app/api/beds24/reviews-sync
-          WEBHOOK_SECRET: ${{ secrets.BEDS24_WEBHOOK_SECRET }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
           FULL: ${{ inputs.full }}
         run: |
           set -uo pipefail
-          if [ -z "${WEBHOOK_SECRET}" ]; then
-            echo "::error::BEDS24_WEBHOOK_SECRET repository secret is not set — add it in repo Settings → Secrets → Actions."
+          if [ -z "${CRON_SECRET}" ]; then
+            echo "::error::CRON_SECRET repository secret is not set — add it in repo Settings → Secrets → Actions (same value as Vercel production CRON_SECRET)."
             exit 1
           fi
 
@@ -82,7 +82,7 @@ jobs:
 
             code=$(curl -sS -o /tmp/reviews-sync.json -w '%{http_code}' \
               -X POST "${url}" \
-              -H "x-beds24-webhook-secret: ${WEBHOOK_SECRET}" \
+              -H "Authorization: Bearer ${CRON_SECRET}" \
               --max-time 120)
             echo "step ${step}: HTTP ${code} (offset=${offset} org=${org:-first})"
             cat /tmp/reviews-sync.json || true

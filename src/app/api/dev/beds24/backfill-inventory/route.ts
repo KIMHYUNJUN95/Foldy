@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { requestMatchesSecret } from "@/lib/api-secret";
 import { backfillBeds24InventoryMinimumStay } from "@/lib/beds24/inventory-sync";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -21,14 +22,6 @@ function ensureDevOnly(request: NextRequest) {
   return null;
 }
 
-function resolveSecret(request: NextRequest) {
-  const fromHeader = request.headers.get("x-beds24-webhook-secret");
-  const fromBearer = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  const fromQuery = request.nextUrl.searchParams.get("secret");
-
-  return fromHeader ?? fromBearer ?? fromQuery;
-}
-
 function isUuid(value: string | null) {
   if (!value) return false;
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
@@ -44,8 +37,8 @@ async function handle(request: NextRequest) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
-  const providedSecret = resolveSecret(request);
-  if (!providedSecret || providedSecret !== requiredSecret) {
+  // 상수 시간 비교 · 헤더 / Bearer / `?secret=` 중 하나라도 맞으면 통과(api-secret).
+  if (!requestMatchesSecret(request, [requiredSecret], { headers: ["x-beds24-webhook-secret"], query: true })) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 

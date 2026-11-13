@@ -25,22 +25,11 @@ export const maxDuration = 60;
 const MAX_JOBS_PER_RUN = 5;
 const MAX_RUNTIME_MS = 45_000;
 
-/** `rates-sync` 와 같은 규칙 — 크론 시크릿 또는 Beds24 웹훅 시크릿. 둘 다 없으면 닫아 둔다. */
+/** `rates-sync` 와 같은 규칙 — `CRON_SECRET` Bearer 하나, 없으면 닫아 둔다(404). 웹훅 비밀값은 받지 않는다(2026-11-13). */
 function authorize(request: NextRequest): { ok: true } | { ok: false; status: number } {
   const cronSecret = process.env.CRON_SECRET?.trim();
-  const webhookSecret = process.env.BEDS24_WEBHOOK_SECRET?.trim();
-  if (!cronSecret && !webhookSecret) return { ok: false, status: 404 };
-
-  // 상수 시간 비교 · 보낸 후보(Bearer / 헤더 / 쿼리) 중 하나라도 맞으면 통과(2026-10-26, api-secret).
-  if (
-    requestMatchesSecret(request, [cronSecret, webhookSecret], {
-      headers: ["x-beds24-webhook-secret"],
-      query: true,
-    })
-  ) {
-    return { ok: true };
-  }
-  return { ok: false, status: 403 };
+  if (!cronSecret) return { ok: false, status: 404 };
+  return requestMatchesSecret(request, [cronSecret]) ? { ok: true } : { ok: false, status: 403 };
 }
 
 async function handle(request: NextRequest) {

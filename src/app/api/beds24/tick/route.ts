@@ -20,8 +20,8 @@ import { safeEqualSecret } from "@/lib/api-secret";
  *
  * Supabase pg_cron 이 매 분 `beds24_tick_if_needed()` 를 돌리고, **할 일이 있을 때만** pg_net 으로
  * 여기를 부른다(`supabase/migrations/202609300004_beds24_tick_cron.sql`). 토큰은 Vault 에 있고
- * `beds24_tick_token_ok()` 로 대조만 한다 — 새 환경변수가 없다. 사람이 손으로 부를 때를 위해
- * 워커와 같은 `CRON_SECRET` / `BEDS24_WEBHOOK_SECRET` 도 받는다.
+ * `beds24_tick_token_ok()` 로 대조만 한다 — 새 환경변수가 없다. 사람이 손으로 부를 때는 `CRON_SECRET`.
+ * `BEDS24_WEBHOOK_SECRET` 은 받지 않는다(2026-11-13) — Beds24 웹훅 설정 화면에 보이는 값이라.
  *
  * 한 번에 한 가지만 한다(`decideBeds24Tick`) — 가격 작업이 남았으면 작업, 없으면 미뤄 둔 건물
  * 재조회. 남은 것은 다음 틱(1분 뒤)이 이어받는다.
@@ -38,24 +38,16 @@ const TICK_LOCK_TTL_MS = 60_000;
 /** 웹훅의 건물 락과 같은 수명. */
 const REFRESH_LOCK_TTL_MS = 55_000;
 
-/** 토큰은 헤더로만 받는다 — 쿼리에 실으면 접근 로그에 남는다. */
-function resolveProvidedSecret(request: NextRequest) {
-  const fromBearer = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim();
-  const fromHeader = request.headers.get("x-beds24-webhook-secret")?.trim();
-  return fromBearer || fromHeader || null;
-}
-
+/** 토큰은 `Authorization: Bearer` 로만 받는다 — 쿼리에 실으면 접근 로그에 남는다. */
 async function authorize(
   request: NextRequest,
   supabase: ReturnType<typeof getSupabaseServiceClient>,
 ): Promise<boolean> {
-  const provided = resolveProvidedSecret(request);
+  const provided = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim();
   if (!provided) return false;
 
   const cronSecret = process.env.CRON_SECRET?.trim();
-  const webhookSecret = process.env.BEDS24_WEBHOOK_SECRET?.trim();
   if (cronSecret && safeEqualSecret(provided, cronSecret)) return true;
-  if (webhookSecret && safeEqualSecret(provided, webhookSecret)) return true;
 
   const checked = await supabase.rpc("beds24_tick_token_ok", { p_token: provided });
   if (checked.error) {

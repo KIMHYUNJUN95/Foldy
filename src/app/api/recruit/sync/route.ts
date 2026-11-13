@@ -148,16 +148,11 @@ async function ingestAll(records: FirestoreRecord[], source: RecruitSource, summ
  * 전량 훑기(`?mode=full`)만 시크릿을 받는다 (2026-10-19).
  *
  * 최신분 호출은 콘솔을 열 때도 부르고 60초 창이 남용을 막지만, 전량 훑기는 창이 없어 반복 호출로 Firestore 무료
- * 읽기를 소진시킬 수 있었다. 다른 크론과 같은 비밀값(`CRON_SECRET` 또는 `BEDS24_WEBHOOK_SECRET`)을
- * `Authorization: Bearer` 나 `x-recruit-sync-secret` 헤더로 받는다. 서버에 둘 다 없으면 닫는다.
+ * 읽기를 소진시킬 수 있었다. 다른 크론과 같은 `CRON_SECRET` 을 `Authorization: Bearer` 로만 받는다(2026-11-13 —
+ * `BEDS24_WEBHOOK_SECRET` · `x-recruit-sync-secret` 헤더는 뺐다). 서버에 없으면 닫는다.
  */
 function authorizeFullSync(request: NextRequest): boolean {
-  // 상수 시간 비교 · 후보 중 하나라도 맞으면 통과(2026-10-26, api-secret).
-  return requestMatchesSecret(
-    request,
-    [process.env.CRON_SECRET, process.env.BEDS24_WEBHOOK_SECRET],
-    { headers: ["x-recruit-sync-secret"] },
-  );
+  return requestMatchesSecret(request, [process.env.CRON_SECRET]);
 }
 
 export async function POST(request: NextRequest) {

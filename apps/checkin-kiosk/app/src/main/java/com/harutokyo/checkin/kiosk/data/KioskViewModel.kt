@@ -10,7 +10,8 @@ import com.harutokyo.checkin.kiosk.BuildConfig
 import com.harutokyo.checkin.kiosk.call.CallController
 import com.harutokyo.checkin.kiosk.call.HttpCallApi
 import com.harutokyo.checkin.kiosk.call.LiveKitRoom
-import com.harutokyo.checkin.kiosk.contract.CONTRACT_VERSION
+import com.harutokyo.checkin.kiosk.contract.SettingsOutcome
+import com.harutokyo.checkin.kiosk.contract.settingsOutcomeOf
 import com.harutokyo.checkin.kiosk.contract.Contract
 import com.harutokyo.checkin.kiosk.contract.DeviceInfo
 import com.harutokyo.checkin.kiosk.contract.EnrollResponse
@@ -37,8 +38,10 @@ import com.harutokyo.checkin.kiosk.contract.ProveResult
 import com.harutokyo.checkin.kiosk.contract.proveResultOf
 import com.harutokyo.checkin.kiosk.contract.findResultOf
 import com.harutokyo.checkin.kiosk.contract.PingResponse
-import com.harutokyo.checkin.kiosk.contract.SettingsResponse
+import com.harutokyo.checkin.kiosk.kiosk.PinCheck
 import com.harutokyo.checkin.kiosk.kiosk.PinGuard
+import com.harutokyo.checkin.kiosk.kiosk.PinGuardStore
+import com.harutokyo.checkin.kiosk.kiosk.pinCheckOf
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -73,13 +76,21 @@ private data class EnrollBody(val code: String, val deviceModel: String, val osV
 private data class PartyBody(val sessionId: String, val partySize: Int)
 
 @Serializable
+private data class PinBody(val pin: String)
+
+@Serializable
 private data class PingBody(val battery: Int, val appVersion: String, val osVersion: String)
 
 class KioskViewModel(application: Application) : AndroidViewModel(application) {
     private val vault = TokenVault(application)
 
-    /** 직원 PIN 시도 횟수 — 화면이 다시 만들어져도(회전 등) 이어서 센다. */
-    val pinGuard = PinGuard()
+    /** 직원 PIN 시도 횟수 — 화면이 다시 만들어져도(회전 등) · 앱을 다시 켜도 이어서 센다(암호화 저장소). */
+    val pinGuard = PinGuard(
+        store = object : PinGuardStore {
+            override fun load() = vault.get(KEY_PIN_GUARD)
+            override fun save(value: String) = vault.put(KEY_PIN_GUARD, value)
+        },
+    )
 
     /** 직원 통화(46) — 화면이 다시 만들어져도 통화는 이어진다. */
     val callRoom = LiveKitRoom(application, viewModelScope)
@@ -89,7 +100,8 @@ class KioskViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         val token = vault.get(KEY_TOKEN)
-        val cached = vault.get(KEY_SETTINGS)?.let { runCatching { Api.json.decodeFromString<SettingsResponse>(it) }.getOrNull() }
+        // 옛 버전으로 저장된 설정은 버린다(모양이 달라 잘못 읽히지 않게) — 새로 받는다.
+        val cached = vault.get(KEY_SETTINGS)?.let { (settingsOutcomeOf(it) as? SettingsOutcome.Ok)?.response }
         if (token == null) {
             _state.value = KioskState(phase = Phase.Enroll)
         } else {
@@ -138,16 +150,18 @@ class KioskViewModel(application: Application) : AndroidViewModel(application) {
             forget(revoked = true)
             return false
         }
-        val parsed = runCatching { Api.json.decodeFromString<SettingsResponse>(result.body) }.getOrNull()
-        val contract = parsed?.contract
-        if (parsed?.ok != true || contract == null) {
-            _state.update { it.copy(online = true) }
-            return false
-        }
-        if (contract.contractVersion != CONTRACT_VERSION) {
+        val outcome = settingsOutcomeOf(result.body)
+        if (outcome is SettingsOutcome.UpdateRequired) {
             _state.update { it.copy(phase = Phase.UpdateRequired, online = true) }
             return false
         }
+        if (outcome !is SettingsOutcome.Ok) {
+            // 읽지 못한 응답 — 저장된 설정이 있으면 그대로, 없으면 Loading 에 멈추지 않고 「업데이트 필요」로.
+            _state.update { it.copy(online = true, phase = if (it.contract != null) Phase.Ready else Phase.UpdateRequired) }
+            return false
+        }
+        val parsed = outcome.response
+        val contract = outcome.contract
         vault.put(KEY_SETTINGS, result.body)
         _state.update {
             it.copy(phase = Phase.Ready, device = parsed.device, contract = contract, settingsVersion = parsed.settingsVersion, online = true)
@@ -170,6 +184,20 @@ class KioskViewModel(application: Application) : AndroidViewModel(application) {
         }
         _state.update { it.copy(online = true) }
         return findResultOf(runCatching { Api.json.decodeFromString<FindResponse>(result.body) }.getOrNull())
+    }
+
+    /** 직원 PIN 서버 확인(`POST /api/kiosk/pin`). 연결이 없으면 Offline — 화면이 계약의 기기별 값으로 대조한다. */
+    suspend fun checkPin(pin: String): PinCheck {
+        val token = vault.get(KEY_TOKEN) ?: return PinCheck.Offline
+        val result = try {
+            Api.request("POST", "/api/kiosk/pin", token, Api.json.encodeToString(PinBody(pin)))
+        } catch (_: IOException) {
+            _state.update { it.copy(online = false) }
+            return PinCheck.Offline
+        }
+        if (result.status == 401) return PinCheck.Offline
+        _state.update { it.copy(online = true) }
+        return pinCheckOf(result.status, result.body)
     }
 
     /** 이름으로 찾은 뒤 — 예약하신 분의 여권(MRZ 원문)으로 본인 확인. 맞으면 예약 내용이 온다. */
@@ -339,6 +367,7 @@ class KioskViewModel(application: Application) : AndroidViewModel(application) {
     private companion object {
         const val KEY_TOKEN = "device_token"
         const val KEY_SETTINGS = "settings"
+        const val KEY_PIN_GUARD = "pin_guard"
         const val PING_MS = 5 * 60_000L
     }
 }

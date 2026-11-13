@@ -21,7 +21,7 @@ name: Beds24 price job worker
 # (`supabase/migrations/202609300004_beds24_tick_cron.sql`). 이 워크플로는 그 틱까지 죽었을 때의
 # **마지막 안전망**으로 남긴다.
 #
-# SETUP (one-time): repository secret `BEDS24_WEBHOOK_SECRET`
+# SETUP (one-time): repository secret `CRON_SECRET`(Vercel 프로덕션과 같은 값, `Authorization: Bearer`)
 #   `beds24-reconcile.yml` · `beds24-rates-sync.yml` 과 같은 값을 쓴다.
 
 on:
@@ -44,16 +44,16 @@ jobs:
       - name: Drain Beds24 price job queue
         env:
           WORKER_URL: https://stay-ops-two.vercel.app/api/beds24/price-jobs/worker
-          WEBHOOK_SECRET: ${{ secrets.BEDS24_WEBHOOK_SECRET }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           set -euo pipefail
-          if [ -z "${WEBHOOK_SECRET}" ]; then
-            echo "::error::BEDS24_WEBHOOK_SECRET repository secret is not set — add it in repo Settings → Secrets → Actions."
+          if [ -z "${CRON_SECRET}" ]; then
+            echo "::error::CRON_SECRET repository secret is not set — add it in repo Settings → Secrets → Actions (same value as Vercel production CRON_SECRET)."
             exit 1
           fi
           code=$(curl -sS -o /tmp/price-job-worker.json -w '%{http_code}' \
             -X POST "${WORKER_URL}" \
-            -H "x-beds24-webhook-secret: ${WEBHOOK_SECRET}" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
             --max-time 120)
           echo "HTTP ${code}"
           cat /tmp/price-job-worker.json || true

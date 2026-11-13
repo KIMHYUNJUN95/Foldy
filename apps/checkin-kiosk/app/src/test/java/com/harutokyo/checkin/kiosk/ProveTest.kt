@@ -40,6 +40,8 @@ class ProveTest {
     fun errorsMapToTheirOwnResults() {
         assertEquals(ProveResult.Unreadable, proveResultOf(400, parse("""{"ok":false,"error":"unreadable"}""")))
         assertEquals(ProveResult.NameMismatch, proveResultOf(403, parse("""{"ok":false,"error":"name_mismatch"}""")))
+        // 명부 여권 번호와 다른 여권 — 다시 찍어도 같으니 직원 호출로(2026-11-13).
+        assertEquals(ProveResult.StaffNeeded, proveResultOf(403, parse("""{"ok":false,"error":"staff_needed"}""")))
         assertTrue(proveResultOf(429, parse("""{"ok":false,"error":"locked","locked_until":"2026-11-04T10:00:00Z"}""")) is ProveResult.Locked)
         // 같은 오류 이름이라도 상태가 다르면 일반 오류 · 증명 안 된 세션(verify_required) · 본문 없음
         assertEquals(ProveResult.Server, proveResultOf(500, parse("""{"ok":false,"error":"name_mismatch"}""")))

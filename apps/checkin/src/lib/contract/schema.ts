@@ -4,7 +4,8 @@ import { LOCALES } from "@/lib/i18n";
 
 // 「계약」 — 명부 칸 · 규칙 · 문구를 서버가 JSON 으로 내려주고, 태블릿(Kotlin)과 웹이 그대로 그린다(16 §2).
 // 이 파일이 원본이다. Kotlin 모델은 이 JSON 과 1:1 로 맞추고, 바꿀 때는 CONTRACT_VERSION 을 올린다.
-export const CONTRACT_VERSION = 1;
+// 2(2026-11-13): staffPin 이 기기별 값(pbkdf2-sha256-hmac-device · deviceSalt · keyBytes)으로 바뀜.
+export const CONTRACT_VERSION = 2;
 
 const localeSchema = z.enum(LOCALES);
 const localizedText = z.partialRecord(localeSchema, z.string());
@@ -49,9 +50,16 @@ export const contractSchema = z.object({
   }),
   // 「직원에게 연락」 — 값은 건물 설정 그대로(전화 · LINE · WhatsApp). 비어 있으면 버튼만 숨긴다.
   supportContacts: z.partialRecord(z.enum(["phone", "line", "whatsapp"]), z.string()),
-  // 직원 해제 PIN — 원문은 없다. 기기가 오프라인에서도 같은 방식(PBKDF2-SHA256)으로 대조한다. 설정 전이면 null.
+  // 직원 해제 PIN — 원문 · 원 해시는 없다. 기기별로 다시 만든 값(오프라인 대조용, `devicePin`). 온라인이면 `POST /api/kiosk/pin`. 설정 전이면 null.
   staffPin: z
-    .object({ algorithm: z.literal("pbkdf2-sha256"), iterations: z.number().int().positive(), salt: z.string(), hash: z.string() })
+    .object({
+      algorithm: z.literal("pbkdf2-sha256-hmac-device"),
+      iterations: z.number().int().positive(),
+      salt: z.string(),
+      deviceSalt: z.string(),
+      keyBytes: z.number().int().positive(),
+      hash: z.string(),
+    })
     .nullable(),
   // 직원 통화(2026-11-06, 46 §4). 옛 앱은 모르는 키를 무시하므로 버전은 그대로. 꺼져 있으면 태블릿은 연락처 화면만 보여 준다.
   staffCallEnabled: z.boolean(),

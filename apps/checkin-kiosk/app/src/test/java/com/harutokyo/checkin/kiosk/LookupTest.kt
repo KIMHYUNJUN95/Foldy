@@ -30,8 +30,18 @@ class LookupTest {
         assertEquals("""{"mode":"name","lastName":"HU","firstName":"DANIEL","checkInDate":"2026-11-05"}""", name)
         val passport = Api.json.encodeToString(FindQuery.serializer(), PassportQuery("HU", "DANIEL"))
         assertEquals("""{"mode":"passport","lastName":"HU","firstName":"DANIEL"}""", passport)
+        // 띠 원문은 prove 와 같은 칸 이름(mrz_raw) — 서버가 검사 숫자 · 이름을 직접 읽는다(2026-11-13).
+        assertEquals(
+            """{"mode":"passport","lastName":"HU","firstName":"DANIEL","mrz_raw":"P<USA\nA1234"}""",
+            Api.json.encodeToString(FindQuery.serializer(), PassportQuery("HU", "DANIEL", "P<USA\nA1234")),
+        )
         // 이름이 비어도 칸은 그대로 간다(서버가 비어 있음을 허용).
         assertEquals("""{"mode":"passport","lastName":"HU","firstName":""}""", Api.json.encodeToString(FindQuery.serializer(), PassportQuery("HU", "")))
+    }
+
+    @Test
+    fun staffNeededFromPassportFind() {
+        assertEquals(FindResult.StaffNeeded, parse("""{"ok":false,"error":"staff_needed"}"""))
     }
 
     @Test

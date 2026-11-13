@@ -2817,8 +2817,8 @@ Beds24 에는 세 칸 모두 우리 값이 그대로 있었고, 그 사이 이 �
 - 웹훅이 그 건물을 읽고 있으면(건물 락 `price-webhook-run:<propId>`) 틱은 건너뛴다.
 
 **인증.** 틱 토큰은 Supabase Vault 에 있고, 마이그레이션이 SQL 안에서 난수로 만든다 — 새 환경변수가 없고 값이
-저장소에 없다. 라우트는 `beds24_tick_token_ok()` 로 대조만 한다. 사람이 손으로 부를 때를 위해 `CRON_SECRET` /
-`BEDS24_WEBHOOK_SECRET` 도 받는다(헤더로만). `BEDS24_SYNC_PAUSED` 면 202 로 아무것도 안 한다.
+저장소에 없다. 라우트는 `beds24_tick_token_ok()` 로 대조만 한다. 사람이 손으로 부를 때를 위해 `CRON_SECRET` 도
+받는다(`Authorization: Bearer` 로만 — `BEDS24_WEBHOOK_SECRET` 은 2026-11-13 부터 안 받음). `BEDS24_SYNC_PAUSED` 면 202 로 아무것도 안 한다.
 
 **안전망은 그대로.** GitHub Actions `beds24-price-job-worker.yml` · 판매 캘린더를 열 때 깨우기 · 주기 요금
 동기화는 남는다. 틱이 죽어도 예전만큼은 돈다.

@@ -21,6 +21,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,20 +32,24 @@ import com.harutokyo.checkin.kiosk.R
 import com.harutokyo.checkin.kiosk.contract.DeviceInfo
 import com.harutokyo.checkin.kiosk.contract.StaffPin
 import com.harutokyo.checkin.kiosk.kiosk.Pin
+import com.harutokyo.checkin.kiosk.kiosk.PinCheck
 import com.harutokyo.checkin.kiosk.kiosk.PinGuard
+import com.harutokyo.checkin.kiosk.kiosk.PinVerdict
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 enum class StaffStep { Closed, Pin, Menu, ConfirmReenroll }
 
 private const val PIN_MAX = 8
 private val PANEL = 420.dp
 
-/** 직원 해제(FR-K18) — 표지 5초 → PIN → 직원 메뉴. PIN 은 기기에서 확인한다(오프라인에서도). */
+/** 직원 해제(FR-K18) — 표지 5초 → PIN → 직원 메뉴. 온라인이면 서버가 PIN 을 확인하고, 연결이 없을 때만 기기에서 대조한다. */
 @Composable
 fun StaffOverlay(
     step: StaffStep,
     pin: StaffPin?,
     guard: PinGuard,
+    checkPin: suspend (String) -> PinCheck,
     device: DeviceInfo?,
     locked: Boolean,
     deviceOwner: Boolean,
@@ -65,7 +70,7 @@ fun StaffOverlay(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             when (step) {
-                StaffStep.Pin -> PinStep(pin, guard, onCancel = { onStep(StaffStep.Closed) }, onOk = { onStep(StaffStep.Menu) })
+                StaffStep.Pin -> PinStep(pin, guard, checkPin, onCancel = { onStep(StaffStep.Closed) }, onOk = { onStep(StaffStep.Menu) })
                 StaffStep.Menu -> Column(Modifier.width(PANEL), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Text(str(R.string.staff_menu_title), color = G.Text, fontSize = 32.sp, fontWeight = FontWeight.Medium)
                     if (device != null) {
@@ -98,8 +103,10 @@ fun StaffOverlay(
 }
 
 @Composable
-private fun PinStep(pin: StaffPin?, guard: PinGuard, onCancel: () -> Unit, onOk: () -> Unit) {
+private fun PinStep(pin: StaffPin?, guard: PinGuard, checkPin: suspend (String) -> PinCheck, onCancel: () -> Unit, onOk: () -> Unit) {
     var value by remember { mutableStateOf("") }
+    var checking by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     var wrong by remember { mutableStateOf(false) }
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     val remaining = guard.remainingMs(now)
@@ -131,16 +138,21 @@ private fun PinStep(pin: StaffPin?, guard: PinGuard, onCancel: () -> Unit, onOk:
         onDelete = { value = value.dropLast(1) },
     )
     Spacer(Modifier.height(24.dp))
-    PrimaryButton(str(R.string.confirm), enabled = !locked && value.length >= 4) {
-        val at = System.currentTimeMillis()
-        if (Pin.verify(value, pin)) {
-            guard.pass()
-            onOk()
-        } else {
-            guard.fail(at)
-            now = at
-            wrong = true
-            value = ""
+    PrimaryButton(str(R.string.confirm), enabled = !locked && !checking && value.length >= 4) {
+        val entered = value
+        checking = true
+        scope.launch {
+            val check = checkPin(entered)
+            val at = System.currentTimeMillis()
+            checking = false
+            when (Pin.decide(check, entered, pin, guard, at)) {
+                PinVerdict.Pass -> onOk()
+                PinVerdict.Wrong, PinVerdict.Locked -> {
+                    now = at
+                    wrong = true
+                    value = ""
+                }
+            }
         }
     }
     Spacer(Modifier.height(14.dp))

@@ -19,8 +19,8 @@ function letters(value: string): string {
   return value.replace(/</g, " ").replace(/0/g, "O").replace(/\s+/g, " ").trim();
 }
 
-/** 두 줄이 모양 · 검사 숫자(번호 · 생년월일 · 만료일 · 선택 칸 · 합계) 모두 맞을 때만 성 · 이름. 아니면 null. */
-export function parseMrzStrip(raw: unknown): { surname: string; givenNames: string } | null {
+/** 두 줄이 모양 · 검사 숫자(번호 · 생년월일 · 만료일 · 선택 칸 · 합계) 모두 맞을 때만 성 · 이름 · 여권 번호(검사 숫자가 맞는 쪽의 O/0). 아니면 null. */
+export function parseMrzStrip(raw: unknown): { surname: string; givenNames: string; documentNumber: string } | null {
   if (typeof raw !== "string") return null;
   const lines = raw.split("\n");
   if (lines.length !== 2) return null;
@@ -42,5 +42,5 @@ export function parseMrzStrip(raw: unknown): { surname: string; givenNames: stri
   const split = names.indexOf("<<");
   const surname = letters(split >= 0 ? names.substring(0, split) : names);
   const givenNames = letters(split >= 0 ? names.substring(split + 2) : "");
-  return surname ? { surname, givenNames } : null;
+  return surname ? { surname, givenNames, documentNumber: number.replace(/<+$/, "") } : null;
 }

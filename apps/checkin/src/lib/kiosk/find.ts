@@ -100,6 +100,31 @@ export function matchByPassportStays(
   return ids.length === 1 ? ids[0] : null;
 }
 
+/** 여권 번호 비교용 — 대소문자 · 띄어쓰기 · 하이픈 무시, 손 입력에서 흔한 O ↔ 0 은 같게 본다. */
+function passportNumberKey(value: string): string {
+  return value.toUpperCase().replace(/[^A-Z0-9]/g, "").replace(/O/g, "0");
+}
+
+/**
+ * 여권 찾기에서 띠의 번호가 명부와 어긋나는가. 명부에 띠의 이름과 맞는 분이 여권 번호를 가지고 있는데 그중 누구와도 번호가 다르면 어긋남
+ * (같은 이름의 다른 여권 — 검사 숫자만 맞춘 띠 등). 명부에 비교할 번호가 없으면 어긋나지 않는다.
+ */
+export function passportNumberConflict(
+  guests: { name_roman: string | null; passport_number: string | null }[],
+  strip: { surname: string; givenNames: string; documentNumber: string },
+): boolean {
+  const scanned = passportNumberKey(strip.documentNumber);
+  const sameName = guests.filter(
+    (guest) => !!guest.name_roman && !!guest.passport_number && nameMatchesPassport(guest.name_roman, strip.surname, strip.givenNames),
+  );
+  return sameName.length > 0 && !sameName.some((guest) => passportNumberKey(guest.passport_number!) === scanned);
+}
+
+/** 여권 찾기에 띠(MRZ)가 꼭 있어야 하나. 기본 필수 — 옛 앱을 잠시 받아야 할 때만 `CHECKIN_KIOSK_REQUIRE_MRZ=false`. */
+export function kioskRequireMrz(value: string | undefined): boolean {
+  return value?.trim().toLowerCase() !== "false";
+}
+
 /** 같은 코드가 여러 줄이면(취소된 옛 예약이 코드를 다시 쓴 경우) 진행 중인 것 → 가장 최근 것. */
 export function pickByCode<T extends { status: string; checkInDate: string }>(rows: T[]): T | null {
   if (rows.length === 0) return null;
@@ -115,22 +140,25 @@ export const KIOSK_WINDOW_MS = 10 * 60_000;
 
 export type KioskAttempt = { succeeded: boolean; attempted_at: string };
 
-/** 최근 시도(새것 먼저)로 지금 잠겼는지 · 몇 번 남았는지. 성공하면 앞의 실패는 지운 셈. */
+/**
+ * 최근 시도(새것 먼저)로 지금 잠겼는지 · 몇 번 남았는지. 성공하면 앞의 실패는 지운 셈.
+ * 잠금은 5의 배수를 채운 실패(가장 최근에 채운 것)부터 1분 — 동시 요청이 한꺼번에 들어와 5 → 7 처럼 배수를 건너뛰어도 잠긴다.
+ */
 export function kioskLockState(recent: KioskAttempt[], now: Date) {
   const windowStart = now.getTime() - KIOSK_WINDOW_MS;
-  let failures = 0;
-  let lastFailure: number | null = null;
+  const failures: number[] = [];
   for (const row of recent) {
     const at = Date.parse(row.attempted_at);
     if (at < windowStart || row.succeeded) break;
-    failures += 1;
-    lastFailure ??= at;
+    failures.push(at);
   }
-  const lockEnd = lastFailure === null ? 0 : lastFailure + KIOSK_LOCK_MS;
-  const locked = failures > 0 && failures % KIOSK_MAX_FAILURES === 0 && lockEnd > now.getTime();
+  const over = failures.length % KIOSK_MAX_FAILURES;
+  const filledAt = failures.length >= KIOSK_MAX_FAILURES ? failures[over] : null;
+  const lockEnd = filledAt === null ? 0 : filledAt + KIOSK_LOCK_MS;
+  const locked = lockEnd > now.getTime();
   return {
-    failures,
-    remaining: KIOSK_MAX_FAILURES - (failures % KIOSK_MAX_FAILURES),
+    failures: failures.length,
+    remaining: KIOSK_MAX_FAILURES - over,
     lockedUntil: locked ? new Date(lockEnd).toISOString() : null,
   };
 }

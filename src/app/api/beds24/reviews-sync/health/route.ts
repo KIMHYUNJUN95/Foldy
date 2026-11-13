@@ -30,21 +30,11 @@ export const dynamic = "force-dynamic";
 /** 이 일수를 넘게 수집이 테이블에 닿지 않으면 알린다. 하루 1회 주기라 2일은 «두 번 걸렀다» 는 뜻이다. */
 const STALE_AFTER_DAYS = 2;
 
+/** `CRON_SECRET` Bearer 하나, 없으면 404. 웹훅 비밀값은 받지 않는다(2026-11-13). */
 function authorize(request: NextRequest): { ok: true } | { ok: false; status: number } {
   const cronSecret = process.env.CRON_SECRET?.trim();
-  const webhookSecret = process.env.BEDS24_WEBHOOK_SECRET?.trim();
-  if (!cronSecret && !webhookSecret) return { ok: false, status: 404 };
-
-  // 상수 시간 비교 · 후보 중 하나라도 맞으면 통과(2026-10-26, api-secret).
-  if (
-    requestMatchesSecret(request, [cronSecret, webhookSecret], {
-      // 쿼리(`?secret=`)로는 받지 않는다(2026-11-10) — 주소는 접속 기록 · 프록시 로그에 남는다. 워크플로는 헤더로 보낸다.
-      headers: ["x-beds24-webhook-secret"],
-    })
-  ) {
-    return { ok: true };
-  }
-  return { ok: false, status: 403 };
+  if (!cronSecret) return { ok: false, status: 404 };
+  return requestMatchesSecret(request, [cronSecret]) ? { ok: true } : { ok: false, status: 403 };
 }
 
 async function handle(request: NextRequest) {

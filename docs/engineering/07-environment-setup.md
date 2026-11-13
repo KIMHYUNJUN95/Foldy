@@ -255,7 +255,7 @@ CRON_SECRET=
 
 Usage:
 
-- `BEDS24_WEBHOOK_SECRET`: verify incoming webhook requests if supported/configured
+- `BEDS24_WEBHOOK_SECRET`: verifies incoming Beds24 webhook deliveries (`/api/beds24/webhook`). **Required in production (2026-11-13)** — unset means the webhook answers `503 not_configured` and nothing is stored. See 「API 라우트별 비밀값」 below.
 - `BEDS24_PRICE_WEBHOOK_FORWARD_URL`: 선택. 받은 Beds24 배달을 그대로 넘길 주소(줄바꿈/쉼표로 여러 개). **미설정이 기본이고 그때는 아무 데도 넘기지 않는다.** 전환기에만 쓴다 — 아래 「Beds24 재고(가격) 웹훅 전환」 참고
 - `BEDS24_WEBHOOK_CAPTURE_MESSAGES`: 선택 · **임시**(2026-11-12, `docs/product/47-guest-messaging.md` §3-4 V1). `1` 이면 손님 메시지(`messages` 배열)가 실린 예약 웹훅 원문을 `beds24_webhook_events.raw_payload` 에 남긴다(모드 `messages_capture`, 첨부는 길이만 · 6만 자 상한). 기본 꺼짐. **끄는 법**: 이 환경변수를 지우고 재배포 → 사용자 컨펌 뒤 SQL Editor 에서 `delete from public.beds24_webhook_events where 'messages_capture' = any(modes) and failed_count = 0;`(원문에 손님 개인정보가 있다 — 47 §3-4)
 - `GUEST_MESSAGES_SEND_ENABLED`: 선택 · 기본 꺼짐(2026-11-13, `docs/product/47-guest-messaging.md` §5-4). **`1` 일 때만** 손님 메시지 답장을 실제로 Beds24 로 보낸다. 꺼져 있으면 답장은 발송 큐에 `queued` 로 쌓이기만 하고 화면에 「보낼 차례 기다림 · 발송이 아직 꺼져 있어요」가 보인다. 켜기 전에 47 §3-4 V1~V4 확인 + 사용자 허락. 발송 작업은 보내기 · 다시 보내기 뒤 `after()` 로만 돌고(목록 · 대화 읽기는 부작용 없음), 10분 넘게 `sending` 인 줄은 다시 보내지 않고 `uncertain` 으로 푼다. 수동 실행은 `POST /api/guest-messages/outbox`(`Authorization: Bearer $CRON_SECRET`, 정기 실행은 아직 안 붙임).
@@ -296,9 +296,30 @@ Usage:
   none of these is in `vercel.json`; the first three are scheduled by Supabase pg_cron migration `202611130006`
   (unapplied; they also accept its Vault token), backfill and media-backfill are manual / temporary pg_cron only). Vercel sends it
   automatically only to routes declared in `vercel.json`; GitHub Actions and manual callers send the
-  bearer header (Beds24 paths also accept `BEDS24_WEBHOOK_SECRET` where documented). An unset reminder
+  bearer header (`BEDS24_WEBHOOK_SECRET` no longer opens any of these — 2026-11-13). An unset reminder
   secret returns 404; invalid/missing caller credentials return 403.
-- **시크릿 비교 공용 규칙 (2026-10-26)**: 모든 API 시크릿 확인은 `src/lib/api-secret.ts`(상수 시간 · 길이 무관). Bearer / 지정 헤더 / (허용된 경로만) `?secret=` 중 **하나라도 맞으면** 통과 — 예전 `a ?? b ?? c` 는 첫 값만 봤다. 쿼리 시크릿은 호환을 위해 유지. `BEDS24_WEBHOOK_SECRET` 미설정 시 웹훅이 열린 채 통과하는 기존 동작(fail-open)은 운영 환경변수 확인 전이라 그대로 두었다(코드에 TODO).
+- **시크릿 비교 공용 규칙 (2026-10-26)**: 모든 API 시크릿 확인은 `src/lib/api-secret.ts`(상수 시간 · 길이 무관). Bearer / 지정 헤더 / (허용된 경로만) `?secret=` 중 **하나라도 맞으면** 통과 — 예전 `a ?? b ?? c` 는 첫 값만 봤다. 쿼리 시크릿은 호환을 위해 유지. 웹훅의 fail-open(비밀값 미설정 시 통과)은 2026-11-13 닫았다 — 아래 표.
+- **API 라우트별 비밀값 (2026-11-13 보안 점검)** — `BEDS24_WEBHOOK_SECRET` 은 Beds24 웹훅 설정 화면(커스텀 헤더 · 주소)에 그대로 보이는 값이라, Beds24 계정에 들어온 사람도 안다. 그래서 **이 값은 웹훅 수신만 연다.** 크론 · 작업 라우트는 `CRON_SECRET`(`Authorization: Bearer`)과 이미 있던 pg_cron Vault 토큰만 받는다(헤더 `x-beds24-webhook-secret` · `x-recruit-sync-secret` · 쿼리 `?secret=` 는 크론 라우트에서 안 받음).
+
+  | 라우트 | 실제 호출자 | 받는 값 | 서버에 비밀값이 없으면 |
+  | --- | --- | --- | --- |
+  | `POST · GET /api/beds24/webhook` | Beds24 (예약 · 가격 V1 배달, 커스텀 헤더) | `BEDS24_WEBHOOK_SECRET` — `x-beds24-webhook-secret` · Bearer · `?secret=` | **503** `not_configured` (예전엔 통과) |
+  | `/api/beds24/tick` | Supabase pg_cron (Vault `beds24_tick_token`) · 사람 | Bearer `CRON_SECRET` · Vault 토큰 | 토큰 대조만 |
+  | `/api/beds24/messages-reconcile` · `messages-backfill` | pg_cron (`guest_messages_cron_token`) · 사람 | Bearer `CRON_SECRET` · Vault 토큰 (`cron-auth.ts`) | 404 |
+  | `/api/beds24/reconcile` | Vercel Cron (자동 Bearer) + GitHub Actions `beds24-reconcile.yml` | Bearer `CRON_SECRET` | 404 |
+  | `/api/beds24/reviews-sync` · `reviews-sync/health` | GitHub Actions `beds24-reviews-sync.yml` · `beds24-reconcile.yml` | Bearer `CRON_SECRET` | 404 |
+  | `/api/beds24/reviews-sync/relink` | 사람(일회성) | Bearer `CRON_SECRET` | 404 |
+  | `/api/beds24/rates-sync` | GitHub Actions `beds24-rates-sync.yml` | Bearer `CRON_SECRET` | 404 |
+  | `/api/beds24/price-jobs/worker` | GitHub Actions `beds24-price-job-worker.yml` | Bearer `CRON_SECRET` | 404 |
+  | `POST /api/recruit/sync?mode=full` | GitHub Actions `recruit-sync.yml` (전량 훑기만, 최신분은 시크릿 없음) | Bearer `CRON_SECRET` | 403 |
+  | `/api/dev/beds24/*` | 로컬 사람 | `x-beds24-webhook-secret` (상수 시간 비교) + `ENABLE_LOCAL_DEV_TOOLS` · localhost | 404 |
+
+  GitHub Actions 5개 워크플로는 저장소 시크릿 **`CRON_SECRET`** 을 `Authorization: Bearer` 로 보내고, 시크릿이 비어 있으면 그 실행을 실패(`::error::`)로 끝낸다(조용히 넘어가지 않음 — recruit 은 전량 훑기 실행만).
+  **배포 순서 (사용자 할 일):**
+  1. **배포 전** — GitHub 저장소 Settings → Secrets and variables → Actions 에 `CRON_SECRET` 추가(값은 Vercel Production 의 `CRON_SECRET` 과 같게). Vercel Production 에 `BEDS24_WEBHOOK_SECRET` · `CRON_SECRET` 이 둘 다 있는지 확인. 없으면 웹훅은 503(예약 · 가격 알림을 못 받음), 크론 라우트는 404.
+  2. 배포(코드 + 워크플로가 같은 커밋 — 배포 전에 워크플로가 먼저 돌아도 옛 라우트가 `CRON_SECRET` Bearer 를 이미 받으므로 끊기지 않는다).
+  3. **배포 직후** — Actions 탭에서 5개 워크플로(`Beds24 reconcile` · `Beds24 reviews sync` · `Beds24 rates sync` · `Beds24 price job worker` · recruit sync 를 `full` 로)를 수동 실행해 HTTP 200(워커는 200/202) 확인.
+  4. 확인 뒤 저장소 시크릿 `BEDS24_WEBHOOK_SECRET` 은 워크플로가 더 쓰지 않는다 — 지워도 된다(Vercel 쪽 값은 웹훅용으로 그대로).
 - 웹훅 로그에는 본문 표본을 남기지 않고(키 · 길이만), 저장하는 거절 본문은 20,000자 상한(넘으면 표본 4,000자 + 길이). `/api/recruit/sync` 최신분(`mode=recent`)은 `{ok, count}` 만 돌려준다.
 - Existing Beds24-linked properties can be backfilled locally through `POST /api/dev/beds24/backfill-inventory`
 
@@ -336,11 +357,11 @@ node scripts/dev/beds24-push-token-to-vercel.mjs # → Vercel production 갱신 
 **검증** (로컬 dev 서버 재시작 후):
 
 ```bash
-curl -sX POST localhost:3000/api/beds24/rates-sync -H "authorization: Bearer $BEDS24_WEBHOOK_SECRET"
+curl -sX POST localhost:3000/api/beds24/rates-sync -H "authorization: Bearer $CRON_SECRET"
 # 기대: skipped: [] · matchedRooms 91 · unmatchedRoomIds []
 ```
 
-`BEDS24_WEBHOOK_SECRET` 은 이 절차와 **무관하다.** GitHub Actions 의 4개 워크플로는 그 시크릿만
+`BEDS24_WEBHOOK_SECRET` · `CRON_SECRET` 은 이 절차와 **무관하다.** GitHub Actions 워크플로는 `CRON_SECRET` 만
 쓰므로 토큰 교체 시 건드리지 않는다. 갱신 대상은 로컬 `.env` 와 Vercel 프로덕션 두 곳뿐이다.
 
 ### Beds24 재고(가격) 웹훅 전환
@@ -561,10 +582,10 @@ Reconciliation safety net (production):
   (0 invocations for both crons — a Vercel-side scheduling failure, not code/token: the endpoint returns
   HTTP 200 when hit manually). The GitHub Actions schedule is a redundant external trigger that does not
   depend on Vercel's cron scheduler, so the safety net survives a broken Vercel cron. reconcile is
-  idempotent, so running from both is harmless. **Required GitHub repo secret:** `BEDS24_WEBHOOK_SECRET`
-  (same value as on Vercel) — set it under repo Settings → Secrets and variables → Actions.
+  idempotent, so running from both is harmless. **Required GitHub repo secret:** `CRON_SECRET`
+  (same value as on Vercel, sent as `Authorization: Bearer` — 2026-11-13; was `BEDS24_WEBHOOK_SECRET`) — set it under repo Settings → Secrets and variables → Actions.
 - Every run (and every inbound webhook) is logged to `beds24_webhook_events` for observability.
-- Manual trigger: `curl "$APP_URL/api/beds24/reconcile" -H "Authorization: Bearer $CRON_SECRET"` (or `-H "x-beds24-webhook-secret: $BEDS24_WEBHOOK_SECRET"`).
+- Manual trigger: `curl "$APP_URL/api/beds24/reconcile" -H "Authorization: Bearer $CRON_SECRET"`. The webhook secret is no longer accepted (2026-11-13).
 
 Webhook ingestion hardening (2026-07-22):
 
@@ -599,7 +620,7 @@ External review collection cron (production):
 - Driven daily by GitHub Actions (`.github/workflows/beds24-reviews-sync.yml`, `5 23 * * *` UTC =
   08:05 Asia/Tokyo). Routine runs use the workflow's rolling window; `?full=1` requests a deeper recovery
   sweep. Optional `?organizationId=<uuid>` limits the run to one org, otherwise active organizations are processed.
-- Auth matches the reconcile endpoint: `CRON_SECRET` bearer, falling back to `BEDS24_WEBHOOK_SECRET` (`x-beds24-webhook-secret` header or `?secret=`) for manual triggers. 404 when neither secret is configured, 403 when the provided one is wrong. `BEDS24_SYNC_PAUSED` short-circuits the run with `202 {ok:true,paused:true}`.
+- Auth matches the reconcile endpoint: `CRON_SECRET` bearer only (2026-11-13 — the webhook secret and `?secret=` are no longer accepted). 404 when `CRON_SECRET` is not configured, 403 when the provided one is wrong. `BEDS24_SYNC_PAUSED` short-circuits the run with `202 {ok:true,paused:true}`.
 - Per-organization failures do not abort the run — they surface in `failures[]` with HTTP 207. The response carries `creditsRemaining` / `stoppedEarly` so a credit-limited early stop is visible; the next cycle resumes the remainder.
 - Manual trigger: `curl "$APP_URL/api/beds24/reviews-sync?full=1" -H "Authorization: Bearer $CRON_SECRET"`.
 

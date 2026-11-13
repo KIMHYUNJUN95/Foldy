@@ -17,8 +17,11 @@ name: Recruit application sync
 # 2. 2026-07-22 에 Vercel 크론이 며칠간 발화하지 않아 예약 5일치가 조용히 비었다. 이후 새 스케줄
 #    작업은 처음부터 외부 트리거를 쓴다(beds24-reconcile.yml, beds24-reviews-sync.yml 과 동일).
 #
-# NO SECRET NEEDED
+# SECRET — 전량 훑기만 (2026-10-19 · 2026-11-13)
 # ----------------
+# 최신분(5분 주기)은 시크릿 없이 돈다. 하루 1회 전량 훑기(`?mode=full`)만 저장소 시크릿 `CRON_SECRET`
+# (Vercel 프로덕션과 같은 값)을 `Authorization: Bearer` 로 보낸다 — 없으면 이 실행은 실패한다.
+# 아래는 최신분에 시크릿이 필요 없는 이유다.
 # 엔드포인트는 외부 입력을 받지 않는다 — 하는 일이 「공개 Firestore 를 읽어 우리 DB 에 넣는다」로
 # 고정이라 호출자가 데이터를 위조할 수 없다. 남는 위험인 남용은 서버가 60초 창으로 막는다
 # (recruit_sync_state). 그래서 저장소 시크릿 설정이 필요 없다 — 이 워크플로는 머지되는 즉시 돈다.
@@ -67,8 +70,8 @@ jobs:
           SYNC_URL: https://stay-ops-two.vercel.app/api/recruit/sync
           # 19:20 UTC 스케줄과 수동 full 실행만 전량으로 돈다.
           FULL: ${{ inputs.full == true || github.event.schedule == '20 19 * * *' }}
-          # 전량 훑기만 시크릿을 요구한다(2026-10-19) — 다른 크론과 같은 저장소 시크릿.
-          SYNC_SECRET: ${{ secrets.BEDS24_WEBHOOK_SECRET }}
+          # 전량 훑기만 시크릿을 요구한다(2026-10-19) — 다른 크론과 같은 저장소 시크릿 `CRON_SECRET`(2026-11-13).
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           set -uo pipefail
 
@@ -76,7 +79,13 @@ jobs:
           if [ "${FULL}" = "true" ]; then url="${url}?mode=full"; fi
 
           auth=()
-          if [ "${FULL}" = "true" ]; then auth=(-H "x-recruit-sync-secret: ${SYNC_SECRET}"); fi
+          if [ "${FULL}" = "true" ]; then
+            if [ -z "${CRON_SECRET}" ]; then
+              echo "::error::CRON_SECRET repository secret is not set — add it in repo Settings → Secrets → Actions (same value as Vercel production CRON_SECRET)."
+              exit 1
+            fi
+            auth=(-H "Authorization: Bearer ${CRON_SECRET}")
+          fi
 
           code=$(curl -sS -o /tmp/recruit-sync.json -w '%{http_code}' \
             -X POST "${url}" \

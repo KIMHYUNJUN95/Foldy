@@ -185,6 +185,7 @@ export function StartFlow({ building, buildingName, locale, dict, langPrompts, w
           </div>
         ) : null}
         <p className="mt-6 text-[15px] leading-relaxed">{dict.locked.arrived}</p>
+        <p className="mt-3 text-[15px] leading-relaxed">{dict.locked.staff}</p>
       </main>
     );
   }

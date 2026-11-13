@@ -144,7 +144,7 @@ Foldy UI는 Beds24를 실시간 조회하지 않고, 수집한 `external_reviews
 | | 프로덕션 cron | 로컬 dev |
 |---|---|---|
 | 경로 | `GET/POST /api/beds24/reviews-sync` | `GET/POST /api/dev/beds24/sync-reviews` |
-| 인증 | `Authorization: Bearer <CRON_SECRET>` (Vercel Cron 자동). 수동 실행은 `BEDS24_WEBHOOK_SECRET`을 `x-beds24-webhook-secret` 헤더/`?secret=`로 폴백 — **`/api/beds24/reconcile`과 동일 규약** | `ENABLE_LOCAL_DEV_TOOLS=true` + localhost + `BEDS24_WEBHOOK_SECRET` |
+| 인증 | `Authorization: Bearer <CRON_SECRET>` (Vercel Cron 자동). GitHub Actions · 수동 실행도 같은 `CRON_SECRET` Bearer — **`/api/beds24/reconcile`과 동일 규약**. 웹훅 비밀값 · `?secret=` 은 2026-11-13 부터 안 받음(`docs/engineering/07` 「API 라우트별 비밀값」) | `ENABLE_LOCAL_DEV_TOOLS=true` + localhost + `BEDS24_WEBHOOK_SECRET` |
 | 대상 | `organizationId` 미지정 시 `status='active'` 전 조직 | `organizationId` **필수** |
 | 수집 창 | Booking 기본 30일, `?full=1`이면 730일 (Airbnb는 항상 전량) | `?sinceDays=N`(1–365) |
 
@@ -328,7 +328,7 @@ Reservation coverage correction (2026-05-26):
 Webhook processing is now split into shared helpers instead of keeping all logic inside the route file:
 
 - `src/app/api/beds24/webhook/route.ts`
-  - verifies secret
+  - verifies secret (`BEDS24_WEBHOOK_SECRET` via `x-beds24-webhook-secret` / Bearer / `?secret=`). **Fail-closed since 2026-11-13:** unset secret → `503 not_configured`, wrong/missing → `403` — nothing is stored. The same secret no longer opens any cron/job route (tick, reconcile, reviews-sync + health + relink, rates-sync, price-jobs/worker, recruit full sync); per-route table: `docs/engineering/07-environment-setup.md` 「API 라우트별 비밀값」
   - parses JSON body
   - extracts one or more booking candidates
   - delegates each booking to `processBeds24WebhookBooking()`

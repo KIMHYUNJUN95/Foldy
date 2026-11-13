@@ -1205,7 +1205,7 @@
 
 /* 연차 화이트 리디자인 — 공용(홈 · 신청서 · 내역 · 캘린더), 2026-10-13 시안 AttLeave*M */
 .lv.lvw { padding: 0 0 28px; }
-.lvw .lvw-title h1 { margin: 0; font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
+.lvw .lvw-title h1 { margin: 0; font-size: 34px; line-height: 41px; font-weight: 600; letter-spacing: -0.02em; color: var(--ink); }
 .lvw .lvw-title span { display: block; margin-top: 4px; font-size: 13px; color: var(--text-3); }
 .lvw .lvw-title { display: flex; flex-direction: column; }
 .lvw .lvw-title--row { flex-direction: row; align-items: flex-end; justify-content: space-between; gap: 12px; }

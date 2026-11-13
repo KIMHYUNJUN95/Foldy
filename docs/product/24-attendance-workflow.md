@@ -1181,6 +1181,10 @@ QR 정책 · `authenticated` 실행 불가. 진짜 동시 실행은 PGlite 로 �
 - 폴드 · 태블릿 배치는 그대로, 같은 변경만 반영.
 - 교통비 정산 큰 제목(`.trnw .ptitle`)도 굵기 600(크기 · 줄높이 그대로) — 근태 첫 화면과 같다. `.trnw` 안에서만 적용돼 다른 화면 영향 없음.
 - en 문장형 통일: `rosterPageTitle` 「Attendance roster」.
+- **2차(문구 · 굵기, 표시만)** — 근무 기록 · 정정 신청 · 정정 상태 · 급여 · 출근자 명단 큰 제목(`.att.att--payw/histw/corrw/corrst/rosterw .ptitle`) · en 한 문장 짧은 문구 마침표도 제거(3언어 맞춤)과
+  연차 제목(`.lvw .lvw-title h1`) 600. en 근태 · 교통비 문구 Title Case → Sentence case 17개(`corrPageTitle` · `statementTitle` · `claimTotal` 등).
+  직원 화면 「GPS + QR」 → ko 「위치 확인 + QR」 · ja 「位置確認 + QR」 · en 「Location + QR」(`methodGpsQr` · `methodGpsWifi` · `resultLine` · `resultGpsSub`).
+  ko · ja 근태 · 연차 · 교통비의 한 문장 짧은 문구 끝 마침표 제거(두 문장 이상 · 이어붙여 쓰는 급여 안내 5개는 유지). PC 관리자 근태 설정의 GPS 용어는 그대로.
 
 ## 근태 점검 2차 — 화면 (2026-11-11)
 

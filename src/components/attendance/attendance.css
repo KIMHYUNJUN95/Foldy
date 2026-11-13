@@ -3548,9 +3548,9 @@
 }
 
 /* HIG 다듬기 2차 — 급여(2026-10-20, HIG 캔버스 A2Pay-* · 지금 A2PayNow-*). 기능 · 배치 그대로.
-   큰 제목 34/700 · 금액 위아래 15 · 가리기 44 · 요약 이름 13 · 묶음 제목 17/600 · 44 · 줄 사이에만 선 · 줄 16/13 · 날짜 줄 50 · 합계 17 ·
+   큰 제목 34/600 · 금액 위아래 15 · 가리기 44 · 요약 이름 13 · 묶음 제목 17/600 · 44 · 줄 사이에만 선 · 줄 16/13 · 날짜 줄 50 · 합계 17 ·
    차트 제목 17/600 · 범례 13 · 막대 위 시간(8일 이하일 때만) · 아래 날짜 11 · 막대 굵기 정수(폰 6 · 폴드 이상 10) + 칸 폭 정수 내림(--col, JS). */
-.att.att--payw .ptitle { font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: -0.02em; }
+.att.att--payw .ptitle { font-size: 34px; line-height: 41px; font-weight: 600; letter-spacing: -0.02em; }
 .att.att--payw .ptitle__sub { margin-top: 4px; font-size: 15px; font-weight: 400; color: var(--text-3); }
 .att.att--payw .payw-hero__k { font-size: 15px; }
 .att.att--payw .payw-eye { width: 44px; height: 44px; margin: -12px -6px; }
@@ -3717,7 +3717,7 @@
 }
 
 /* HIG 다듬기 2차 — 근무 기록 · 정정 요청 · 정정 요청 상태(2026-10-20, HIG 캔버스 A2AttHist-* · A2AttCorr-* · 지금 *Now-*). 기능 · 배치 그대로. */
-.att.att--histw .ptitle, .att.att--corrw .ptitle, .att.att--corrst .ptitle { font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: -0.02em; }
+.att.att--histw .ptitle, .att.att--corrw .ptitle, .att.att--corrst .ptitle { font-size: 34px; line-height: 41px; font-weight: 600; letter-spacing: -0.02em; }
 .att.att--histw .ptitle__sub, .att.att--corrw .ptitle__sub, .att.att--corrst .ptitle__sub { margin-top: 4px; font-size: 15px; font-weight: 400; color: var(--text-3); }
 /* 달 넘기기(공용 — 급여 화면도 같이): 동그라미 30 → 36 · 누르는 자리 44 · 달 글자 15 */
 .att .msw__arrow { position: relative; width: 36px; height: 36px; }
@@ -3836,9 +3836,9 @@
 }
 
 /* HIG 다듬기 2차 — 출근자 명단(2026-10-20, HIG 캔버스 A2Roster-* · 지금 A2RosterNow-*). 기능 · 배치 그대로.
-   큰 제목 34/700(다른 화면과 같게) · 아래 줄 15 · 날짜 화살표 · 「오늘」 44 · 줄 사이 선은 공용 규칙(이니셜 38 + 간격 12 → 50, 줄 사이에만) ·
+   큰 제목 34/600(다른 화면과 같게) · 아래 줄 15 · 날짜 화살표 · 「오늘」 44 · 줄 사이 선은 공용 규칙(이니셜 38 + 간격 12 → 50, 줄 사이에만) ·
    이름 16/500 · 역할 · 시각 13 · 전화 44 · 태블릿 달력 ‹ › 44 · 달 17/600 · 요일 13 · 날짜 16 · 요약 줄 44 · 오른쪽 제목 17/600 · 44. */
-.att.att--rosterw .ptitle { font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: -0.02em; }
+.att.att--rosterw .ptitle { font-size: 34px; line-height: 41px; font-weight: 600; letter-spacing: -0.02em; }
 .att.att--rosterw .ptitle__sub { margin-top: 4px; font-size: 15px; font-weight: 400; color: var(--text-3); }
 .att.att--rosterw .ro-daterow__arrow { width: 44px; height: 44px; }
 .att.att--rosterw .ro-daterow__d { height: 44px; font-weight: 600; }

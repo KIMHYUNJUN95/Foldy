@@ -7,16 +7,20 @@ import {
   MEDIA_COPY_LIMITS,
   checkFetchedMedia,
   extensionForMime,
+  disallowedMediaQueryKeys,
   isAllowedMediaFetchUrl,
   isOrgMediaPath,
+  isPermanentMediaFailure,
+  mediaFetchPlan,
   mediaObjectPath,
+  mediaSourceVariant,
   nextMediaState,
   planMediaCopy,
   storedMediaOf,
+  type MediaCopyTarget,
   type SignedMedia,
   type StoredMediaAttachment,
 } from "@/lib/guest-messages/message-media";
-import { airbnbImageVariant } from "@/lib/guest-messages/message-body";
 
 /**
  * 손님 메시지 사진 사본 — 받아 와서 비공개 버킷에 올리고 `attachments` 에 적는다. docs/product/47 §5-8.
@@ -27,6 +31,9 @@ import { airbnbImageVariant } from "@/lib/guest-messages/message-body";
  *   실행이 죽으면 5분 뒤 다른 실행이 다시 잡는다.
  * - 받아 오기: `https://a0.muscache.com/im/…?im_w=1200`(큰 사진) + `?im_w=480`(작은 사진) 만(SSRF 막기 `isAllowedMediaFetchUrl`),
  *   넘김(redirect) 거절, 15초 · 10MB · 이미지 4종. Beds24 를 부르지 않는다(크레딧 0). 작은 사진은 실패해도 사본은 된 것으로 본다.
+ *   손님이 올린 사진(`/im/pictures-signed/`)은 서명 없이는 403 — 본문 href 의 서명 쿼리 그대로 `im_w` 만 바꿔 받는다.
+ *   서명 href 가 안 되거나 서명이 이미 죽었으면 서명 없는 정본 `?im_w=` 로 한 번 더(죽은 서명 사진도 일부는 열린다).
+ *   서명이 죽은 뒤(또는 죽는 때를 모를 때) 서명 없는 시도까지 403 이면 다시 하지 않는다(바로 failed).
  * - 실패는 로그(메시지 번호 · 이유 코드만 — 주소 · 서명 없음) + 뒤로 미룸, 5번이면 failed.
  * - **절대 던지지 않는다** — 웹훅 · 보정 조회 · 가져오기 뒤 `after()` 에서 부른다.
  */
@@ -92,14 +99,17 @@ async function readCapped(response: Response, maxBytes: number): Promise<Uint8Ar
   return out;
 }
 
-/** 사진 하나 받아 오기 — 이유 코드만 돌려준다(주소는 로그에 안 남김). */
+/** 사진 하나 받아 오기 — 이유 코드만 돌려준다(주소는 로그에 안 남김). 정본 글을 주면 서명 없는 사진으로 본다. */
 export async function fetchMediaImage(
-  canonical: string,
+  target: string | Pick<MediaCopyTarget, "sourceUrl" | "signedHref">,
   fetchImpl: FetchLike = fetch,
   width: number = MEDIA_COPY_LIMITS.fetchWidth,
-): Promise<{ ok: true; bytes: Uint8Array; mime: string } | { ok: false; reason: string }> {
-  const url = airbnbImageVariant(canonical, width);
-  if (!isAllowedMediaFetchUrl(url)) return { ok: false, reason: "not_allowed" };
+): Promise<{ ok: true; bytes: Uint8Array; mime: string } | { ok: false; reason: string; keys?: string[] }> {
+  const url = mediaSourceVariant(typeof target === "string" ? { sourceUrl: target } : target, width);
+  if (!isAllowedMediaFetchUrl(url)) {
+    const keys = disallowedMediaQueryKeys(url);
+    return keys.length > 0 ? { ok: false, reason: "not_allowed_query", keys } : { ok: false, reason: "not_allowed" };
+  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), MEDIA_COPY_LIMITS.timeoutMs);
   try {
@@ -151,12 +161,34 @@ async function copyOne(
   const targets = planMediaCopy(row.body, row.attachments);
   const added: StoredMediaAttachment[] = [];
   let failed = 0;
+  let permanent = 0;
   for (const target of targets) {
     if (Date.now() > deadline) break;
-    const fetched = await fetchMediaImage(target.sourceUrl, fetchImpl);
+    // 서명이 살아 있으면 서명 href → 서명 없는 정본, 죽었으면 서명 없는 정본만(`mediaFetchPlan`). 작은 사진은 열린 쪽으로.
+    let fetched: Awaited<ReturnType<typeof fetchMediaImage>> = { ok: false, reason: "not_tried" };
+    let source: Pick<MediaCopyTarget, "sourceUrl" | "signedHref"> = { sourceUrl: target.sourceUrl };
+    let signedReason: string | null = null;
+    let keys: string[] | undefined;
+    for (const mode of mediaFetchPlan(target, now)) {
+      source = mode === "signed" ? target : { sourceUrl: target.sourceUrl };
+      fetched = await fetchMediaImage(source, fetchImpl);
+      if (fetched.ok) break;
+      if (mode === "signed") {
+        signedReason = fetched.reason;
+        keys = fetched.keys;
+      }
+    }
     if (!fetched.ok) {
-      failed += 1;
-      console.warn("[guest-messages/media] fetch failed", { messageId: row.id, index: target.index, reason: fetched.reason });
+      if (isPermanentMediaFailure(target, fetched.reason, now)) permanent += 1;
+      else failed += 1;
+      // 주소 · 서명 값은 남기지 않는다 — 모르는 쿼리 키는 이름만.
+      console.warn("[guest-messages/media] fetch failed", {
+        messageId: row.id,
+        index: target.index,
+        reason: fetched.reason,
+        ...(signedReason ? { signedReason } : {}),
+        ...(keys ? { keys } : {}),
+      });
       continue;
     }
     const ext = extensionForMime(fetched.mime) ?? "jpg";
@@ -170,7 +202,7 @@ async function copyOne(
     }
     // 작은 사진(말풍선용) — 실패해도 큰 사진으로 보이므로 사본은 된 것으로 본다.
     let thumbPath: string | null = null;
-    const thumb = await fetchMediaImage(target.sourceUrl, fetchImpl, MEDIA_COPY_LIMITS.thumbWidth);
+    const thumb = await fetchMediaImage(source, fetchImpl, MEDIA_COPY_LIMITS.thumbWidth);
     if (thumb.ok) {
       const candidate = mediaObjectPath({ ...base, ext: extensionForMime(thumb.mime) ?? "jpg", thumb: true });
       const thumbError = await uploadOne(supabase, candidate, thumb.bytes, thumb.mime);
@@ -190,7 +222,14 @@ async function copyOne(
     });
   }
   const remaining = targets.length - added.length;
-  const next = nextMediaState({ attempts: row.media_attempts, remaining, copiedThisRun: added.length, failedThisRun: failed, now });
+  const next = nextMediaState({
+    attempts: row.media_attempts,
+    remaining,
+    copiedThisRun: added.length,
+    failedThisRun: failed,
+    permanentThisRun: permanent,
+    now,
+  });
   const attachments = [...(Array.isArray(row.attachments) ? row.attachments : []), ...added];
   const saved = await supabase
     .from("guest_messages")
@@ -207,8 +246,8 @@ async function copyOne(
     .select("id");
   if (saved.error) throw new Error(`media state save failed: ${saved.error.message}`);
   // 0줄 = 잡은 시간이 지나 다른 실행이 다시 잡았다 — 그쪽이 저장한다(올린 파일은 같은 경로라 그대로 쓰인다).
-  if ((saved.data ?? []).length === 0) return { copied: 0, failed, finalState: "lost" };
-  return { copied: added.length, failed, finalState: next.state };
+  if ((saved.data ?? []).length === 0) return { copied: 0, failed: failed + permanent, finalState: "lost" };
+  return { copied: added.length, failed: failed + permanent, finalState: next.state };
 }
 
 /** 후보를 고르고 조건부 update 로 잡는다 — 돌려받은 줄만 내 것. */

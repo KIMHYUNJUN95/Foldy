@@ -2,7 +2,8 @@
 
 /**
  * 메시지 본문 그리기 — 글 · 링크 · 사진(47 §5-8). 본문의 HTML 을 그대로 넣지 않고 조각(`parseMessageBody`)을 React 요소로.
- * 사진은 사본(서명 URL)이 먼저, 없거나 못 불러오면 Airbnb `?im_w=` 주소, 그것도 안 되면 조용한 「사진을 불러올 수 없어요」 + 원본 열기.
+ * 사진은 사본(서명 URL)이 먼저, 없거나 못 불러오면 Airbnb 주소, 그것도 안 되면 조용한 「사진을 불러올 수 없어요」 + 원본 열기.
+ * 손님이 올린 사진인데 사본이 없고 Airbnb 서명도 죽었으면(`unavailable`) 깨진 사진 대신 「사진은 Airbnb 에서 볼 수 있어요」.
  * 누르면 공용 `ImageLightbox`(Esc · 맨 위 오버레이 · role=dialog).
  */
 
@@ -70,15 +71,19 @@ export function MessageBodyView({
   const srcOf = (index: number, kind: "thumb" | "full") => {
     const image = images[index];
     if (!image) return null;
+    if (image.unavailable) return null;
     // 사본이 안 열리면(서명 만료 등) Airbnb 주소로 한 번 더.
     if (broken[index] === 1 && image.stored) return image.fallback;
     return kind === "thumb" ? image.thumb : image.full;
   };
   const onError = (index: number) => {
     const image = images[index];
-    setBroken((prev) => ({ ...prev, [index]: prev[index] === undefined && image?.stored ? 1 : 2 }));
+    setBroken((prev) => ({ ...prev, [index]: prev[index] === undefined && image?.stored && image.fallback ? 1 : 2 }));
   };
-  const viewable = images.map((image, i) => (broken[i] === 1 && image.stored ? image.fallback : image.full));
+  // 크게 보기에는 볼 수 있는 사진만(Airbnb 에서만 보이는 사진은 빼고) — 누른 사진의 자리를 그 목록 안 번호로 바꾼다.
+  const viewableIndexes = images.flatMap((image, i) => (image.unavailable ? [] : [i]));
+  const viewable = viewableIndexes.map((i) => (broken[i] === 1 && images[i].stored ? (images[i].fallback ?? images[i].full) : images[i].full));
+  const openAt = open === null ? null : Math.max(0, viewableIndexes.indexOf(open));
 
   return (
     <>
@@ -104,6 +109,13 @@ export function MessageBodyView({
             {piece.indexes.map((index) => {
               const n = index + 1;
               const src = srcOf(index, "thumb");
+              if (images[index]?.unavailable) {
+                return (
+                  <span key={index} className="gm-photo gm-photo--broken">
+                    <span className="gm-photo__msg">{copy.photoUnavailable}</span>
+                  </span>
+                );
+              }
               if (!src || broken[index] === 2) {
                 const original = images[index]?.fallback ?? null;
                 return (
@@ -152,8 +164,8 @@ export function MessageBodyView({
           </span>
         );
       })}
-      {interactive && images.length > 0 ? (
-        <ImageLightbox urls={viewable} openIndex={open} onClose={close} closeLabel={copy.photoClose} />
+      {interactive && viewable.length > 0 ? (
+        <ImageLightbox urls={viewable} openIndex={openAt} onClose={close} closeLabel={copy.photoClose} />
       ) : null}
     </>
   );

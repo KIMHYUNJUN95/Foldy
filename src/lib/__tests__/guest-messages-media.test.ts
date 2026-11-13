@@ -8,6 +8,7 @@ import {
   messagePlainText,
   messageTextForTranslation,
   parseMessageBody,
+  signedImageExpiresAt,
 } from "@/lib/guest-messages/message-body";
 import {
   MEDIA_COPY_LIMITS,
@@ -15,7 +16,11 @@ import {
   imageViewsFor,
   isAllowedMediaFetchUrl,
   isOrgMediaPath,
+  isPermanentMediaFailure,
+  isSignedMediaExpired,
+  mediaFetchPlan,
   mediaObjectPath,
+  mediaSourceVariant,
   nextMediaState,
   planMediaCopy,
   providerAttachmentCount,
@@ -26,14 +31,24 @@ import { copyPendingGuestMessageMedia, fetchMediaImage, signGuestMessageMedia } 
 const PATH = "/im/pictures-signed/messaging/Messaging-2726943899/original/fa4d40a1-77ea-4691-a3d6-0a76dbb92eeb.png";
 const CANON = `https://a0.muscache.com${PATH}`;
 const SIGNED = `${CANON}?X-Amz-Security-Token=FAKE%2Ftoken&amp;X-Amz-Expires=3600&amp;X-Amz-Signature=deadbeef&amp;im_w=1200`;
+/** 본문 href 를 풀어 읽은 것(파서가 `signedHref` 로 그대로 둔다). */
+const SIGNED_HREF = SIGNED.replace(/&amp;/g, "&");
+const SIGNED_Q = "X-Amz-Security-Token=FAKE%2Ftoken&X-Amz-Expires=3600&X-Amz-Signature=deadbeef";
+const signedImage = (index = 0, url = CANON, signedHref = SIGNED_HREF) => ({ type: "image", url, index, signedHref, expiresAt: null });
+/** 날짜까지 있는 가짜 서명 주소(진짜 토큰 아님) — 2026-05-05T00:26:03Z 서명, 3600초 → 01:26:03Z 에 죽는다. */
+const DATED_HREF =
+  `${CANON}?X-Amz-Security-Token=FAKE%2Btoken%3D&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20260505T002603Z` +
+  `&X-Amz-SignedHeaders=host&X-Amz-Credential=FAKE%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Expires=3600` +
+  `&X-Amz-Signature=0000fake0000&im_w=1200`;
+const DATED_EXPIRES = "2026-05-05T01:26:03.000Z";
 const anchor = (href: string, inner = href) => `<a href="${href}">${inner}</a>`;
 
 describe("parseMessageBody", () => {
   it("운영 모양 — 앵커 안에 <img> (2026-11-13 운영 본문 그대로의 구조)", () => {
     const longSigned = `${CANON}?X-Amz-Security-Token=${"A".repeat(1500)}&X-Amz-Expires=3600&im_w=1200`;
     const body = `<a href="${longSigned}" target="_blank"><img src="${longSigned}" style="height:100px"></a>`;
-    expect(parseMessageBody(body)).toEqual([{ type: "image", url: CANON, index: 0 }]);
-    expect(planMediaCopy(body, [])).toEqual([{ sourceUrl: CANON, index: 0 }]);
+    expect(parseMessageBody(body)).toEqual([signedImage(0, CANON, longSigned)]);
+    expect(planMediaCopy(body, [])).toEqual([{ sourceUrl: CANON, index: 0, signedHref: longSigned, expiresAt: null }]);
     expect(messagePlainText(body)).not.toContain("<img");
     const mixed = `봐 주세요\n${body}\n${body.replace("fa4d40a1", "fb4d40a1")}`;
     expect(parseMessageBody(mixed).filter((s) => s.type === "image")).toHaveLength(2);
@@ -47,14 +62,36 @@ describe("parseMessageBody", () => {
   });
 
   it("Airbnb 사진 앵커 → 사진 조각(쿼리 버린 정본)", () => {
-    expect(parseMessageBody(anchor(SIGNED))).toEqual([{ type: "image", url: CANON, index: 0 }]);
+    expect(parseMessageBody(anchor(SIGNED))).toEqual([signedImage()]);
+  });
+
+  it("서명 사진 — signedHref(쿼리 그대로) · expiresAt(X-Amz-Date + X-Amz-Expires)", () => {
+    const body = `<a href="${DATED_HREF.replace(/&/g, "&amp;")}" target="_blank"><img src="x" style="height:100px"></a>`;
+    expect(parseMessageBody(body)).toEqual([{ type: "image", url: CANON, index: 0, signedHref: DATED_HREF, expiresAt: DATED_EXPIRES }]);
+    // 날짜 · 수명을 못 읽으면 null.
+    const [bad] = parseMessageBody(anchor(DATED_HREF.replace("20260505T002603Z", "yesterday")));
+    expect(bad).toMatchObject({ signedHref: expect.any(String), expiresAt: null });
+  });
+
+  it("X-Amz-Date 범위 · 굴러 넘어간 날짜는 null", () => {
+    for (const date of ["20261305T002603Z", "20260500T002603Z", "20260532T002603Z", "20260505T242603Z", "20260505T006003Z", "20260505T002660Z", "20260230T002603Z"]) {
+      expect(signedImageExpiresAt(DATED_HREF.replace("20260505T002603Z", date)), date).toBeNull();
+    }
+    expect(signedImageExpiresAt(DATED_HREF.replace("20260505T002603Z", "20240229T235959Z"))).toBe("2024-03-01T00:59:59.000Z");
+    expect(signedImageExpiresAt(DATED_HREF)).toBe(DATED_EXPIRES);
+  });
+
+  it("서명 없는 /im/pictures/ 사진은 signedHref 가 없다", () => {
+    const [segment] = parseMessageBody(anchor("https://a0.muscache.com/im/pictures/MESSAGING/a.jpg?im_w=720"));
+    expect(segment).toEqual({ type: "image", url: "https://a0.muscache.com/im/pictures/MESSAGING/a.jpg", index: 0 });
+    expect(segment).not.toHaveProperty("signedHref");
   });
 
   it("글 + 앵커 섞임 — 글은 그대로, 사진 앞 빈 줄 정리", () => {
     const segments = parseMessageBody(`Here is the broken lamp:\n${anchor(SIGNED)}\nThanks`);
     expect(segments).toEqual([
       { type: "text", text: "Here is the broken lamp:" },
-      { type: "image", url: CANON, index: 0 },
+      signedImage(),
       { type: "text", text: "Thanks" },
     ]);
   });
@@ -208,7 +245,7 @@ describe("SSRF 허용 목록", () => {
       `https://evil.com/?u=https://a0.muscache.com${PATH}`,
       `https://a0.muscache.com:8443${PATH}`,
       `https://user:pw@a0.muscache.com${PATH}`,
-      `${CANON}?X-Amz-Signature=abc`,
+      "https://a0.muscache.com/im/pictures/x.jpg?X-Amz-Signature=abc",
       `${CANON}?im_w=1&x=2`,
       "https://a0.muscache.com/admin",
       "https://169.254.169.254/latest/meta-data",
@@ -217,6 +254,34 @@ describe("SSRF 허용 목록", () => {
     ]) {
       expect(isAllowedMediaFetchUrl(url), url).toBe(false);
     }
+  });
+  it("서명 사진 — AWS 서명 키 + im_w 만", () => {
+    expect(isAllowedMediaFetchUrl(DATED_HREF)).toBe(true);
+    expect(isAllowedMediaFetchUrl(`${CANON}?${SIGNED_Q}`)).toBe(true);
+    for (const url of [
+      `${DATED_HREF}&x=1`,
+      `${DATED_HREF}&X-Amz-Other=1`,
+      `${DATED_HREF}&im_w=480`,
+      DATED_HREF.replace("im_w=1200", "im_w=1600"),
+      `${DATED_HREF}#frag`,
+      DATED_HREF.replace("a0.muscache.com", "a1.muscache.com"),
+      DATED_HREF.replace("a0.muscache.com", "a0.muscache.com.evil.com"),
+      DATED_HREF.replace("https://", "http://"),
+      DATED_HREF.replace("a0.muscache.com", "a0.muscache.com:8443"),
+      DATED_HREF.replace("/im/pictures-signed/", "/im/pictures/"),
+    ]) {
+      expect(isAllowedMediaFetchUrl(url), url).toBe(false);
+    }
+  });
+  it("받아 올 주소 — 서명 쿼리 글자 그대로 + im_w 바꿈", () => {
+    const target = { sourceUrl: CANON, signedHref: DATED_HREF };
+    const big = mediaSourceVariant(target, 1200);
+    expect(big).toBe(DATED_HREF);
+    const thumb = mediaSourceVariant(target, 480);
+    expect(thumb).toBe(DATED_HREF.replace("im_w=1200", "im_w=480"));
+    expect(thumb).toContain("X-Amz-Security-Token=FAKE%2Btoken%3D");
+    expect(mediaSourceVariant({ sourceUrl: CANON, signedHref: `${CANON}?${SIGNED_Q}` }, 1200)).toBe(`${CANON}?${SIGNED_Q}&im_w=1200`);
+    expect(mediaSourceVariant({ sourceUrl: CANON }, 480)).toBe(`${CANON}?im_w=480`);
   });
 });
 
@@ -236,11 +301,11 @@ describe("사본 판단", () => {
 
   it("사본 없는 사진만 고른다 · 같은 사진 두 번은 하나", () => {
     expect(planMediaCopy(`${anchor(SIGNED)}${anchor(second)}`, [])).toEqual([
-      { sourceUrl: CANON, index: 0 },
-      { sourceUrl: CANON.replace("fa4d40a1", "bb11cc22"), index: 1 },
+      { sourceUrl: CANON, index: 0, signedHref: SIGNED_HREF, expiresAt: null },
+      { sourceUrl: CANON.replace("fa4d40a1", "bb11cc22"), index: 1, signedHref: SIGNED_HREF.replace("fa4d40a1", "bb11cc22"), expiresAt: null },
     ]);
     expect(planMediaCopy(`${anchor(SIGNED)}${anchor(second)}`, [stored])).toEqual([
-      { sourceUrl: CANON.replace("fa4d40a1", "bb11cc22"), index: 1 },
+      { sourceUrl: CANON.replace("fa4d40a1", "bb11cc22"), index: 1, signedHref: SIGNED_HREF.replace("fa4d40a1", "bb11cc22"), expiresAt: null },
     ]);
     expect(planMediaCopy(`${anchor(SIGNED)}${anchor(SIGNED)}`, [])).toHaveLength(1);
     expect(planMediaCopy("no photo <truncated>", [])).toEqual([]);
@@ -273,6 +338,51 @@ describe("사본 판단", () => {
     expect(nextMediaState({ attempts: 2, remaining: 3, copiedThisRun: 0, failedThisRun: 0, now })).toEqual({ state: "pending", attempts: 2, nextTryAt: null });
   });
 
+  it("상태: 남은 것이 모두 다시 해도 안 되는 것(서명 죽음 · 403)이면 바로 failed", () => {
+    const now = new Date("2026-11-13T00:00:00Z");
+    const failed = { state: "failed", attempts: MEDIA_COPY_LIMITS.maxAttempts, nextTryAt: null };
+    expect(nextMediaState({ attempts: 0, remaining: 1, copiedThisRun: 0, failedThisRun: 0, permanentThisRun: 1, now })).toEqual(failed);
+    // 일부는 복사됐고 나머지는 죽음 → failed(올린 사본은 그대로 보인다).
+    expect(nextMediaState({ attempts: 0, remaining: 1, copiedThisRun: 2, failedThisRun: 0, permanentThisRun: 1, now })).toEqual(failed);
+    // 다시 해 볼 것이 하나라도 남으면 예전 규칙.
+    expect(nextMediaState({ attempts: 0, remaining: 2, copiedThisRun: 0, failedThisRun: 1, permanentThisRun: 1, now })).toMatchObject({ state: "pending", attempts: 1 });
+    // 영구 실패 + 시간 한도로 못 본 사진 → 진행 없는 실패로 센다(바로 다시 · 횟수 그대로 무한 반복 금지).
+    expect(nextMediaState({ attempts: 0, remaining: 2, copiedThisRun: 0, failedThisRun: 0, permanentThisRun: 1, now })).toEqual({
+      state: "pending",
+      attempts: 1,
+      nextTryAt: "2026-11-13T00:10:00.000Z",
+    });
+    expect(
+      nextMediaState({ attempts: MEDIA_COPY_LIMITS.maxAttempts - 1, remaining: 2, copiedThisRun: 0, failedThisRun: 0, permanentThisRun: 1, now }),
+    ).toMatchObject({ state: "failed", nextTryAt: null });
+  });
+
+  it("죽음 판정 · 다시 해도 안 되는 실패", () => {
+    const fresh = { signedHref: DATED_HREF, expiresAt: DATED_EXPIRES };
+    expect(isSignedMediaExpired(fresh, new Date("2026-05-05T01:00:00Z"))).toBe(false);
+    expect(isSignedMediaExpired(fresh, new Date("2026-05-05T01:26:04Z"))).toBe(true);
+    expect(isSignedMediaExpired({ signedHref: DATED_HREF, expiresAt: null }, new Date("2030-01-01T00:00:00Z"))).toBe(false);
+    expect(isSignedMediaExpired({ expiresAt: DATED_EXPIRES }, new Date("2030-01-01T00:00:00Z"))).toBe(false);
+    const before = new Date("2026-05-05T01:00:00Z");
+    const after = new Date("2026-05-05T02:00:00Z");
+    // 403: 서명이 아직 살아 있으면 일시, 죽은 뒤 · 죽는 때 모름이면 영구.
+    expect(isPermanentMediaFailure(fresh, "http_403", before)).toBe(false);
+    expect(isPermanentMediaFailure(fresh, "http_403", after)).toBe(true);
+    expect(isPermanentMediaFailure({ signedHref: DATED_HREF, expiresAt: null }, "http_403", before)).toBe(true);
+    // 모르는 쿼리 키는 일시(로그로 원인 보기), 죽음 · 허용 밖은 영구.
+    expect(isPermanentMediaFailure(fresh, "not_allowed_query", before)).toBe(false);
+    expect(isPermanentMediaFailure(fresh, "http_404", after)).toBe(false);
+    expect(isPermanentMediaFailure(fresh, "timeout", after)).toBe(false);
+    expect(isPermanentMediaFailure(fresh, "not_allowed", before)).toBe(true);
+    expect(isPermanentMediaFailure(fresh, "timeout", before)).toBe(false);
+    expect(isPermanentMediaFailure({}, "http_403", after)).toBe(false);
+    // 받는 순서: 살아 있으면 서명 → 서명 없음, 죽었으면 서명 없음만, 서명 없는 사진은 하나.
+    expect(mediaFetchPlan(fresh, before)).toEqual(["signed", "unsigned"]);
+    expect(mediaFetchPlan(fresh, after)).toEqual(["unsigned"]);
+    expect(mediaFetchPlan({ signedHref: DATED_HREF, expiresAt: null }, after)).toEqual(["signed", "unsigned"]);
+    expect(mediaFetchPlan({}, before)).toEqual(["unsigned"]);
+  });
+
   it("받은 응답 검사", () => {
     expect(checkFetchedMedia({ status: 200, contentType: "image/jpeg", contentLength: 100 })).toEqual({ ok: true, mime: "image/jpeg" });
     expect(checkFetchedMedia({ status: 404, contentType: "text/html", contentLength: null })).toEqual({ ok: false, reason: "http_404" });
@@ -296,9 +406,27 @@ describe("사본 판단", () => {
   it("화면 주소 — 사본 먼저, 없으면 Airbnb im_w", () => {
     const body = `${anchor(SIGNED)}${anchor(second)}`;
     const views = imageViewsFor(body, { [CANON]: { full: "https://storage.local/full?token=x", thumb: "https://storage.local/t?token=x" } });
-    expect(views[0]).toMatchObject({ stored: true, thumb: "https://storage.local/t?token=x", full: "https://storage.local/full?token=x", fallback: `${CANON}?im_w=1200` });
+    expect(views[0]).toMatchObject({
+      stored: true,
+      unavailable: false,
+      thumb: "https://storage.local/t?token=x",
+      full: "https://storage.local/full?token=x",
+      fallback: `${CANON}?${SIGNED_Q}&im_w=1200`,
+    });
     expect(imageViewsFor(anchor(SIGNED), { [CANON]: { full: "F", thumb: null } })[0]).toMatchObject({ thumb: "F", full: "F" });
-    expect(views[1]).toMatchObject({ stored: false, thumb: `${CANON.replace("fa4d40a1", "bb11cc22")}?im_w=480` });
+    expect(views[1]).toMatchObject({ stored: false, unavailable: false, thumb: `${CANON.replace("fa4d40a1", "bb11cc22")}?${SIGNED_Q}&im_w=480` });
+    const plain = imageViewsFor(anchor("https://a0.muscache.com/im/pictures/a.jpg"), null)[0];
+    expect(plain).toMatchObject({ stored: false, unavailable: false, thumb: "https://a0.muscache.com/im/pictures/a.jpg?im_w=480" });
+  });
+
+  it("화면 주소 — 서명 사진: 살아 있으면 서명 href, 죽었고 사본 없으면 unavailable", () => {
+    const body = anchor(DATED_HREF.replace(/&/g, "&amp;"));
+    const alive = imageViewsFor(body, null, new Date("2026-05-05T01:00:00Z"))[0];
+    expect(alive).toMatchObject({ stored: false, unavailable: false, full: DATED_HREF, fallback: DATED_HREF, thumb: DATED_HREF.replace("im_w=1200", "im_w=480") });
+    const dead = imageViewsFor(body, null, new Date("2026-11-13T00:00:00Z"))[0];
+    expect(dead).toMatchObject({ stored: false, unavailable: true, fallback: null });
+    const copied = imageViewsFor(body, { [CANON]: { full: "F", thumb: "T" } }, new Date("2026-11-13T00:00:00Z"))[0];
+    expect(copied).toMatchObject({ stored: true, unavailable: false, thumb: "T", full: "F", fallback: null });
   });
 });
 
@@ -494,6 +622,134 @@ describe("copyPendingGuestMessageMedia", () => {
     await copyPendingGuestMessageMedia(db.client, ORG, { fetchImpl });
     expect(fetchImpl).not.toHaveBeenCalled();
     expect(rows[0].media_state).toBe("done");
+  });
+
+  it("서명 사진 — 받는 주소에 서명이 그대로 · im_w=1200 / 480", async () => {
+    const body = anchor(DATED_HREF.replace(/&/g, "&amp;"));
+    const rows: Row[] = [{ id: MSG, conversation_id: CONV, body, attachments: [], media_attempts: 0, media_state: "pending" }];
+    const db = fakeDb(rows);
+    const fetchImpl = vi.fn(async () => imageResponse());
+    await copyPendingGuestMessageMedia(db.client, ORG, { fetchImpl, now: () => new Date("2026-05-05T00:40:00Z") });
+    const urls = fetchImpl.mock.calls.map((call) => (call as unknown as [string])[0]);
+    expect(urls[0]).toBe(DATED_HREF);
+    expect(urls[0]).toContain("X-Amz-Signature=0000fake0000");
+    expect(urls[1]).toBe(DATED_HREF.replace("im_w=1200", "im_w=480"));
+    expect(rows[0].media_state).toBe("done");
+  });
+
+  it("서명이 죽은 사진 — 서명 없는 im_w=1200 으로 한 번, 200 이면 사본 · done", async () => {
+    const body = anchor(DATED_HREF.replace(/&/g, "&amp;"));
+    const rows: Row[] = [{ id: MSG, conversation_id: CONV, body, attachments: [], media_attempts: 0, media_state: "pending" }];
+    const db = fakeDb(rows);
+    const fetchImpl = vi.fn(async () => imageResponse());
+    await copyPendingGuestMessageMedia(db.client, ORG, { fetchImpl, now: () => new Date("2026-11-13T00:00:00Z") });
+    const urls = fetchImpl.mock.calls.map((call) => (call as unknown as [string])[0]);
+    expect(urls).toEqual([`${CANON}?im_w=1200`, `${CANON}?im_w=480`]);
+    expect(rows[0].media_state).toBe("done");
+    expect(rows[0].attachments).toEqual([expect.objectContaining({ sourceUrl: CANON, thumbPath: `${ORG}/${CONV}/${MSG}/0-t.jpg` })]);
+  });
+
+  it("서명이 죽은 사진 — 서명 없는 시도도 403 이면 바로 failed(다시 안 함)", async () => {
+    const body = anchor(DATED_HREF.replace(/&/g, "&amp;"));
+    const rows: Row[] = [{ id: MSG, conversation_id: CONV, body, attachments: [], media_attempts: 0, media_state: "pending" }];
+    const db = fakeDb(rows);
+    const fetchImpl = vi.fn(async () => new Response("AccessDenied", { status: 403 }));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await copyPendingGuestMessageMedia(db.client, ORG, { fetchImpl, now: () => new Date("2026-11-13T00:00:00Z") });
+    expect(fetchImpl.mock.calls.map((call) => (call as unknown as [string])[0])).toEqual([`${CANON}?im_w=1200`]);
+    expect(rows[0]).toMatchObject({ media_state: "failed", media_attempts: MEDIA_COPY_LIMITS.maxAttempts, media_next_try_at: null });
+    expect(JSON.stringify(warn.mock.calls)).not.toContain("muscache");
+    expect(JSON.stringify(warn.mock.calls)).not.toContain("X-Amz");
+    warn.mockRestore();
+  });
+
+  it("서명이 죽은 사진의 서명 없는 404 는 일시 실패(미룸)", async () => {
+    const body = anchor(DATED_HREF.replace(/&/g, "&amp;"));
+    const rows: Row[] = [{ id: MSG, conversation_id: CONV, body, attachments: [], media_attempts: 0, media_state: "pending" }];
+    const db = fakeDb(rows);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await copyPendingGuestMessageMedia(db.client, ORG, { fetchImpl: async () => new Response("no", { status: 404 }), now: () => new Date("2026-11-13T00:00:00Z") });
+    expect(rows[0]).toMatchObject({ media_state: "pending", media_attempts: 1 });
+    warn.mockRestore();
+  });
+
+  it("살아 있는 서명 href 실패 → 서명 없는 주소로 다시 · 작은 사진도 그쪽", async () => {
+    const body = anchor(DATED_HREF.replace(/&/g, "&amp;"));
+    const rows: Row[] = [{ id: MSG, conversation_id: CONV, body, attachments: [], media_attempts: 0, media_state: "pending" }];
+    const db = fakeDb(rows);
+    const fetchImpl = vi.fn(async (url: string) => (url.includes("X-Amz") ? new Response("no", { status: 403 }) : imageResponse()));
+    await copyPendingGuestMessageMedia(db.client, ORG, { fetchImpl, now: () => new Date("2026-05-05T00:40:00Z") });
+    const urls = fetchImpl.mock.calls.map((call) => (call as unknown as [string])[0]);
+    expect(urls).toEqual([DATED_HREF, `${CANON}?im_w=1200`, `${CANON}?im_w=480`]);
+    expect(rows[0].media_state).toBe("done");
+  });
+
+  it("서명 사진 403 → 바로 failed(다시 안 함)", async () => {
+    const rows: Row[] = [{ id: MSG, conversation_id: CONV, body: anchor(SIGNED), attachments: [], media_attempts: 0, media_state: "pending" }];
+    const db = fakeDb(rows);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await copyPendingGuestMessageMedia(db.client, ORG, { fetchImpl: async () => new Response("no", { status: 403 }) });
+    expect(rows[0]).toMatchObject({ media_state: "failed", media_attempts: MEDIA_COPY_LIMITS.maxAttempts, media_next_try_at: null });
+    warn.mockRestore();
+  });
+
+  it("서명이 아직 살아 있는 사진의 403 → 일시 실패(미룸)", async () => {
+    const body = anchor(DATED_HREF.replace(/&/g, "&amp;"));
+    const rows: Row[] = [{ id: MSG, conversation_id: CONV, body, attachments: [], media_attempts: 0, media_state: "pending" }];
+    const db = fakeDb(rows);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await copyPendingGuestMessageMedia(db.client, ORG, {
+      fetchImpl: async () => new Response("no", { status: 403 }),
+      now: () => new Date("2026-05-05T00:40:00Z"),
+    });
+    expect(rows[0]).toMatchObject({ media_state: "pending", media_attempts: 1, media_next_try_at: "2026-05-05T00:50:00.000Z" });
+    warn.mockRestore();
+  });
+
+  it("모르는 쿼리 키 → not_allowed_query · 키 이름만 로그(값 없음) · 미룸", async () => {
+    const extra = `${DATED_HREF}&X-Amz-NewThing=secretvalue123`;
+    const rows: Row[] = [{ id: MSG, conversation_id: CONV, body: anchor(extra.replace(/&/g, "&amp;")), attachments: [], media_attempts: 0, media_state: "pending" }];
+    const db = fakeDb(rows);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fetchImpl = vi.fn(async () => new Response("no", { status: 404 }));
+    await copyPendingGuestMessageMedia(db.client, ORG, { fetchImpl, now: () => new Date("2026-05-05T00:40:00Z") });
+    // 서명 주소는 허용 밖이라 부르지 않고, 서명 없는 정본만 한 번.
+    expect(fetchImpl.mock.calls.map((call) => (call as unknown as [string])[0])).toEqual([`${CANON}?im_w=1200`]);
+    expect(rows[0]).toMatchObject({ media_state: "pending", media_attempts: 1 });
+    const logged = JSON.stringify(warn.mock.calls);
+    expect(logged).toContain("not_allowed_query");
+    expect(logged).toContain("X-Amz-NewThing");
+    expect(logged).not.toContain("secretvalue123");
+    expect(logged).not.toContain("0000fake0000");
+    expect(logged).not.toContain("muscache");
+    warn.mockRestore();
+  });
+
+  it("서명 없는 사진 403 은 예전처럼 미룸", async () => {
+    const rows: Row[] = [
+      { id: MSG, conversation_id: CONV, body: anchor("https://a0.muscache.com/im/pictures/a.jpg"), attachments: [], media_attempts: 0, media_state: "pending" },
+    ];
+    const db = fakeDb(rows);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await copyPendingGuestMessageMedia(db.client, ORG, { fetchImpl: async () => new Response("no", { status: 403 }) });
+    expect(rows[0]).toMatchObject({ media_state: "pending", media_attempts: 1 });
+    warn.mockRestore();
+  });
+
+  it("한 장 복사 · 한 장 죽음(서명 없이도 403) → 사본은 남고 failed", async () => {
+    const dead = DATED_HREF.replace("fa4d40a1", "dd4d40a1");
+    const fresh = DATED_HREF.replace("20260505T002603Z", "20261112T235000Z");
+    const body = `${anchor(fresh.replace(/&/g, "&amp;"))}${anchor(dead.replace(/&/g, "&amp;"))}`;
+    const rows: Row[] = [{ id: MSG, conversation_id: CONV, body, attachments: [], media_attempts: 0, media_state: "pending" }];
+    const db = fakeDb(rows);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const deadCanon = CANON.replace("fa4d40a1", "dd4d40a1");
+    const fetchImpl = vi.fn(async (url: string) => (url.startsWith(deadCanon) ? new Response("AccessDenied", { status: 403 }) : imageResponse()));
+    await copyPendingGuestMessageMedia(db.client, ORG, { fetchImpl, now: () => new Date("2026-11-13T00:00:00Z") });
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+    expect(rows[0].media_state).toBe("failed");
+    expect(rows[0].attachments).toEqual([expect.objectContaining({ sourceUrl: CANON, index: 0 })]);
+    warn.mockRestore();
   });
 
   it("DB 가 던져도 던지지 않는다", async () => {

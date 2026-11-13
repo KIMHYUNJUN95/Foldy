@@ -13,6 +13,7 @@ import {
   AIRBNB_IM_WIDTHS,
   airbnbImageVariant,
   canonicalAirbnbImageUrl,
+  isSignedAirbnbImageUrl,
   messageImages,
 } from "@/lib/guest-messages/message-body";
 
@@ -79,9 +80,20 @@ export function storedMediaOf(attachments: unknown): StoredMediaAttachment[] {
   return Array.isArray(attachments) ? attachments.filter(isStoredMedia) : [];
 }
 
+/** 서명 사진 주소에 붙어 있어도 되는 쿼리(AWS 서명 7개) — 나머지는 `im_w` 하나만. */
+const SIGNED_QUERY_KEYS = new Set([
+  "X-Amz-Algorithm",
+  "X-Amz-Credential",
+  "X-Amz-Date",
+  "X-Amz-Expires",
+  "X-Amz-SignedHeaders",
+  "X-Amz-Security-Token",
+  "X-Amz-Signature",
+]);
+
 /**
- * 받아 와도 되는 주소인가(SSRF 막기) — https · 호스트가 정확히 a0.muscache.com · 포트 · 계정 없음 · 사진 경로.
- * 쿼리는 `im_w` 하나만 허용(서명 주소를 다시 쓰지 않는다).
+ * 받아 와도 되는 주소인가(SSRF 막기) — https · 호스트가 정확히 a0.muscache.com · 포트 · 계정 · # 없음 · 사진 경로.
+ * 쿼리: `/im/pictures/` 는 `im_w` 하나만. `/im/pictures-signed/` 는 AWS 서명 키(`SIGNED_QUERY_KEYS`) + `im_w`. 같은 키 두 번은 거절.
  */
 export function isAllowedMediaFetchUrl(raw: string): boolean {
   let url: URL;
@@ -92,15 +104,90 @@ export function isAllowedMediaFetchUrl(raw: string): boolean {
   }
   if (url.protocol !== "https:" || url.hostname !== AIRBNB_IMAGE_HOST || url.port || url.username || url.password) return false;
   if (url.hash) return false;
+  const canonical = `https://${AIRBNB_IMAGE_HOST}${url.pathname}`;
+  if (canonicalAirbnbImageUrl(canonical) !== canonical) return false;
+  const signed = isSignedAirbnbImageUrl(canonical);
   const keys = [...url.searchParams.keys()];
-  if (keys.some((key) => key !== "im_w") || keys.length > 1) return false;
+  if (new Set(keys).size !== keys.length) return false;
+  if (keys.some((key) => key !== "im_w" && !(signed && SIGNED_QUERY_KEYS.has(key)))) return false;
   const width = url.searchParams.get("im_w");
   if (width !== null && !(AIRBNB_IM_WIDTHS as readonly number[]).includes(Number(width))) return false;
-  return canonicalAirbnbImageUrl(`https://${url.hostname}${url.pathname}`) === `https://${AIRBNB_IMAGE_HOST}${url.pathname}`;
+  return true;
+}
+
+/**
+ * 허용 목록에서 쿼리 키 때문에만 떨어지는 주소면 그 키 이름들(값 없이, 짧게 — 로그용), 아니면 빈 배열.
+ * Airbnb 가 서명 주소에 키를 새로 붙이면 이유 코드 `not_allowed_query` + 키 이름으로 원인을 알 수 있게.
+ */
+export function disallowedMediaQueryKeys(raw: string): string[] {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return [];
+  }
+  const bare = `https://${AIRBNB_IMAGE_HOST}${url.pathname}`;
+  if (url.search === "" || isAllowedMediaFetchUrl(raw) || !isAllowedMediaFetchUrl(`${url.protocol}//${url.host}${url.pathname}`)) return [];
+  const signed = isSignedAirbnbImageUrl(bare);
+  const keys = [...url.searchParams.keys()];
+  const bad = keys.filter((key, i) => keys.indexOf(key) !== i || (key !== "im_w" && !(signed && SIGNED_QUERY_KEYS.has(key))));
+  return [...new Set(bad)].slice(0, 5).map((key) => key.replace(/[^\w-]/g, "?").slice(0, 40));
 }
 
 export function mediaFetchUrl(canonical: string): string {
   return airbnbImageVariant(canonical, MEDIA_COPY_LIMITS.fetchWidth);
+}
+
+/**
+ * 받아 올 주소 — 서명 사진은 정본 + 본문 href 의 쿼리를 **글자 그대로** 두고 `im_w` 만 바꾸거나 붙인다(다시 인코딩하면 서명이 깨질 수 있다 —
+ * `im_w` 는 서명 뒤에 붙는 CDN 값이라 바꿔도 된다). 서명 없는 사진은 정본 + `?im_w=`.
+ */
+export function mediaSourceVariant(target: { sourceUrl: string; signedHref?: string | null }, width: number): string {
+  if (!target.signedHref) return airbnbImageVariant(target.sourceUrl, width);
+  const w = new URL(airbnbImageVariant(target.sourceUrl, width)).searchParams.get("im_w") ?? String(width);
+  const hashAt = target.signedHref.indexOf("#");
+  const href = hashAt >= 0 ? target.signedHref.slice(0, hashAt) : target.signedHref;
+  const queryAt = href.indexOf("?");
+  const parts = queryAt >= 0 ? href.slice(queryAt + 1).split("&").filter((part) => part && part.split("=")[0] !== "im_w") : [];
+  return `${target.sourceUrl}?${[...parts, `im_w=${w}`].join("&")}`;
+}
+
+/** 서명이 이미 죽었나(서명 사진만 — 죽는 때를 모르면 아직 산 것으로 본다). */
+export function isSignedMediaExpired(target: { signedHref?: string | null; expiresAt?: string | null }, now: Date): boolean {
+  if (!target.signedHref || !target.expiresAt) return false;
+  const at = Date.parse(target.expiresAt);
+  return Number.isFinite(at) && now.getTime() > at;
+}
+
+/**
+ * 서명 사진을 어떤 주소로 받아 볼까(순서대로) — 서명이 살아 있으면 서명 href → 서명 없는 정본 `?im_w=`, 죽었으면 서명 없는 것만.
+ * 서명이 죽은 사진도 일부는 서명 없이 열린다(2026-11-13 운영: 유효 시간 안에 한 번 열려 이미지 서버에 남은 것, 11/9~11/13 33건).
+ * 서명 없는 사진은 늘 정본 `?im_w=` 하나.
+ */
+export function mediaFetchPlan(
+  target: { signedHref?: string | null; expiresAt?: string | null },
+  now: Date,
+): Array<"signed" | "unsigned"> {
+  if (!target.signedHref || isSignedMediaExpired(target, now)) return ["unsigned"];
+  return ["signed", "unsigned"];
+}
+
+/**
+ * 마지막 시도(서명 없는 정본)의 실패가 다시 해도 소용없는 것인가(서명 사진만 — 서명 없는 사진은 늘 다시 해 본다, 예전 그대로).
+ * - `not_allowed`(호스트 · 경로 — 본문은 안 바뀐다) = 영구.
+ * - `http_403`(S3 AccessDenied) = 서명이 죽은 뒤이거나 죽는 때를 모르면 영구, 아직 살아 있으면 일시
+ *   (다음 시도가 만료 뒤면 그때 서명 없는 403 으로 영구).
+ * - 404 · 네트워크 · 타임아웃 · `not_allowed_query`(모르는 쿼리 키 — 키 이름 로그) = 일시.
+ */
+export function isPermanentMediaFailure(
+  target: { signedHref?: string | null; expiresAt?: string | null },
+  reason: string,
+  now: Date,
+): boolean {
+  if (!target.signedHref) return false;
+  if (reason === "not_allowed") return true;
+  if (reason === "http_403") return !target.expiresAt || isSignedMediaExpired(target, now);
+  return false;
 }
 
 export function extensionForMime(mime: string | null): string | null {
@@ -138,7 +225,13 @@ export function isOrgMediaPath(path: string, organizationId: string): boolean {
   return path.startsWith(`${organizationId}/`) && !path.includes("..") && path.split("/").length === 4;
 }
 
-export type MediaCopyTarget = { sourceUrl: string; index: number };
+export type MediaCopyTarget = {
+  sourceUrl: string;
+  index: number;
+  /** 서명 사진만 — 본문 href 그대로(`mediaSourceVariant` 로 `im_w` 만 바꿔 받는다). */
+  signedHref?: string;
+  expiresAt?: string | null;
+};
 
 /** 이 메시지에서 아직 사본이 없는 사진 — 본문 사진 조각 중 같은 정본 주소의 사본 줄이 없는 것. */
 export function planMediaCopy(body: string, attachments: unknown): MediaCopyTarget[] {
@@ -148,7 +241,11 @@ export function planMediaCopy(body: string, attachments: unknown): MediaCopyTarg
   for (const image of messageImages(body)) {
     if (stored.has(image.url) || seen.has(image.url)) continue;
     seen.add(image.url);
-    out.push({ sourceUrl: image.url, index: image.index });
+    out.push(
+      image.signedHref
+        ? { sourceUrl: image.url, index: image.index, signedHref: image.signedHref, expiresAt: image.expiresAt ?? null }
+        : { sourceUrl: image.url, index: image.index },
+    );
   }
   return out;
 }
@@ -156,17 +253,24 @@ export function planMediaCopy(body: string, attachments: unknown): MediaCopyTarg
 /**
  * 한 번 돌린 뒤 상태 — 남은 사진이 없으면 done, 있으면 실패 횟수를 올려 미루고, 한도면 failed.
  * 이번에 하나라도 새로 복사했으면 실패 횟수를 올리지 않는다(나아가고 있다) — 남은 것만 10분 뒤 다시.
+ * 남은 것이 모두 다시 해도 안 되는 것(서명 죽음 · 서명 403 — `permanentThisRun`)이면 바로 failed(시도 횟수 한도로, 다시 안 함).
  */
 export function nextMediaState(args: {
   attempts: number;
   remaining: number;
   copiedThisRun: number;
-  /** 이번에 실패한 사진 수. 0 인데 남았으면 시간 한도로 멈춘 것 — 횟수 그대로, 바로 다시. */
+  /** 이번에 실패한 사진 수(다시 해 볼 것만). 0 인데 남았으면 시간 한도로 멈춘 것 — 횟수 그대로, 바로 다시. */
   failedThisRun: number;
+  /** 이번에 다시 해도 안 되는 것으로 판정한 사진 수(남은 수에 들어 있다). */
+  permanentThisRun?: number;
   now: Date;
 }): { state: "done" | "pending" | "failed"; attempts: number; nextTryAt: string | null } {
   if (args.remaining <= 0) return { state: "done", attempts: args.attempts, nextTryAt: null };
-  if (args.failedThisRun <= 0) return { state: "pending", attempts: args.attempts, nextTryAt: null };
+  if (args.remaining - (args.permanentThisRun ?? 0) <= 0) {
+    return { state: "failed", attempts: Math.max(args.attempts, MEDIA_COPY_LIMITS.maxAttempts), nextTryAt: null };
+  }
+  // 실패가 하나도 없는데 남았으면 시간 한도로 멈춘 것 — 바로 다시. 영구 실패도 실패로 센다(횟수 없이 무한 반복되지 않게).
+  if (args.failedThisRun + (args.permanentThisRun ?? 0) <= 0) return { state: "pending", attempts: args.attempts, nextTryAt: null };
   if (args.copiedThisRun > 0) {
     return { state: "pending", attempts: args.attempts, nextTryAt: new Date(args.now.getTime() + RETRY_MINUTES[0] * 60_000).toISOString() };
   }
@@ -189,22 +293,37 @@ export function checkFetchedMedia(args: {
   return { ok: true, mime };
 }
 
-/** 화면에 줄 사진 주소 한 쌍 — 사본(서명 URL)이 있으면 그것, 없으면 Airbnb `?im_w=`. */
-export type MessageImageView = { sourceUrl: string; thumb: string; full: string; fallback: string; stored: boolean };
+/**
+ * 화면에 줄 사진 주소 — 사본(서명 URL)이 있으면 그것, 없으면 Airbnb 주소(서명 사진은 서명 href, 아니면 `?im_w=`).
+ * 서명 사진인데 사본이 없고 서명도 죽었으면 `unavailable` — 화면은 깨진 사진 대신 「Airbnb 에서 보기」 안내.
+ * `fallback` 은 사본이 안 열릴 때 쓸 Airbnb 주소(죽은 서명이면 null).
+ */
+export type MessageImageView = {
+  sourceUrl: string;
+  thumb: string;
+  full: string;
+  fallback: string | null;
+  stored: boolean;
+  unavailable: boolean;
+};
 
 /** 사본 서명 URL 한 쌍 — 작은 사진이 없으면 null(큰 사진을 쓴다). */
 export type SignedMedia = { full: string; thumb: string | null };
 
-export function imageViewsFor(body: string, signed: Record<string, SignedMedia> | null): MessageImageView[] {
+export function imageViewsFor(body: string, signed: Record<string, SignedMedia> | null, now: Date = new Date()): MessageImageView[] {
   return messageImages(body).map((image) => {
     const copy = signed?.[image.url] ?? null;
-    const fallback = airbnbImageVariant(image.url, MEDIA_COPY_LIMITS.fetchWidth);
+    const target = { sourceUrl: image.url, signedHref: image.signedHref ?? null, expiresAt: image.expiresAt ?? null };
+    const expired = isSignedMediaExpired(target, now);
+    const fallback = expired ? null : mediaSourceVariant(target, MEDIA_COPY_LIMITS.fetchWidth);
+    const outsideThumb = expired ? "" : mediaSourceVariant(target, MEDIA_COPY_LIMITS.thumbWidth);
     return {
       sourceUrl: image.url,
-      thumb: copy ? (copy.thumb ?? copy.full) : airbnbImageVariant(image.url, MEDIA_COPY_LIMITS.thumbWidth),
-      full: copy ? copy.full : fallback,
+      thumb: copy ? (copy.thumb ?? copy.full) : outsideThumb,
+      full: copy ? copy.full : (fallback ?? ""),
       fallback,
       stored: Boolean(copy),
+      unavailable: !copy && expired,
     };
   });
 }

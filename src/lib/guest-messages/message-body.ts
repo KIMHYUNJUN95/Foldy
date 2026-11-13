@@ -18,6 +18,13 @@ export type MessageSegment =
       url: string;
       /** 이 메시지 안에서 몇 번째 사진인가(0부터) — 저장 경로 `<…>/<index>.<ext>`. */
       index: number;
+      /**
+       * `/im/pictures-signed/` 사진만 — 본문 href 그대로(엔티티만 풂, 쿼리 그대로). 서명 없이는 403 이라 사본은 이 주소로만 받는다.
+       * `/im/pictures/` 사진은 없음(`?im_w=` 만으로 열림).
+       */
+      signedHref?: string;
+      /** 서명이 죽는 때(ISO) = X-Amz-Date + X-Amz-Expires. 못 읽으면 null. 서명 사진만. */
+      expiresAt?: string | null;
     }
   | {
       type: "link";
@@ -82,13 +89,40 @@ export function canonicalAirbnbImageUrl(raw: string): string | null {
 }
 
 /**
- * 정본 → 크기 지정 주소(`?im_w=N`). 서명 없이 `im_w` 만 붙이면 지금은 열린다(2026-11-13 확인 — 문서에 없는 동작이라
+ * 정본 → 크기 지정 주소(`?im_w=N`). `/im/pictures/` 는 서명 없이 `im_w` 만 붙이면 지금은 열린다(`/im/pictures-signed/` 는 403 —
+ * 서명 href 로만, `mediaSourceVariant`). (2026-11-13 확인 — 문서에 없는 동작이라
  * 언제 막힐지 모른다 → 사본을 Foldy 저장소에 남긴다, §5-8).
  */
 export function airbnbImageVariant(canonical: string, width: number): string {
   // Airbnb 는 정해진 폭만 준다(그 밖은 403 · 404 — 2026-11-13 실측: 720 · 1600 · 1024 거절). 요청보다 크거나 같은 첫 폭.
   const w = AIRBNB_IM_WIDTHS.find((candidate) => candidate >= width) ?? AIRBNB_IM_WIDTHS[AIRBNB_IM_WIDTHS.length - 1];
   return `${canonical}?im_w=${w}`;
+}
+
+const SIGNED_IMAGE_PATH = "/im/pictures-signed/";
+
+export function isSignedAirbnbImageUrl(canonical: string): boolean {
+  return canonical.startsWith(`https://${AIRBNB_IMAGE_HOST}${SIGNED_IMAGE_PATH}`);
+}
+
+/** `X-Amz-Date`(20260505T002603Z) + `X-Amz-Expires`(초) → ISO. 못 읽으면 null. */
+export function signedImageExpiresAt(href: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(href);
+  } catch {
+    return null;
+  }
+  const date = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/.exec(url.searchParams.get("X-Amz-Date") ?? "");
+  const expires = url.searchParams.get("X-Amz-Expires") ?? "";
+  if (!date || !/^\d{1,7}$/.test(expires)) return null;
+  const [, y, mo, d, h, mi, se] = date.map(Number);
+  if (mo < 1 || mo > 12 || d < 1 || d > 31 || h > 23 || mi > 59 || se > 59) return null;
+  const start = Date.UTC(y, mo - 1, d, h, mi, se);
+  const back = new Date(start);
+  // 2월 30일처럼 굴러 넘어간 날짜는 거절(왕복이 같아야 한다).
+  if (back.getUTCFullYear() !== y || back.getUTCMonth() !== mo - 1 || back.getUTCDate() !== d) return null;
+  return new Date(start + Number(expires) * 1000).toISOString();
 }
 
 /** 서명 없이 열리는 `im_w` 값(2026-11-13 실측). */
@@ -132,7 +166,9 @@ export function parseMessageBody(body: string | null | undefined): MessageSegmen
       if (!url) continue; // http(s) 아님(mailto · javascript 등) — 글자 그대로 남긴다.
       pushText(source.slice(cursor, match.index));
       const canonical = canonicalAirbnbImageUrl(href);
-      if (canonical) out.push({ type: "image", url: canonical, index: imageIndex++ });
+      if (canonical && isSignedAirbnbImageUrl(canonical)) {
+        out.push({ type: "image", url: canonical, index: imageIndex++, signedHref: href, expiresAt: signedImageExpiresAt(href) });
+      } else if (canonical) out.push({ type: "image", url: canonical, index: imageIndex++ });
       else {
         const label = linkLabel(inner, url);
         out.push({ type: "link", href: url.toString(), label, host: url.hostname, showHost: needsHost(label, url.hostname) });

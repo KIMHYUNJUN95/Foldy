@@ -220,38 +220,11 @@ export async function loadInboxList(
   const all = [...((open.data ?? []) as ConversationDbRow[]), ...((done.data ?? []) as ConversationDbRow[])];
 
   const buildings = [...new Set(all.map((row) => row.property_name).filter((name): name is string => !!name))].sort();
-  const states = all.map((row) => ({
-    row,
-    state: effectiveRowState(row, now),
-  }));
-  const visible = states
-    .filter(
-      ({ row, state }) =>
-        matchesStatusFilter(state, filter.status) &&
-        (!filter.building || row.property_name === filter.building) &&
-        matchesChannelFilter(toChannelKey(row.channel), channelFilter),
-    )
-    .map(({ row }) => row);
+  const visible = all.filter((row) => matchesInboxFilter(row, { ...filter, channel: channelFilter }, now));
 
   const ids = visible.map((row) => row.id);
   const [lastLines, outbox] = await Promise.all([loadLastLines(db, organizationId, ids), loadOpenOutbox(db, organizationId, ids)]);
-  if (!visibility.canSeeCodes) {
-    // 목록 한 줄은 자동 안내인지 알 수 없다 — 우리 쪽 말(host)은 모두 그 건물 코드를 가린다.
-    let buildings: Map<string, BuildingGuestInfo> | null = null;
-    try {
-      buildings = new Map((await loadBuildingGuestInfos(db, organizationId)).map((building) => [building.canonicalName, building]));
-    } catch {
-      buildings = null;
-    }
-    for (const row of visible) {
-      const line = lastLines.get(row.id);
-      if (!line || line.direction !== "host") continue;
-      const base = buildingBaseFor(row.property_name);
-      line.body = buildings
-        ? maskEntryCodes(line.body, codesOf(base ? (buildings.get(base.canonicalName) ?? null) : null))
-        : maskAllCodeLike(line.body);
-    }
-  }
+  if (!visibility.canSeeCodes) await maskHostLines(db, organizationId, visible, lastLines);
   const rows = sortInboxRows(
     visible.map((row) =>
       toInboxRow(
@@ -266,17 +239,118 @@ export async function loadInboxList(
     ),
   );
 
-  // 머리 숫자는 상태 필터와 무관(건물 · 채널 필터는 따른다) — 「답장 기다림 N」 · 「목표 넘음 N」.
+  return { rows, ...headerCounts(all, filter, settings, now), buildings };
+}
+
+type InboxFilter = { status: InboxStatusFilter; building: string | null; channel?: InboxChannelFilter };
+
+/** 지금 보는 필터(상태 · 건물 · 채널)에 드는 줄인가 — 목록 · 실시간 줄 다시 읽기가 같은 판정을 쓴다. */
+function matchesInboxFilter(row: ConversationDbRow, filter: InboxFilter, now: Date): boolean {
+  return (
+    matchesStatusFilter(effectiveRowState(row, now), filter.status) &&
+    (!filter.building || row.property_name === filter.building) &&
+    matchesChannelFilter(toChannelKey(row.channel), filter.channel ?? "all")
+  );
+}
+
+/** 머리 숫자는 상태 필터와 무관(건물 · 채널 필터는 따른다) — 「답장 기다림 N」 · 「목표 넘음 N」. */
+function headerCounts(rows: readonly ConversationDbRow[], filter: InboxFilter, settings: GuestMessageSettings, now: Date) {
   let awaitingCount = 0;
   let overdueCount = 0;
-  for (const { row, state } of states) {
-    if (state !== "awaiting") continue;
+  for (const row of rows) {
+    if (effectiveRowState(row, now) !== "awaiting") continue;
     if (filter.building && row.property_name !== filter.building) continue;
-    if (!matchesChannelFilter(toChannelKey(row.channel), channelFilter)) continue;
+    if (!matchesChannelFilter(toChannelKey(row.channel), filter.channel ?? "all")) continue;
     awaitingCount += 1;
     if (waitingOf(row, settings, now).overdue) overdueCount += 1;
   }
-  return { rows, awaitingCount, overdueCount, buildings };
+  return { awaitingCount, overdueCount };
+}
+
+/** 목록 한 줄은 자동 안내인지 알 수 없다 — 우리 쪽 말(host)은 모두 그 건물 코드를 가린다. */
+async function maskHostLines(
+  db: Client,
+  organizationId: string,
+  rows: readonly ConversationDbRow[],
+  lastLines: Map<string, { direction: GuestMessageDirection; body: string }>,
+) {
+  let buildings: Map<string, BuildingGuestInfo> | null = null;
+  try {
+    buildings = new Map((await loadBuildingGuestInfos(db, organizationId)).map((building) => [building.canonicalName, building]));
+  } catch {
+    buildings = null;
+  }
+  for (const row of rows) {
+    const line = lastLines.get(row.id);
+    if (!line || line.direction !== "host") continue;
+    const base = buildingBaseFor(row.property_name);
+    line.body = buildings
+      ? maskEntryCodes(line.body, codesOf(base ? (buildings.get(base.canonicalName) ?? null) : null))
+      : maskAllCodeLike(line.body);
+  }
+}
+
+export type InboxRowsResult = {
+  /** 이 조직에 있는 줄 — `matches` 는 지금 필터에 드는지. */
+  updates: Array<{ row: InboxConversationRow; matches: boolean }>;
+  /** 이 조직에 없는 id(지워짐 · 다른 조직 — 어느 쪽인지 알리지 않는다). */
+  missing: string[];
+  awaitingCount: number;
+  overdueCount: number;
+};
+
+/**
+ * 실시간 — 신호가 온 대화 몇 개만 목록 줄 모양으로 다시 읽는다(47 §5-9). 목록 전체를 다시 읽지 않고, 머리 숫자는 열린 대화만 세어 고친다.
+ * 조직 필터는 언제나 여기서(신호의 id 는 힌트일 뿐 — 다른 조직 id 가 와도 `missing`).
+ */
+export async function loadInboxRowsByIds(
+  db: Client,
+  organizationId: string,
+  ids: readonly string[],
+  filter: InboxFilter,
+  now: Date = new Date(),
+  visibility: CodeVisibility = { canSeeCodes: true, canManageAuto: true },
+): Promise<InboxRowsResult> {
+  // 목록과 같은 창 — 열린 대화는 오래 기다린 500개, 처리 끝은 최근 200개. 그 밖의 줄은 목록에도 없으니 `matches` 도 아니다.
+  const [found, open, doneWindow, settings] = await Promise.all([
+    db.from("guest_conversations").select(CONVERSATION_COLUMNS).eq("organization_id", organizationId).in("id", [...ids]),
+    db
+      .from("guest_conversations")
+      .select(CONVERSATION_COLUMNS)
+      .eq("organization_id", organizationId)
+      .in("status", ["awaiting", "snoozed"])
+      .order("last_guest_at", { ascending: true })
+      .limit(OPEN_LIMIT),
+    db
+      .from("guest_conversations")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("status", "done")
+      .order("last_message_at", { ascending: false })
+      .limit(DONE_LIMIT),
+    loadGuestMessageSettings(db, organizationId),
+  ]);
+  if (found.error) throw new Error(`conversation read failed: ${found.error.message}`);
+  if (open.error) throw new Error(`conversation read failed: ${open.error.message}`);
+  if (doneWindow.error) throw new Error(`conversation read failed: ${doneWindow.error.message}`);
+  const openRows = (open.data ?? []) as ConversationDbRow[];
+  const inWindow = new Set([...openRows.map((row) => row.id), ...((doneWindow.data ?? []) as Array<{ id: string }>).map((row) => row.id)]);
+  const rows = (found.data ?? []) as ConversationDbRow[];
+  const foundIds = rows.map((row) => row.id);
+  const [lastLines, outbox] = await Promise.all([
+    loadLastLines(db, organizationId, foundIds),
+    loadOpenOutbox(db, organizationId, foundIds),
+  ]);
+  if (!visibility.canSeeCodes) await maskHostLines(db, organizationId, rows, lastLines);
+  const seen = new Set(foundIds);
+  return {
+    updates: rows.map((row) => ({
+      row: toInboxRow(row, { lastLine: lastLines.get(row.id) ?? null, outboxStatuses: outbox.get(row.id) ?? [] }, settings, now),
+      matches: inWindow.has(row.id) && matchesInboxFilter(row, filter, now),
+    })),
+    missing: ids.filter((id) => !seen.has(id)),
+    ...headerCounts(openRows, filter, settings, now),
+  };
 }
 
 /** 메뉴 · 탭 숫자 — 답장 기다림(끝난 「나중에」 포함). 실패하면 0. */

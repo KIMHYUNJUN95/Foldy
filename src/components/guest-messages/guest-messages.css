@@ -1069,3 +1069,73 @@ button.gm-photo:focus-visible { outline: 2px solid var(--gm-primary); outline-of
 @media (prefers-reduced-motion: reduce) {
   .gm-photo { transition: none; }
 }
+
+/* ── 실시간(47 §5-9, 2026-11-13) ─────────────────────────────────────────────
+   새로 든 목록 줄은 살짝 내려오며 나타난다(빠지는 줄은 공용 `.row-collapse`). 「새 메시지」는 답장 칸 바로 위 가운데 —
+   위로 올려 읽는 동안에만. 들어오고 나가는 것을 같은 전환(transition)으로 해서 중간에 끊겨도 튀지 않는다. */
+.gm-tfoot { position: relative; }
+.row-collapse[data-entering] > * { animation: gm-row-in 220ms var(--gm-ease) both; }
+@keyframes gm-row-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+.gm-newpill {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 4px);
+  z-index: 6;
+  /* 눌리는 자리는 44px — 보이는 알약은 그 안에 32px. */
+  min-height: 44px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 6px) scale(0.96);
+  transition:
+    opacity 160ms ease,
+    transform 200ms var(--gm-ease);
+}
+.gm-newpill[data-shown] {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, 0) scale(1);
+}
+.gm-newpill__face {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 14px 0 12px;
+  border-radius: 999px;
+  background: var(--gm-ink);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 6px 18px rgba(22, 20, 31, 0.18);
+  transition: transform 120ms var(--gm-ease);
+}
+.gm-newpill:active .gm-newpill__face { transform: scale(0.97); }
+.gm-newpill:focus-visible { outline: none; }
+.gm-newpill:focus-visible .gm-newpill__face { outline: 2px solid var(--gm-primary); outline-offset: 2px; }
+.gm-newpill__n {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.2);
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+@media (prefers-reduced-motion: reduce) {
+  .row-collapse[data-entering] > * { animation: none; }
+  .gm-newpill,
+  .gm-newpill[data-shown] { transform: translate(-50%, 0); transition: opacity 160ms ease; }
+}

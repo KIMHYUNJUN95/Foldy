@@ -1895,3 +1895,14 @@ Supabase advisor `anon_security_definer_function_executable` 정리. 운영 `pg_
 - **일부러 남긴 9개**(anon EXECUTE 유지): `can_manage_attendance_payroll` · `can_view_payroll` · `can_view_staff_suggestion` ·
   `current_user_active_organization_ids` · `has_active_membership` · `has_org_role` · `is_platform_admin` · `is_project_participant` · `is_task_participant`.
   역할 미지정(PUBLIC) 정책에서 쓰이며, 익명은 `auth.uid()` 가 null 이라 false/빈 값뿐이라 피해가 없다. 회수하면 anon 이 그 표를 읽을 때 42501 로 깨진다.
+
+## 2026-11-13 손님 메시지 실시간 — publication (`202611130008_guest_messages_realtime`, **운영 적용 2026-11-14**)
+
+기준 문서: `docs/product/47-guest-messaging.md` §5-9.
+
+- `guest_conversations` · `guest_messages` · `guest_message_outbox` · `auto_message_runs` 를 `supabase_realtime` publication 에 넣는다(멱등, 발행이 없으면 건너뜀). 정책은 새로 만들지 않았다 — Realtime 이 구독자마다 **기존 select 정책**으로 거른다. 네 표 모두 `is_platform_admin()` 또는 `has_capability(organization_id, auth.uid(), 'guest_messages.view')`(authenticated, select 만 GRANT). 로컬 Postgres 확인(2026-11-13): 대표 · CS = 그 조직 줄 전부, 알바(view 없음) = 네 표 모두 0줄.
+- 넣지 않은 것: `guest_message_translations`(authenticated 정책 없음 — 서버만 읽음) · `guest_message_links` · `auto_message_rules` · 설정 · 과거 가져오기 상태(화면이 실시간으로 볼 필요 없음).
+- **신호에 행 전체가 실린다(알고 둔 노출).** Realtime `postgres_changes` 의 `payload.new` 에는 그 행의 **모든 칸**이 온다 — `guest_messages.body` · `attachments`, `guest_message_outbox.body`(자동 안내의 **채워진 출입 코드** 포함), `guest_conversations.guest_name` 등. 받는 사람은 그 행의 select RLS 를 통과한 사람(그 조직 `guest_messages.view`)뿐이고, 그 사람은 지금도 같은 칸을 REST select 로 읽을 수 있다(authenticated 에 표 select GRANT) — **새 권한이 아니라 기존 노출과 같은 범위**다. 다만 47 Q10(출입 코드 가리기, `guest_messages.manage` · `property_info.edit` 없는 사람)은 **서버 액션에서만** 가리므로, 브라우저 개발자 도구로 웹소켓을 보면 가려지기 전 글이 보인다(REST select 도 마찬가지).
+  - 코드 쪽: `useLiveChannel` 이 `payload.new` 를 받자마자 `pickLiveIds()`(`id` · `conversation_id` · `provider_booking_id` · `organization_id` 만)로 줄이고 나머지는 버린다 — 상태 · 그리기 · 저장에 행 내용이 들어가지 않는다(시험 `guest-messages-live.test.ts`).
+  - 줄이는 방법 두 가지(아직 안 함, 결정 필요): ① publication **칸 목록**(`alter publication … add table t (id, organization_id, conversation_id, …)`, PG15+) — Supabase Realtime 이 칸 목록 publication 을 지원하는지 · RLS 판정에 필요한 칸이 빠져도 되는지 **먼저 확인**해야 한다. ② DB 트리거가 id 만 **broadcast**(`realtime.send`, private 채널)하고 `realtime.messages` 에 RLS 를 걸기 — 행 내용이 아예 소켓에 오르지 않는다. 함께 authenticated 의 표 select GRANT 를 칸 단위로 줄이는 것도 검토 대상(REST 노출).
+- 화면은 신호의 **id 만** 쓰고 그 항목을 서버 액션으로 다시 읽는다: `getGuestConversationRows`(`guest_messages.view`, 조직은 세션 — 다른 조직 id 는 `missing`) · `getGuestConversation` · `getAutoRunsByIdsAction` · `listAutoRuleSummariesAction`(관리자 웹 + `guest_messages.manage`). 모두 거부는 `forbidden` 결과(redirect 없음).

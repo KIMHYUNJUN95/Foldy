@@ -273,6 +273,18 @@ export async function loadUpcomingAutoRuns(
   return toRunViews(db, organizationId, (data ?? []) as RunViewRow[]);
 }
 
+/** 실시간 — 실행 줄 몇 개만(취소 포함, 47 §5-9). 조직 필터는 언제나 여기서. */
+export async function loadAutoRunsByIds(db: Client, organizationId: string, ids: readonly string[]): Promise<AutoRunView[]> {
+  if (ids.length === 0) return [];
+  const { data, error } = await untyped(db)
+    .from("auto_message_runs")
+    .select(RUN_VIEW_COLUMNS)
+    .eq("organization_id", organizationId)
+    .in("id", [...ids]);
+  if (error) throw new Error(`auto runs read failed: ${error.code ?? error.message}`);
+  return toRunViews(db, organizationId, (data ?? []) as RunViewRow[]);
+}
+
 /** 한 예약(대화)의 자동 안내 — 대화 오른쪽 패널 · 모바일 예약 정보 시트. 취소된 것은 뺀다. 표가 없으면 빈 목록. */
 export async function loadBookingAutoRuns(db: Client, organizationId: string, providerBookingId: string): Promise<AutoRunView[]> {
   const { data, error } = await untyped(db)

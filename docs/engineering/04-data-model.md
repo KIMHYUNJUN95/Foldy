@@ -2471,6 +2471,8 @@ RLS 켜짐 · 정책 없음 — service_role 만(GRANT `all to service_role`).
 INSERT · UPDATE 신호만, DELETE 는 오지 않는다. 대신 `task_occurrence_state` · `task_participants` 삭제는 트리거
 `task_occurrence_state_touch_task` · `task_participants_touch_task`(함수 `touch_task_after_child_delete`)가 부모 `tasks.updated_at` 을 새로 써 UPDATE 신호를 낸다. 화면 쪽: `src/lib/live-sources.ts` · `src/components/shared/live-refresh.tsx`.
 
+- 2026-11-13 `202611130008_guest_messages_realtime.sql`(**운영 적용 2026-11-14**): `guest_conversations` · `guest_messages` · `guest_message_outbox` · `auto_message_runs` 추가 — 손님 메시지 화면의 그 자리 갱신(`useLiveChanges`, 문서 47 §5-9 · 05).
+
 ## 2026-11-02 · 11-04 `checkin` 스키마 — 셀프 체크인 (`202611020001` · `202611020002`, 운영 적용 2026-11-10)
 
 표 정의는 `docs/engineering/16-self-checkin-technical-design.md` §3. Foldy 직원 서버(2026-11-04)가 읽고 쓰는 범위만 적는다.

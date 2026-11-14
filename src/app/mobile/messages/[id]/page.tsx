@@ -30,6 +30,7 @@ export default async function MobileMessageThreadPage({ params }: { params: Prom
     <MobileShell activeItem="messages" badges={badges} title={dict.guestMessages.title}>
       {result.ok ? (
         <MobileThreadScreen
+          organizationId={session.organization.id}
           conversationId={id}
           initial={result.thread}
           copy={dict.guestMessages}

@@ -704,6 +704,14 @@ Current rules:
   60초 넘게 가려졌거나 소켓이 다시 붙거나 `online` 이면 한 번 따라잡기(`src/lib/live-refresh-schedule.ts`). 화면별 묶음은
   `src/lib/live-sources.ts`. 테이블은 `supabase_realtime` publication 에 있어야 한다(`202610290001_enable_ops_realtime.sql`).
   폴링이 아니다. 새 화면이 같이 쓰는 데이터를 보여 주면 서버 페이지에 `<LiveRefresh sources={…} />` 한 줄을 붙인다.
+  - **그 자리 갱신 — `useLiveChanges` (2026-11-13, 손님 메시지)**: 같은 파일이 세 층으로 나뉜다. `useLiveChannel`(소켓 · 토큰 · 다시 붙음 ·
+    `online` · 탭 보임/숨김 — **소켓 다루는 곳은 여기 하나**) 위에 `useLiveRefresh`(위 그대로, `router.refresh()`)와 `useLiveChanges` 가 있다.
+    `useLiveChanges(sources, { toKeys, onFlush, onCatchUp })` 는 신호에서 **id 만** 열쇠로 꺼내(`toKeys`) 묶은 뒤(`createLiveChangeBatcher` —
+    600ms 디바운스 · 최대 3초 · 열쇠 40개 넘으면 `onCatchUp` 한 번 · 숨은 탭은 보일 때 · 60초 넘게 숨음 · 다시 붙음은 `onCatchUp`) 화면이 그 항목만
+    권한 검사하는 서버 액션으로 다시 읽어 합치게 한다(`onFlush`). 서버 렌더를 다시 받지 않아 입력 · 열린 시트 · 스크롤 · 포커스가 그대로다.
+    소켓의 행 데이터는 그리지 않는다. 구독에 `event: "INSERT" | "UPDATE"` 를 줄 수 있다(손님 메시지 목록은 메시지 INSERT 만 — 사진 사본 갱신
+    홍수를 거른다). 구독 묶음이 바뀌어 채널을 닫고 새로 붙어도 그 틈을 끊김으로 보고 따라잡는다(처음 붙을 때는 아님). 신호 행은 받자마자
+    id 칸만 남긴다(`pickLiveIds`) — 화면에 행 내용이 들어가지 않는다. 쓰는 곳: 손님 메시지(47 §5-9).
 
   | 화면 | 구독 |
   | --- | --- |
@@ -712,6 +720,7 @@ Current rules:
   | 홈 | 요청(주문 · 수리 · 분실물) — Beds24 신호는 그대로 |
   | 요청 목록 · 주문/수리/분실물 상세 · 반환 · 폐기 목록 | `order_requests` · `maintenance_reports` · `lost_items` |
   | 정정 처리 상태 · 연차 신청 내역 | `attendance_sessions` · `attendance_correction_requests` · `transport_reimbursement_reports` · `annual_leave_requests` |
+  | 손님 메시지 목록 · 대화(태블릿 칸 포함, PC `/admin/messages` 대화 · 자동 안내 탭도) — **그 자리 갱신**(`useLiveChanges`) | 목록 `guest_conversations` · `guest_messages`(INSERT) · `guest_message_outbox`(조직), 대화 = 그 대화의 세 표 + `auto_message_runs`(조직), 자동 안내 탭 `auto_message_runs` |
 
   알려진 한계: **삭제 신호는 없다**(replica identity 기본값) — 할 일은 소프트 삭제라 바로 반영되지만, 주문 · 수리 · 분실물을 남이 지우면
   다음 갱신 때 빠진다. 반복 회차 완료 되돌리기 · 「건너뛴 날」 되살리기 · 참여자 빼기는 행을 지우지만 DB 트리거가 부모 할 일의 `updated_at` 을

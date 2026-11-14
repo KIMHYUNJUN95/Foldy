@@ -84,6 +84,7 @@ export default async function AdminMessagesPage({
     content = (
       <div className="gm-tabpage">
         <AutoMessagesManager
+          organizationId={organizationId}
           copy={copy}
           locale={locale}
           rules={rules}
@@ -141,6 +142,7 @@ export default async function AdminMessagesPage({
     content = (
       <MessagesConsole
         key={`${status}|${building ?? ""}|${channel}`}
+        organizationId={organizationId}
         copy={copy}
         shared={dict.admin.shared}
         locale={locale}

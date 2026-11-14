@@ -4,12 +4,14 @@
  * 모바일 손님 메시지 — 목록(`/mobile/messages`) → 대화(`/mobile/messages/[id]`). 문서 47 §5-2 · §5-4.
  * 태블릿 가로는 공용 `SplitList`(목록 | 대화 칸, 칸 안은 같은 대화 화면을 「칸 모드」로)를 쓴다 — 상세 주소가 있는 화면 규칙(16).
  * 폴드는 폰처럼 목록 → 대화로 넘어간다(레일만 보임). 탭바는 대화 화면에서도 그대로(결정 Q1). 뒤로는 공용 화면 스와이프.
+ * 실시간(47 §5-9): 목록 · 대화 모두 신호의 항목만 서버 액션으로 다시 읽어 그 자리에서 합친다(서버 렌더를 다시 받지 않음).
+ * 태블릿 칸은 다른 문서(iframe)라 목록과 대화가 따로 구독한다.
  */
 
 import { haptic } from "@/lib/haptics";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { AutoRunsList } from "@/components/guest-messages/auto-runs-list";
 import { useBuildingName } from "@/components/shared/building-names";
@@ -37,6 +39,11 @@ import {
   type GmCopy,
 } from "@/components/guest-messages/gm-format";
 import { useThread } from "@/components/guest-messages/use-thread";
+import { useInboxLive } from "@/components/guest-messages/use-inbox-live";
+import { NewMessagesPill, useThreadFollow } from "@/components/guest-messages/thread-follow";
+import { useLiveChanges } from "@/components/shared/live-refresh";
+import { guestInboxLiveSources, guestThreadLiveSources } from "@/lib/live-sources";
+import { idsOfKind, liveKeysOf, pruneLocalLeaving, touchesThread } from "@/lib/guest-messages/live-merge";
 import {
   INBOX_CHANNEL_FILTERS,
   parseChannelFilter,
@@ -107,6 +114,7 @@ function listHref(status: InboxStatusFilter, building: string | null, channel: I
 // ── 목록 ──────────────────────────────────────────────────────────────────────
 
 export function MobileInbox({
+  organizationId,
   copy,
   locale,
   data,
@@ -115,6 +123,8 @@ export function MobileInbox({
   channel,
   stall = null,
 }: {
+  /** 실시간 구독 필터(조직) — 권한 · 조직 판정은 서버 액션이 다시 한다. */
+  organizationId: string;
   copy: GmCopy;
   locale: string;
   data: InboxListData | null;
@@ -128,7 +138,15 @@ export function MobileInbox({
   const { toast, show: notify, dismiss } = useMobileToast();
   const now = useNow();
   const buildingName = useBuildingName();
-  const [leaving, setLeaving] = useState<Set<string>>(new Set());
+  const [leaving, setLeaving] = useState<ReadonlySet<string>>(new Set());
+  const inbox = useInboxLive(data, { status, building, channel });
+  const list = inbox.list;
+  const liveSources = useMemo(() => guestInboxLiveSources(organizationId), [organizationId]);
+  useLiveChanges(liveSources, {
+    toKeys: (change) => liveKeysOf(change).filter((key) => key.startsWith("c:")),
+    onFlush: (keys) => void inbox.applyIds(idsOfKind(keys, "c")),
+    onCatchUp: () => void inbox.reload(),
+  });
 
   // 칸 안 대화가 보낸 「빠짐 / 되돌림」 — 서버 응답 전에 줄을 접고, 실패하면 다시 편다(16 「줄 접힘」).
   useEffect(() => {
@@ -146,12 +164,14 @@ export function MobileInbox({
     return () => window.removeEventListener("message", onMessage);
   }, []);
 
-  // 새 목록이 오면 접어 둔 표시를 비운다 — 다시 나타난 대화(되돌리기 · 새 손님 말)가 접힌 채 남지 않게.
-  const rowsKey = data?.rows.map((row) => `${row.id}:${row.state}`).join("|") ?? "";
-  const [seenKey, setSeenKey] = useState(rowsKey);
-  if (seenKey !== rowsKey) {
-    setSeenKey(rowsKey);
-    if (leaving.size > 0) setLeaving(new Set());
+  // 먼저 접어 둔 줄은 서버 답이 올 때까지 접힌 채 — 다른 줄의 실시간 합치기로 펴지 않는다(16 「줄 접힘」: 실패할 때만 다시 편다).
+  // 그 줄이 목록에서 빠지면 표시를 지운다(나중에 같은 대화가 다시 들어오면 펴진 채로 나타나게).
+  const rowIds = list?.rows.map((row) => row.id).join("|") ?? "";
+  const [seenRowIds, setSeenRowIds] = useState(rowIds);
+  if (seenRowIds !== rowIds) {
+    setSeenRowIds(rowIds);
+    const pruned = pruneLocalLeaving(leaving, list?.rows ?? []);
+    if (pruned !== leaving) setLeaving(pruned);
   }
 
   return (
@@ -166,7 +186,7 @@ export function MobileInbox({
             value={status}
             onChange={(event) => router.replace(listHref(event.target.value as InboxStatusFilter, building, channel))}
           >
-            <option value="awaiting">{data ? fill(copy.filterAwaitingCount, { n: data.awaitingCount }) : copy.filterAwaiting}</option>
+            <option value="awaiting">{list ? fill(copy.filterAwaitingCount, { n: list.awaitingCount }) : copy.filterAwaiting}</option>
             <option value="snoozed">{copy.filterSnoozed}</option>
             <option value="done">{copy.filterDone}</option>
             <option value="all">{copy.filterAll}</option>
@@ -178,7 +198,7 @@ export function MobileInbox({
             onChange={(event) => router.replace(listHref(status, event.target.value || null, channel))}
           >
             <option value="">{copy.buildingAll}</option>
-            {(data?.buildings ?? []).map((name) => (
+            {(list?.buildings ?? []).map((name) => (
               <option key={name} value={name}>
                 {buildingName(name)}
               </option>
@@ -198,14 +218,19 @@ export function MobileInbox({
           </select>
         </div>
       </div>
-      {!data ? (
-        <InboxError copy={copy} onRetry={() => router.refresh()} />
-      ) : data.rows.length === 0 ? (
+      {!list ? (
+        <InboxError copy={copy} onRetry={() => void inbox.reload()} />
+      ) : list.rows.length === 0 ? (
         <InboxEmpty filter={status} copy={copy} />
       ) : (
         <div className="gm-mrows">
-          {data.rows.map((row) => (
-            <div className="row-collapse" key={row.id} data-leaving={leaving.has(row.id) ? "" : undefined}>
+          {list.rows.map((row) => (
+            <div
+              className="row-collapse"
+              key={row.id}
+              data-leaving={leaving.has(row.id) || inbox.leaving.has(row.id) ? "" : undefined}
+              data-entering={inbox.entered.has(row.id) ? "" : undefined}
+            >
               <div>
                 <Link className="gm-row" href={`/mobile/messages/${row.id}`}>
                   <ConversationRowBody row={row} copy={copy} locale={locale} now={now} withTarget={false} withDates={false} />
@@ -223,6 +248,7 @@ export function MobileInbox({
 // ── 대화 화면(폰 · 폴드 · 태블릿 칸 안) ────────────────────────────────────────
 
 export function MobileThreadScreen({
+  organizationId,
   conversationId,
   initial,
   copy,
@@ -232,6 +258,8 @@ export function MobileThreadScreen({
   taskKinds = [],
   taskCategoryCopy,
 }: {
+  /** 실시간 구독 필터(조직 — 자동 안내 실행 줄). */
+  organizationId: string;
   conversationId: string;
   initial: InboxThread | null;
   copy: GmCopy;
@@ -248,6 +276,16 @@ export function MobileThreadScreen({
   const { toast, show: notify, dismiss } = useMobileToast();
   const controller = useThread(conversationId, initial);
   const thread = controller.thread;
+  const follow = useThreadFollow(thread);
+  const bookingNumber = thread?.reservation.bookingNumber ?? null;
+  // 실시간(47 §5-9) — 이 대화의 새 말 · 발송 상태 · 사진 사본 · 자동 안내 줄. 들어온 말에는 햅틱 없음.
+  const liveSources = useMemo(() => guestThreadLiveSources(organizationId, conversationId), [organizationId, conversationId]);
+  const refreshThread = controller.refresh;
+  useLiveChanges(liveSources, {
+    toKeys: (change) => (touchesThread(liveKeysOf(change), conversationId, bookingNumber) ? ["thread"] : []),
+    onFlush: () => refreshThread(),
+    onCatchUp: () => refreshThread(),
+  });
   // 번역해서 볼 언어 — 비우면 원문.
   const [viewLang, setViewLang] = useState<StaffViewLang | null>(null);
   const [sheet, setSheet] = useState<"none" | "info" | "more" | "snooze" | "lang" | "task" | "taskForm">("none");
@@ -261,7 +299,10 @@ export function MobileThreadScreen({
 
   const afterChange = () => {
     controller.refresh();
-    router.refresh();
+  };
+  const afterSend = () => {
+    follow.follow();
+    controller.refresh();
   };
 
   const setDone = (done: boolean) => {
@@ -272,7 +313,6 @@ export function MobileThreadScreen({
         notify(errorText(result.errorKey, copy));
         return;
       }
-      router.refresh();
       if (done)
         notify(copy.doneToast, {
           label: copy.undo,
@@ -291,7 +331,6 @@ export function MobileThreadScreen({
         notify(errorText(result.errorKey, copy));
         return;
       }
-      router.refresh();
       notify(
         fill(copy.snoozedToast, {
           time: result.snoozeUntil ? formatWhen(result.snoozeUntil, locale, new Date()) : "",
@@ -391,9 +430,11 @@ export function MobileThreadScreen({
           selectable={selecting}
           pickedIds={picked}
           onTogglePick={togglePick}
+          endRef={follow.endRef}
         />
       </div>
       <div className="gm-mfoot">
+        <NewMessagesPill count={follow.unseen} copy={copy} onJump={follow.jump} />
         {selecting ? (
           <div className="gm-tselect" role="group" aria-label={copy.taskPickMessages}>
             <span className="gm-hint">{picked.size > 0 ? fill(copy.taskPickedCount, { n: picked.size }) : copy.taskSelectHint}</span>
@@ -424,7 +465,7 @@ export function MobileThreadScreen({
             canManageReplies={canManage}
             variant="phone"
             notify={(message) => notify(message)}
-            onSent={afterChange}
+            onSent={afterSend}
           />
         </div>
       </div>
@@ -474,7 +515,9 @@ export function MobileThreadScreen({
                   className="gm-sheet__item"
                   onClick={() => {
                     setSheet("none");
-                    controller.unsnooze((r) => (r.ok ? router.refresh() : notify(errorText(r.errorKey, copy))));
+                    controller.unsnooze((r) => {
+                      if (!r.ok) notify(errorText(r.errorKey, copy));
+                    });
                   }}
                 >
                   {copy.unsnooze}

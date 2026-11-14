@@ -10,8 +10,7 @@
  */
 
 import { Check, ChevronDown, Lock, Trash2 } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   deleteAutoRuleAction,
   listUpcomingAutoRunsAction,
@@ -20,7 +19,12 @@ import {
   setAutoRunPausedAction,
   toggleAutoRuleAction,
   type SaveAutoRuleActionResult,
+  getAutoRunsByIdsAction,
+  listAutoRuleSummariesAction,
 } from "@/app/admin/messages/auto-actions";
+import { useLiveChanges } from "@/components/shared/live-refresh";
+import { autoRunLiveSources } from "@/lib/live-sources";
+import { idsOfKind, liveKeysOf, mergeAutoRuns, mergeRuleCounts } from "@/lib/guest-messages/live-merge";
 import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
 import { AdminTimePicker } from "@/components/admin/shared/admin-time-picker";
 import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
@@ -318,6 +322,7 @@ function UpcomingRow({
 }
 
 export function AutoMessagesManager({
+  organizationId,
   copy,
   locale,
   rules,
@@ -326,6 +331,8 @@ export function AutoMessagesManager({
   buildings,
   sendEnabled,
 }: {
+  /** 실시간 구독 필터(조직) — 권한 · 조직 판정은 서버 액션이 다시 한다. */
+  organizationId: string;
   copy: GmCopy;
   locale: string;
   rules: AutoRuleSummary[] | null;
@@ -334,7 +341,6 @@ export function AutoMessagesManager({
   buildings: Array<{ key: string; label: string }>;
   sendEnabled: boolean;
 }) {
-  const router = useRouter();
   const buildingName = useBuildingName();
   const roomLabel = useRoomPlaceLabel();
   const { toast, showToast, dismiss } = useAdminToast();
@@ -375,6 +381,45 @@ export function AutoMessagesManager({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [previewKey]);
 
+  // 실시간(47 §5-9) — 실행 줄은 그 줄만 다시 읽어 「보낼 예정」 그 자리에서 고치고, 규칙 숫자는 숫자 칸만 합친다.
+  const refreshCounts = async () => {
+    const result = await listAutoRuleSummariesAction();
+    if (result.ok) setList((current) => mergeRuleCounts(current, result.rules));
+  };
+  // 응답이 올 때의 필터로 판정한다 — 필터를 바꾼 사이에 온 옛 응답이 새 목록에 섞이지 않게.
+  const runFilterRef = useRef(runFilter);
+  useEffect(() => {
+    runFilterRef.current = runFilter;
+  });
+  // 「보낼 예정」 통째 읽기 번호 — 마지막에 보낸 것만 반영, 그보다 먼저 시작한 줄 합치기는 버린다(통째 읽기가 더 새 값).
+  const listSeq = useRef(0);
+  const fetchRuns = async (filter: string) => {
+    const mine = ++listSeq.current;
+    const result = await listUpcomingAutoRunsAction(filter || null);
+    if (result.ok && mine === listSeq.current && filter === runFilterRef.current) setRuns(result.runs);
+  };
+  const liveSources = useMemo(() => autoRunLiveSources(organizationId), [organizationId]);
+  useLiveChanges(liveSources, {
+    toKeys: (change) => liveKeysOf(change).filter((key) => key.startsWith("r:")),
+    onFlush: async (keys) => {
+      const ids = idsOfKind(keys, "r");
+      const filter = runFilterRef.current;
+      const listAtStart = listSeq.current;
+      const result = await getAutoRunsByIdsAction(ids);
+      if (result.ok && filter === runFilterRef.current && listAtStart === listSeq.current) {
+        const found = new Set(result.runs.map((run) => run.id));
+        setRuns((current) =>
+          mergeAutoRuns(current, result.runs, ids.filter((id) => !found.has(id)), { ruleId: filter || null, now: new Date() }),
+        );
+      }
+      await refreshCounts();
+    },
+    onCatchUp: async () => {
+      await fetchRuns(runFilterRef.current);
+      await refreshCounts();
+    },
+  });
+
   if (rules === null) {
     return (
       <div className="gm-root gm-settings">
@@ -388,10 +433,7 @@ export function AutoMessagesManager({
   const original = editing?.id ? (list.find((rule) => rule.id === editing.id) ?? null) : null;
   const dirty = editing ? isDirty(editing, original) : false;
 
-  const refreshRuns = async (filter: string = runFilter) => {
-    const result = await listUpcomingAutoRunsAction(filter || null);
-    if (result.ok) setRuns(result.runs);
-  };
+  const refreshRuns = (filter: string = runFilter) => fetchRuns(filter);
 
   const pick = (next: Editing | null) => {
     if (editing && dirty) {
@@ -433,7 +475,7 @@ export function AutoMessagesManager({
         setConflict(false);
         showToast(result.rule.enabled ? copy.autoSaved : copy.autoSavedOff);
         await refreshRuns();
-        router.refresh();
+        await refreshCounts();
       } else if (result.errorKey === "conflict") {
         haptic("error");
         const latest = result.current;
@@ -456,7 +498,7 @@ export function AutoMessagesManager({
       if (result.ok) {
         showToast(next ? copy.autoTurnedOn : copy.autoTurnedOff);
         await refreshRuns();
-        router.refresh();
+        await refreshCounts();
       } else {
         haptic("error");
         setList((current) => current.map((item) => (item.id === rule.id ? { ...item, enabled: rule.enabled } : item)));
@@ -475,7 +517,7 @@ export function AutoMessagesManager({
         setRuns((current) => current.filter((run) => run.ruleId !== rule.id));
         if (editing?.id === rule.id) setEditing(null);
         showToast(copy.autoDeleted);
-        router.refresh();
+        await refreshCounts();
       } else {
         haptic("error");
         showToast(errorOf(result.errorKey, copy));

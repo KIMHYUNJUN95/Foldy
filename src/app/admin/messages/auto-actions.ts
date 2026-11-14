@@ -17,12 +17,15 @@ import { validateAutoRuleInput, type AutoRule, type AutoRuleInputError } from "@
 import {
   createAutoRule,
   deleteAutoRule,
+  loadAutoRuleSummaries,
+  loadAutoRunsByIds,
   loadUpcomingAutoRuns,
   previewAutoRule,
   setAutoRuleEnabled,
   setAutoRunPaused,
   updateAutoRule,
   type AutoPreview,
+  type AutoRuleSummary,
 } from "@/lib/guest-messages/auto-rules-server";
 import { runAutoMessagePlanner } from "@/lib/guest-messages/auto-scheduler";
 import { isGuestLang } from "@/lib/guest-messages/guest-info-model";
@@ -167,6 +170,35 @@ export async function listUpcomingAutoRunsAction(ruleId: string | null): Promise
   if (ruleId !== null && (typeof ruleId !== "string" || !UUID_RE.test(ruleId))) return { ok: false, errorKey: "invalid" };
   try {
     return { ok: true, runs: await loadUpcomingAutoRuns(getSupabaseServiceClient(), access.organizationId, { ruleId }) };
+  } catch {
+    return { ok: false, errorKey: "failed" };
+  }
+}
+
+/**
+ * 실시간 — 신호가 온 실행 줄만 다시 읽는다(「보낼 예정」 그 자리 고치기, 47 §5-9). 취소된 줄도 돌려준다(화면이 뺀다).
+ * 조직 밖 id 는 결과에 없을 뿐이다(화면은 없어진 줄로 뺀다).
+ */
+export async function getAutoRunsByIdsAction(ids: readonly string[]): Promise<{ ok: true; runs: AutoRunView[] } | { ok: false; errorKey: "forbidden" | "invalid" | "failed" }> {
+  const access = await gate("manage");
+  if (!access.ok) return access;
+  const unique = Array.isArray(ids) ? [...new Set(ids)] : [];
+  if (unique.length === 0 || unique.length > 50 || !unique.every((id) => typeof id === "string" && UUID_RE.test(id))) {
+    return { ok: false, errorKey: "invalid" };
+  }
+  try {
+    return { ok: true, runs: await loadAutoRunsByIds(getSupabaseServiceClient(), access.organizationId, unique) };
+  } catch {
+    return { ok: false, errorKey: "failed" };
+  }
+}
+
+/** 실시간 — 규칙 목록의 숫자(다음 발송 · 보낼 예정 · 막힘)만 다시 읽는다. 화면은 숫자 칸만 합친다(편집 중인 글은 그대로). */
+export async function listAutoRuleSummariesAction(): Promise<{ ok: true; rules: AutoRuleSummary[] } | { ok: false; errorKey: "forbidden" | "failed" }> {
+  const access = await gate("manage");
+  if (!access.ok) return access;
+  try {
+    return { ok: true, rules: await loadAutoRuleSummaries(getSupabaseServiceClient(), access.organizationId) };
   } catch {
     return { ok: false, errorKey: "failed" };
   }

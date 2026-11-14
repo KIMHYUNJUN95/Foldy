@@ -5,7 +5,45 @@
  * `task_updates`)은 나 · 그 할 일로 거른다. 어느 경우든 RLS 가 볼 수 있는 행의 신호만 보낸다.
  * 테이블은 `supabase_realtime` publication 에 있어야 한다(`202610290001_enable_ops_realtime.sql`).
  */
-export type LiveSource = { table: string; filter: string };
+export type LiveSource = {
+  table: string;
+  filter: string;
+  /** 받을 변경 종류(기본 전부). 손님 메시지는 목록에 `INSERT` 만 받아 사진 사본 갱신 같은 홍수를 거른다(2026-11-13). */
+  event?: "INSERT" | "UPDATE";
+};
+
+/** 신호 하나 — `useLiveChanges` 의 `toKeys` 가 받는다. `record` 는 `pickLiveIds` 가 남긴 id 칸뿐이다(행 내용은 들어오지 않는다). */
+export type LiveChange = {
+  table: string;
+  eventType: "INSERT" | "UPDATE" | "DELETE";
+  record: Record<string, unknown>;
+};
+
+/** 신호 행에서 남길 칸 — id 와 이어 주는 칸만(본문 · 이름 · 첨부 · 출입 코드가 든 글은 버린다, 47 §5-9 · 05). */
+export const LIVE_ID_COLUMNS = ["id", "conversation_id", "provider_booking_id", "organization_id"] as const;
+
+export function pickLiveIds(row: unknown): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (!row || typeof row !== "object") return out;
+  for (const column of LIVE_ID_COLUMNS) {
+    const value = (row as Record<string, unknown>)[column];
+    if (typeof value === "string") out[column] = value;
+  }
+  return out;
+}
+
+/** 구독 묶음 → 문자열(내용이 같으면 다시 구독하지 않게). */
+export function liveSourcesKey(sources: readonly LiveSource[]): string {
+  return sources.map((s) => `${s.table}|${s.filter}|${s.event ?? ""}`).join(",");
+}
+
+export function parseLiveSourcesKey(key: string): LiveSource[] {
+  if (!key) return [];
+  return key.split(",").map((entry) => {
+    const [table, filter, event] = entry.split("|");
+    return event === "INSERT" || event === "UPDATE" ? { table, filter, event } : { table, filter };
+  });
+}
 
 const byOrg = (table: string, organizationId: string): LiveSource => ({
   table,
@@ -75,4 +113,34 @@ export function attendanceWagesLiveSources(organizationId: string): LiveSource[]
     byOrg("employment_type_history", organizationId),
     byOrg("attendance_pay_allowances", organizationId),
   ];
+}
+
+/**
+ * 손님 메시지 목록(PC 대화 탭 · 모바일 목록, 2026-11-13 — PC 는 목록 채널과 열린 대화 채널을 따로 둔다) — 대화 줄 · 새 메시지(INSERT 만) · 발송 큐. 볼 권한(`guest_messages.view`)
+ * 이 있는 사람에게만 RLS 가 신호를 보낸다. 표는 `202611130008_guest_messages_realtime.sql` 에서 publication 에 넣었다.
+ */
+export function guestInboxLiveSources(organizationId: string): LiveSource[] {
+  return [
+    byOrg("guest_conversations", organizationId),
+    { ...byOrg("guest_messages", organizationId), event: "INSERT" },
+    byOrg("guest_message_outbox", organizationId),
+  ];
+}
+
+/**
+ * 열린 대화 한 건 — 그 대화의 메시지(새 말 · 사진 사본 · 되돌아옴) · 발송 큐 · 대화 줄 + 조직의 자동 안내 실행 줄
+ * (대화가 생기기 전에 계획된 줄은 `conversation_id` 가 비어 있어 예약 번호로 맞춘다).
+ */
+export function guestThreadLiveSources(organizationId: string, conversationId: string): LiveSource[] {
+  return [
+    { table: "guest_conversations", filter: `id=eq.${conversationId}` },
+    { table: "guest_messages", filter: `conversation_id=eq.${conversationId}` },
+    { table: "guest_message_outbox", filter: `conversation_id=eq.${conversationId}` },
+    byOrg("auto_message_runs", organizationId),
+  ];
+}
+
+/** PC 자동 안내 탭 — 실행 줄(보낼 예정 · 보냄 · 막힘). */
+export function autoRunLiveSources(organizationId: string): LiveSource[] {
+  return [byOrg("auto_message_runs", organizationId)];
 }

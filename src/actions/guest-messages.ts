@@ -36,7 +36,7 @@ import {
   type InboxThread,
   type SnoozeInput,
 } from "@/lib/guest-messages/inbox-model";
-import { loadConversationRow, loadInboxList, loadInboxThread } from "@/lib/guest-messages/inbox-server";
+import { loadConversationRow, loadInboxList, loadInboxRowsByIds, loadInboxThread, type InboxRowsResult } from "@/lib/guest-messages/inbox-server";
 import { isGuestMessageSendEnabled, runGuestOutbox } from "@/lib/guest-messages/outbox-runner";
 import { createTranslationBudget, deeplTranslate } from "@/lib/review-translate";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
@@ -153,6 +153,47 @@ export async function listGuestConversations(
     return { ok: true, ...data };
   } catch (error) {
     logFailure("list", error);
+    return { ok: false, errorKey: "failed" };
+  }
+}
+
+/** 실시간 줄 다시 읽기 한 번에 받는 대화 수 상한 — 넘는 신호는 화면이 목록 전체 다시 읽기로 바꾼다(`LIVE_CHANGE_MAX_KEYS`). */
+const LIVE_ROWS_LIMIT = 50;
+
+export type GetGuestConversationRowsResult = ({ ok: true } & InboxRowsResult) | Failure;
+
+/**
+ * 실시간 — 신호가 온 대화 몇 개만 목록 줄로 다시 읽는다(47 §5-9). 권한 · 조직은 목록 읽기와 같다(`guest_messages.view`, 조직은 세션).
+ * id 는 신호에서 온 힌트일 뿐이라 조직 밖 id 는 `missing` 으로만 돌아온다.
+ */
+export async function getGuestConversationRows(input: {
+  ids: readonly string[];
+  status?: string | null;
+  building?: string | null;
+  channel?: string | null;
+}): Promise<GetGuestConversationRowsResult> {
+  const auth = await gate(false);
+  if (!auth.ok) return auth;
+  const ids = Array.isArray(input?.ids) ? [...new Set(input.ids)] : [];
+  if (ids.length === 0 || ids.length > LIVE_ROWS_LIMIT || !ids.every((id) => typeof id === "string" && UUID_RE.test(id))) {
+    return { ok: false, errorKey: "invalid" };
+  }
+  const status = (INBOX_STATUS_FILTERS as readonly string[]).includes(input.status ?? "")
+    ? (input.status as InboxStatusFilter)
+    : "awaiting";
+  const building = typeof input.building === "string" && input.building.trim() ? input.building.trim().slice(0, 120) : null;
+  try {
+    const result = await loadInboxRowsByIds(
+      db(),
+      auth.organizationId,
+      ids.map((id) => id.toLowerCase()),
+      { status, building, channel: parseChannelFilter(input.channel) },
+      new Date(),
+      visibilityOf(auth.capabilities),
+    );
+    return { ok: true, ...result };
+  } catch (error) {
+    logFailure("live rows", error);
     return { ok: false, errorKey: "failed" };
   }
 }

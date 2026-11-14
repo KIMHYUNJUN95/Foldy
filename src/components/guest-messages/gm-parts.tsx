@@ -16,6 +16,7 @@ import {
   useState,
   useTransition,
   type ReactNode,
+  type RefObject,
 } from "react";
 import {
   addGuestInternalNote,
@@ -277,11 +278,14 @@ export function ThreadMessages({
   selectable = false,
   pickedIds,
   onTogglePick,
+  endRef,
 }: {
   thread: InboxThread;
   copy: GmCopy;
   locale: string;
   canReply: boolean;
+  /** 대화 끝 표시 — 따라 내려가기 · 「새 메시지」는 `useThreadFollow` 가 이것으로 스크롤 칸을 찾는다(47 §5-9). */
+  endRef: RefObject<HTMLDivElement | null>;
   /** 머리 「번역해서 보기」 — 켜면 손님 말을 모두 번역해 보인다. */
   translateAll: boolean;
   /** 번역해서 볼 언어(한국어 · 일본어 · 영어). 비우면 보는 사람 언어. 손님 말 옆 「번역」도 이 언어로 한다. */
@@ -384,25 +388,6 @@ export function ThreadMessages({
     }
     return out;
   }, [thread.messages, thread.links]);
-
-  const endRef = useRef<HTMLDivElement | null>(null);
-  const lastId = thread.messages[thread.messages.length - 1]?.id;
-  useEffect(() => {
-    // scrollIntoView(end) 는 마지막 말을 스크롤 칸 맨 아래 — 붙어 있는 답장 칸 · 탭바 밑 — 로 보낸다.
-    // 감싼 스크롤 칸(PC 대화 칸 · 모바일 셸 본문)을 끝까지 내려 답장 칸 위에 마지막 말이 보이게 한다.
-    let el = endRef.current?.parentElement ?? null;
-    while (el) {
-      const overflowY = getComputedStyle(el).overflowY;
-      if (
-        (overflowY === "auto" || overflowY === "scroll") &&
-        el.scrollHeight > el.clientHeight
-      ) {
-        el.scrollTop = el.scrollHeight;
-        return;
-      }
-      el = el.parentElement;
-    }
-  }, [lastId, thread.conversation.id]);
 
   if (thread.messages.length === 0) {
     return <p className="gm-thread__empty">{copy.noMessages}</p>;

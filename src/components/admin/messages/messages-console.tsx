@@ -2,7 +2,8 @@
 
 /**
  * PC 손님 메시지함 `/admin/messages` — 왼쪽 목록 · 가운데 대화 · 오른쪽 예약 정보(시안 R2Main). docs/product/47 §5-1
- * 필터는 주소(`?status=&building=&c=`) — 새로고침 · 링크로 같은 화면. 목록은 서버가 그리고, 대화는 서버 액션으로 읽는다.
+ * 필터는 주소(`?status=&building=&c=`) — 새로고침 · 링크로 같은 화면. 처음 목록은 서버가 주고, 대화는 서버 액션으로 읽는다.
+ * 실시간(47 §5-9): 신호의 대화만 서버 액션으로 다시 읽어 그 자리에서 합친다 — 서버 렌더를 다시 받지 않는다.
  * 2단계 범위: 대화 탭만(자동 안내 · 정해 둔 문구 · 설정 탭은 그 단계에서 — 빈 탭을 그리지 않는다).
  */
 
@@ -11,7 +12,7 @@ import { setAutoRunPausedAction } from "@/app/admin/messages/auto-actions";
 import { AutoRunsList } from "@/components/guest-messages/auto-runs-list";
 import type { AutoRunView } from "@/lib/guest-messages/auto-model";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AdmDropdown, type AdmOption } from "@/components/admin/shared/adm-dropdown";
 import { AdminDatePicker } from "@/components/admin/shared/admin-date-picker";
 import { AdminTimePicker } from "@/components/admin/shared/admin-time-picker";
@@ -39,6 +40,11 @@ import {
   type GmCopy,
 } from "@/components/guest-messages/gm-format";
 import { useThread } from "@/components/guest-messages/use-thread";
+import { useInboxLive } from "@/components/guest-messages/use-inbox-live";
+import { NewMessagesPill, useThreadFollow } from "@/components/guest-messages/thread-follow";
+import { useLiveChanges } from "@/components/shared/live-refresh";
+import { guestInboxLiveSources, guestThreadLiveSources } from "@/lib/live-sources";
+import { idsOfKind, liveKeysOf, pruneLocalLeaving, touchesThread } from "@/lib/guest-messages/live-merge";
 import { StallNoticeLine } from "@/components/guest-messages/stall-notice";
 import { BuildingGuestInfoPanel } from "@/components/admin/messages/building-guest-info-panel";
 import type { StallNotice } from "@/lib/guest-messages/channel-overview-server";
@@ -62,6 +68,7 @@ import { TaskCreateForm, TaskPanelSection, type TaskCategoryCopy } from "@/compo
 type Shared = Dictionary["admin"]["shared"];
 
 export function MessagesConsole({
+  organizationId,
   copy,
   shared,
   locale,
@@ -77,6 +84,8 @@ export function MessagesConsole({
   taskKinds = [],
   taskCategoryCopy,
 }: {
+  /** 실시간 구독 필터(조직) — 권한 · 조직 판정은 서버 액션이 다시 한다. */
+  organizationId: string;
   copy: GmCopy;
   shared: Shared;
   locale: string;
@@ -97,8 +106,10 @@ export function MessagesConsole({
   const router = useRouter();
   const now = useNow();
   const buildingName = useBuildingName();
+  const inbox = useInboxLive(data, { status, building, channel });
+  const list = inbox.list;
   const [selected, setSelected] = useState<string | null>(selectedId ?? data?.rows[0]?.id ?? null);
-  const [leaving, setLeaving] = useState<Set<string>>(new Set());
+  const [leaving, setLeaving] = useState<ReadonlySet<string>>(new Set());
   const { toast, showToast, dismiss } = useAdminToast();
   const [undo, setUndo] = useState<{ id: string; stamp: number } | null>(null);
   // 번역해서 볼 언어 — 비우면 원문(§9).
@@ -108,15 +119,39 @@ export function MessagesConsole({
   const [editBuilding, setEditBuilding] = useState<string | null>(null);
   // 건물 손님용 정보를 저장하면 올린다 — 답장 칸 넣기 목록이 새 값으로 다시 읽힌다.
   const [insertsRefreshKey, setInsertsRefreshKey] = useState(0);
-  // 새 목록이 오면 접어 둔 줄 표시를 비운다 — 빠진 줄은 목록에서 없어졌고, 되돌리기로 돌아온 줄이 접힌 채 남지 않게.
-  const rowsKey = data?.rows.map((row) => `${row.id}:${row.state}`).join("|") ?? "";
-  const [seenKey, setSeenKey] = useState(rowsKey);
-  if (seenKey !== rowsKey) {
-    setSeenKey(rowsKey);
-    if (leaving.size > 0) setLeaving(new Set());
+  // 먼저 접어 둔 줄은 서버 답이 올 때까지 접힌 채 — 다른 줄의 실시간 합치기로 펴지 않는다(16 「줄 접힘」: 실패할 때만 다시 편다).
+  // 그 줄이 목록에서 빠지면 표시를 지운다(나중에 같은 대화가 다시 들어오면 펴진 채로 나타나게).
+  const rowIds = list?.rows.map((row) => row.id).join("|") ?? "";
+  const [seenRowIds, setSeenRowIds] = useState(rowIds);
+  if (seenRowIds !== rowIds) {
+    setSeenRowIds(rowIds);
+    const pruned = pruneLocalLeaving(leaving, list?.rows ?? []);
+    if (pruned !== leaving) setLeaving(pruned);
   }
   const controller = useThread(selected, initialThread);
   const thread = controller.thread;
+  const follow = useThreadFollow(thread);
+  const bookingNumber = thread?.conversation.id === selected ? (thread?.reservation.bookingNumber ?? null) : null;
+
+  // 실시간(47 §5-9) — 목록 줄은 그 대화만, 열린 대화는 조용히 다시 읽어 합친다. 들어온 말에는 햅틱 없음.
+  // 목록 채널은 고른 대화와 상관없이 그대로 — 대화를 바꿔도 목록 구독이 끊기지 않는다.
+  const listSources = useMemo(() => guestInboxLiveSources(organizationId), [organizationId]);
+  useLiveChanges(listSources, {
+    toKeys: (change) => liveKeysOf(change).filter((key) => key.startsWith("c:")),
+    onFlush: (keys) => void inbox.applyIds(idsOfKind(keys, "c")),
+    onCatchUp: () => void inbox.reload(),
+  });
+  // 열린 대화 채널 — 대화를 바꾸면 이것만 다시 구독하고, 다시 붙으면 따라잡기(그 대화 다시 읽기).
+  const threadSources = useMemo(
+    () => (selected ? guestThreadLiveSources(organizationId, selected) : []),
+    [organizationId, selected],
+  );
+  const refreshThread = controller.refresh;
+  useLiveChanges(threadSources, {
+    toKeys: (change) => (selected && touchesThread(liveKeysOf(change), selected, bookingNumber) ? ["thread"] : []),
+    onFlush: () => refreshThread(),
+    onCatchUp: () => refreshThread(),
+  });
   // 업무 만들기(6단계) — 열면 오른쪽 패널이 만들기 칸이 되고 손님 말을 눌러 붙인다(시안 R2Task).
   const [taskKind, setTaskKind] = useState<LinkTargetType | null>(null);
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
@@ -163,13 +198,17 @@ export function MessagesConsole({
 
   const afterChange = () => {
     controller.refresh();
-    router.refresh();
+    if (selected) void inbox.applyIds([selected]);
+  };
+  const afterSend = () => {
+    follow.follow();
+    afterChange();
   };
 
   const statusOptions: AdmOption[] = [
     {
       value: "awaiting",
-      label: data ? fill(copy.filterAwaitingCount, { n: data.awaitingCount }) : copy.filterAwaiting,
+      label: list ? fill(copy.filterAwaitingCount, { n: list.awaitingCount }) : copy.filterAwaiting,
     },
     { value: "snoozed", label: copy.filterSnoozed },
     { value: "done", label: copy.filterDone },
@@ -177,7 +216,7 @@ export function MessagesConsole({
   ];
   const buildingOptions: AdmOption[] = [
     { value: "", label: copy.buildingAll },
-    ...(data?.buildings ?? []).map((name) => ({
+    ...(list?.buildings ?? []).map((name) => ({
       value: name,
       label: buildingName(name),
     })),
@@ -197,7 +236,7 @@ export function MessagesConsole({
       if (result.ok) {
         if (done) setUndo({ id, stamp: Date.now() });
         else showToast(copy.reopenToast);
-        router.refresh();
+        void inbox.applyIds([id]);
       } else {
         setLeaving((prev) => {
           const next = new Set(prev);
@@ -221,7 +260,7 @@ export function MessagesConsole({
             time: result.snoozeUntil ? formatWhen(result.snoozeUntil, locale, new Date()) : "",
           }),
         );
-        router.refresh();
+        void inbox.applyIds([id]);
       } else {
         setLeaving((prev) => {
           const next = new Set(prev);
@@ -257,19 +296,24 @@ export function MessagesConsole({
             ariaLabel={copy.filterChannel}
             onChange={(value) => router.replace(hrefFor({ channel: parseChannelFilter(value), c: null }))}
           />
-          {data && data.overdueCount > 0 ? (
-            <span className="gm-filters__overdue">{fill(copy.overdueCount, { n: data.overdueCount })}</span>
+          {list && list.overdueCount > 0 ? (
+            <span className="gm-filters__overdue">{fill(copy.overdueCount, { n: list.overdueCount })}</span>
           ) : null}
         </div>
         {canManage ? <StallNoticeLine notice={stall} copy={copy} locale={locale} notify={(message) => showToast(message)} /> : null}
         <div className="gm-scroll">
-          {!data ? (
-            <InboxError copy={copy} onRetry={() => router.refresh()} />
-          ) : data.rows.length === 0 ? (
+          {!list ? (
+            <InboxError copy={copy} onRetry={() => void inbox.reload()} />
+          ) : list.rows.length === 0 ? (
             <InboxEmpty filter={status} copy={copy} />
           ) : (
-            data.rows.map((row) => (
-              <div className="row-collapse" key={row.id} data-leaving={leaving.has(row.id) ? "" : undefined}>
+            list.rows.map((row) => (
+              <div
+                className="row-collapse"
+                key={row.id}
+                data-leaving={leaving.has(row.id) || inbox.leaving.has(row.id) ? "" : undefined}
+                data-entering={inbox.entered.has(row.id) ? "" : undefined}
+              >
                 <div>
                   <button
                     type="button"
@@ -321,7 +365,13 @@ export function MessagesConsole({
                         type="button"
                         className="gm-btn"
                         disabled={controller.pending}
-                        onClick={() => controller.unsnooze((r) => (r.ok ? router.refresh() : showToast(errorText(r.errorKey, copy))))}
+                        onClick={() => {
+                          const id = selected;
+                          controller.unsnooze((r) => {
+                            if (!r.ok) showToast(errorText(r.errorKey, copy));
+                            else if (id) void inbox.applyIds([id]);
+                          });
+                        }}
                       >
                         {copy.unsnooze}
                       </button>
@@ -374,9 +424,11 @@ export function MessagesConsole({
                 selectable={taskKind !== null}
                 pickedIds={picked}
                 onTogglePick={togglePick}
+                endRef={follow.endRef}
               />
             </div>
             <div className="gm-tfoot">
+              <NewMessagesPill count={follow.unseen} copy={copy} onJump={follow.jump} />
               <Composer
                 key={thread.conversation.id}
                 thread={thread}
@@ -385,7 +437,7 @@ export function MessagesConsole({
                 canReply={canReply}
                 variant="pc"
                 notify={(message) => showToast(message)}
-                onSent={afterChange}
+                onSent={afterSend}
                 canManageReplies={canManage}
                 onEditBuilding={setEditBuilding}
                 insertsRefreshKey={insertsRefreshKey}
@@ -466,7 +518,7 @@ export function MessagesConsole({
             }
             // 다른 대화로 옮긴 뒤 되돌리기 — 그 대화만 다시 답장 기다림으로.
             void setGuestConversationDone(id, false).then((result) => {
-              if (result.ok) router.refresh();
+              if (result.ok) void inbox.applyIds([id]);
               else showToast(errorText(result.errorKey, copy));
             });
           }}

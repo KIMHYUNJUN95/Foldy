@@ -48,6 +48,7 @@ export default async function MobileMessagesPage({
       <SplitList detail="messages">
         <MobileInbox
           key={`${status}|${building ?? ""}|${channel}`}
+          organizationId={session.organization.id}
           copy={dict.guestMessages}
           locale={locale}
           data={list.ok ? list : null}

@@ -1,5 +1,6 @@
 "use client";
 
+import { formatLeaveRange } from "@/lib/attendance-console-labels";
 import { leaveApproveNeedsReason } from "@/lib/annual-leave";
 import { AdminLoadError } from "@/components/admin/shared/admin-no-access";
 import { rowActivateProps } from "@/components/admin/shared/row-activate";
@@ -68,11 +69,6 @@ function initial(name: string): string {
 
 function localeTagOf(locale: Locale): string {
   return locale === "ko" ? "ko-KR" : locale === "ja" ? "ja-JP" : "en-US";
-}
-
-/** "2026-07-14" → "07/14" */
-function fmtMd(dateStr: string): string {
-  return dateStr.length >= 10 ? dateStr.slice(5).replace("-", "/") : dateStr;
 }
 
 /** "2026-07-14" → "2026/07/14" */
@@ -627,7 +623,7 @@ export function LeaveQueueClient({
                   >
                     <td style={{ paddingLeft: 16 }}>
                       <div className="who">
-                        <span className="avatar" style={{ background: "var(--adm-primary)", color: "#fff" }}>
+                        <span className="avatar">
                           {item.avatarInitial || initial(item.applicantName)}
                         </span>
                         <div>
@@ -641,15 +637,15 @@ export function LeaveQueueClient({
                         {typeLabel(item.leaveType, lc)}
                       </span>
                     </td>
-                    <td className="mono">
-                      {fmtMd(item.startDate)} – {fmtMd(item.endDate)}
+                    <td className="num">
+                      {formatLeaveRange(item.startDate, item.endDate)}
                       {item.durationUnit !== "full" ? (
                         <span className="halftag">
                           {item.durationUnit === "am" ? lc.durationAmTag : lc.durationPmTag}
                         </span>
                       ) : null}
                     </td>
-                    <td className="mono">{lc.daysUnit(item.daysCount)}</td>
+                    <td className="num">{lc.daysUnit(item.daysCount)}</td>
                     <td style={{ maxWidth: 240 }}>
                       <div
                         className="who__sub"
@@ -877,7 +873,7 @@ function LeavePanel({
               <span>
                 <span
                   className="panel__sub"
-                  style={{ display: "block", color: "var(--ink)", fontSize: 17, fontWeight: 900 }}
+                  style={{ display: "block", color: "var(--ink)", fontSize: 17, fontWeight: 600 }}
                 >
                   {item.applicantName}
                 </span>
@@ -1046,8 +1042,8 @@ function LeavePanel({
                           </span>
                           <div className="cvrow__b">
                             <div className="cvrow__t">{o.applicantName}</div>
-                            <div className="cvrow__s mono">
-                              {fmtMd(o.startDate)} – {fmtMd(o.endDate)}
+                            <div className="cvrow__s">
+                              {formatLeaveRange(o.startDate, o.endDate)}
                             </div>
                           </div>
                           <span className={`pill ${op.cls}`}>

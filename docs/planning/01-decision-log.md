@@ -7522,3 +7522,7 @@ Status: Confirmed (2026-10-19). 실제 Beds24 시험 대기.
 ## 2026-11-13 — API 비밀값 분리: 웹훅은 fail-closed, 크론은 `CRON_SECRET` · Vault 토큰만
 
 - `BEDS24_WEBHOOK_SECRET` 은 Beds24 웹훅 수신(`/api/beds24/webhook`)만 연다. 서버에 없으면 503 `not_configured`(예전 fail-open 폐지). 크론 · 작업 라우트(tick · reconcile · reviews-sync + health + relink · rates-sync · price-jobs/worker · recruit full)는 `CRON_SECRET` Bearer 와 pg_cron Vault 토큰만 받는다 — 웹훅 비밀값은 Beds24 설정 화면에 보이는 값이라 분리. GitHub Actions 는 저장소 시크릿 `CRON_SECRET` 으로 부른다. 표 · 배포 순서: `docs/engineering/07-environment-setup.md` 「API 라우트별 비밀값」.
+
+## 2026-11-13 — PC 근태 콘솔: 「검토 큐」를 「검토 목록」으로, 탭 숫자는 할 일만
+
+- 사용자 승인 시안. 「큐」는 현장에서 안 쓰는 말이라 「검토 목록」. 「급여 검토」 탭 숫자(시급 대상 인원)는 할 일이 아니라 뺀다. 상세: `docs/product/24-attendance-workflow.md` 「PC 근태 콘솔 다듬기」.

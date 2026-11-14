@@ -8,7 +8,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Sparkles, X } from "lucide-react";
+import { X } from "lucide-react";
 import type { AdminAllowanceRow } from "@/lib/admin-attendance";
 import { getDictionary, type Dictionary, type Locale } from "@/lib/i18n";
 import {
@@ -287,14 +287,7 @@ export function AttendanceAllowancesSection({
       ) : null}
 
       {allowances.length === 0 ? (
-        <div className="alw__empty">
-          <span className="alw__emptyic">
-            <Ic>
-              <Sparkles />
-            </Ic>
-          </span>
-          <span>{c.allowEmpty}</span>
-        </div>
+        <div className="alw__empty">{c.allowEmpty}</div>
       ) : (
         <table className="qtbl alw-tbl">
           <thead>

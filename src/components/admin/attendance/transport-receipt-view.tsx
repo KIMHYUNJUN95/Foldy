@@ -104,7 +104,7 @@ export function TransportReceiptView({
         <span className="ic" style={{ color: "var(--adm-primary)" }}>
           <Receipt />
         </span>
-        <div style={{ fontSize: 16, fontWeight: 900, color: "var(--ink)" }}>{data.staffName}</div>
+        <div style={{ fontSize: 16, fontWeight: 600, color: "var(--ink)" }}>{data.staffName}</div>
         <span className={`pill ${pill.cls}`}>
           <span className="d" />
           {pill.label}
@@ -113,7 +113,7 @@ export function TransportReceiptView({
         <span style={{ marginLeft: "auto", fontSize: 13, color: "var(--adm-muted)" }}>
           {c.trReceiptCount(data.items.length)} · {c.trReceiptPhotoCount(photos.length)}
         </span>
-        <span className="mono" style={{ fontSize: 15, fontWeight: 800, color: "var(--ink)" }}>
+        <span className="mono" style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)" }}>
           {yen(data.totalAmount)}
         </span>
       </div>

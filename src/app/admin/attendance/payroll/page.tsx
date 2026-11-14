@@ -88,7 +88,6 @@ export default async function AdminAttendancePayrollPage({
             n: badgeStats.queueOpen,
             urgent: badgeStats.queueUrgent > 0,
           },
-          payroll: { n: payroll.kpi.hourlyTarget },
           transport: { n: badgeStats.transportPending },
         }}
       />

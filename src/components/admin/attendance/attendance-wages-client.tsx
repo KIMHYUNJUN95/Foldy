@@ -1,5 +1,6 @@
 "use client";
 
+import { attendanceRoleLabel, formatAdminDate } from "@/lib/attendance-console-labels";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -57,9 +58,9 @@ function Ic({ children }: { children: React.ReactNode }) {
 function initial(name: string): string {
   return name.trim().slice(0, 1) || "·";
 }
-function fmtDate(d: string | null): string {
+function fmtDate(d: string | null, localeTag: string): string {
   if (!d) return "—";
-  return d.replace(/-/g, ".").slice(2);
+  return formatAdminDate(d, localeTag);
 }
 
 export function AttendanceWagesClient({
@@ -299,7 +300,7 @@ export function AttendanceWagesClient({
                         <div>
                           <div className="who__nm">{r.userName}</div>
                           <div className="who__sub">
-                            {r.role ?? "—"} · {salaried ? c.wageTagSalaried : c.wageTagHourly}
+                            {attendanceRoleLabel(r.role, dictionary.roles as Record<string, string>)} · {salaried ? c.wageTagSalaried : c.wageTagHourly}
                           </div>
                         </div>
                       </div>
@@ -307,7 +308,7 @@ export function AttendanceWagesClient({
                     <td className="r num">
                       {salaried || r.currentRate == null ? <span className="dim-cell">{c.wageNotApplied}</span> : <b>{yen(r.currentRate)}</b>}
                     </td>
-                    <td className="r num">{salaried || !r.currentFrom ? <span className="dim-cell">—</span> : fmtDate(r.currentFrom)}</td>
+                    <td className="r num">{salaried || !r.currentFrom ? <span className="dim-cell">—</span> : fmtDate(r.currentFrom, localeTag)}</td>
                     <td className="r num">
                       {salaried || hist.length === 0 ? (
                         <span className="dim-cell">—</span>
@@ -599,12 +600,12 @@ function WagePanel({
                     display: "block",
                     color: "var(--ink)",
                     fontSize: 17,
-                    fontWeight: 900,
+                    fontWeight: 600,
                   }}
                 >
                   {row.userName}
                 </span>
-                <span className="panel__sub">{row.role ?? "—"}</span>
+                <span className="panel__sub">{attendanceRoleLabel(row.role, getDictionary(locale).roles as Record<string, string>)}</span>
               </span>
             </span>
           </div>
@@ -702,7 +703,7 @@ function WagePanel({
                 </Ic>
                 <span>
                   {empChanged
-                    ? c.wagePanelEmpPreview(empTypeLabel, fmtDate(empDate))
+                    ? c.wagePanelEmpPreview(empTypeLabel, fmtDate(empDate, localeTag))
                     : c.wagePanelEmpSame}
                 </span>
               </div>
@@ -735,7 +736,7 @@ function WagePanel({
           {empConfirm ? (
             <AdminReasonModal
               title={c.wagePanelEmpConfirmTitle}
-              description={c.wagePanelEmpConfirmDesc(row.userName, empTypeLabel, fmtDate(empDate))}
+              description={c.wagePanelEmpConfirmDesc(row.userName, empTypeLabel, fmtDate(empDate, localeTag))}
               placeholder={c.dialogReasonPlaceholder}
               confirmLabel={c.wagePanelEmpApply}
               cancelLabel={c.wagePanelBtnCancel}
@@ -770,8 +771,8 @@ function WagePanel({
                         </div>
                         <div className="ratelist__period">
                           {e.to
-                            ? c.wagePanelTierRange(fmtDate(e.from), fmtDate(e.to))
-                            : c.wagePanelTierRangeOpen(fmtDate(e.from))}
+                            ? c.wagePanelTierRange(fmtDate(e.from, localeTag), fmtDate(e.to, localeTag))
+                            : c.wagePanelTierRangeOpen(fmtDate(e.from, localeTag))}
                         </div>
                         {e.note ? (
                           <div className="ratelist__note">
@@ -812,7 +813,7 @@ function WagePanel({
                 {row.currentFrom ? (
                   <div className="kv">
                     <span className="kv__k">{c.wagePanelEmploymentFrom}</span>
-                    <span className="kv__v mono">{fmtDate(row.currentFrom)}</span>
+                    <span className="kv__v mono">{fmtDate(row.currentFrom, localeTag)}</span>
                   </div>
                 ) : null}
               </div>
@@ -828,7 +829,7 @@ function WagePanel({
                     {formatOptionalAdminYen(row.currentRate, localeTag)}
                   </span>
                   <span className="psum__lbl">
-                    {c.wagePanelCurrentSub(fmtDate(row.currentFrom))}
+                    {c.wagePanelCurrentSub(fmtDate(row.currentFrom, localeTag))}
                   </span>
                 </div>
               </div>
@@ -952,8 +953,8 @@ function WagePanel({
                           </div>
                           <div className="ratelist__period">
                             {h.to
-                              ? c.wagePanelTierRange(fmtDate(h.from), fmtDate(h.to))
-                              : c.wagePanelTierRangeOpen(fmtDate(h.from))}
+                              ? c.wagePanelTierRange(fmtDate(h.from, localeTag), fmtDate(h.to, localeTag))
+                              : c.wagePanelTierRangeOpen(fmtDate(h.from, localeTag))}
                           </div>
                           {h.note ? (
                             <div className="ratelist__note">

@@ -334,7 +334,7 @@ function EmployeeDrawer({
               {emp.initial}
             </span>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: "-.02em" }}>{emp.name}</div>
+              <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-.02em" }}>{emp.name}</div>
               <div className="panel__sub" style={{ fontSize: 12 }}>
                 {roleLabel(emp.role, dictionary)} · {lc.balanceHiredPrefix} {emp.hireDate ?? "—"}
               </div>

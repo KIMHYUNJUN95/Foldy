@@ -5,6 +5,7 @@ import type {
   AdminCorrectionRow,
 } from "@/lib/admin-attendance";
 import type { ReviewQueueItem } from "@/lib/attendance-review";
+import { reviewReason, type ReviewReason } from "@/lib/attendance-review-reason";
 import type { Dictionary } from "@/lib/i18n";
 import { formatAdminYen } from "../shared/admin-format";
 
@@ -24,17 +25,29 @@ function corrFieldLabel(field: AdminCorrectionField, c: Att): string {
   return c.corrFieldOther;
 }
 
+function reasonText(kind: ReviewReason, c: Att): string {
+  switch (kind) {
+    case "clockout_missing":
+      return c.issueClockoutMissing;
+    case "correction_pending":
+      return c.issueCorrectionPending;
+    case "long_shift":
+      return c.issueLongShift;
+    case "abnormal":
+      return c.issueAbnormal;
+    case "incomplete":
+      return c.issueIncomplete;
+    default:
+      return c.cardReviewLive;
+  }
+}
+
 function ReviewRow({ item, c, ym, cardExpired }: { item: ReviewQueueItem; c: Att; ym: string; cardExpired: boolean }) {
   const isUrgent = item.reviewState === "review_required" && (item.isAbnormal || !item.clockOutLabel);
-  // 사유는 데이터로 알 수 있는 것만 — 퇴근 누락 · 장시간(인정 12시간 초과) · 이상 감지(2026-10-13 시안 컨펌).
-  const reason = !item.clockOutLabel
-    ? c.issueClockoutMissing
-    : (item.paidDurationSec ?? 0) > 12 * 3600
-      ? c.issueLongShift
-      : item.isAbnormal
-        ? c.issueAbnormal
-        : c.cardReviewLive;
-  const tag = isUrgent && reason !== c.cardReviewLive ? `${c.tagUrgent} · ${reason}` : isUrgent ? c.tagUrgent : reason;
+  // 사유 판정은 검토 목록과 같은 함수 하나(attendance-review-reason).
+  const kind = reviewReason(item);
+  const reason = reasonText(kind, c);
+  const tag = isUrgent && kind !== "review" ? `${c.tagUrgent} · ${reason}` : isUrgent ? c.tagUrgent : reason;
   const subParts = [
     item.clockInLabel ? `${item.clockInLabel} → ${item.clockOutLabel ?? "—"}` : null,
     item.clockInSiteName ?? null,
@@ -94,7 +107,7 @@ export function AttendanceOverview({
   const yen = (n: number) => `${c.yenSym}${formatAdminYen(n, localeTag)}`;
 
   const kpis: { label: string; value: string; unit?: string; sub: string; tone?: "danger" }[] = [
-    { label: c.kpiReviewSessions, value: `${k.reviewSessions}`, unit: c.unitCount, sub: c.kpiReviewUrgent(k.urgent), tone: k.urgent > 0 ? "danger" : undefined },
+    { label: c.kpiReviewSessions, value: `${k.reviewSessions}`, unit: c.unitCount, sub: c.kpiReviewUrgent(k.urgent, k.reviewSessions), tone: k.urgent > 0 ? "danger" : undefined },
     { label: c.kpiCorrOpen, value: `${k.corrOpen}`, unit: c.unitCount, sub: c.kpiCorrSub },
     { label: c.kpiPayEstimated, value: yen(k.payTotal), sub: c.kpiPaySub(k.payEstimated) },
     { label: c.kpiPayExcluded, value: `${k.payExcluded}`, unit: c.unitCount, sub: c.kpiPayExcludedSub },
@@ -185,7 +198,7 @@ export function AttendanceOverview({
               <span className={`wstat__v${k.payExcluded > 0 ? " is-warn" : ""}`}>{k.payExcluded}</span>
             </div>
           </div>
-          <p className="wnote">{c.payNote(k.payExcluded)}</p>
+          {k.payExcluded > 0 ? <p className="wnote">{c.payNote(k.payExcluded)}</p> : null}
           <p className="wnote">{c.payFootNote}</p>
         </section>
         <section>

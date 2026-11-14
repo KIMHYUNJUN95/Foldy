@@ -127,7 +127,7 @@ adds owner-enforced server actions for:
 - active-QR issue/reissue for the selected site
 - scannable QR rendering in the admin page itself (SVG via `qrcode`)
 
-This is intentionally **not** the full attendance dashboard: no review queue, payroll, export, or
+This is intentionally **not** the full attendance dashboard: no review list, payroll, export, or
 totals UI, and no broader site-history/revoke management surface yet. The dev temp-QR route remains for
 local-only testing. Still pending for the worker app (Step 3+): clock-in/out + break + correction
 execution.
@@ -248,7 +248,7 @@ redesign of an existing screen.
 - **Self-only safety** is enforced server-side in the query layer (not UI hiding). Reads use the
   service client but always pin `user_id` to the session user + org.
 
-Still pending (Step 6+): correction request submit/review, admin review queue, payroll
+Still pending (Step 6+): correction request submit/review, admin review list, payroll
 (employment/rate history, expected pay, monthly finalization, dashboard), export, notifications, and the
 full midnight sweep. The query layer is shaped to absorb correction indicators + pay views later.
 
@@ -292,7 +292,7 @@ form + `/mobile/attendance/correction/status` screens (these already existed as 
   + authoritative-application step can be added without reshaping the data.
 
 **Pending migration to apply:** `202606170003_attendance_correction_storage.sql` (correction-photo
-storage). Still pending (Step 7+): admin review queue + approve/reject + authoritative correction
+storage). Still pending (Step 7+): admin review list + approve/reject + authoritative correction
 application, manual admin session create/update, payroll, export, notifications, full midnight sweep.
 
 ## As-built - Step 7 (admin review + correction approve/reject, 2026-06-17)
@@ -495,7 +495,7 @@ data. **No admin PC/web dashboard** (explicit scope rule). The pay screen is **n
 > Cancelling an allowance from the wage-page list (`cancelAttendanceAllowance`) restores the affected pay.
 >
 > **Update (2026-07-10, off-site / manual entry):** the field always has variables — off-site work and
-> forgotten clock-ins. So (1) admins can enter a session by hand from the review queue
+> forgotten clock-ins. So (1) admins can enter a session by hand from the review list
 > (`ManualSessionModal` → `createManualAttendanceSession`, free-text `manual_location` instead of a
 > required site; migration `202607100004`), (2) per-user Excel/PDF exports gained a **근무 위치** column
 > (manual location, else the site name), and (3) `getMonthlyPayView` now applies a **`daily_fixed`
@@ -591,7 +591,7 @@ the worker's own pay screen showing the finalized number + badge.
   `{ eligible, blockers }`. Session counts come from `countBlockingSessions` (shared with
   `computePayrollMonth`); **`invalid` sessions never count** — invalidating is the admin's resolution
   (2026-10-19). Before that, a session invalidated while still `review_required` kept blocking the month
-  forever (restore was the only UI exit, which re-validated it). The review queue `review_required`
+  forever (restore was the only UI exit, which re-validated it). The review list `review_required`
   filter, the 근태 badge, the overview "검토 필요" KPI, the queue 검토 tab, and staff-detail abnormal
   marks exclude `invalid` the same way; invalid sessions stay visible in 전체 with the 무효 pill.
 - **Finalize** `finalizeAttendanceMonth({ userId, ym })` (`src/app/admin/attendance/actions.ts`,
@@ -690,7 +690,7 @@ export, so this is backend + a dev test route.
 
 Still pending (Step 14+): **notifications** (18:30 reminder, correction/finalize outcomes), full
 midnight sweep, the employment/rate **management** backend (Step 9), and the owner/admin **web-dashboard
-UI** (site/QR, review queue, manual management, rate management, finalize/reopen, totals dashboard, export -> all deferred until the app is complete). ~~The final operator Excel export template also remains
+UI** (site/QR, review list, manual management, rate management, finalize/reopen, totals dashboard, export -> all deferred until the app is complete). ~~The final operator Excel export template also remains
 pending (interim CSV is in place).~~ **Done (2026-07-03):** the final monthly + per-user **Excel
 workbook + PDF** export ships in the admin 급여 검토 page; see the 2026-07-03 as-built sections below.
 
@@ -728,7 +728,7 @@ the privileged review/manage surfaces are implemented in the admin attendance co
   deep-link to the attendance home).
 
 This is the **final attendance/payroll app-scope step.** Intentionally deferred (document-only): the
-owner/admin **web-dashboard UI** (site/QR, review queue, manual management, employment/rate management [Step 9],
+owner/admin **web-dashboard UI** (site/QR, review list, manual management, employment/rate management [Step 9],
 finalize/reopen, totals dashboard, export), the operator Excel **export template**, the full
 **midnight sweep**, and **Web Push** delivery (notifications are in-app only).
 
@@ -838,7 +838,7 @@ The desktop admin attendance console now consumes the attendance/payroll/transpo
 directly instead of rendering placeholder dashboard values.
 
 - **Overview aggregation** (`src/lib/admin-attendance.ts`): `getAdminAttendanceOverview` pulls from the
-  same review queue, correction-request, payroll, and transport helpers used by the detail pages (since
+  same review list, correction-request, payroll, and transport helpers used by the detail pages (since
   2026-10-19 it reads only the slices its numbers need — see "Admin attendance read path — batched"). KPI
   values therefore represent the current queue/payroll/transport data instead of safe-zero placeholders.
   Transport KPI includes real missing-receipt evidence count derived from reimbursement items with no
@@ -862,7 +862,7 @@ directly instead of rendering placeholder dashboard values.
   payroll/transport, staff-day panels to queue, and wage panels to staff detail also carry the selected
   `ym`.
 - **Blocker → review-queue deep links (2026-07-10)**: in the payroll side panel, each 마감 차단 사유
-  card (검토 필요 세션 / 정정 요청 대기 / 진행 중 세션) is a link into the review queue pre-filtered to
+  card (검토 필요 세션 / 정정 요청 대기 / 진행 중 세션) is a link into the review list pre-filtered to
   the blocking work. `검토 필요`·`진행 중` → `filter=review`, `정정 요청` → `filter=corr`, all carrying
   `?ym=<selected>&q=<staff name>`. The queue page (`/admin/attendance/queue`) now reads `filter`
   (`review|corr|all`, default `review`; the old `pending` tab was merged into `corr` on 2026-10-29 and `?filter=pending` now opens `corr`) and `q` (name search, ≤60 chars) from `searchParams` and
@@ -914,7 +914,7 @@ directly instead of rendering placeholder dashboard values.
   indicator keeps its own pulse. `RosterEntry` includes `openBreakStartedAt` so the admin roster can show
   an elapsed `휴게 N분` value in the break column while keeping `휴게 중` as the status chip. Date selection
   lives in one top attendance-subnav date picker, not inside the roster body. This page is read-only;
-  payroll-impacting edits remain in the review queue actions.
+  payroll-impacting edits remain in the review list actions.
 - **i18n guard fix**: the complaint image lightbox aria labels are dictionary-backed (`lightboxClose`,
   `lightboxPhoto`) in ko/ja/en so the repository-wide i18n guard remains green.
 
@@ -939,7 +939,7 @@ Important boundary:
 - break tracking
 - own attendance history
 - correction / exception request flow
-- admin review queue
+- admin review list
 - failure attempt logging
 
 ### Phase B - Hourly Pay Core
@@ -1396,7 +1396,7 @@ Admin attendance read path — batched (2026-10-19):
   profile · month inputs · transport report start together, then breaks · corrections · sites · transport
   items. The ledger reuses the pay sessions (newest first) instead of reading sessions, breaks, and
   corrections a second time. ~12 serial steps → 2 (+ the privilege check inside step 1).
-- **Overview** reads only what its numbers need: the review queue with `filter: "review_required"` (not
+- **Overview** reads only what its numbers need: the review list with `filter: "review_required"` (not
   every session of the month), the open-correction **count** (`head` count, capped at the corr tab's
   200) plus the first 5 for the sample, the batched payroll KPI, and the transport KPI straight from
   `getTransportReportSummaryForAdmin` (`transportKpiOf`, same numbers as the transport table). ~11 serial

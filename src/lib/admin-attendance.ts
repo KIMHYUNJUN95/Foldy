@@ -67,7 +67,7 @@ function tokyoDateLabel(iso: string | null, localeTag: string): string | null {
   if (!iso) return null;
   return new Intl.DateTimeFormat(localeTag, {
     timeZone: TZ,
-    month: "long",
+    month: localeTag.startsWith("en") ? "short" : "long",
     day: "numeric",
     weekday: "short",
   }).format(new Date(iso));
@@ -120,7 +120,6 @@ export type AdminAttendanceBadgeStats = {
   ym: string;
   queueOpen: number;
   queueUrgent: number;
-  payrollTargets: number;
   transportPending: number;
 };
 
@@ -139,7 +138,6 @@ const EMPTY_KPI = {
 const EMPTY_BADGE_STATS = {
   queueOpen: 0,
   queueUrgent: 0,
-  payrollTargets: 0,
   transportPending: 0,
 };
 
@@ -172,14 +170,8 @@ export async function getAdminAttendanceBadgeStats(
 
   const monthFrom = `${ym}-01`;
   const monthTo = lastDayOfYm(ym);
-  const today = new Intl.DateTimeFormat("en-CA", {
-    timeZone: TZ,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
 
-  const [reviewRes, correctionsRes, transportRes, membersRes, empRes, rateRes] =
+  const [reviewRes, correctionsRes, transportRes] =
     await Promise.all([
       service
         .from("attendance_sessions")
@@ -203,24 +195,6 @@ export async function getAdminAttendanceBadgeStats(
         .eq("organization_id", session.organization.id)
         .eq("target_month", monthFrom)
         .in("status", ["submitted", "reviewing"]),
-      service
-        .from("memberships")
-        .select("user_id")
-        .eq("organization_id", session.organization.id)
-        .eq("status", "active"),
-      service
-        .from("employment_type_history")
-        .select("user_id, employment_type, effective_from, effective_to")
-        .eq("organization_id", session.organization.id)
-        .lte("effective_from", today)
-        .or(`effective_to.is.null,effective_to.gte.${today}`)
-        .order("effective_from", { ascending: false }),
-      service
-        .from("hourly_rate_history")
-        .select("user_id, hourly_rate, effective_from, effective_to")
-        .eq("organization_id", session.organization.id)
-        .lte("effective_from", today)
-        .or(`effective_to.is.null,effective_to.gte.${today}`),
     ]);
 
   const openCorrectionSessionIds = new Set(
@@ -233,38 +207,12 @@ export async function getAdminAttendanceBadgeStats(
     clock_out_at: string | null;
     status: string;
   }[]).filter((row) => !openCorrectionSessionIds.has(row.id));
-  const activeUserIds = new Set(
-    ((membersRes.data ?? []) as { user_id: string }[]).map((row) => row.user_id),
-  );
-  const currentEmploymentByUser = new Map<string, string>();
-  for (const row of (empRes.data ?? []) as {
-    user_id: string;
-    employment_type: string;
-    effective_from: string;
-    effective_to: string | null;
-  }[]) {
-    if (!currentEmploymentByUser.has(row.user_id)) {
-      currentEmploymentByUser.set(row.user_id, row.employment_type);
-    }
-  }
-  const currentHourlyRateUsers = new Set(
-    ((rateRes.data ?? []) as { user_id: string; hourly_rate: number }[])
-      .filter((row) => Number(row.hourly_rate) > 0)
-      .map((row) => row.user_id),
-  );
-  let payrollTargets = 0;
-  for (const userId of activeUserIds) {
-    if (currentEmploymentByUser.get(userId) === "salaried") continue;
-    if (currentHourlyRateUsers.has(userId)) payrollTargets += 1;
-  }
-
   return {
     isPrivileged: true,
     ym,
     // 검토 큐 탭 숫자와 같다: 「검토 필요」(열린 정정이 걸린 근무는 뺌) + 「정정 요청」(목록 상한 200건과 같게, 2026-10-29).
     queueOpen: reviewRows.length + Math.min(correctionsRes.count ?? 0, CORRECTION_LIST_LIMIT),
     queueUrgent: reviewRows.filter((row) => !row.clock_out_at).length,
-    payrollTargets,
     transportPending: transportRes.count ?? 0,
   };
 }

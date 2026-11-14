@@ -1,5 +1,6 @@
 "use client";
 
+import { attendanceRoleLabel } from "@/lib/attendance-console-labels";
 import { LiveWash } from "@/components/shared/live-wash";
 import Image from "next/image";
 import { Fragment, useEffect, useMemo, useState, useTransition } from "react";
@@ -25,6 +26,8 @@ import { useRouter } from "next/navigation";
 import { ManualSessionModal } from "./manual-session-modal";
 import type { ReviewQueueItem } from "@/lib/attendance-review";
 import type { AdminCorrectionRow, AdminCorrectionField } from "@/lib/admin-attendance";
+import { attendanceMethodLabel as methodLabel } from "@/lib/attendance-console-labels";
+import { reviewReason, type ReviewReason } from "@/lib/attendance-review-reason";
 import { needsReviewRow, type AttendanceCorrectionStatus } from "@/lib/attendance";
 import { getDictionary, type Dictionary, type Locale } from "@/lib/i18n";
 import {
@@ -67,16 +70,9 @@ function fmtSec(sec: number | null): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
-type IssueKind = "clockout_missing" | "correction_pending" | "abnormal" | "incomplete" | "review";
+type IssueKind = ReviewReason;
 
-function classifyIssue(item: ReviewQueueItem): IssueKind {
-  if (item.status === "open" && !item.clockOutLabel) return "clockout_missing";
-  if (item.correctionStatus === "requested" || item.correctionStatus === "in_review")
-    return "correction_pending";
-  if (item.isAbnormal) return "abnormal";
-  if (!item.clockOutLabel) return "incomplete";
-  return "review";
-}
+const classifyIssue = reviewReason;
 
 /** 수동 정정 · 수기 입력 뒤 토스트 — 같이 닫힌 정정 요청 수를 덧붙인다. */
 function withClosedCorrections(c: Att, base: string, closed?: ClosedCorrections): string {
@@ -86,26 +82,26 @@ function withClosedCorrections(c: Att, base: string, closed?: ClosedCorrections)
   return parts.join(" ");
 }
 
-function issueLabel(kind: IssueKind, c: Att): { t: string; s: string } {
+/** t = 행 제목(사유) · s = 패널 설명 · todo = 목록 줄의 짧은 할 일. */
+function issueLabel(kind: IssueKind, c: Att, item?: ReviewQueueItem): { t: string; s: string; todo: string } {
   switch (kind) {
     case "clockout_missing":
-      return { t: c.issueClockoutMissing, s: c.issueClockoutMissingNote };
+      return { t: c.issueClockoutMissing, s: c.issueClockoutMissingNote, todo: c.todoClockoutMissing };
     case "correction_pending":
-      return { t: c.issueCorrectionPending, s: c.issueCorrectionPendingNote };
+      return { t: c.issueCorrectionPending, s: c.issueCorrectionPendingNote, todo: c.todoCorrectionPending };
+    case "long_shift":
+      return {
+        t: c.issueLongShift,
+        s: c.issueLongShiftNote,
+        todo: c.todoLongShift.replace("{time}", item?.clockOutLabel ?? "—"),
+      };
     case "abnormal":
-      return { t: c.issueAbnormal, s: c.issueAbnormalNote };
+      return { t: c.issueAbnormal, s: c.issueAbnormalNote, todo: c.todoAbnormal };
     case "incomplete":
-      return { t: c.issueIncomplete, s: c.issueIncompleteNote };
+      return { t: c.issueIncomplete, s: c.issueIncompleteNote, todo: c.todoIncomplete };
     default:
-      return { t: c.issueGenericReview, s: c.issueGenericReviewNote };
+      return { t: c.issueGenericReview, s: c.issueGenericReviewNote, todo: c.todoReview };
   }
-}
-
-function methodLabel(method: string | null, c: Att): string {
-  if (!method) return c.methodFallback;
-  if (method === "qr" || method === "qr_gps") return c.methodQr;
-  if (method === "manual") return c.methodManual;
-  return method;
 }
 
 function isUrgent(item: ReviewQueueItem): boolean {
@@ -171,7 +167,7 @@ function SessionRow({
   onOpen: (id: string) => void;
 }) {
   const urgent = isUrgent(item);
-  const issue = issueLabel(classifyIssue(item), c);
+  const issue = issueLabel(classifyIssue(item), c, item);
   const pill = statusPill(item, c);
   return (
     <tr
@@ -207,9 +203,8 @@ function SessionRow({
           </div>
         </div>
       </td>
-      <td>
-        <span className="mono">{item.operatingDate.slice(5)}</span>{" "}
-        <span className="dim-cell">{item.dateLabel.split(" ").pop()}</span>
+      <td className="num">
+        {item.dateLabel}
       </td>
       <td>
         <span className="issue">{issue.t}</span>
@@ -222,7 +217,7 @@ function SessionRow({
           </>
         ) : null}
         <div className="who__sub" style={{ marginTop: 2 }}>
-          {issue.s}
+          {issue.todo}
         </div>
       </td>
       <td className="mono">
@@ -230,7 +225,7 @@ function SessionRow({
         {item.clockOutLabel ? (
           item.clockOutLabel
         ) : (
-          <b style={{ color: "var(--danger)", fontFamily: "var(--font)" }}>{c.missingOut}</b>
+          <b style={{ color: "var(--danger)", fontFamily: "var(--font)", whiteSpace: "nowrap" }}>{c.missingOut}</b>
         )}
       </td>
       <td className="mono">{fmtSec(item.paidDurationSec)}</td>
@@ -325,6 +320,7 @@ export function AttendanceQueueClient({
   locale: Locale;
 }) {
   const c = getDictionary(locale).admin.attendanceConsole;
+  const roleNames = getDictionary(locale).roles as Record<string, string>;
   const localeTag = locale === "ko" ? "ko-KR" : locale === "ja" ? "ja-JP" : "en-US";
   const router = useRouter();
   const [manualOpen, setManualOpen] = useState(false);
@@ -810,13 +806,13 @@ export function AttendanceQueueClient({
                           </span>
                           <div>
                             <div className="who__nm">{r.requesterName}</div>
-                            <div className="who__sub">{r.requesterRole ?? "—"}</div>
+                            <div className="who__sub">{attendanceRoleLabel(r.requesterRole, roleNames)}</div>
                           </div>
                         </div>
                       </td>
-                      <td>
+                      <td className="num">
                         {r.dateLabel ? (
-                          <span className="mono">{r.operatingDate?.slice(5) ?? "—"}</span>
+                          r.dateLabel
                         ) : (
                           <span className="dim-cell">—</span>
                         )}
@@ -1118,7 +1114,7 @@ function SessionPanel({
   const [auditReloadKey, setAuditReloadKey] = useState(0);
   const panelRef = useAdminPanelA11y<HTMLElement>(onClose, { disabled: modal !== null });
   const issueKind = classifyIssue(item);
-  const issue = issueLabel(issueKind, c);
+  const issue = issueLabel(issueKind, c, item);
   const pill = statusPill(item, c);
   const urgent = isUrgent(item);
   const isInvalid = item.status === "invalid";
@@ -1334,7 +1330,7 @@ function SessionPanel({
                     display: "block",
                     color: "var(--ink)",
                     fontSize: 17,
-                    fontWeight: 900,
+                    fontWeight: 600,
                   }}
                 >
                   {item.userName}
@@ -1867,7 +1863,7 @@ function CorrectionPanel({
                     display: "block",
                     color: "var(--ink)",
                     fontSize: 17,
-                    fontWeight: 900,
+                    fontWeight: 600,
                   }}
                 >
                   {row.requesterName}

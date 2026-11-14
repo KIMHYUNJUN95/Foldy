@@ -1,5 +1,6 @@
 "use client";
 
+import { attendanceRoleLabel } from "@/lib/attendance-console-labels";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import type { ReactNode } from "react";
 import { Clock, Phone } from "lucide-react";
@@ -280,7 +281,7 @@ export function AttendanceRosterClient({
                                 </span>
                               ) : null}
                             </div>
-                            <div className="who__sub">{e.role}</div>
+                            <div className="who__sub">{attendanceRoleLabel(e.role, getDictionary(locale).roles as Record<string, string>)}</div>
                           </div>
                         </div>
                       </td>

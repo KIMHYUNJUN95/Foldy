@@ -43,7 +43,6 @@ export default async function AdminAttendanceOverviewPage({
         localeTag={localeTag}
         badges={{
           queue: { n: data.kpi.reviewSessions + data.kpi.corrOpen, urgent: data.kpi.urgent > 0 },
-          payroll: { n: data.kpi.payEstimated },
           transport: { n: data.kpi.trPending },
         }}
       />

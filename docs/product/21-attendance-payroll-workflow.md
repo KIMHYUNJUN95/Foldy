@@ -8,7 +8,7 @@
 
 Status: **Implemented across mobile and admin.** Mobile provides QR/GPS clock-in/out, breaks, trusted
 device flow, corrections, history, expected pay, notifications, and reminders. The admin console provides
-overview, review queue, manual management, roster, employment/rate management, payroll/finalization,
+overview, review list (검토 목록), manual management, roster, employment/rate management, payroll/finalization,
 transportation, annual leave, and Excel/print-to-PDF exports. Wi-Fi activation, tax/deduction accounting,
 and salaried payroll remain outside the current implementation.
 
@@ -437,7 +437,7 @@ Minimum audit history must include:
 Implemented (2026-07-10). Admins can manually enter attendance for off-site work or missed QR
 clock-in/out.
 
-- **Entry point:** `/admin/attendance/queue` (검토 큐) toolbar **"근무 추가"** → `ManualSessionModal`
+- **Entry point:** `/admin/attendance/queue` (검토 목록) toolbar **"근무 추가"** → `ManualSessionModal`
   → `createManualAttendanceSession` (`src/app/admin/attendance/actions.ts`).
 - **Who:** `isAttendancePayrollAdmin` — `owner` / `senior_managing_director`(전무, owner-equivalent) /
   `attendance_payroll_admin`.

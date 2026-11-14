@@ -1,5 +1,6 @@
 "use client";
 
+import { attendanceRoleLabel } from "@/lib/attendance-console-labels";
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import {
@@ -344,6 +345,7 @@ export function AttendancePayrollClient({
           weekly={weeklyLimit[panelRow.userId] ?? null}
           c={c}
           shared={shared}
+          roles={dictionary.roles as Record<string, string>}
           localeTag={localeTag}
           advanced={advanced}
           onClose={() => openPanel(null)}
@@ -409,6 +411,7 @@ function PayrollPanel({
   weekly,
   c,
   shared,
+  roles,
   localeTag,
   advanced,
   onClose,
@@ -420,6 +423,7 @@ function PayrollPanel({
   weekly: WeeklyLimitChip | null;
   c: Att;
   shared: AdminExportLabels;
+  roles: Record<string, string>;
   localeTag: string;
   advanced: boolean;
   onClose: () => void;
@@ -536,12 +540,12 @@ function PayrollPanel({
                     display: "block",
                     color: "var(--ink)",
                     fontSize: 17,
-                    fontWeight: 900,
+                    fontWeight: 600,
                   }}
                 >
                   {row.userName}
                 </span>
-                <span className="panel__sub">{row.role ?? "—"}</span>
+                <span className="panel__sub">{attendanceRoleLabel(row.role, roles)}</span>
               </span>
             </span>
           </div>

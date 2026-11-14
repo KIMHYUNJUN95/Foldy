@@ -154,7 +154,7 @@ function dateLabelOf(operatingDate: string, localeTag: string): string {
   const d = new Date(`${operatingDate}T00:00:00+09:00`);
   return new Intl.DateTimeFormat(localeTag, {
     timeZone: TZ,
-    month: "long",
+    month: localeTag.startsWith("en") ? "short" : "long",
     day: "numeric",
     weekday: "short",
   }).format(d);

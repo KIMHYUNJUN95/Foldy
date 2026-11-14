@@ -1,5 +1,6 @@
 "use client";
 
+import { attendanceRoleLabel } from "@/lib/attendance-console-labels";
 import Link from "next/link";
 import { useState } from "react";
 import {
@@ -78,7 +79,8 @@ export function AttendanceStaffDetail({
   /** 재류카드 만료 — 이름 옆 빨간 칩(경고만, docs/product/41 「만료 표시」). */
   cardExpired?: boolean;
 }) {
-  const c = getDictionary(locale).admin.attendanceConsole;
+  const dictionary = getDictionary(locale);
+  const c = dictionary.admin.attendanceConsole;
   const [panelSel, setPanelSel] = useState<string | null>(null);
   const [ledgerExpanded, setLedgerExpanded] = useState(false);
   const selSession =
@@ -125,7 +127,7 @@ export function AttendanceStaffDetail({
             alignItems: "center",
             justifyContent: "center",
             color: "#fff",
-            fontWeight: 800,
+            fontWeight: 600,
           }}
         >
           {initial(data.user.name)}
@@ -141,7 +143,7 @@ export function AttendanceStaffDetail({
             ) : null}
           </div>
           <div className="uhead__sub">
-            {data.user.role ?? "—"}
+            {attendanceRoleLabel(data.user.role, dictionary.roles as Record<string, string>)}
             <span className="sep" />
             {data.monthLabel}
           </div>
@@ -536,7 +538,7 @@ function DaySessionPanel({
             <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span
                 className="panel__room"
-                style={{ fontFamily: "var(--mono)", fontSize: 20, fontWeight: 900 }}
+                style={{ fontFamily: "var(--mono)", fontSize: 20, fontWeight: 600 }}
               >
                 {day.date.slice(5)}
               </span>

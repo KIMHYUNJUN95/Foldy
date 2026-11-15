@@ -76,6 +76,7 @@ Historical: Retained for decision history but superseded by a newer document or 
 | [Cleaning Rules Table](./product/45-cleaning-rules-table.md) | Living | Source of truth for cleaning · assignment behavior (room states, assignment changes, record counting, daily load cap) |
 | [Self Check-in Kiosk](./product/43-self-checkin-kiosk.md) | Draft | Building-tablet self check-in — decision record (23 decisions, Hotelsmart survey) |
 | [Self Check-in QA · Rollout Plan](./planning/20-self-checkin-qa-rollout-plan.md) | Draft | QA gates, device checklist, pilot → all buildings, staff ops guide, schedule |
+| [CLAUDE.md Rules — Detail](./planning/21-claude-rules-detail.md) | Active | Full wording of the project rules; root `CLAUDE.md` is the short version (2026-11-15) |
 | [Self Check-in PRD](./product/44-self-checkin-prd.md) | Draft | Requirements (FR/NFR), personas, journeys, KPIs, risks, acceptance criteria |
 | [Self Check-in Staff Call](./product/46-self-checkin-staff-call.md) | Living | Tablet ↔ staff call on demand — decisions, states, API contract, LiveKit tokens, screens |
 | [Guest Messaging](./product/47-guest-messaging.md) | 구현 중(2~6단계 커밋 전) | OTA guest messages via Beds24 (webhook-first, credit budget, channel adapter), auto messages, response targets, usage view, building info card, message → task |

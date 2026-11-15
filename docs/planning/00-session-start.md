@@ -11,6 +11,7 @@
 | 작업 | 먼저 읽기 |
 | --- | --- |
 | 무엇이든 | `CLAUDE.md` 「Read These First」 · `docs/planning/05-ai-collaboration-rules.md` |
+| 규칙의 자세한 내용 | `docs/planning/21-claude-rules-detail.md` (CLAUDE.md 는 짧은 판 — 해당 영역 섹션만 열기) |
 | 모바일 화면 | `docs/product/16-mobile-navigation.md` (폰 · 폴드 · 태블릿 3폭 필수) |
 | 관리자(PC) 화면 | `docs/product/05-admin-web-ia.md` + `src/components/admin/shared` 재사용 |
 | 급여 · 근태 | `docs/product/39-*` · `40-*` · `21-*` · `24-*` (계산 방식은 건드리지 않음) |
@@ -29,3 +30,4 @@
 8. 구현 · 수정마다 맞는 **설치된 스킬을 `Skill` 도구로 실제 호출**하고, 보고에 쓴 스킬(없으면 없다고)을 적는다.
 9. 다른 세션이 같은 저장소에서 일한다 — 내 파일만 스테이징(`git add -A` 금지).
 10. **모든 작업은 에이전트 흐름으로**: ⓪ 계획 · 시작 컨펌 → ① 구현 에이전트(문서 · 새 테스트 · 자체 lint 포함) → ② 독립 검사(리뷰 · 감사 · 화면/DB 실제로 돌려 보기, diff 만) → ③ 같은 에이전트가 고치기 → ④ 리드가 전체 test · lint · build · 보고 · 허락 뒤 직접 커밋. 소 · 중 · 대로 줄이기 — `05` 「에이전트 작업 흐름」.
+11. **모델은 세 가지만**: 간단한 일 = Sonnet(기본) · 중요한 일 = Opus · 아주 어려운 일 = Fable(가끔). Haiku 금지(훅이 막음). 에이전트 정의에 모델이 없으면 Sonnet 으로 돈다(`.claude/settings.json` env) — Opus · Fable 이 필요하면 `model` 을 직접 지정 — `05` 「모델 고르기」.

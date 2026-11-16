@@ -1908,7 +1908,7 @@ Supabase advisor `anon_security_definer_function_executable` 정리. 운영 `pg_
   - 줄이는 방법 두 가지 — 2026-11-16 ② 로 정함(사용자 승인 B, 아래 절): ① publication **칸 목록**(`alter publication … add table t (id, organization_id, conversation_id, …)`, PG15+) — Supabase Realtime 이 칸 목록 publication 을 지원하는지 · RLS 판정에 필요한 칸이 빠져도 되는지 **먼저 확인**해야 한다. ② DB 트리거가 id 만 **broadcast**(`realtime.send`, private 채널)하고 `realtime.messages` 에 RLS 를 걸기 — 행 내용이 아예 소켓에 오르지 않는다. 함께 authenticated 의 표 select GRANT 를 칸 단위로 줄이는 것도 검토 대상(REST 노출).
 - 화면은 신호의 **id 만** 쓰고 그 항목을 서버 액션으로 다시 읽는다: `getGuestConversationRows`(`guest_messages.view`, 조직은 세션 — 다른 조직 id 는 `missing`) · `getGuestConversation` · `getAutoRunsByIdsAction` · `listAutoRuleSummariesAction`(관리자 웹 + `guest_messages.manage`). 모두 거부는 `forbidden` 결과(redirect 없음).
 
-## 2026-11-16 손님 메시지 실시간 — private broadcast (`202611160001_guest_messages_realtime_private`, **아직 적용 전**)
+## 2026-11-16 손님 메시지 실시간 — private broadcast (`202611160001_guest_messages_realtime_private`, **운영 적용 확인 2026-11-17**)
 
 기준 문서: `docs/product/47-guest-messaging.md` §5-9. 위 절의 「행 전체가 실린다」를 없앤다.
 

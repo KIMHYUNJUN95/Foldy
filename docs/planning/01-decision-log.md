@@ -7556,5 +7556,5 @@ Status: Confirmed (2026-10-19). 실제 Beds24 시험 대기.
 ## 2026-11-16 — 손님 메시지 실시간 신호는 id 만 든 private broadcast (사용자 선택 B)
 
 - 2026-11-13 의 `postgres_changes` 신호에는 행 전체(본문 · 사진 · 손님 이름 · 자동 안내의 채워진 출입 코드)가 실려, 브라우저 개발자 도구로 Q10 가리기 전 글이 보였다. publication 칸 목록은 Supabase Realtime 이 지킨다고 믿기 어려워 쓰지 않는다.
-- 사용자가 B 를 골랐다: 네 표를 publication 에서 빼고, 트리거(`guest_messages_live_signal`, SECURITY DEFINER)가 id 칸만 든 신호를 조직 private 토픽 `guest-messages:<조직 id>` 로 보낸다. 받기는 `realtime.messages` 정책으로 그 조직 `guest_messages.view` 만, 보내기 정책은 없다. 화면이 id 로 다시 읽는 방식(11-13 결정)은 그대로다. 마이그레이션 `202611160001`(운영 적용 · 배포 대기). 상세: 47 §5-9 · 05.
+- 사용자가 B 를 골랐다: 네 표를 publication 에서 빼고, 트리거(`guest_messages_live_signal`, SECURITY DEFINER)가 id 칸만 든 신호를 조직 private 토픽 `guest-messages:<조직 id>` 로 보낸다. 받기는 `realtime.messages` 정책으로 그 조직 `guest_messages.view` 만, 보내기 정책은 없다. 화면이 id 로 다시 읽는 방식(11-13 결정)은 그대로다. 마이그레이션 `202611160001`(운영 적용 · 배포 확인 2026-11-17). 상세: 47 §5-9 · 05.
 - 남은 것: REST select GRANT 줄이기 · Realtime 「Allow public access」 끄기는 따로 결정.

@@ -2500,9 +2500,15 @@
 .adm .dd__btn--sm .dd__chev svg { width: 15px; height: 15px; }
 .adm .dd.open .dd__btn--sm { box-shadow: none; background: #f4f4f7; }
 .adm .dd:has(.dd__btn--sm) .dd__menu { right: auto; min-width: max(100%, 180px); }
-.adm .dd__menu { position: absolute; z-index: 50; top: calc(100% + 6px); left: 0; right: 0; min-width: 100%; background: var(--card); border: 1px solid var(--line); border-radius: 13px; box-shadow: var(--sh-pop); padding: 6px; animation: ddIn 0.14s ease; overflow: hidden; }
+/* 메뉴 폭 = 내용 폭(트리거보다 좁지 않게, 최대 360px). 옵션 글자는 한 줄 — 넘치면 말줄임. 오른쪽 끝에 붙은 트리거는 .dd__menu--end 로 오른쪽 맞춤. */
+.adm .dd__menu { position: absolute; z-index: 50; top: calc(100% + 6px); left: 0; right: auto; width: max-content; min-width: 100%; max-width: min(360px, calc(100vw - 32px)); background: var(--card); border: 1px solid var(--line); border-radius: 13px; box-shadow: var(--sh-pop); padding: 6px; animation: ddIn 0.14s ease; overflow: hidden; }
 .adm .dd__menu--up { top: auto; bottom: calc(100% + 6px); transform-origin: bottom; }
-.adm .dd__menu--wide { min-width: 280px; }
+.adm .dd__menu--end { left: auto; right: 0; }
+.adm .dd:has(.dd__btn--sm) .dd__menu.dd__menu--end { left: auto; right: 0; }
+.adm .dd__menu--wide { right: 0; width: auto; min-width: 280px; max-width: none; }
+.adm .dd--search .dd__menu { right: 0; width: auto; max-width: none; }
+.adm .dd__opt__k { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adm .dd__opt__k:has(> b) { white-space: normal; overflow: visible; }
 @keyframes ddIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 .adm .dd__opt { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 9px; border: none; background: none; text-align: left; font-size: 13px; font-weight: 700; color: var(--ink-soft); cursor: pointer; }
 .adm .dd__opt:hover { background: var(--card2); color: var(--ink); }

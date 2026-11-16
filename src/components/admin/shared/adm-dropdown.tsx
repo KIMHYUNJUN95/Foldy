@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from "react";
 import { Check, ChevronDown, Search, X } from "lucide-react";
 import { useSession } from "@/components/providers/session-provider";
 import { dictionaries } from "@/lib/i18n";
@@ -47,6 +47,19 @@ type AdmDropdownProps = {
   placement?: "down" | "up";
 };
 
+/** 내용 폭 메뉴가 뷰포트 오른쪽 여백(8px)을 넘으면 오른쪽 맞춤으로 뒤집어야 한다. */
+export function menuOverflowsRight(menuRight: number, viewportWidth: number): boolean {
+  return menuRight > viewportWidth - 8;
+}
+
+/** 열 때 한 번 재서 `.dd__menu--end` 를 붙인다 — 그리기 전에 클래스만 붙여 깜빡임 · 재렌더 없음. `.dd__menu` 를 직접 그리는 곳도 같이 쓴다. */
+export function useDdMenuEdgeFlip(menuRef: RefObject<HTMLElement | null>, open: boolean) {
+  useLayoutEffect(() => {
+    const menu = menuRef.current;
+    if (open && menu && menuOverflowsRight(menu.getBoundingClientRect().right, window.innerWidth)) menu.classList.add("dd__menu--end");
+  }, [menuRef, open]);
+}
+
 /** 열린 메뉴에서 화살표 · Home · End 로 옮길 다음 옵션 위치(끝에서 멈춤). current -1 = 목록 밖(검색 입력). */
 export function nextOptionIndex(key: string, current: number, count: number): number {
   if (count <= 0) return -1;
@@ -62,8 +75,8 @@ export function returnsToSearch(key: string, current: number, searchable: boolea
   return searchable && key === "ArrowUp" && current === 0;
 }
 
-export function ddMenuClassName(opts: { wide: boolean; placement: "down" | "up"; instant: boolean }): string {
-  return `dd__menu${opts.wide ? " dd__menu--wide" : ""}${opts.placement === "up" ? " dd__menu--up" : ""}${opts.instant ? " dd__menu--instant" : ""}`;
+export function ddMenuClassName(opts: { wide: boolean; placement: "down" | "up"; instant: boolean; end?: boolean }): string {
+  return `dd__menu${opts.wide ? " dd__menu--wide" : ""}${opts.end ? " dd__menu--end" : ""}${opts.placement === "up" ? " dd__menu--up" : ""}${opts.instant ? " dd__menu--instant" : ""}`;
 }
 
 /**
@@ -131,6 +144,8 @@ export function AdmDropdown({
       window.removeEventListener("keydown", onKey, true);
     };
   }, [close, open]);
+
+  useDdMenuEdgeFlip(menuRef, open);
 
   function optionEls(): HTMLButtonElement[] {
     return Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="option"]') ?? []);
@@ -271,7 +286,7 @@ export function AdmDropdown({
                     {option.desc ? <small>{option.desc}</small> : null}
                   </span>
                 ) : (
-                  <span className="dd__opt__k">{option.label}</span>
+                  <span className="dd__opt__k" title={typeof option.label === "string" ? option.label : undefined}>{option.label}</span>
                 )}
                 {on ? (
                   <span className="ic dd__chk">

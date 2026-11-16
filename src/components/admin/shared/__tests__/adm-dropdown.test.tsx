@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SessionProvider } from "@/components/providers/session-provider";
-import { AdmDropdown, ddMenuClassName, nextOptionIndex, returnsToSearch } from "@/components/admin/shared/adm-dropdown";
+import { AdmDropdown, ddMenuClassName, menuOverflowsRight, nextOptionIndex, returnsToSearch } from "@/components/admin/shared/adm-dropdown";
 
 // 환경이 node 라 DOM 이벤트(Esc 전파 · 포커스 복귀)는 못 돌린다 — 키 이동 계산 · 방향 클래스 · 접근성 속성만 검증하고,
 // Esc · 포커스는 화면에서 확인한다.
@@ -57,5 +57,12 @@ describe("AdmDropdown 닫힌 상태", () => {
     expect(html).toContain('aria-haspopup="listbox"');
     expect(html).toContain('aria-expanded="false"');
     expect(html).toContain("English");
+  });
+});
+
+describe("menuOverflowsRight", () => {
+  it("오른쪽 여백 8px 를 넘으면 뒤집는다", () => {
+    expect(menuOverflowsRight(1272, 1280)).toBe(false);
+    expect(menuOverflowsRight(1273, 1280)).toBe(true);
   });
 });

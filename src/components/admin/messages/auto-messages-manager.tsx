@@ -25,7 +25,7 @@ import {
 import { useLiveChanges } from "@/components/shared/live-refresh";
 import { autoRunLiveSources } from "@/lib/live-sources";
 import { idsOfKind, liveKeysOf, mergeAutoRuns, mergeRuleCounts } from "@/lib/guest-messages/live-merge";
-import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
+import { AdmDropdown, useDdMenuEdgeFlip } from "@/components/admin/shared/adm-dropdown";
 import { AdminTimePicker } from "@/components/admin/shared/admin-time-picker";
 import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
 import { autoRunStatusText, autoVariableLabel, autoWhenText, formatAutoAt, missingText } from "@/components/guest-messages/auto-format";
@@ -181,6 +181,8 @@ function MultiDropdown({
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  useDdMenuEdgeFlip(menuRef, open);
   useEffect(() => {
     if (!open) return;
     const onDoc = (event: MouseEvent) => {
@@ -222,7 +224,7 @@ function MultiDropdown({
         </span>
       </button>
       {open ? (
-        <div className="dd__menu" role="listbox" aria-multiselectable="true" aria-label={label}>
+        <div className="dd__menu" ref={menuRef} role="listbox" aria-multiselectable="true" aria-label={label}>
           <button
             type="button"
             className={`dd__opt${all ? " on" : ""}`}

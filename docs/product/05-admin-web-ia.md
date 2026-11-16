@@ -297,6 +297,7 @@ Permissions · Invite Codes · Attendance Sites/QR 등)은 위 3개 그룹의 �
   래퍼)를 쓴다. CSS는 `admin-console.css`에 있어 모든 `.adm` 페이지에서 로드된다. **화면마다 다른
   드롭다운을 만들지 않는다**(구 칩형 `ChipDropdown`/`.adp` 드롭다운은 폐기·삭제됨, 2026-07-13).
   단, 달력형 `AdminDatePicker`/`AdminTimePicker`/`AdminMonthPicker`는 드롭다운이 아닌 별도 피커 컨트롤이다.
+  **메뉴 폭 규칙(2026-11-16)**: 일반 메뉴는 **내용 폭**(`width: max-content`, 트리거보다 좁지 않게 `min-width: 100%`, 최대 `min(360px, 100vw - 32px)`)이고 옵션 글자는 한 줄 — 넘치면 말줄임(`.dd__opt__k`). 「답장 기다림 42」 같은 옵션이 좁은 트리거 폭에서 두 줄로 꺾이던 문제의 공용 해결. 메뉴가 화면 오른쪽으로 삐져나가면 열 때 한 번 재서 `.dd__menu--end`(오른쪽 맞춤)로 뒤집는다. `wide`(설명 `<small>` 있는 여러 줄 옵션) · `rich` · `searchable` 메뉴는 예전 폭 규칙(트리거 폭, wide 는 최소 280px) 그대로.
   네이티브 `<select>`를 폼에서 대체할 땐 `DdFormSelect`, 네이티브 `<input type="date">`를 폼에서
   대체할 땐 `DateFormField`(둘 다 숨은 input 래퍼)를 쓴다. 과거의 두 번째 커스텀 드롭다운
   `AdminSelectField`(`.selfield`)는 폐기·삭제됨(2026-07-14) — `.dd`만 쓴다.

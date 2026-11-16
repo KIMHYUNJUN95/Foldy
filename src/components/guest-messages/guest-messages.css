@@ -427,6 +427,9 @@
 .gm-mlist-head { display: flex; flex-direction: column; gap: 12px; margin-bottom: 8px; }
 .gm-mlist-head h1 { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.01em; }
 .gm-mselects { display: flex; gap: 8px; flex-wrap: wrap; }
+/* 세 선택은 줄이 바뀌어도 줄 폭을 채운다(혼자 남은 칸이 짧게 떠 보이지 않게) — 글자는 한 줄, 넘치면 말줄임. 넓은 화면(폴드 ↑)은 내용 폭. */
+.gm-mselects > .gm-select { flex: 1 1 auto; min-width: 0; white-space: nowrap; text-overflow: ellipsis; }
+@media (min-width: 600px) { .gm-mselects > .gm-select { flex: 0 1 auto; } }
 .gm-select {
   appearance: none;
   -webkit-appearance: none;

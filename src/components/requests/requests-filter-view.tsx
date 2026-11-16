@@ -170,7 +170,6 @@ type FilterLabels = {
   filterClosed: string;
   filterLast7Days: string;
   filterLast30Days: string;
-  filterScopeMine: string;
   filterScopeMineRequest: string;
   filterToday: string;
   groupDate: string;
@@ -846,7 +845,7 @@ export function RequestsFilterView({
       daysLeft: clock?.daysLeft ?? 0,
       node: (
         <RequestListCard
-          key={item.id}
+          key={`lost-found:${item.id}`}
           live={`l-${item.id}`}
           leaving={leavingKey === `lost-found-${item.id}`}
           kind="lost-found"
@@ -875,7 +874,7 @@ export function RequestsFilterView({
       time: report.created_at,
       node: (
         <RequestListCard
-          key={report.id}
+          key={`maintenance:${report.id}`}
           live={`m-${report.id}`}
           leaving={leavingKey === `maintenance-${report.id}`}
           kind="maintenance"
@@ -925,7 +924,7 @@ export function RequestsFilterView({
         sortKey: orderGroup === "deliv" ? (delivStart ?? "") : order.created_at,
         node: (
           <RequestListCard
-            key={order.id}
+            key={`order:${order.id}`}
             live={`o-${order.id}`}
             leaving={leavingKey === `order-${order.id}`}
             kind="order"
@@ -1021,7 +1020,7 @@ export function RequestsFilterView({
               className={scopeFilter === "mine" ? "on" : undefined}
               onClick={() => updateQuery({ scope: "mine" })}
             >
-              {typeFilter === "lost-found" ? filterLabels.filterScopeMine : filterLabels.filterScopeMineRequest}
+              {filterLabels.filterScopeMineRequest}
             </button>
           </div>
           {typeFilter === "order" ? (

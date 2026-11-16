@@ -3,6 +3,7 @@
 // 값이며 src/lib/admin-linen-returns.ts 에서 만든다.
 // 참고: docs/product/19-linen-defect-workflow.md.
 
+import { summarizeLinenLines } from "@/lib/linen-summary";
 import type {
   AdminLinenBuildingOption,
   AdminLinenItemOption,
@@ -81,10 +82,7 @@ export function tpl(template: string, vars: Record<string, string | number>): st
 
 /** 행 요약 — "싱글 이불 커버 외 2종". 품목이 하나면 이름만. */
 export function summaryOf(record: AdminLinenRecordVM, moreLabel: string, kindsUnit: string): string {
-  if (record.lines.length === 0) return "—";
-  const first = record.lines[0].name;
-  if (record.lines.length === 1) return first;
-  return `${first} ${moreLabel} ${record.lines.length - 1}${kindsUnit}`;
+  return summarizeLinenLines(record.lines, moreLabel, kindsUnit);
 }
 
 /** 삭제 확인 모달용 전체 나열 — "타월 8 · 베개 커버 12". */

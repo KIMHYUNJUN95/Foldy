@@ -17,6 +17,7 @@ import {
   isKnownBuilding,
   type LinenReturnRecord,
 } from "@/lib/linen-returns";
+import { summarizeLinenLines, linenPhotoCount } from "@/lib/linen-summary";
 import { getMobileNavBadges } from "@/lib/nav-badges";
 import { getOnboardingState } from "@/lib/onboarding";
 import { localizeBuildingName } from "@/lib/room-label-normalization";
@@ -160,10 +161,10 @@ export default async function LinenReturnListPage({ searchParams }: PageProps) {
                       <span>{t.hm}</span>
                     </span>
                     <span className="lnw-row__b">
-                      <b>{linesText(record)}</b>
+                      <b>{summarizeLinenLines(record.lines, copy.summaryMore, copy.kindsUnit)}</b>
                       <span>
                         {record.registrantName}
-                        {record.imageUrls.length > 0 ? ` · ${copy.wPhotoN.replace("{n}", String(record.imageUrls.length))}` : ""}
+                        {record.imageUrls.length > 0 ? ` · ${linenPhotoCount(record.imageUrls.length, copy)}` : ""}
                       </span>
                     </span>
                     <span className="lnw-row__q num">

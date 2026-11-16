@@ -40,12 +40,13 @@
 .rqw-row__t { font-size: 16px; font-weight: 500; color: #16141f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rqw-row__t em { margin-left: 6px; font-style: normal; font-size: 13px; font-weight: 600; color: #c5282e; }
 .rqw-row__m { font-size: 13px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rqw-row__s { font-size: 13px; font-weight: 600; color: #6b6878; white-space: nowrap; }
+.rqw-row__s { font-size: 13px; font-weight: 500; color: #6b6878; white-space: nowrap; }
 .rqw-row__s.is-open { display: inline-flex; align-items: center; gap: 6px; color: #4b4858; font-weight: 500; }
 .rqw-row__s.is-open::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #5a30cf; }
 .rqw-row__s.is-prog { color: #2f6fde; }
 .rqw-row__s.is-done { color: var(--text-3); font-weight: 500; }
-.rqw-row__s.is-soon { color: #c5282e; }
+.rqw-row__s.is-soon { display: inline-flex; align-items: center; gap: 6px; color: #c5282e; font-weight: 500; }
+.rqw-row__s.is-soon::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #e5484d; }
 .rqw-row__del { position: relative; display: grid; place-items: center; width: 30px; height: 30px; flex: none; border: 0; border-radius: 8px; background: none; color: #b4b1bf; cursor: pointer; }
 .rqw-row__del::before { content: ""; position: absolute; inset: -7px; }
 .rqw-row__del:hover { background: #fdecec; color: #c5282e; }

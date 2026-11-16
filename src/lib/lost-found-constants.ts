@@ -80,6 +80,22 @@ export type LostItemClock = {
   isExtended: boolean;
 };
 
+/** 「D-14 · 11월 30일」 — 남은 날과 자동 폐기 날짜를 한 줄에(PC 패널 · 모바일 상세 공통). */
+export function lostDueLine(
+  daysLeft: number,
+  dueDate: string,
+  locale: string,
+  c: { dueOn: string; dOver: string },
+): string {
+  const head = (daysLeft < 0 ? c.dOver : c.dueOn).replace("{n}", String(Math.abs(daysLeft)));
+  const date = new Date(`${dueDate}T00:00:00+09:00`);
+  if (Number.isNaN(date.getTime())) return head;
+  const day = new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", timeZone: "Asia/Tokyo" }).format(date);
+  return `${head} · ${day}`;
+}
+
+export { distinctRoom } from "./place-label";
+
 /**
  * 보관 시계(도쿄 달력) — 모바일 상세 · 요청 목록용 파생 계산. 어드민은 `admin-lost-found.ts` 가 같은 규칙으로 계산한다.
  * 종결(반환 · 폐기) 건은 null.

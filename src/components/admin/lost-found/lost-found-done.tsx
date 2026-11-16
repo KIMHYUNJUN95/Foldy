@@ -6,7 +6,7 @@
 import { CheckCircle2, TriangleAlert } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import type { AdminLostItemVM } from "@/lib/admin-lost-found";
-import { fmtDateTime, parseTs, type LFFilters } from "./lost-found-console-data";
+import { fmtDateTime, locationLabel, parseTs, type LFFilters } from "./lost-found-console-data";
 import { LFState, type LFCopy } from "./lost-found-console-shared";
 
 type DoneProps = {
@@ -79,7 +79,7 @@ export function LostFoundDone({ items, t, locale, filters, onClearFilters, selec
               <b className="num">{fmtDateTime(i.handledAt, locale)}</b>
               <span className="ell">{i.itemName}</span>
               <span className="ell">
-                {i.buildingLabel} · {i.room ?? t.buildingWhole}
+                {locationLabel(i, t.buildingWhole)}
               </span>
               <span>{i.returnMethod === "delivery" ? t.methodDelivery : i.returnMethod === "pickup" ? t.methodPickup : "—"}</span>
               <span className={`ell${i.returnTrackingNo ? "" : " dim"}`}>{i.returnTrackingNo || "—"}</span>

@@ -2119,8 +2119,8 @@
 .adm .datepick { display:inline-flex; align-items:center; gap:7px; height:36px; padding:0 12px; border:1px solid var(--line); border-radius:9px; background:var(--card); font-size:12.5px; font-weight:700; color:var(--ink-soft); cursor:pointer; }
 .adm .datepick:hover { background:var(--adm-surface); }
 .adm .datepick .ic { font-size:15px; color:var(--adm-muted); }
-.adm .datepick .v { font-family:var(--mono); font-weight:800; color:var(--ink); }
-.adm .datepick .dash { color:var(--faint); font-weight:700; }
+.adm .datepick .v { font-family:var(--mono); font-weight:500; color:var(--ink); }
+.adm .datepick .dash { color:var(--faint); font-weight:400; }
 .adm .datepick .dd__chev { margin-left:2px; font-size:15px; color:var(--adm-muted); transition:transform .16s; }
 .adm .dpick.open .datepick { border-color:var(--adm-primary); box-shadow:0 0 0 3.5px var(--primary-soft); }
 .adm .dpick.open .datepick .dd__chev { transform:rotate(180deg); }

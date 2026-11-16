@@ -11,10 +11,11 @@ import { canDeleteRequestRecord, type RequestDeleteAccess } from "@/lib/request-
 import { useAdminPanelA11y } from "@/components/admin/shared/use-admin-panel-a11y";
 import type { Locale } from "@/lib/i18n";
 import type { AdminLostItemVM } from "@/lib/admin-lost-found";
+import { distinctRoom, lostDueLine } from "@/lib/lost-found-constants";
 import { localizeLostFoundMemo } from "@/lib/lost-found-memo";
 import { fmtDate, fmtDateTime, isActive, lostGuestLine, tpl } from "./lost-found-console-data";
 import { categoryLabel, statusLabel, type LFCopy } from "./lost-found-console-shared";
-import { dueText, storageTotal } from "./lost-found-board";
+import { storageTotal } from "./lost-found-board";
 
 export type LFActionKind = "return" | "dispose" | "extend" | "correct" | "restore" | "delete";
 
@@ -86,7 +87,11 @@ export function LostFoundDetailPanel({ item, t, adminRestoreLabel, autoDisposeLa
           </div>
           <div className="lfp__title">{item.itemName}</div>
           <div className="lfp__sub">
-            {item.room ? <b className="mono">{item.room}</b> : <b>{t.buildingWhole}</b>} · {item.buildingLabel}
+            {(() => {
+              const room = distinctRoom(item.room, item.buildingLabel);
+              if (room) return <><b className="mono">{room}</b> · {item.buildingLabel}</>;
+              return item.room ? item.buildingLabel : <><b>{t.buildingWhole}</b> · {item.buildingLabel}</>;
+            })()}
           </div>
           <GuestMessageBackLink targetType="lost_found" targetId={item.id} surface="admin" locale={locale} />
         </div>
@@ -98,14 +103,13 @@ export function LostFoundDetailPanel({ item, t, adminRestoreLabel, autoDisposeLa
             <div className="lfp__clock">
               <div className="lfp__clockh">
                 <span>{t.autoDueIn}</span>
-                <b className={item.isDueSoon || item.isExpired ? "is-soon" : ""}>{dueText(item, t, locale)}</b>
+                <b className={item.isDueSoon || item.isExpired ? "is-soon" : ""}>{lostDueLine(item.daysLeft, item.dueDate, locale, t)}</b>
               </div>
               <span className="lfw-bar lfw-bar--lg">
                 <i className={item.isExtended && !item.isDueSoon ? "is-ext" : ""} style={{ width: `${pct}%` }} />
               </span>
               <span className="lfp__clocks">
-                {tpl(t.regOn, fmtDate(item.foundAt.split(" ")[0], locale))} · {tpl(t.storedNth, item.storedDays)} ·{" "}
-                {tpl(t.dueOnDate, fmtDate(item.dueDate, locale))}
+                {tpl(t.regOn, fmtDate(item.foundAt.split(" ")[0], locale))} · {tpl(t.storedNth, item.storedDays)}
               </span>
             </div>
           ) : null}

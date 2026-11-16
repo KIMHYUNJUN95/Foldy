@@ -4,6 +4,7 @@
 // 참고: docs/product/09-lost-found-workflow.md.
 
 import type { AdminLostItemVM, AdminLostFoundData } from "@/lib/admin-lost-found";
+import { placeLine } from "@/lib/place-label";
 import { isLostItemTerminal, type LostItemCategory, type LostItemStatus } from "@/lib/lost-found-constants";
 import type { Locale } from "@/lib/i18n";
 
@@ -97,7 +98,7 @@ export function fmtDateTime(ts: string | null, locale: Locale): string {
 
 /** "건물 · 객실" (객실 없는 건물 단위 등록이면 buildingWhole 라벨). 검색에도 쓰인다. */
 export function locationLabel(item: AdminLostItemVM, buildingWholeLabel: string): string {
-  return `${item.buildingLabel} · ${item.room ?? buildingWholeLabel}`;
+  return placeLine(item.buildingLabel, item.room, buildingWholeLabel);
 }
 
 /** 보드 카드 정렬 — 폐기까지 남은 일수 오름차순, 동률이면 발견일시 오름차순(오래된 건을 위로). */

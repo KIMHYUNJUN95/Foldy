@@ -492,23 +492,23 @@ List visibility:
 - All users can create and view maintenance requests.
 - All users can create and view lost item records.
 - All users can create and view order requests.
-- Users should also have a "My registrations" view for records they created.
+- Users should also have a "My requests" view for records they created.
 - The Requests mobile list exposes a dedicated **"내 요청" (mine) toggle switch** in the filter row (`role="switch"`, `scope` query `mine`/`all`). This replaces the old scope option inside the filter sheet.
   - `All` (default): all visible records in the organization scope
-  - `My registrations` (toggle on): records created by the current user only
+  - `My requests` (toggle on): records created by the current user only
 - The mine toggle applies consistently across maintenance, lost and found, and order request list views.
-- **Toggle label per tab (2026-06-15)**: the scope toggle text is tab-dependent — 분실물
-  (lost-found) keeps **"내 등록"** (`filterScopeMine`), while 수리요청 (maintenance) and 비품주문
-  (order) show **"내 요청"** (`filterScopeMineRequest`, ko "내 요청" / ja "自分の依頼" / en "My
-  requests"). Same `scope` behavior; label only.
+- 「전체」 목록 행의 React 키는 `${kind}:${id}` — 종류가 다른 행끼리 id 가 겹쳐도 충돌하지 않는다.
+- **Toggle label (2026-11-16)**: all three tabs (분실물 · 수리요청 · 비품주문) now show the same
+  **"내 요청"** (`filterScopeMineRequest`, ko "내 요청" / ja "自分の依頼" / en "My requests"); the old
+  lost-found-only "내 등록" (`filterScopeMine`) key is removed. Same `scope` behavior.
 
 List layout (`src/components/requests/requests-filter-view.tsx`):
 
-- **Filter row**: `[필터 버튼] · [내 요청/내 등록 토글] · (비품주문 탭) [배송 캘린더 아이콘] · [총 N건 카운트(ml-auto)]`.
+- **Filter row**: `[필터 버튼] · [내 요청 토글] · (비품주문 탭) [배송 캘린더 아이콘] · [총 N건 카운트(ml-auto)]`.
 - **완료-목록 진입 행 (분실물 탭 전용, 2026-07-16)**: 필터 행 바로 아래 **별도 줄**에 `[반환완료 pill][폐기 내역 pill]`
   두 개를 나란히 둔다. 두 pill을 필터 행에 함께 넣으면 좁은 화면에서 오른쪽이 잘려서 별도 줄로 분리했다
   (`space-y-3` 형제 행, 가로 넘침 시 스크롤).
-- **반환완료 진입 pill (2026-07-15)**: 분실물 탭에서만, "내 등록" 토글 옆에 네이비 아웃라인 pill
+- **반환완료 진입 pill (2026-07-15)**: 분실물 탭에서만, "내 요청" 토글 옆에 네이비 아웃라인 pill
   (Undo2 아이콘 + `dictionary.lostFound.returned.entry`)이 뜬다. 탭 → **반환완료 전용 목록**
   `/mobile/requests/lost-found/returned` (`ReturnedLostFoundList`). 반환완료(`returned`) 항목만
   통계·검색·기간/건물 필터와 함께 월별 그룹으로 본다. 자세한 내용은 `docs/product/09-lost-found-workflow.md`

@@ -210,7 +210,7 @@ export function MaintenanceConsole({ canHandle, deleteAccess, initialReportId = 
             <span className="ic">
               <Eye />
             </span>
-            {t.readonly}. {t.sortNote}
+            {t.readonly} · {t.sortNote}
           </p>
         </>
       ) : null}

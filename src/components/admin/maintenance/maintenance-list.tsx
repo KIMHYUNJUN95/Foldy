@@ -33,7 +33,6 @@ import {
 import {
   CategoryChip,
   PriorityBadge,
-  ReporterAvatar,
   StatusPill,
   copyOf,
   localeTagOf,
@@ -160,7 +159,7 @@ export function MaintenanceList({
           ...reporterOptions.map((r) => ({ value: r.id, label: r.name })),
         ]}
       />
-      <div className="qsearch qsearch--inline">
+      <div className="qsearch qsearch--inline mw-search">
         <span className="ic">
           <Search aria-hidden="true" />
         </span>
@@ -266,8 +265,7 @@ export function MaintenanceList({
         <table className="qtbl mtbl">
           <thead>
             <tr>
-              <th style={{ paddingLeft: 16 }}>{t.colId}</th>
-              <th>{t.colPriority}</th>
+              <th style={{ paddingLeft: 16 }}>{t.colPriority}</th>
               <th>{t.colCategory}</th>
               <th>{t.colTitle}</th>
               {scope === "list" ? <th>{t.colStatus}</th> : null}
@@ -288,9 +286,6 @@ export function MaintenanceList({
                 onClick={() => onSelect(r.id)}
               >
                 <td style={{ paddingLeft: 16 }}>
-                  <span className="tt-id">{r.shortId}</span>
-                </td>
-                <td>
                   <PriorityBadge priority={r.priority} t={t} />
                 </td>
                 <td>
@@ -303,7 +298,7 @@ export function MaintenanceList({
                     {scope === "list" && r.occupied ? (
                       <>
                         {" · "}
-                        <span style={{ color: "var(--warn)", fontWeight: 800 }}>{t.occupied}</span>
+                        <span style={{ color: "var(--warn)", fontWeight: 500 }}>{t.occupied}</span>
                       </>
                     ) : null}
                   </div>
@@ -315,7 +310,6 @@ export function MaintenanceList({
                 ) : null}
                 <td>
                   <span className="who">
-                    <ReporterAvatar id={r.reporterId} name={r.reporterName} className="who__av" />
                     <span className="who__nm">{r.reporterName}</span>
                   </span>
                 </td>
@@ -323,7 +317,6 @@ export function MaintenanceList({
                   <td>
                     {r.completedByName ? (
                       <span className="who">
-                        <ReporterAvatar id={r.completedByName} name={r.completedByName} className="who__av" />
                         <span className="who__nm">{r.completedByName}</span>
                       </span>
                     ) : (

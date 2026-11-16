@@ -31,7 +31,6 @@ import {
   MAINT_CATEGORY,
   MAINT_PRIORITY,
   MAINT_STATUS,
-  avatarColorFor,
 } from "./maintenance-console-data";
 
 export type MaintCopy = Dictionary["maintenance"]["console"];
@@ -147,22 +146,6 @@ export function PhotoBadge({ count }: { count: number }) {
         <Camera aria-hidden="true" />
       </span>
       {count}
-    </span>
-  );
-}
-
-export function ReporterAvatar({
-  id,
-  name,
-  className,
-}: {
-  id: string | null;
-  name: string;
-  className: string;
-}) {
-  return (
-    <span className={className} style={{ background: id ? avatarColorFor(id) : "var(--adm-surface)" }}>
-      {name ? name.slice(0, 1) : "?"}
     </span>
   );
 }

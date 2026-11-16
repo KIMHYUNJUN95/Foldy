@@ -7,7 +7,7 @@ import { MobileShell } from "@/components/shell/mobile-shell";
 import { getMobileNavBadges } from "@/lib/nav-badges";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { getLostItemById, isLostItemTerminal } from "@/lib/lost-found";
-import { lostItemClock } from "@/lib/lost-found-constants";
+import { distinctRoom, lostDueLine, lostItemClock } from "@/lib/lost-found-constants";
 import { splitLostFoundHandlingMemo } from "@/lib/lost-found-handling";
 import { localizeLostFoundMemo } from "@/lib/lost-found-memo";
 import { getOnboardingState } from "@/lib/onboarding";
@@ -46,12 +46,6 @@ function formatDateTime(value: string, locale: Locale) {
   const thisYear = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo", year: "numeric" }).format(new Date());
   const md = `${Number(parts.month)}/${Number(parts.day)}`;
   return `${parts.year === thisYear ? md : `${parts.year}/${md}`} ${parts.hour}:${parts.minute}`;
-}
-
-/** "YYYY-MM-DD" → "M/D". */
-function shortDate(ymd: string) {
-  const [, m, d] = ymd.split("-").map(Number);
-  return `${m}/${d}`;
 }
 
 export default async function MobileLostItemDetailPage({ params, searchParams }: PageProps) {
@@ -99,7 +93,7 @@ export default async function MobileLostItemDetailPage({ params, searchParams }:
   const clock = lostItemClock(item);
   const c = copy.console;
   const flag = clock?.isExpired ? c.expiredFlag : clock?.isDueSoon ? c.soonFlag : null;
-  const roomText = location.roomLabel && location.roomLabel !== "-" ? location.roomLabel : null;
+  const roomText = distinctRoom(location.roomLabel, location.buildingLabel);
   const showCreatedBanner = query.created === "1";
 
   const navBadges = await navBadgesPromise;
@@ -109,7 +103,7 @@ export default async function MobileLostItemDetailPage({ params, searchParams }:
   return (
     <MobileShell activeItem="requests" badges={navBadges} title={copy.detailTitle}>
       <LiveRefresh sources={requestLiveSources(session.organization.id)} />
-      <div className="mdw">
+      <div className="mdw lfd">
         {showCreatedBanner ? <p className="mdw-created">{copy.createdSuccess}</p> : null}
 
         <div className="mdw-kick">
@@ -140,7 +134,7 @@ export default async function MobileLostItemDetailPage({ params, searchParams }:
             <div className="lfd-clock__h">
               <span>{c.autoDueIn}</span>
               <b className={clock.isDueSoon || clock.isExpired ? "is-soon" : undefined}>
-                {clock.daysLeft < 0 ? c.dOver.replace("{n}", String(-clock.daysLeft)) : c.dueOn.replace("{n}", String(clock.daysLeft))}
+                {lostDueLine(clock.daysLeft, clock.dueDate, locale, c)}
               </b>
             </div>
             <span className="lfd-bar">
@@ -150,17 +144,27 @@ export default async function MobileLostItemDetailPage({ params, searchParams }:
               />
             </span>
             <span className="lfd-clock__s">
-              {c.storedNth.replace("{n}", String(clock.storedDays))} · {c.dueOnDate.replace("{n}", shortDate(clock.dueDate))} · {copy.handling.extendHint}
+              {c.storedNth.replace("{n}", String(clock.storedDays))} · {copy.handling.extendHint}
             </span>
           </div>
         ) : null}
 
         {item.memo ? <p className="mdw-desc">{item.memo}</p> : null}
 
-        {item.guest_name ? (
+        {item.guest_name || (clock?.isExtended && item.hold_reason) ? (
           <dl className="mdw-dl">
-            <dt>{c.guestShort}</dt>
-            <dd>{item.guest_name}</dd>
+            {item.guest_name ? (
+              <>
+                <dt>{c.guestShort}</dt>
+                <dd>{item.guest_name}</dd>
+              </>
+            ) : null}
+            {clock?.isExtended && item.hold_reason ? (
+              <>
+                <dt>{c.pExtReason}</dt>
+                <dd>{item.hold_reason}</dd>
+              </>
+            ) : null}
           </dl>
         ) : null}
 

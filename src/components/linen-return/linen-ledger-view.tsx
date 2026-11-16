@@ -3,6 +3,7 @@
 // 린넨 장부 — 화이트 리디자인(2026-10-14, 시안 LinenLedger-Phone · LinenLedgerItems-Phone): [기록 | 품목 집계] 토글 →
 // 글자 고르기(내 등록만 · 등록자 · 품목) → 숫자 둘(반품 장수 · 기록 건수) → 한 줄 기록 / 품목 막대. 상자 · 칩 · 그라데이션 제거.
 
+import { summarizeLinenLines, linenPhotoCount } from "@/lib/linen-summary";
 import { useMemo, useRef, useState, useEffect } from "react";
 import Link from "next/link";
 import { Check, ChevronDown } from "lucide-react";
@@ -169,10 +170,10 @@ export function LinenLedgerView({
                     <span>{t.hm}</span>
                   </span>
                   <span className="lnw-row__b">
-                    <b>{r.lines.length ? r.lines.map((l) => `${l.name} ${l.quantity}`).join(" · ") : "—"}</b>
+                    <b>{summarizeLinenLines(r.lines, copy.summaryMore, copy.kindsUnit)}</b>
                     <span>
                       {r.registrantName}
-                      {r.imageUrls.length > 0 ? ` · ${copy.wPhotoN.replace("{n}", String(r.imageUrls.length))}` : ""}
+                      {r.imageUrls.length > 0 ? ` · ${linenPhotoCount(r.imageUrls.length, copy)}` : ""}
                     </span>
                   </span>
                   <span className="lnw-row__q num">

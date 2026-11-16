@@ -8,6 +8,7 @@
 // See docs/product/08-maintenance-workflow.md → "2026-07-14 어드민 수리·점검 대시보드".
 
 import type { AdminMaintenanceReport } from "@/lib/admin-maintenance";
+import { placeLine } from "@/lib/place-label";
 import {
   isMaintenanceTerminal,
   type MaintenanceCategory,
@@ -63,6 +64,16 @@ export function isOldOpen(r: AdminMaintenanceReport): boolean {
 }
 export function isOccupied(r: AdminMaintenanceReport): boolean {
   return r.occupied;
+}
+
+/** 연동 정보 판정은 여기 한 곳 — 재실 경고와 「연동」 줄이 같은 예약을 본다(예전엔 재실이면 예약 링크가 빠졌다). */
+export function linkedOf(r: AdminMaintenanceReport): {
+  cleaning: AdminMaintenanceReport["link"]["cleaning"];
+  reservation: AdminMaintenanceReport["link"]["reservation"];
+  empty: boolean;
+} {
+  const { cleaning, reservation } = r.link;
+  return { cleaning, reservation, empty: !cleaning && !reservation };
 }
 
 // ── 시간 헬퍼 (모든 입력은 admin-maintenance.ts 의 도쿄 "YYYY-MM-DD HH:MM") ──
@@ -137,7 +148,7 @@ export function locationLabel(
   r: AdminMaintenanceReport,
   buildingOnlyLabel: string,
 ): string {
-  return `${r.buildingLabel} · ${r.room ?? buildingOnlyLabel}`;
+  return placeLine(r.buildingLabel, r.room, buildingOnlyLabel);
 }
 
 /** Board column order: 우선순위 높은 순 → 같은 우선순위면 오래된 순(방치 건을 위로). */

@@ -9,6 +9,7 @@ import { Search } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import type { AdminLostItemVM } from "@/lib/admin-lost-found";
 import { fmtDate, isActive, sortForBoard, tpl, type LFFilters } from "./lost-found-console-data";
+import { distinctRoom } from "@/lib/lost-found-constants";
 import { CATEGORY_ICON, categoryLabel, type LFCopy } from "./lost-found-console-shared";
 
 type BoardProps = {
@@ -46,6 +47,7 @@ function Row({
   onSelect: (id: string) => void;
 }) {
   const CatIcon = CATEGORY_ICON[item.category];
+  const room = distinctRoom(item.room, item.buildingLabel);
   const total = storageTotal(item);
   const pct = Math.min(100, Math.round((item.storedDays / total) * 100));
   const tone = item.isExpired || item.isDueSoon ? "is-soon" : item.isExtended ? "is-ext" : "";
@@ -71,7 +73,7 @@ function Row({
         </span>
       </span>
       <span className="lfw-tr__loc">
-        {item.room ? <b className="mono">{item.room}</b> : null} {item.room ? item.buildingLabel : `${item.buildingLabel} · ${t.buildingWhole}`}
+        {room ? <b className="mono">{room}</b> : null} {room || item.room ? item.buildingLabel : `${item.buildingLabel} · ${t.buildingWhole}`}
       </span>
       <span className="lfw-tr__bar">
         <span className="lfw-bar">

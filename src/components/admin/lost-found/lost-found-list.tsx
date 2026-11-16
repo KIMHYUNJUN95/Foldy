@@ -22,8 +22,8 @@ type ListProps = {
 };
 
 const STATUS_TONE: Record<AdminLostItemVM["status"], string> = {
-  registered: "",
-  stored: "",
+  registered: "reg",
+  stored: "sto",
   disposal_scheduled: "danger",
   returned: "ok",
   disposed: "dim",
@@ -86,11 +86,11 @@ export function LostFoundList({ items, t, locale, filters, onClearFilters, selec
             <b className="num">{fmtDateTime(i.foundAt, locale)}</b>
             <span className="ell strong">{i.itemName}</span>
             <span className="ell">
-              {i.buildingLabel} · {i.room ?? t.buildingWhole}
+              {locationLabel(i, t.buildingWhole)}
             </span>
             <span className="ell dim2">{categoryLabel(i.category, t)}</span>
             <span className="ell">{i.reporterName}</span>
-            <span className={`r st ${STATUS_TONE[i.status]}`}>{statusLabel(i.status, t)}</span>
+            <span className={`r st p-st ${STATUS_TONE[i.status]}`}>{statusLabel(i.status, t)}</span>
           </button>
         ))}</LiveWash>
       </div>

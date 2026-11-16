@@ -11,9 +11,10 @@ import { Trash2, TriangleAlert, X } from "lucide-react";
 import { useAdminPanelA11y } from "@/components/admin/shared/use-admin-panel-a11y";
 import type { Locale } from "@/lib/i18n";
 import type { AdminMaintenanceReport } from "@/lib/admin-maintenance";
-import { fmtDate, fmtDateTime, fmtElapsed, isActive } from "./maintenance-console-data";
+import { fmtDate, fmtDateTime, fmtElapsed, isActive, linkedOf } from "./maintenance-console-data";
 import { categoryLabel, priorityLabel, statusLabel, type MaintCopy } from "./maintenance-console-shared";
 import { useRoomPlaceLabel } from "@/components/shared/building-names";
+import { distinctRoom } from "@/lib/place-label";
 import { canDeleteRequestRecord, type RequestDeleteAccess } from "@/lib/request-delete-rule";
 
 export type MaintExceptionKind = "force" | "void" | "del";
@@ -58,8 +59,7 @@ export function MaintenanceDetailPanel({
   const active = isActive(report);
   const canAct = active && canHandle;
 
-  const resv = report.link.reservation;
-  const clean = report.link.cleaning;
+  const { cleaning: clean, reservation: resv, empty: noLink } = linkedOf(report);
 
   // 화이트 리디자인(2026-10-13, 시안 Maint-PC 오른쪽 패널): 위 한 줄(우선순위 · 상태 · 분류) + 삭제 · 닫기 → 제목 → 호실 · 건물 →
   // 재실 경고 한 줄 → 사진 → 설명 → 정보 줄(신고자 · 접수 · 연동 · 처리 메모) → 아래 관리자 예외 개입(강제 완료 · 무효). 칩 · 상자 · 아래 닫기 버튼 제거.
@@ -87,7 +87,11 @@ export function MaintenanceDetailPanel({
           </div>
           <div className="mwp__title">{report.title}</div>
           <div className="mwp__sub">
-            {report.room ? <b className="mono">{report.room}</b> : <b>{t.buildingOnly}</b>} · {report.buildingLabel}
+            {(() => {
+              const room = distinctRoom(report.room, report.buildingLabel);
+              if (room) return <><b className="mono">{room}</b> · {report.buildingLabel}</>;
+              return report.room?.trim() && report.room.trim() !== "-" ? <b>{report.buildingLabel}</b> : <><b>{t.buildingOnly}</b> · {report.buildingLabel}</>;
+            })()}
             {aging ? <span className="mwp__aging"> · {t.oldFlag}</span> : null}
           </div>
           <GuestMessageBackLink targetType="maintenance" targetId={report.id} surface="admin" locale={locale} />
@@ -143,12 +147,12 @@ export function MaintenanceDetailPanel({
                 </Link>
               ) : null}
               {clean && resv ? <br /> : null}
-              {resv && !occupied ? (
+              {resv ? (
                 <Link className="mwp__link" href={reservationHref(resv.checkIn, report.buildingRaw)}>
                   {t.pReservation} · {resv.guest}
                 </Link>
               ) : null}
-              {!clean && (!resv || occupied) ? <span className="mwp__muted">{t.noLinked}</span> : null}
+              {noLink ? <span className="mwp__muted">{t.noLinked}</span> : null}
             </dd>
             <dt>{t.pMemo}</dt>
             <dd>{report.memo ? report.memo : <span className="mwp__muted">{t.noMemo}</span>}</dd>

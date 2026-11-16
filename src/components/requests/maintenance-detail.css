@@ -9,10 +9,16 @@
 .mdw-pri.is-high { color: #a8641c; }
 .mdw-from { color: #7a52e6; font-weight: 600; }
 .mdw-title { margin: -4px 0 0; font-size: 24px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.25; color: #16141f; }
+.mdw:not(.odw) .mdw-title { margin: -4px 0 0; font-size: 22px; font-weight: 600; letter-spacing: -0.03em; line-height: 1.25; color: #16141f; }
 .mdw-sub { margin: -6px 0 0; font-size: 13px; color: var(--text-3); }
 .mdw-sub b { font-weight: 700; color: #16141f; }
+.mdw:not(.odw) .mdw-sub b { font-weight: 500; color: #16141f; }
 .mdw-warn { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 13px; color: #3a3746; }
 .mdw-warn span { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: #fdf3e2; color: #b7791f; font-size: 12px; font-weight: 800; flex: none; }
+.mdw:not(.odw) .mdw-warn span { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: #fdf3e2; color: #b7791f; font-size: 12px; font-weight: 600; flex: none; }
+.mdw-shots { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+.mdw-shot { position: relative; flex: none; width: 96px; height: 96px; padding: 0; overflow: hidden; border: 0; border-radius: 12px; background: #f2f2f5; cursor: zoom-in; }
+.mdw-shot img { object-fit: cover; }
 .mdw-desc { margin: 0; font-size: 15px; line-height: 1.6; color: #16141f; white-space: pre-wrap; }
 .mdw-dl { display: grid; grid-template-columns: 84px minmax(0, 1fr); row-gap: 12px; margin: 0; padding-top: 14px; border-top: 0.5px solid var(--separator); font-size: 14px; }
 .mdw-dl dt { color: var(--text-3); }
@@ -27,6 +33,7 @@
 .mdw-handle { display: flex; flex-direction: column; gap: 14px; margin-top: 8px; padding-top: 18px; border-top: 0.5px solid var(--separator); }
 .mdw-handle__h { display: flex; flex-direction: column; gap: 4px; }
 .mdw-handle__h b { font-size: 16px; font-weight: 700; color: #16141f; }
+.mdw:not(.odw) .mdw-handle__h b { font-size: 16px; font-weight: 600; color: #16141f; }
 .mdw-handle__h span { font-size: 12px; color: var(--text-3); }
 .mdw-seg { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
 .mdw-seg button { height: 42px; border: 0; border-radius: 12px; background: #f4f4f7; font: inherit; font-size: 14px; color: #3a3746; cursor: pointer; transition: background 180ms cubic-bezier(.23,1,.32,1), color 180ms ease, transform 140ms ease; }

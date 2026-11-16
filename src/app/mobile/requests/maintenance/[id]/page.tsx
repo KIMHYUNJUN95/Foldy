@@ -1,6 +1,6 @@
 import { GuestMessageBackLink } from "@/components/guest-messages/guest-message-back-link";
 import { notFound, redirect } from "next/navigation";
-import { AnnouncementImageGrid } from "@/components/announcements/announcement-image-grid";
+import { MaintenancePhotoStrip } from "@/components/requests/maintenance-photo-strip";
 import { MaintenanceHandlingForm } from "@/components/requests/maintenance-handling-form";
 import { canHandleMaintenance } from "@/app/mobile/requests/maintenance/actions";
 import { MobileShell } from "@/components/shell/mobile-shell";
@@ -136,27 +136,19 @@ export default async function MobileMaintenanceDetailPage({ params, searchParams
         {report.guest_name ? (
           <p className="mdw-warn">
             <span aria-hidden="true">!</span>
-            {dictionary.tasks.contextLinkedSection} · {report.guest_name}
+            {copy.linkedReservation} · {report.guest_name}
           </p>
         ) : null}
 
-        <AnnouncementImageGrid imageUrls={report.image_urls} closeLabel={dictionary.common.close} imageAltLabel={dictionary.requestImages.attachments} />
+        <MaintenancePhotoStrip imageUrls={report.image_urls} closeLabel={dictionary.common.close} imageAltLabel={dictionary.requestImages.attachments} />
 
         {report.description ? <p className="mdw-desc">{report.description}</p> : null}
 
         <dl className="mdw-dl">
-          <dt>{dictionary.cleaning.manualBuildingLabel}</dt>
-          <dd>{[location.buildingLabel, roomText].filter(Boolean).join(" · ") || "-"}</dd>
           <dt>{copy.form.categoryLabel}</dt>
           <dd>{copy.form.categories[report.category]}</dd>
           <dt>{copy.form.urgencyLabel}</dt>
           <dd className={report.priority === "urgent" ? "is-urgent" : undefined}>{copy.form.urgencies[report.priority]}</dd>
-          {report.reservation_id ? (
-            <>
-              <dt>{dictionary.mobile.calendarReservationId}</dt>
-              <dd className="mono">{report.reservation_id}</dd>
-            </>
-          ) : null}
           {isTerminal && report.completed_at ? (
             <>
               <dt>{copy.handling.completedAt}</dt>
@@ -181,7 +173,7 @@ export default async function MobileMaintenanceDetailPage({ params, searchParams
         {report.resolution_image_urls.length > 0 ? (
           <div className="mdw-block">
             <span className="mdw-k">{copy.handling.photosLabel}</span>
-            <AnnouncementImageGrid imageUrls={report.resolution_image_urls} closeLabel={dictionary.common.close} imageAltLabel={copy.handling.photosLabel} />
+            <MaintenancePhotoStrip imageUrls={report.resolution_image_urls} closeLabel={dictionary.common.close} imageAltLabel={copy.handling.photosLabel} />
           </div>
         ) : null}
 

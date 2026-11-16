@@ -5,7 +5,7 @@
 import { TriangleAlert } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import type { AdminLostItemVM } from "@/lib/admin-lost-found";
-import { fmtDate, tpl, type LFFilters } from "./lost-found-console-data";
+import { fmtDate, locationLabel, tpl, type LFFilters } from "./lost-found-console-data";
 import { LFState, type LFCopy } from "./lost-found-console-shared";
 
 type DisposalProps = {
@@ -67,7 +67,7 @@ export function LostFoundDisposal({
                 <b className="num">{i.disposedDate ? fmtDate(i.disposedDate, locale) : "—"}</b>
                 <span className="ell">{i.itemName}</span>
                 <span className="ell">
-                  {i.buildingLabel} · {i.room ?? t.buildingWhole}
+                  {locationLabel(i, t.buildingWhole)}
                 </span>
                 <span className={i.isAutoDisposed ? "dim" : ""}>
                   {i.isAutoDisposed ? t.modeAuto : `${t.modeManual} · ${i.handledByName ?? ""}`}

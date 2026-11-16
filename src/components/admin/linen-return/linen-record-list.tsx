@@ -52,7 +52,7 @@ export function LinenRecordList({ records, t, units, localeTag, itemFilter, item
               type="button"
             >
               <span className="lnp-when num">
-                <b>{`${day.slice(5, 7)}.${day.slice(8, 10)} ${timeOf(record.registeredAt)}`}</b>
+                <b>{`${+day.slice(5, 7)}/${+day.slice(8, 10)} ${timeOf(record.registeredAt)}`}</b>
                 <span>{weekdayLabel(day, localeTag)}</span>
               </span>
               <span className="ell">{record.buildingLabel}</span>

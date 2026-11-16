@@ -178,9 +178,9 @@ describe("신호 → 열쇠 (id 만)", () => {
 
 describe("목록 합치기", () => {
   it("새로 든 줄은 넣고 정렬, 바뀐 줄은 고치고, 필터에서 빠진 줄은 예전 값 그대로 접기 표시", () => {
-    const a = row(C1, { waiting: { waitingMinutes: 10, targetMinutes: 60, ratio: 0.1, overdue: false } });
-    const b = row(C2, { waiting: { waitingMinutes: 30, targetMinutes: 60, ratio: 0.5, overdue: false } });
-    const incoming = row(C3, { waiting: { waitingMinutes: 90, targetMinutes: 60, ratio: 1.5, overdue: true } });
+    const a = row(C1, { lastMessageAt: "2026-11-13T01:00:00Z" });
+    const b = row(C2, { lastMessageAt: "2026-11-13T02:00:00Z" });
+    const incoming = row(C3, { lastMessageAt: "2026-11-13T03:00:00Z" });
     const doneB = row(C2, { state: "done" });
     const merged = mergeInboxRows([b, a], [
       { row: incoming, matches: true },
@@ -194,6 +194,14 @@ describe("목록 합치기", () => {
     expect(dropRows(merged.rows, new Set(merged.left)).map((r) => r.id)).toEqual([C3, C1]);
   });
 
+  it("새 메시지(손님이든 직원이든)가 온 대화는 맨 위로", () => {
+    const a = row(C1, { lastMessageAt: "2026-11-13T01:00:00Z" });
+    const b = row(C2, { lastMessageAt: "2026-11-13T02:00:00Z" });
+    const replied = row(C1, { state: "done", lastMessageAt: "2026-11-13T05:00:00Z", lastLine: { direction: "host", body: "ok" } });
+    const merged = mergeInboxRows([b, a], [{ row: replied, matches: true }]);
+    expect(merged.rows.map((r) => r.id)).toEqual([C1, C2]);
+  });
+
   it("값이 같으면 같은 객체(다시 그리지 않음), 없어진 id 는 접기", () => {
     const a = row(C1);
     const merged = mergeInboxRows([a, row(C2)], [{ row: row(C1), matches: true }], [C2]);
@@ -203,9 +211,9 @@ describe("목록 합치기", () => {
   });
 
   it("미리 보기 · 상태가 바뀐 줄은 새 값으로 다시 정렬", () => {
-    const a = row(C1, { waiting: { waitingMinutes: 1, targetMinutes: 60, ratio: 0.01, overdue: false } });
-    const b = row(C2, { waiting: { waitingMinutes: 20, targetMinutes: 60, ratio: 0.3, overdue: false } });
-    const aOverdue = row(C1, { lastLine: { direction: "guest", body: "still there?" }, waiting: { waitingMinutes: 70, targetMinutes: 60, ratio: 1.2, overdue: true } });
+    const a = row(C1, { lastMessageAt: "2026-11-13T01:00:00Z" });
+    const b = row(C2, { lastMessageAt: "2026-11-13T02:00:00Z" });
+    const aOverdue = row(C1, { lastMessageAt: "2026-11-13T04:00:00Z", lastLine: { direction: "guest", body: "still there?" } });
     const merged = mergeInboxRows([b, a], [{ row: aOverdue, matches: true }]);
     expect(merged.rows.map((r) => r.id)).toEqual([C1, C2]);
     expect(merged.rows[0].lastLine?.body).toBe("still there?");

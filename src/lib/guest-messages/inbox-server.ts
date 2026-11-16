@@ -204,14 +204,14 @@ export async function loadInboxList(
       .select(CONVERSATION_COLUMNS)
       .eq("organization_id", organizationId)
       .in("status", ["awaiting", "snoozed"])
-      .order("last_guest_at", { ascending: true })
+      .order("last_message_at", { ascending: false, nullsFirst: false })
       .limit(OPEN_LIMIT),
     db
       .from("guest_conversations")
       .select(CONVERSATION_COLUMNS)
       .eq("organization_id", organizationId)
       .eq("status", "done")
-      .order("last_message_at", { ascending: false })
+      .order("last_message_at", { ascending: false, nullsFirst: false })
       .limit(DONE_LIMIT),
     loadGuestMessageSettings(db, organizationId),
   ]);
@@ -311,7 +311,7 @@ export async function loadInboxRowsByIds(
   now: Date = new Date(),
   visibility: CodeVisibility = { canSeeCodes: true, canManageAuto: true },
 ): Promise<InboxRowsResult> {
-  // 목록과 같은 창 — 열린 대화는 오래 기다린 500개, 처리 끝은 최근 200개. 그 밖의 줄은 목록에도 없으니 `matches` 도 아니다.
+  // 목록과 같은 창 — 열린 대화는 최근 메시지 500개, 처리 끝은 최근 200개. 그 밖의 줄은 목록에도 없으니 `matches` 도 아니다.
   const [found, open, doneWindow, settings] = await Promise.all([
     db.from("guest_conversations").select(CONVERSATION_COLUMNS).eq("organization_id", organizationId).in("id", [...ids]),
     db
@@ -319,14 +319,14 @@ export async function loadInboxRowsByIds(
       .select(CONVERSATION_COLUMNS)
       .eq("organization_id", organizationId)
       .in("status", ["awaiting", "snoozed"])
-      .order("last_guest_at", { ascending: true })
+      .order("last_message_at", { ascending: false, nullsFirst: false })
       .limit(OPEN_LIMIT),
     db
       .from("guest_conversations")
       .select("id")
       .eq("organization_id", organizationId)
       .eq("status", "done")
-      .order("last_message_at", { ascending: false })
+      .order("last_message_at", { ascending: false, nullsFirst: false })
       .limit(DONE_LIMIT),
     loadGuestMessageSettings(db, organizationId),
   ]);

@@ -105,7 +105,7 @@ function useMobileToast() {
 
 function listHref(status: InboxStatusFilter, building: string | null, channel: InboxChannelFilter) {
   const params = new URLSearchParams();
-  if (status !== "awaiting") params.set("status", status);
+  if (status !== "all") params.set("status", status);
   if (building) params.set("building", building);
   if (channel !== "all") params.set("channel", channel);
   const query = params.toString();

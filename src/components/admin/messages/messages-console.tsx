@@ -177,7 +177,7 @@ export function MessagesConsole({
       const s = next.status ?? status;
       const b = next.building === undefined ? building : next.building;
       const c = next.c === undefined ? selected : next.c;
-      if (s !== "awaiting") params.set("status", s);
+      if (s !== "all") params.set("status", s);
       const ch = next.channel ?? channel;
       if (b) params.set("building", b);
       if (ch !== "all") params.set("channel", ch);

@@ -393,13 +393,32 @@ describe("정렬 · 막힘 판정", () => {
       ...over,
     }) as InboxConversationRow;
 
-  it("답장 기다림은 목표 넘은 줄 → 목표에 가까운 줄 순", () => {
+  it("상태 · 기다림과 상관없이 마지막 메시지가 최신인 줄이 위", () => {
     const rows = sortInboxRows([
-      base({ id: "calm" }),
-      base({ id: "near", waiting: { waitingMinutes: 50, targetMinutes: 60, ratio: 0.83, overdue: false } as never }),
-      base({ id: "over", waiting: { waitingMinutes: 70, targetMinutes: 60, ratio: 1.16, overdue: true } as never }),
+      base({ id: "old-over", lastMessageAt: "2026-11-10T00:00:00.000Z", waiting: { waitingMinutes: 70, targetMinutes: 60, ratio: 1.16, overdue: true } as never }),
+      base({ id: "done-new", state: "done", lastMessageAt: "2026-11-16T00:00:00.000Z" }),
+      base({ id: "snoozed-mid", state: "snoozed", lastMessageAt: "2026-11-13T00:00:00.000Z" }),
     ]);
-    expect(rows.map((row) => row.id)).toEqual(["over", "near", "calm"]);
+    expect(rows.map((row) => row.id)).toEqual(["done-new", "snoozed-mid", "old-over"]);
+  });
+
+  it("직원이 답장하면(lastMessageAt 갱신) 그 대화가 맨 위로", () => {
+    const before = [
+      base({ id: "a", lastMessageAt: "2026-11-15T00:00:00.000Z" }),
+      base({ id: "b", lastMessageAt: "2026-11-14T00:00:00.000Z" }),
+    ];
+    expect(sortInboxRows(before).map((row) => row.id)).toEqual(["a", "b"]);
+    const after = [before[0], base({ id: "b", state: "done", lastMessageAt: "2026-11-16T00:00:00.000Z" })];
+    expect(sortInboxRows(after).map((row) => row.id)).toEqual(["b", "a"]);
+  });
+
+  it("lastMessageAt 이 없는 줄은 맨 아래, 같으면 id 순", () => {
+    const rows = sortInboxRows([
+      base({ id: "z-null", lastMessageAt: null }),
+      base({ id: "b", lastMessageAt: "2026-11-12T00:00:00.000Z" }),
+      base({ id: "a", lastMessageAt: "2026-11-12T00:00:00.000Z" }),
+    ]);
+    expect(rows.map((row) => row.id)).toEqual(["a", "b", "z-null"]);
   });
 
   it("보낼 수 있는 채널 판정이 Beds24 어댑터와 같다", () => {

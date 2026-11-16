@@ -141,7 +141,7 @@ export async function listGuestConversations(
   if (!auth.ok) return auth;
   const status = (INBOX_STATUS_FILTERS as readonly string[]).includes(input.status ?? "")
     ? (input.status as InboxStatusFilter)
-    : "awaiting";
+    : "all";
   const building = typeof input.building === "string" && input.building.trim() ? input.building.trim().slice(0, 120) : null;
   try {
     const data = await loadInboxList(db(), auth.organizationId, {
@@ -180,7 +180,7 @@ export async function getGuestConversationRows(input: {
   }
   const status = (INBOX_STATUS_FILTERS as readonly string[]).includes(input.status ?? "")
     ? (input.status as InboxStatusFilter)
-    : "awaiting";
+    : "all";
   const building = typeof input.building === "string" && input.building.trim() ? input.building.trim().slice(0, 120) : null;
   try {
     const result = await loadInboxRowsByIds(

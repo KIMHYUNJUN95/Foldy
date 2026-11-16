@@ -102,35 +102,17 @@ export function toChannelKey(value: string | null | undefined): GuestChannelKey 
   return value && keys.includes(value) ? (value as GuestChannelKey) : null;
 }
 
-const STATE_ORDER: Record<InboxRowState, number> = {
-  awaiting: 0,
-  snoozed: 1,
-  done: 2,
-};
-
 function ms(value: string | null): number {
   if (!value) return 0;
   const parsed = Date.parse(value);
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
-/** 응답 목표에 가까운 순(§6-1). 안정 정렬 — 같으면 id. */
+/** 마지막 메시지(누가 보냈든)가 최신인 순(§6-1). 없는 줄은 맨 아래, 같으면 id. */
 export function compareInboxRows(a: InboxConversationRow, b: InboxConversationRow): number {
-  const byState = STATE_ORDER[a.state] - STATE_ORDER[b.state];
-  if (byState !== 0) return byState;
-  if (a.state === "awaiting") {
-    if (a.waiting.overdue !== b.waiting.overdue) return a.waiting.overdue ? -1 : 1;
-    if (a.waiting.ratio !== b.waiting.ratio) return b.waiting.ratio - a.waiting.ratio;
-    // 같은 비율(둘 다 0 등)이면 먼저 온 손님 말이 위.
-    const byGuest = ms(a.lastGuestAt) - ms(b.lastGuestAt);
-    if (byGuest !== 0) return byGuest;
-  } else if (a.state === "snoozed") {
-    const bySnooze = ms(a.snoozeUntil) - ms(b.snoozeUntil);
-    if (bySnooze !== 0) return bySnooze;
-  } else {
-    const byRecent = ms(b.lastMessageAt) - ms(a.lastMessageAt);
-    if (byRecent !== 0) return byRecent;
-  }
+  if (!a.lastMessageAt !== !b.lastMessageAt) return a.lastMessageAt ? -1 : 1;
+  const byRecent = ms(b.lastMessageAt) - ms(a.lastMessageAt);
+  if (byRecent !== 0) return byRecent;
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
 

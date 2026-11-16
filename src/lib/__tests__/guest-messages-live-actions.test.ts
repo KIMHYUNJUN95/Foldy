@@ -88,6 +88,16 @@ describe("getGuestConversationRows — 실시간 목록 줄 다시 읽기", () =
     expect(await getGuestConversationRows({ ids: many })).toEqual({ ok: false, errorKey: "invalid" });
   });
 
+  it("status 가 없거나 잘못되면 전체(all) — 답장 기다림 줄도 목록에 맞는다", async () => {
+    state.session = sessionWith(["guest_messages.view", "guest_messages.manage"]);
+    for (const status of [undefined, "bogus"]) {
+      const result = await getGuestConversationRows({ ids: [MINE], status });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.updates[0].matches).toBe(true);
+    }
+  });
+
   it("볼 권한이면 이 조직 줄만 — 다른 조직 id 는 missing, 필터 판정 · 머리 숫자 같이", async () => {
     state.session = sessionWith(["guest_messages.view", "guest_messages.manage"]);
     const result = await getGuestConversationRows({ ids: [MINE, THEIRS], status: "done" });

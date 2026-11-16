@@ -124,7 +124,7 @@ export default async function AdminMessagesPage({
   } else {
     const status: InboxStatusFilter = (INBOX_STATUS_FILTERS as readonly string[]).includes(params.status ?? "")
       ? (params.status as InboxStatusFilter)
-      : "awaiting";
+      : "all";
     const building = typeof params.building === "string" && params.building.trim() ? params.building.trim().slice(0, 120) : null;
     const channel = parseChannelFilter(params.channel);
     const requested = typeof params.c === "string" && UUID_RE.test(params.c) ? params.c : null;

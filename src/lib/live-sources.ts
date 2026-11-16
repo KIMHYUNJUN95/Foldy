@@ -4,12 +4,19 @@
  * 필터는 Supabase realtime `postgres_changes` 형식(`칸=eq.값`). 조직 칸이 없는 테이블(`task_participants` ·
  * `task_updates`)은 나 · 그 할 일로 거른다. 어느 경우든 RLS 가 볼 수 있는 행의 신호만 보낸다.
  * 테이블은 `supabase_realtime` publication 에 있어야 한다(`202610290001_enable_ops_realtime.sql`).
+ * 예외: `topic` 이 있는 줄(손님 메시지, 2026-11-16)은 private broadcast 로 받고 브라우저가 같은 필터로 거른다 — 그 표는 publication 에 없다.
  */
 export type LiveSource = {
   table: string;
   filter: string;
   /** 받을 변경 종류(기본 전부). 손님 메시지는 목록에 `INSERT` 만 받아 사진 사본 갱신 같은 홍수를 거른다(2026-11-13). */
   event?: "INSERT" | "UPDATE";
+  /**
+   * 있으면 `postgres_changes` 가 아니라 이 **private broadcast 토픽**으로 받는다(2026-11-16, 손님 메시지).
+   * DB 트리거가 id 칸만 든 신호를 보내고(`LIVE_BROADCAST_EVENT`), 브라우저가 `table` · `event` · `filter` 로 거른다
+   * (`liveChangeMatches`). 구독 허가는 `realtime.messages` RLS 가 한다 — 행 전체가 소켓에 실리지 않는다.
+   */
+  topic?: string;
 };
 
 /** 신호 하나 — `useLiveChanges` 의 `toKeys` 가 받는다. `record` 는 `pickLiveIds` 가 남긴 id 칸뿐이다(행 내용은 들어오지 않는다). */
@@ -34,15 +41,54 @@ export function pickLiveIds(row: unknown): Record<string, unknown> {
 
 /** 구독 묶음 → 문자열(내용이 같으면 다시 구독하지 않게). */
 export function liveSourcesKey(sources: readonly LiveSource[]): string {
-  return sources.map((s) => `${s.table}|${s.filter}|${s.event ?? ""}`).join(",");
+  return sources.map((s) => `${s.table}|${s.filter}|${s.event ?? ""}|${s.topic ?? ""}`).join(",");
 }
 
 export function parseLiveSourcesKey(key: string): LiveSource[] {
   if (!key) return [];
   return key.split(",").map((entry) => {
-    const [table, filter, event] = entry.split("|");
-    return event === "INSERT" || event === "UPDATE" ? { table, filter, event } : { table, filter };
+    const [table, filter, event, topic] = entry.split("|");
+    const source: LiveSource = { table, filter };
+    if (event === "INSERT" || event === "UPDATE") source.event = event;
+    if (topic) source.topic = topic;
+    return source;
   });
+}
+
+// ── private broadcast 신호 (2026-11-16) ─────────────────────────────────────────────────────────────
+
+/** DB 트리거가 `realtime.send(…, 'change', topic, true)` 로 보내는 이벤트 이름. `202611160001_guest_messages_realtime_private.sql` 과 같아야 한다. */
+export const LIVE_BROADCAST_EVENT = "change";
+
+/** 손님 메시지 네 표의 조직 토픽 — `realtime.messages` 정책이 `'guest-messages:' || 조직 id` 로 비교한다. */
+export function guestLiveTopic(organizationId: string): string {
+  return `guest-messages:${organizationId}`;
+}
+
+/**
+ * broadcast 신호 → `LiveChange`. 표 · 종류를 모르면 버린다(null). 칸은 `pickLiveIds` 로 한 번 더 거른다 —
+ * 트리거가 이미 id 칸만 보내지만, 무엇이 오든 화면 상태에 다른 칸이 들어가지 않게.
+ */
+export function liveChangeFromBroadcast(payload: unknown): LiveChange | null {
+  if (!payload || typeof payload !== "object") return null;
+  const { table, eventType } = payload as Record<string, unknown>;
+  if (typeof table !== "string" || !table) return null;
+  if (eventType !== "INSERT" && eventType !== "UPDATE") return null;
+  return { table, eventType, record: pickLiveIds(payload) };
+}
+
+/**
+ * 신호가 이 구독 줄에 드는가 — `postgres_changes` 가 서버에서 하던 거르기를 브라우저에서 똑같이 한다:
+ * 같은 표 · (있으면) 같은 종류 · `칸=eq.값` 이 맞을 것. 모르는 필터 모양이면 받지 않는다(넓게 받는 것보다 안전).
+ * uuid 는 대소문자를 가리지 않는다.
+ */
+export function liveChangeMatches(source: LiveSource, change: LiveChange): boolean {
+  if (source.table !== change.table) return false;
+  if (source.event && source.event !== change.eventType) return false;
+  const match = /^([a-z_]+)=eq\.(.+)$/.exec(source.filter);
+  if (!match) return false;
+  const value = change.record[match[1]];
+  return typeof value === "string" && value.toLowerCase() === match[2].toLowerCase();
 }
 
 const byOrg = (table: string, organizationId: string): LiveSource => ({
@@ -115,32 +161,39 @@ export function attendanceWagesLiveSources(organizationId: string): LiveSource[]
   ];
 }
 
+const byOrgTopic = (table: string, organizationId: string): LiveSource => ({
+  ...byOrg(table, organizationId),
+  topic: guestLiveTopic(organizationId),
+});
+
 /**
- * 손님 메시지 목록(PC 대화 탭 · 모바일 목록, 2026-11-13 — PC 는 목록 채널과 열린 대화 채널을 따로 둔다) — 대화 줄 · 새 메시지(INSERT 만) · 발송 큐. 볼 권한(`guest_messages.view`)
- * 이 있는 사람에게만 RLS 가 신호를 보낸다. 표는 `202611130008_guest_messages_realtime.sql` 에서 publication 에 넣었다.
+ * 손님 메시지 목록(PC 대화 탭 · 모바일 목록, 2026-11-13 — PC 는 목록 채널과 열린 대화 채널을 따로 둔다) — 대화 줄 · 새 메시지(INSERT 만) · 발송 큐.
+ * 2026-11-16 부터 publication 이 아니라 조직 private 토픽(`guestLiveTopic`)으로 받는다 — 트리거가 id 칸만 보내고, 볼 권한
+ * (`guest_messages.view`)이 있는 사람만 `realtime.messages` RLS 로 구독된다(`202611160001_guest_messages_realtime_private.sql`).
  */
 export function guestInboxLiveSources(organizationId: string): LiveSource[] {
   return [
-    byOrg("guest_conversations", organizationId),
-    { ...byOrg("guest_messages", organizationId), event: "INSERT" },
-    byOrg("guest_message_outbox", organizationId),
+    byOrgTopic("guest_conversations", organizationId),
+    { ...byOrgTopic("guest_messages", organizationId), event: "INSERT" },
+    byOrgTopic("guest_message_outbox", organizationId),
   ];
 }
 
 /**
  * 열린 대화 한 건 — 그 대화의 메시지(새 말 · 사진 사본 · 되돌아옴) · 발송 큐 · 대화 줄 + 조직의 자동 안내 실행 줄
- * (대화가 생기기 전에 계획된 줄은 `conversation_id` 가 비어 있어 예약 번호로 맞춘다).
+ * (대화가 생기기 전에 계획된 줄은 `conversation_id` 가 비어 있어 예약 번호로 맞춘다). 토픽은 조직 하나 — 그 대화 것만 브라우저가 거른다.
  */
 export function guestThreadLiveSources(organizationId: string, conversationId: string): LiveSource[] {
+  const topic = guestLiveTopic(organizationId);
   return [
-    { table: "guest_conversations", filter: `id=eq.${conversationId}` },
-    { table: "guest_messages", filter: `conversation_id=eq.${conversationId}` },
-    { table: "guest_message_outbox", filter: `conversation_id=eq.${conversationId}` },
-    byOrg("auto_message_runs", organizationId),
+    { table: "guest_conversations", filter: `id=eq.${conversationId}`, topic },
+    { table: "guest_messages", filter: `conversation_id=eq.${conversationId}`, topic },
+    { table: "guest_message_outbox", filter: `conversation_id=eq.${conversationId}`, topic },
+    byOrgTopic("auto_message_runs", organizationId),
   ];
 }
 
 /** PC 자동 안내 탭 — 실행 줄(보낼 예정 · 보냄 · 막힘). */
 export function autoRunLiveSources(organizationId: string): LiveSource[] {
-  return [byOrg("auto_message_runs", organizationId)];
+  return [byOrgTopic("auto_message_runs", organizationId)];
 }

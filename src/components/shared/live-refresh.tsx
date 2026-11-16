@@ -3,7 +3,17 @@
 import { useEffect, useId, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createLiveChangeBatcher, createLiveRefreshScheduler } from "@/lib/live-refresh-schedule";
-import { liveSourcesKey, parseLiveSourcesKey, pickLiveIds, type LiveChange, type LiveSource } from "@/lib/live-sources";
+import { createPrivateTopicHub } from "@/lib/live-private-topic";
+import {
+  LIVE_BROADCAST_EVENT,
+  liveChangeFromBroadcast,
+  liveChangeMatches,
+  liveSourcesKey,
+  parseLiveSourcesKey,
+  pickLiveIds,
+  type LiveChange,
+  type LiveSource,
+} from "@/lib/live-sources";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 /**
@@ -17,6 +27,9 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
  *
  * 어느 쪽이든 웹소켓의 행 데이터는 **그리지 않는다** — 권한 검사를 통과한 서버 결과만 그린다. 구독도 select RLS 를 통과해야
  * 신호가 온다(볼 수 없는 행은 신호도 없다). 테이블은 `supabase_realtime` publication 에 들어 있어야 한다.
+ * 예외 — `topic` 이 있는 구독 줄(손님 메시지, 2026-11-16): publication 이 아니라 **private broadcast** 로 받는다. DB 트리거가
+ * id 칸만 든 신호를 보내고, 구독 허가는 `realtime.messages` RLS, 거르기(표 · 종류 · 필터)는 여기서 `liveChangeMatches` 로 한다.
+ * 같은 토픽은 화면 안에서 채널 하나를 나눠 쓴다(`createPrivateTopicHub` — supabase-js 가 같은 토픽 채널을 하나로 묶기 때문).
  * 폴링이 아니라 함수 호출이 늘지 않는다. 삭제 신호는 오지 않는다(replica identity 기본값).
  * docs/product/16-mobile-navigation.md 「실시간 갱신 — 공용」
  *
@@ -50,30 +63,15 @@ export function useLiveChannel(sources: readonly LiveSource[], handlers: Channel
     const onOnline = () => handlersRef.current.onReconnect?.();
 
     // 로그인 토큰을 먼저 소켓에 실은 뒤 구독한다. 쿠키 세션이 아직 안 읽힌 채로 붙으면 anon 으로 들어가
-    // `invalid column for filter organization_id` 로 거절되고 신호가 영영 안 온다(2026-10-15 실측).
+    // `invalid column for filter organization_id` 로 거절되고 신호가 영영 안 온다(2026-10-15 실측). private 토픽은 anon 이면
+    // join 자체가 거절된다. 토큰 갱신은 supabase-js 가 `TOKEN_REFRESHED` 때 `realtime.setAuth` 로 채널마다 다시 싣는다.
     let channel: ReturnType<typeof supabase.channel> | null = null;
+    const leaves: Array<() => void> = [];
     let disposed = false;
-    let wasDisconnected = hadChannel.current;
-    void (async () => {
-      const { data } = await supabase.auth.getSession();
-      if (disposed) return;
-      if (data.session?.access_token) await supabase.realtime.setAuth(data.session.access_token);
-      if (disposed) return;
-      // 같은 화면에 여럿(홈 · 분할 패널) 있어도 채널 이름이 겹치지 않게 `useId` 를 붙인다.
-      let next = supabase.channel(`live:${id}:${parsed.map((s) => s.table).join("+")}`);
-      for (const { table, filter, event } of parsed) {
-        next = next.on(
-          "postgres_changes",
-          { event: event ?? "*", schema: "public", table, filter },
-          (payload: { eventType?: string; new?: unknown }) => {
-            // 행 전체가 오지만(RLS 를 통과한 그 사람이 REST 로 읽을 수 있는 칸) id 칸만 남기고 버린다 — 화면 상태 · 그리기에 들어가지 않게.
-            const record = pickLiveIds(payload.new);
-            const eventType = payload.eventType === "INSERT" || payload.eventType === "UPDATE" ? payload.eventType : "DELETE";
-            handlersRef.current.onChange({ table, eventType, record });
-          },
-        );
-      }
-      channel = next.subscribe((status) => {
+    // 채널마다 따로 센다 — 하나가 다시 붙으면 그 하나가 놓친 신호를 따라잡는다.
+    const trackStatus = () => {
+      let wasDisconnected = hadChannel.current;
+      return (status: string) => {
         if (status === "SUBSCRIBED") {
           // 처음 붙은 것이 아니라 **다시** 붙었다 — 끊긴 동안의 신호를 놓쳤을 수 있다.
           if (wasDisconnected) handlersRef.current.onReconnect?.();
@@ -81,7 +79,49 @@ export function useLiveChannel(sources: readonly LiveSource[], handlers: Channel
         } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
           if (!disposed) wasDisconnected = true;
         }
-      });
+      };
+    };
+    void (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (disposed) return;
+      if (data.session?.access_token) await supabase.realtime.setAuth(data.session.access_token);
+      if (disposed) return;
+
+      const changes = parsed.filter((s) => !s.topic);
+      if (changes.length > 0) {
+        // 같은 화면에 여럿(홈 · 분할 패널) 있어도 채널 이름이 겹치지 않게 `useId` 를 붙인다.
+        let next = supabase.channel(`live:${id}:${changes.map((s) => s.table).join("+")}`);
+        for (const { table, filter, event } of changes) {
+          next = next.on(
+            "postgres_changes",
+            { event: event ?? "*", schema: "public", table, filter },
+            (payload: { eventType?: string; new?: unknown }) => {
+              // 행 전체가 오지만(RLS 를 통과한 그 사람이 REST 로 읽을 수 있는 칸) id 칸만 남기고 버린다 — 화면 상태 · 그리기에 들어가지 않게.
+              const record = pickLiveIds(payload.new);
+              const eventType = payload.eventType === "INSERT" || payload.eventType === "UPDATE" ? payload.eventType : "DELETE";
+              handlersRef.current.onChange({ table, eventType, record });
+            },
+          );
+        }
+        channel = next.subscribe(trackStatus());
+      }
+
+      // private 토픽 — 토픽마다 한 번 듣고, 이 화면의 구독 줄 중 하나라도 맞으면 한 번 넘긴다.
+      const topics = new Map<string, LiveSource[]>();
+      for (const source of parsed) {
+        if (source.topic) topics.set(source.topic, [...(topics.get(source.topic) ?? []), source]);
+      }
+      for (const [topic, sources] of topics) {
+        leaves.push(
+          privateTopicHub().join(topic, {
+            onMessage: (payload) => {
+              const change = liveChangeFromBroadcast(payload);
+              if (change && sources.some((source) => liveChangeMatches(source, change))) handlersRef.current.onChange(change);
+            },
+            onStatus: trackStatus(),
+          }),
+        );
+      }
     })();
 
     document.addEventListener("visibilitychange", onVisibility);
@@ -92,8 +132,26 @@ export function useLiveChannel(sources: readonly LiveSource[], handlers: Channel
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("online", onOnline);
       if (channel) void supabase.removeChannel(channel);
+      for (const leave of leaves.splice(0)) leave();
     };
   }, [sourcesKey, id]);
+}
+
+/** 브라우저 클라이언트 하나에 허브 하나(클라이언트도 하나다). 처음 쓸 때 만든다. */
+type BrowserChannel = ReturnType<ReturnType<typeof getSupabaseBrowserClient>["channel"]>;
+let hub: ReturnType<typeof createPrivateTopicHub<BrowserChannel>> | null = null;
+function privateTopicHub() {
+  if (hub) return hub;
+  const supabase = getSupabaseBrowserClient();
+  hub = createPrivateTopicHub<BrowserChannel>({
+    open: (topic, onMessage, onStatus) =>
+      supabase
+        .channel(topic, { config: { private: true } })
+        .on("broadcast", { event: LIVE_BROADCAST_EVENT }, (message: { payload?: unknown }) => onMessage(message.payload))
+        .subscribe(onStatus),
+    close: (channel) => supabase.removeChannel(channel),
+  });
+  return hub;
 }
 
 /**

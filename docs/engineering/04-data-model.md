@@ -2472,6 +2472,7 @@ INSERT · UPDATE 신호만, DELETE 는 오지 않는다. 대신 `task_occurrence
 `task_occurrence_state_touch_task` · `task_participants_touch_task`(함수 `touch_task_after_child_delete`)가 부모 `tasks.updated_at` 을 새로 써 UPDATE 신호를 낸다. 화면 쪽: `src/lib/live-sources.ts` · `src/components/shared/live-refresh.tsx`.
 
 - 2026-11-13 `202611130008_guest_messages_realtime.sql`(**운영 적용 2026-11-14**): `guest_conversations` · `guest_messages` · `guest_message_outbox` · `auto_message_runs` 추가 — 손님 메시지 화면의 그 자리 갱신(`useLiveChanges`, 문서 47 §5-9 · 05).
+- 2026-11-16 `202611160001_guest_messages_realtime_private.sql`(**아직 적용 전**): 위 네 표를 **다시 뺀다** — 신호에 행 전체(본문 · 이름 · 채워진 출입 코드)가 실렸기 때문. 대신 트리거 `guest_messages_live_signal()`(`<표>_live_insert` · `<표>_live_update` — `updated_at` 말고 바뀐 칸이 있을 때만)이 id 칸만 든 신호를 private 토픽 `guest-messages:<조직 id>` 로 보내고(`realtime.send`), `realtime.messages` 받기 정책이 그 조직 `guest_messages.view` 만 연다(05 · 47 §5-9).
 
 ## 2026-11-02 · 11-04 `checkin` 스키마 — 셀프 체크인 (`202611020001` · `202611020002`, 운영 적용 2026-11-10)
 

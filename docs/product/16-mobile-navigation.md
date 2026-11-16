@@ -712,6 +712,10 @@ Current rules:
     소켓의 행 데이터는 그리지 않는다. 구독에 `event: "INSERT" | "UPDATE"` 를 줄 수 있다(손님 메시지 목록은 메시지 INSERT 만 — 사진 사본 갱신
     홍수를 거른다). 구독 묶음이 바뀌어 채널을 닫고 새로 붙어도 그 틈을 끊김으로 보고 따라잡는다(처음 붙을 때는 아님). 신호 행은 받자마자
     id 칸만 남긴다(`pickLiveIds`) — 화면에 행 내용이 들어가지 않는다. 쓰는 곳: 손님 메시지(47 §5-9).
+  - **private broadcast 구독 줄 (2026-11-16, 손님 메시지)**: 구독 줄에 `topic` 을 주면 `postgres_changes` 대신 그 private 토픽으로 받는다 —
+    DB 트리거가 id 칸만 든 신호를 보내고(이벤트 `change`), 구독 허가는 `realtime.messages` RLS, 거르기(표 · `event` · `칸=eq.값`)는 브라우저가
+    `liveChangeMatches` 로 한다. 소켓에 행 내용이 아예 오르지 않는다. 같은 토픽은 화면 안에서 채널 하나를 나눠 쓴다(`createPrivateTopicHub` —
+    supabase-js 가 같은 토픽 채널을 하나로 묶어, 한쪽이 닫으면 다른 쪽도 끊기기 때문). 개인정보가 든 표의 새 실시간은 이 길을 쓴다.
 
   | 화면 | 구독 |
   | --- | --- |
@@ -720,7 +724,7 @@ Current rules:
   | 홈 | 요청(주문 · 수리 · 분실물) — Beds24 신호는 그대로 |
   | 요청 목록 · 주문/수리/분실물 상세 · 반환 · 폐기 목록 | `order_requests` · `maintenance_reports` · `lost_items` |
   | 정정 처리 상태 · 연차 신청 내역 | `attendance_sessions` · `attendance_correction_requests` · `transport_reimbursement_reports` · `annual_leave_requests` |
-  | 손님 메시지 목록 · 대화(태블릿 칸 포함, PC `/admin/messages` 대화 · 자동 안내 탭도) — **그 자리 갱신**(`useLiveChanges`) | 목록 `guest_conversations` · `guest_messages`(INSERT) · `guest_message_outbox`(조직), 대화 = 그 대화의 세 표 + `auto_message_runs`(조직), 자동 안내 탭 `auto_message_runs` |
+  | 손님 메시지 목록 · 대화(태블릿 칸 포함, PC `/admin/messages` 대화 · 자동 안내 탭도) — **그 자리 갱신**(`useLiveChanges`) | 조직 private 토픽 `guest-messages:<조직 id>`(2026-11-16 — `postgres_changes` 아님, id 칸만). 브라우저가 신호의 칸으로 거른다: 목록 `guest_conversations` · `guest_messages`(INSERT) · `guest_message_outbox`(조직), 대화 = 그 대화의 세 표 + `auto_message_runs`(조직), 자동 안내 탭 `auto_message_runs` |
 
   알려진 한계: **삭제 신호는 없다**(replica identity 기본값) — 할 일은 소프트 삭제라 바로 반영되지만, 주문 · 수리 · 분실물을 남이 지우면
   다음 갱신 때 빠진다. 반복 회차 완료 되돌리기 · 「건너뛴 날」 되살리기 · 참여자 빼기는 행을 지우지만 DB 트리거가 부모 할 일의 `updated_at` 을

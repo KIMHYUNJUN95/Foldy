@@ -384,18 +384,20 @@ describe("변경 묶기 (createLiveChangeBatcher)", () => {
 
 describe("손님 메시지 구독 묶음", () => {
   it("목록은 조직 + 메시지는 INSERT 만, 대화는 그 대화 + 조직 실행 줄", () => {
+    // 2026-11-16 — publication 이 아니라 조직 private 토픽으로 받는다(트리거가 id 칸만 보냄).
+    const topic = `guest-messages:${ORG}`;
     expect(guestInboxLiveSources(ORG)).toEqual([
-      { table: "guest_conversations", filter: `organization_id=eq.${ORG}` },
-      { table: "guest_messages", filter: `organization_id=eq.${ORG}`, event: "INSERT" },
-      { table: "guest_message_outbox", filter: `organization_id=eq.${ORG}` },
+      { table: "guest_conversations", filter: `organization_id=eq.${ORG}`, topic },
+      { table: "guest_messages", filter: `organization_id=eq.${ORG}`, event: "INSERT", topic },
+      { table: "guest_message_outbox", filter: `organization_id=eq.${ORG}`, topic },
     ]);
     expect(guestThreadLiveSources(ORG, C1)).toEqual([
-      { table: "guest_conversations", filter: `id=eq.${C1}` },
-      { table: "guest_messages", filter: `conversation_id=eq.${C1}` },
-      { table: "guest_message_outbox", filter: `conversation_id=eq.${C1}` },
-      { table: "auto_message_runs", filter: `organization_id=eq.${ORG}` },
+      { table: "guest_conversations", filter: `id=eq.${C1}`, topic },
+      { table: "guest_messages", filter: `conversation_id=eq.${C1}`, topic },
+      { table: "guest_message_outbox", filter: `conversation_id=eq.${C1}`, topic },
+      { table: "auto_message_runs", filter: `organization_id=eq.${ORG}`, topic },
     ]);
-    expect(autoRunLiveSources(ORG)).toEqual([{ table: "auto_message_runs", filter: `organization_id=eq.${ORG}` }]);
+    expect(autoRunLiveSources(ORG)).toEqual([{ table: "auto_message_runs", filter: `organization_id=eq.${ORG}`, topic }]);
   });
 
   it("신호 행은 id 칸만 남기고 본문 · 이름 · 첨부는 버린다", () => {

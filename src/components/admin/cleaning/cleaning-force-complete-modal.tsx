@@ -11,11 +11,13 @@ import { Clock, ShieldCheck, X } from "lucide-react";
 import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
 import { AdminTimePicker } from "@/components/admin/shared/admin-time-picker";
 import type { AdminCleaningTask } from "@/lib/admin-cleaning";
+import type { Locale } from "@/lib/i18n";
 import { forceCompleteDefaultStaff } from "@/lib/cleaning-assign/room-rules";
-import { fmtDur, toMin, type CleaningTaskType } from "./cleaning-console-data";
+import { toMin, type CleaningTaskType } from "./cleaning-console-data";
 import {
   StatusPill,
   buildingLabelOf,
+  durLabel,
   staffLabelOf,
   typeLabel,
   type ConsoleCopy,
@@ -42,6 +44,7 @@ type ForceCompleteModalProps = {
   task: AdminCleaningTask;
   nowLabel: string;
   t: ConsoleCopy;
+  locale: Locale;
   buildingLabels: Record<string, string>;
   staffDirectory: StaffDirectory;
   pending?: boolean;
@@ -53,6 +56,7 @@ export function CleaningForceCompleteModal({
   task,
   nowLabel,
   t,
+  locale,
   buildingLabels,
   staffDirectory,
   pending,
@@ -70,7 +74,7 @@ export function CleaningForceCompleteModal({
 
   const durMin = toMin(end) != null && toMin(start) != null ? (toMin(end) as number) - (toMin(start) as number) : null;
   const durInvalid = durMin != null && durMin <= 0;
-  const durText = durMin != null && durMin > 0 ? fmtDur(durMin) : "—";
+  const durText = durMin != null && durMin > 0 ? durLabel(durMin, t, locale) : "—";
 
   const staffOptions = [...staffDirectory.values()].sort((a, b) => a.name.localeCompare(b.name, "ko"));
 

@@ -508,8 +508,11 @@ export type CleaningAssignCopy = {
   boardFilterWaiting: string;
   boardFilterOpen: string;
   boardAttention: string;
-  boardLate: string;
-  boardLateTag: string;
+  boardLate: string; // 1시간 미만 — "{t} 지남"
+  boardLateHours: string; // 1시간 이상 — "시작 예정 {t} 지남"
+  boardLateTag: string; // "{t} 늦음"
+  boardUnitHour: string;
+  boardUnitMin: string;
   boardPlanned: string;
   boardIn: string;
   boardGuests: string;
@@ -893,7 +896,7 @@ const ko: CleaningAssignCopy = {
   emptyTitle: "오늘은 배정된 방이 없어요",
   emptyBodyNone: "신청하신 날이지만 그날 방이 모두 배정됐어요. 나오지 않아도 돼요.",
   emptyBodyWaiting: "신청하셨어요. 아직 방을 나누는 중이에요.",
-  emptyBodyFree: "오늘은 신청하지 않은 날이에요.",
+  emptyBodyFree: "오늘은 신청하지 않은 날이에요",
   emptyBodyCancelled: "관리자가 오늘 일정을 취소했어요. 나오지 않아도 돼요.",
   goMyShift: "내 시프트 보기",  psOpen: "{name} 시프트 달력 열기",
   psClose: "닫기",
@@ -949,7 +952,7 @@ const ko: CleaningAssignCopy = {
   psRowNext: "다음 근무 {rel} {time} · 방 {n}개",
   psRowNoNext: "앞으로 배정된 날이 없어요",
   psDone: "처리했어요",  seatAdd: "사람",
-  seatAddMore: "1명 더",
+  seatAddMore: "+1명",
   seatAddAria: "{room}에 사람 넣기",
   seatRemoveAria: "{room}에서 {name} 빼기",
   seatRemoved: "{room}에서 {name} 뺐어요",
@@ -1022,8 +1025,11 @@ const ko: CleaningAssignCopy = {
   boardFilterWaiting: "대기",
   boardFilterOpen: "담당 없음",
   boardAttention: "먼저 챙길 방",
-  boardLate: "{n}분째 시작 전",
-  boardLateTag: "{n}분 늦음",
+  boardLate: "{t} 지남",
+  boardLateHours: "시작 예정 {t} 지남",
+  boardLateTag: "{t} 늦음",
+  boardUnitHour: "시간",
+  boardUnitMin: "분",
   boardPlanned: "{name} · {time} 시작 예정",
   boardIn: "들어옴 {time}",
   boardGuests: "{n}명",
@@ -1407,7 +1413,7 @@ const ja: CleaningAssignCopy = {
   emptyTitle: "今日は割り当てられた部屋がありません",
   emptyBodyNone: "申請した日ですが、その日の部屋はすべて割り当て済みです。出勤しなくて大丈夫です。",
   emptyBodyWaiting: "申請済みです。まだ部屋を割り振っています。",
-  emptyBodyFree: "今日は申請していない日です。",
+  emptyBodyFree: "今日は申請していない日です",
   emptyBodyCancelled: "管理者が今日の予定を取り消しました。出勤しなくて大丈夫です。",
   goMyShift: "マイシフトを見る",  psOpen: "{name}のシフトカレンダーを開く",
   psClose: "閉じる",
@@ -1463,7 +1469,7 @@ const ja: CleaningAssignCopy = {
   psRowNext: "次の勤務 {rel} {time} · {n}室",
   psRowNoNext: "今後の割り当てはありません",
   psDone: "処理しました",  seatAdd: "人",
-  seatAddMore: "もう1人",
+  seatAddMore: "+1人",
   seatAddAria: "{room}に人を入れる",
   seatRemoveAria: "{room}から{name}を外す",
   seatRemoved: "{room}から{name}を外しました",
@@ -1536,8 +1542,11 @@ const ja: CleaningAssignCopy = {
   boardFilterWaiting: "待機",
   boardFilterOpen: "担当なし",
   boardAttention: "先に確認する部屋",
-  boardLate: "{n}分経っても未開始",
-  boardLateTag: "{n}分遅れ",
+  boardLate: "{t}経過",
+  boardLateHours: "開始予定から{t}経過",
+  boardLateTag: "{t}遅れ",
+  boardUnitHour: "時間",
+  boardUnitMin: "分",
   boardPlanned: "{name} · {time} 開始予定",
   boardIn: "チェックイン {time}",
   boardGuests: "{n}名",
@@ -1921,7 +1930,7 @@ const en: CleaningAssignCopy = {
   emptyTitle: "No rooms for you today",
   emptyBodyNone: "You applied, but all rooms that day are assigned. You don't need to come in.",
   emptyBodyWaiting: "You applied. Rooms are still being assigned.",
-  emptyBodyFree: "You didn't apply for today.",
+  emptyBodyFree: "You didn't apply for today",
   emptyBodyCancelled: "An admin cancelled your day. You don't need to come in.",
   goMyShift: "View my shifts",  psOpen: "Open {name}'s shift calendar",
   psClose: "Close",
@@ -1977,7 +1986,7 @@ const en: CleaningAssignCopy = {
   psRowNext: "Next shift {rel} {time} · {n} rooms",
   psRowNoNext: "No upcoming assigned days",
   psDone: "Done",  seatAdd: "Person",
-  seatAddMore: "1 more",
+  seatAddMore: "+1",
   seatAddAria: "Add someone to {room}",
   seatRemoveAria: "Remove {name} from {room}",
   seatRemoved: "Removed {name} from {room}",
@@ -2050,8 +2059,11 @@ const en: CleaningAssignCopy = {
   boardFilterWaiting: "Waiting",
   boardFilterOpen: "Unassigned",
   boardAttention: "Needs attention",
-  boardLate: "Not started · {n} min",
-  boardLateTag: "{n} min late",
+  boardLate: "{t} past start time",
+  boardLateHours: "Due to start {t} ago",
+  boardLateTag: "{t} late",
+  boardUnitHour: "h",
+  boardUnitMin: "m",
   boardPlanned: "{name} · due {time}",
   boardIn: "In {time}",
   boardGuests: "{n} guests",

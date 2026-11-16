@@ -18,6 +18,7 @@ import {
   type CleaningHistoryExportRow,
 } from "@/app/admin/cleaning/actions";
 import type { AdminCleaningHistoryItem } from "@/lib/admin-cleaning";
+import { countedCleaningMinutes, historyRowDuration, summarizeCleaningDurations } from "@/lib/cleaning-record-duration";
 import { BUILDING_ORDER, fmtDate, toMin, type BuildingKey } from "./cleaning-console-data";
 import {
   buildingLabelOf,
@@ -261,11 +262,11 @@ export function HistoryBoard({
     );
   }
 
-  // 숫자 줄 — 지금 걸러진 줄 기준(시안: 기록 · 총 소요 · 평균 소요 · 오래 걸림 · 관리자 완료).
-  const timed = rows.filter((h) => h.dur != null && h.status === "done");
-  const totalMin = timed.reduce((sum, h) => sum + (h.dur ?? 0), 0);
-  const avgMin = timed.length ? Math.round(totalMin / timed.length) : null;
-  const longCount = timed.filter((h) => (h.dur ?? 0) > LONG_CLEANING_MIN).length;
+  // 숫자 줄 — 지금 걸러진 줄 기준(시안: 기록 · 총 소요 · 평균 소요 · 오래 걸림 · 관리자 완료). 합계 규칙은 모바일 기록과 같은 함수 하나.
+  const { totalMin, timedCount, avgMin } = summarizeCleaningDurations(
+    rows.map(historyRowDuration),
+  );
+  const longCount = rows.filter((h) => (countedCleaningMinutes(historyRowDuration(h)) ?? 0) > LONG_CLEANING_MIN).length;
   const proxyCount = rows.filter((h) => h.proxy).length;
   const staffCount = new Set(rows.map((h) => h.staffId).filter(Boolean)).size;
   const totalH = Math.floor(totalMin / 60);
@@ -307,7 +308,7 @@ export function HistoryBoard({
             {avgMin == null ? "—" : avgMin}
             {avgMin == null ? null : <small>{t.unitMin}</small>}
           </span>
-          <span className="cl-kpi__d">{t.doneBasis.replace("{n}", String(timed.length))}</span>
+          <span className="cl-kpi__d">{t.doneBasis.replace("{n}", String(timedCount))}</span>
         </div>
         <div className="cl-kpi">
           <span className="cl-kpi__k">{t.kpiLong}</span>
@@ -342,13 +343,15 @@ export function HistoryBoard({
         <tbody>
           {shown.map((h) => {
             // 취소된 세션은 끝난 게 아니라 완료 시각 · 소요를 비운다.
-            const shownDur = h.status === "done" ? h.dur : null;
+            const shownDur = countedCleaningMinutes(historyRowDuration(h));
             const end = endOf(h.start, shownDur);
-            const long = h.status === "done" && (h.dur ?? 0) > LONG_CLEANING_MIN;
+            const long = (shownDur ?? 0) > LONG_CLEANING_MIN;
+            // 취소 · 처리 끝 · 대리 완료는 담당 옆 점 + 글자로, 메모 칸은 메모만.
+            const flags = [
+              h.status === "cancelled" ? t.stCancelled : null,
+              h.closed ? t.stClosed : h.proxy ? t.stProxy : null,
+            ].filter((x): x is string => x !== null);
             const memo: string[] = [];
-            if (h.status === "cancelled") memo.push(t.stCancelled);
-            if (h.closed) memo.push(t.stClosed);
-            else if (h.proxy) memo.push(t.stProxy);
             if (h.reports?.issue) memo.push(`${t.pIssue} ${h.reports.issue}`);
             if (h.reports?.lost) memo.push(`${t.pLostItem} ${h.reports.lost}`);
             if (long) memo.push(t.longTag);
@@ -356,9 +359,9 @@ export function HistoryBoard({
             const staffName = staffLabelOf(h.staffId, staffDirectory) || h.staffName;
             return (
               <tr key={h.id} data-live={h.id} className={selectedId === h.id ? "sel" : ""} onClick={() => onSelect(h.id)}>
-                <td className="mono b">{shortDate(h.date)}</td>
+                <td className="mono">{shortDate(h.date)}</td>
                 <td>
-                  <span className="mono b">{bRoom(h.room)}</span>
+                  <span className="b">{bRoom(h.room)}</span>
                   <div className="cl-tbl__sub">{typeLabel(h.type, t)}</div>
                 </td>
                 <td>{buildingLabelOf(h, buildingLabels)}</td>
@@ -366,12 +369,18 @@ export function HistoryBoard({
                   <span className="cl-who">
                     <span className="cl-av">{staffName ? Array.from(staffName)[0] : "–"}</span>
                     <b>{staffName || t.unassigned}</b>
+                    {flags.map((flag) => (
+                      <span className="cl-flag" key={flag}>
+                        <i aria-hidden="true" />
+                        {flag}
+                      </span>
+                    ))}
                   </span>
                 </td>
                 <td className="mono">
                   {h.start || "—"} → {h.status === "progress" ? <span className="cl-live">{t.stProgress}</span> : (end ?? "—")}
                 </td>
-                <td className={`mono b${long ? " is-danger" : ""}${shownDur == null ? " is-muted" : ""}`}>{durLabel(shownDur, t)}</td>
+                <td className={`mono m${long ? " is-danger" : ""}${shownDur == null ? " is-muted" : ""}`}>{durLabel(shownDur, t, locale)}</td>
                 <td className="r cl-tbl__memo" title={memo.join(" · ")}>
                   {memo.length ? memo.join(" · ") : "—"}
                 </td>

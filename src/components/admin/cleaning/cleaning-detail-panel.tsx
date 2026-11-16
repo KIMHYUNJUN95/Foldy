@@ -214,17 +214,13 @@ export function CleaningDetailPanel({
                   <div className="timenode__t">{start}</div>
                 </div>
                 <div className="timemid">
-                  <div className="timemid__n">{durLabel(dur, t)}</div>
+                  <div className="timemid__n">{durLabel(dur, t, locale)}</div>
                   <div className="timeline2" />
                 </div>
                 <div className="timenode">
                   <div className="timenode__lbl">{t.endAt}</div>
                   <div className="timenode__t">{end}</div>
                 </div>
-              </div>
-              <div className="durbig" style={{ marginTop: 12 }}>
-                <div className="durbig__v">{durLabel(dur, t)}</div>
-                <span className="durbig__lbl">{t.duration}</span>
               </div>
             </div>
           ) : start && !closed ? (
@@ -234,7 +230,7 @@ export function CleaningDetailPanel({
                 <div className="durbig__v">{start}</div>
                 <span className="durbig__lbl">
                   {/* 다음 날 「청소했어요」로 닫은 기록 — 진행 중이 아니라 끝낸 시각만 모른다(경과 시간을 세지 않는다). */}
-                  {task?.unmeasured ? `${t.startAt} · ${t.endUnknown}` : `${t.startAt} · ${t.elapsed} ${durLabel(task ? elapsedMin(task.start) : null, t)}`}
+                  {task?.unmeasured ? `${t.startAt} · ${t.endUnknown}` : `${t.startAt} · ${t.elapsed} ${durLabel(task ? elapsedMin(task.start) : null, t, locale)}`}
                 </span>
               </div>
             </div>
@@ -294,9 +290,9 @@ export function CleaningDetailPanel({
             </div>
           ) : null}
 
+          {reports && (reports.lost || reports.issue) ? (
           <div className="pblock">
             <div className="pblock__t">{t.pLinked}</div>
-            {reports && (reports.lost || reports.issue) ? (
               <div className="rptiles">
                 {reports.issue ? (
                   <button type="button" className="rptile rptile--issue" onClick={() => onOpenReport("issue")}>
@@ -323,13 +319,8 @@ export function CleaningDetailPanel({
                   </button>
                 ) : null}
               </div>
-            ) : (
-              <div className="locknote">
-                <Info className="ic" aria-hidden="true" />
-                {t.noReports}
-              </div>
-            )}
           </div>
+          ) : null}
         </div>
 
         <div className="panel__foot">

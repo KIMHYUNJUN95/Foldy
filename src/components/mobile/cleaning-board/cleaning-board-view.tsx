@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { Fragment, useEffect, useMemo, useState, useTransition } from "react";
 import { Check, ChevronRight } from "lucide-react";
 import { assignToRoom, unassignFromRoom } from "@/actions/cleaning-assign-room";
 import { dayLabel, timeLabel, tokyoTime } from "@/components/admin/cleaning-assign/format";
@@ -13,6 +13,8 @@ import { useIsTablet } from "@/components/shell/split-list";
 import { TaskToast } from "@/components/tasks/task-toast";
 import { addWarningText, assignFailText, fill, type CleaningAssignCopy } from "@/lib/cleaning-assign-i18n";
 import { directAddWarnings } from "@/lib/cleaning-assign/room-rules";
+import { boardLateParts, boardLateText } from "@/lib/cleaning-board-late";
+import type { Locale } from "@/lib/i18n";
 import {
   attentionRows,
   matchesFilter,
@@ -32,6 +34,31 @@ import "./cleaning-board.css";
  * 시작 전 방을 누르면 담당 넣기 — 폰 · 폴드는 공용 바닥 시트, 태블릿 가로는 오른쪽 칸. 넣고 나면 확인 창 없이 「되돌리기」 토스트.
  * 시작 버튼은 없다(알바는 「오늘 내 방」에서 시작). docs/product/07-cleaning-workflow.md 「모바일 청소 현황판」
  */
+
+function LateText({ copy, locale, minutes }: { copy: CleaningAssignCopy; locale: Locale; minutes: number }) {
+  const { after, before, t } = boardLateParts(minutes, locale, copy);
+  return (
+    <>
+      {before}
+      <span className="cbd-nowrap">{t}</span>
+      {after}
+    </>
+  );
+}
+
+/** 「 · 」로 이은 부제 — 조각(이름 · 시간 · 건물)마다 줄바꿈 없이, 조각 사이에서만 꺾는다. */
+function SubParts({ text }: { text: string }) {
+  const parts = text.split(" · ");
+  return (
+    <>
+      {parts.map((part, i) => (
+        <Fragment key={i}>
+          <span className="cbd-seg">{i < parts.length - 1 ? `${part}\u00a0·` : part}</span>{" "}
+        </Fragment>
+      ))}
+    </>
+  );
+}
 
 export type BoardViewRow = CleaningBoardRow & { info: string; startedAt: string | null };
 export type BoardViewPerson = {
@@ -172,7 +199,7 @@ export function CleaningBoardView({
       const minutes = row.startedAt ? Math.max(0, Math.floor((now - new Date(row.startedAt).getTime()) / 60000)) : row.elapsedMinutes;
       return minutes === null ? copy.boardFilterProgress : fill(copy.boardMinutes, { n: minutes });
     }
-    if (row.kind === "late") return fill(copy.boardLateTag, { n: row.lateMinutes ?? 0 });
+    if (row.kind === "late") return boardLateText(row.lateMinutes ?? 0, locale as Locale, copy, "tag");
     if (row.kind === "open") return copy.boardAdd;
     return copy.boardWaiting;
   };
@@ -248,11 +275,15 @@ export function CleaningBoardView({
       <>
         <span className="cbd-room">{roomName(row)}</span>
         <span className="cbd-main">
-          <b className="cbd-warn">{row.kind === "open" ? copy.boardFilterOpen : fill(copy.boardLate, { n: row.lateMinutes ?? 0 })}</b>
+          <b className="cbd-warn">{row.kind === "open" ? copy.boardFilterOpen : <LateText minutes={row.lateMinutes ?? 0} locale={locale as Locale} copy={copy} />}</b>
           <span>
-            {row.kind === "open"
-              ? [bName(row.propertyName), row.info].filter(Boolean).join(" · ")
-              : [bName(row.propertyName), fill(copy.boardPlanned, { name: row.plannedName ?? "", time: timeLabel(row.plannedStartMinutes ?? 0) })].join(" · ")}
+            <SubParts
+              text={
+                row.kind === "open"
+                  ? [bName(row.propertyName), row.info].filter(Boolean).join(" · ")
+                  : [bName(row.propertyName), fill(copy.boardPlanned, { name: row.plannedName ?? "", time: timeLabel(row.plannedStartMinutes ?? 0) })].join(" · ")
+              }
+            />
           </span>
         </span>
         <span className={row.kind === "open" ? "cbd-pill" : "cbd-link"}>{row.kind === "open" ? copy.boardAdd : copy.boardView}</span>
@@ -323,7 +354,7 @@ export function CleaningBoardView({
                 {summary.waiting > 0 ? <i className="is-waiting" style={{ flexGrow: summary.waiting }} /> : null}
                 {summary.open > 0 ? <i className="is-open" style={{ flexGrow: summary.open }} /> : null}
               </div>
-              <div className="cbd-filters" role="group" aria-label={copy.boardFilterLabel}>
+              <div className="cbd-filters" data-swipe-back="off" role="group" aria-label={copy.boardFilterLabel}>
                 {FILTERS.map((f) => (
                   <button
                     key={f}

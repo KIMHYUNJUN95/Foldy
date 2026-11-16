@@ -588,3 +588,10 @@
 - `releaseHold`: 지우기 전에 줄을 읽어 되돌릴 사람이 있는데 방을 못 찾으면 줄을 남기고 `conflict`. 줄이 없으면 `conflict`.
 - `assignToRoom`: `pending` 인 방에만 넣는다. `answerTraineeCheck`: 현장 멤버만. `saveFixedStaff`: 지운 뒤 넣기가 실패하면 원래 목록을 되살린다.
 - 월 자동 제안 · 하루 달력 미배정 수: 끝난 방 · 미룸 · 처리 끝은 뺀다 — 하루 보기와 같은 `buildDayRooms` · `countOpenRooms`(문서 45 C9).
+
+## 2026-11-16 unslop 다듬기 (청소 배정 · 모바일 현황판)
+
+- PC 배정 보드: 요약 숫자 24px/600(미배정만 빨강), 굵기 700 → 600, 방 줄 태그(어제부터 · 직접 추가 · 큰 방 · 끝남 · 청소 중 · 초과)는 회색 글자 + 경고 의미만 6px 점, 줄마다 「X 넣기」 · 「고정 인력 먼저 넣기」 · 취소 요청 「받아 주기 · 돌려보내기」는 글자 버튼(색 채움은 맨 위 「제안대로 N개」 하나), 아이콘 · 시간 버튼 누름 영역 44px.
+- 모바일 현황판: 「손이 필요한 방」 주황 채움 카드 → 투명 + 점, 「담당 없음」 회색 글자 + 점, 「넣기」 옅은 보라, 필터 줄 44px.
+- 늦은 정도 문구: 「N분째 시작 전」 → ko 「N분 지남」(1시간 미만) · 「시작 예정 N시간 M분 지남」, ja 「N分経過」 · 「開始予定からN時間M分経過」, en 「Nm past start time」 · 「Due to start Nh Mm ago」. 시간 형식은 청소 기록 소요와 같은 `formatCleaningMinutes` 하나(`src/lib/cleaning-board-late.ts` · 테스트 `cleaning-board-late.test.ts`).
+- 이름 통일: 사람을 더 붙일 때만 「+1명」(ja 「+1人」 · en 「+1」), 그 밖은 「넣기」. 「오늘 내 방」 한 문장 빈 문구 끝 마침표 제거.

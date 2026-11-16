@@ -345,6 +345,7 @@ export function CleaningConsole({
       <div className="cbody">
         {view === "today" ? (
           <TodayBoard
+            locale={locale}
             tasks={tasks}
             setupTargets={setupTargets}
             staffDirectory={staffDirectory}
@@ -412,6 +413,7 @@ export function CleaningConsole({
       {modalTask && canForceComplete ? (
         <CleaningForceCompleteModal
           task={modalTask}
+          locale={locale}
           // 지난 날은 「지금」이 그날 시각이 아니다 — 비워서 끝 시각을 직접 고르게 하고 「지금」 버튼도 감춘다(2026-11-02).
           nowLabel={isPast ? "" : nowLabelTokyo()}
           t={t}

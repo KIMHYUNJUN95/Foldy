@@ -1,6 +1,6 @@
 import { AdminShell } from "@/components/shell/admin-shell";
 import { CleaningConsole } from "@/components/admin/cleaning/cleaning-console";
-import { monthRange } from "@/components/admin/cleaning/cleaning-console-data";
+import { resolveHistoryRange } from "@/lib/cleaning-history-range";
 import { getAdminCleaningHistory, getAdminCleaningToday } from "@/lib/admin-cleaning";
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { canForceCompleteCleaning, getCleaningOperatingDateKey } from "@/lib/cleaning";
@@ -19,21 +19,22 @@ const LIVE_KINDS = ["reservations", "cleaning_assign"] as const;
 export default async function AdminCleaningPage({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string | string[] }>;
+  searchParams: Promise<{ date?: string | string[]; from?: string | string[]; to?: string | string[] }>;
 }) {
   const session = await requireAdminPageSession({ nextPath: "/admin/cleaning" });
   const locale = session.user.preferredLanguage;
   const dictionary = getDictionary(locale);
 
   // 조회할 운영일. 형식이 어긋나면 조용히 오늘로 떨어진다 — 잘못된 링크로 화면이 깨지지 않게.
-  const rawDate = (await searchParams)?.date;
+  const query = await searchParams;
+  const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
+  const rawDate = query?.date;
   const dateParam = Array.isArray(rawDate) ? rawDate[0] : rawDate;
   const operatingToday = getCleaningOperatingDateKey();
   const viewDate =
     dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : operatingToday;
 
-  const [ty, tm] = operatingToday.split("-").map(Number);
-  const range = monthRange(ty, tm - 1);
+  const range = resolveHistoryRange(operatingToday, first(query?.from), first(query?.to));
   // 기록은 객실 목록만 기다린다 — 오늘 현황과 동시에 읽는다.
   const [today, history] = await Promise.all([
     getAdminCleaningToday(session, viewDate),

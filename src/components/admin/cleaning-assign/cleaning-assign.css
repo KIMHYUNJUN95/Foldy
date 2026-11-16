@@ -19,15 +19,15 @@
 .adm .cas-btn:disabled { opacity: .5; cursor: default; }
 .adm .cas-btn.is-pri { background: #7a52e6; color: #fff; }
 .adm .cas-btn.is-pri:hover:not(:disabled) { background: #6b43dc; }
-.adm .cas-btn.is-soft { background: #f4f1fd; color: #5a30cf; }
-.adm .cas-btn.is-soft:hover:not(:disabled) { background: #ece5fc; }
+.adm .cas-btn.is-soft { background: transparent; color: #5a30cf; font-weight: 500; }
+.adm .cas-btn.is-soft:hover:not(:disabled) { background: #f4f1fd; }
 .adm .cas-btn.is-gray { background: #f4f4f7; color: #3a3746; }
 .adm .cas-btn.is-ghost:hover:not(:disabled) { background: #f4f4f7; }
 .adm .cas-btn.is-line { background: #fff; color: #5a30cf; box-shadow: inset 0 0 0 1px #dcd2fa; height: 32px; }
 .adm .cas-btn.is-danger-text { color: #b4232a; }
 .adm .cas-btn.is-danger-text:hover:not(:disabled) { background: #fdecec; }
 .adm .cas-btn.is-tiny { height: 28px; padding: 0 8px; font-size: 12px; }
-.adm .cas-icon { display: grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: 10px; background: transparent; color: #6b6878; cursor: pointer; }
+.adm .cas-icon { display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 10px; background: transparent; color: #6b6878; cursor: pointer; }
 .adm .cas-icon:hover { background: #f4f4f7; }
 .adm .cas-icon svg { width: 18px; height: 18px; }
 .adm .cas button:focus-visible, .adm .cas a:focus-visible, .adm .cas [role="button"]:focus-visible, .adm .cas-modal button:focus-visible { outline: 2px solid #7a52e6; outline-offset: 2px; }
@@ -35,15 +35,15 @@
 .adm .cas-stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); padding-bottom: 18px; border-bottom: .5px solid #e4e3e9; }
 .adm .cas-stats > div { display: flex; flex-direction: column; gap: 4px; }
 .adm .cas-stats span { font-size: 13px; color: #6b6878; }
-.adm .cas-stats b { font-size: 28px; font-weight: 700; letter-spacing: -.02em; }
-.adm .cas-stats b.is-warn { color: #c5282e; }
+.adm .cas-stats b { font-size: 24px; font-variant-numeric: tabular-nums; font-weight: 600; letter-spacing: -.02em; }
+.adm .cas-stats b.is-warn { color: #b4232a; }
 .adm .cas-stats small { margin-left: 2px; font-size: 13px; font-weight: 500; color: #6b6878; }
 
 .adm .cas-grid { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 48px; align-items: start; }
 .adm .cas-rooms, .adm .cas-people { display: flex; flex-direction: column; min-width: 0; }
 .adm .cas-people { position: sticky; top: 12px; }
 .adm .cas-h { display: flex; align-items: baseline; gap: 8px; padding: 4px 0 8px; }
-.adm .cas-h h2 { margin: 0; font-size: 17px; font-weight: 700; }
+.adm .cas-h h2 { margin: 0; font-size: 17px; font-weight: 600; }
 .adm .cas-h > span { font-size: 14px; color: #6b6878; }
 .adm .cas-h > span.is-warn { color: #c5282e; font-weight: 600; }
 .adm .cas-bld { display: flex; flex-direction: column; margin-top: 16px; }
@@ -63,21 +63,23 @@
 .adm .cas-room.is-cancelled .cas-room__no { color: #6b6878; text-decoration: line-through; }
 .adm .cas-room__id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .adm .cas-room__bld { font-size: 12px; color: #6b6878; }
-.adm .cas-room__no { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.adm .cas-room__no { font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .adm .cas-room__sub { font-size: 12px; color: #6b6878; }
 .adm .cas-room__body { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
-.adm .cas-room__note { font-size: 13px; color: #6b6878; }
+/* 좁은 칸에서 줄이 지저분하게 꺾이지 않게 한 줄 말줄임 — 전체는 title */
+.adm .cas-room__note { flex: 1 1 160px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: #6b6878; }
+.adm .cas-tag + .cas-tag { margin-left: 8px; }
 .adm .cas-room__act { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 6px; min-width: 0; }
 .adm .cas-room__act.is-stack { flex-direction: column; align-items: flex-end; }
 .adm .cas-room__pair { display: flex; gap: 4px; }
 .adm .cas-room__count { font-size: 13px; color: #6b6878; }
 .adm .cas-room__hint { font-size: 13px; color: #6b6878; }
 
-.adm .cas-tag { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: 6px; background: #f4f4f7; color: #3a3746; font-size: 12px; font-weight: 600; }
-.adm .cas-tag.is-warn { background: #fff1dc; color: #8a4b00; }
-.adm .cas-tag.is-blue { background: #eef4ff; color: #1f4fb0; }
-.adm .cas-tag.is-pri { background: #f4f1fd; color: #5a30cf; }
-.adm .cas-tag.is-danger { background: #fdecec; color: #b4232a; }
+.adm .cas-tag { display: inline-flex; align-items: center; gap: 6px; color: #6b6878; font-size: 13px; font-weight: 500; }
+.adm .cas-tag::before { content: ""; width: 6px; height: 6px; flex: none; border-radius: 50%; background: #b8b6c2; }
+.adm .cas-tag.is-warn::before, .adm .cas-tag.is-over::before { background: #d9822b; }
+.adm .cas-tag.is-danger::before { background: #e5484d; }
+.adm .cas-tag.is-pri::before { background: #7a52e6; }
 .adm .cas-chip { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border: 0; border-radius: 8px; background: #f4f4f7; color: #16141f; font: inherit; font-size: 14px; }
 .adm .cas-chip small { font-size: 12px; font-weight: 600; color: #5a30cf; }
 .adm .cas-chip.is-picked { background: #7a52e6; color: #fff; font-weight: 600; }
@@ -127,14 +129,14 @@
 .adm .cas-person__req.is-amber i { background: #f07b1a; }
 .adm .cas-person__req.is-amber b { color: #8a4b00; }
 .adm .cas-person__reqacts { display: flex; gap: 6px; flex-wrap: wrap; }
-.adm .cas-reqbtn { display: inline-flex; align-items: center; height: 30px; padding: 0 12px; border: 0; border-radius: 999px; background: #f4f4f7; color: #3a3746; font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background 150ms ease, transform 140ms ease, opacity 150ms ease; }
-.adm .cas-reqbtn:hover:not(:disabled) { background: #ececf0; }
+.adm .cas-reqbtn { display: inline-flex; align-items: center; min-height: 44px; padding: 0 10px; border: 0; border-radius: 999px; background: transparent; color: #5a30cf; font: inherit; font-size: 13px; font-weight: 500; white-space: nowrap; cursor: pointer; transition: background 150ms ease, transform 140ms ease, opacity 150ms ease; }
+.adm .cas-reqbtn:hover:not(:disabled) { background: #f4f1fd; }
 .adm .cas-reqbtn:active:not(:disabled) { transform: scale(.97); }
 .adm .cas-reqbtn:disabled { opacity: .5; cursor: default; }
-.adm .cas-reqbtn.is-red { background: #fdecec; color: #b4232a; }
-.adm .cas-reqbtn.is-red:hover:not(:disabled) { background: #fadcdc; }
-.adm .cas-reqbtn.is-pri { background: #7a52e6; color: #fff; }
-.adm .cas-reqbtn.is-pri:hover:not(:disabled) { background: #6b43dc; }
+.adm .cas-reqbtn.is-red { color: #b4232a; }
+.adm .cas-reqbtn.is-red:hover:not(:disabled) { background: #fdecec; }
+.adm .cas-reqbtn.is-pri { color: #7a52e6; font-weight: 600; }
+.adm .cas-reqbtn.is-pri:hover:not(:disabled) { background: #f4f1fd; }
 /* 「일정 취소」 — 평소엔 회색 글자, 올렸을 때만 빨강(빨강은 요청 줄 하나만 눈에 띄게). */
 .adm .cas-quietdanger { height: 26px; padding: 0 6px; border: 0; border-radius: 6px; background: transparent; color: #8e8a99; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; transition: color 150ms ease, background 150ms ease; }
 .adm .cas-quietdanger:hover:not(:disabled) { color: #b4232a; background: #fdecec; }
@@ -142,6 +144,9 @@
 .adm .cas-person__time { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
 .adm .cas-time { height: 28px; padding: 0 6px; border: 0; border-radius: 6px; background: transparent; color: #6b6878; font: inherit; font-size: 13px; font-variant-numeric: tabular-nums; cursor: pointer; }
 .adm .cas-time:hover { background: #f4f4f7; }
+/* 세로로 쌓인 이웃(일정 취소)과 누름 영역이 겹치면 오조작 — 좌우로만 넓힌다 */
+.adm .cas-time, .adm .cas-quietdanger { position: relative; }
+.adm .cas-time::after, .adm .cas-quietdanger::after { content: ""; position: absolute; left: -8px; right: -8px; top: 0; bottom: 0; }
 .adm .cas-time.is-ex { color: #5a30cf; font-weight: 600; }
 .adm .cas-timeedit { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .adm .cas-phone { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: #3a3746; text-decoration: none; font-variant-numeric: tabular-nums; }
@@ -149,7 +154,7 @@
 .adm .cas-more { align-self: flex-start; height: 36px; padding: 0 8px; border: 0; background: transparent; color: #5a30cf; font: inherit; font-weight: 600; cursor: pointer; }
 
 .adm .modal.cas-modal { width: 420px; padding: 22px; gap: 14px; border: 0; overflow: visible; }
-.adm .cas-modal h3 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -.02em; }
+.adm .cas-modal h3 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -.02em; }
 .adm .cas-modal__sub { margin: 4px 0 0; font-size: 13px; color: #6b6878; }
 .adm .cas-modal__f { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; margin-top: 4px; }
 .adm .cas-modal__f .cas-btn { height: 44px; border-radius: 12px; }
@@ -166,7 +171,7 @@
 .adm .cas-dot { width: 6px; height: 6px; border-radius: 50%; background: #8e8a99; display: inline-block; }
 /* 그날 일정을 취소한 칸 — 빈칸과 구분(2026-11-02). 누르면 하루 보기의 「다시 넣기」 안내. */
 .adm .cas-cellx { width: 10px; height: 1.5px; border-radius: 1px; background: #8e8a99; display: inline-block; }
-.adm .cas-cellmark { display: inline-grid; place-items: center; width: 24px; height: 22px; border-radius: 7px; font-size: 12px; font-weight: 700; font-style: normal; font-variant-numeric: tabular-nums; }
+.adm .cas-cellmark { display: inline-grid; place-items: center; width: 24px; height: 22px; border-radius: 7px; font-size: 12px; font-weight: 600; font-style: normal; font-variant-numeric: tabular-nums; }
 .adm .cas-cellmark.is-on { background: #ede7fc; color: #3b2a7a; }
 .adm .cas-cellmark.is-sug { box-shadow: inset 0 0 0 1.5px #7a52e6; color: #5a30cf; }
 .adm .cas-month { display: flex; flex-direction: column; overflow-x: auto; }
@@ -177,13 +182,13 @@
 .adm .cas-mday { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 4px 0; border-radius: 8px; color: #16141f; text-decoration: none; }
 .adm .cas-mday:hover { background: #f4f4f7; }
 .adm .cas-mday small { font-size: 11px; color: #6b6878; }
-.adm .cas-mday b { font-size: 14px; font-weight: 700; }
+.adm .cas-mday b { font-size: 14px; font-weight: 600; }
 .adm .cas-mday.is-weekend b { color: #6b6878; }
 .adm .cas-mday.is-today b { color: #7a52e6; }
 .adm .cas-mlabel { font-size: 13px; color: #6b6878; }
 .adm .cas-msum { text-align: center; font-size: 12px; color: #3a3746; }
 .adm .cas-msum.is-zero { color: #a8a5b3; }
-.adm .cas-msum.is-warn { color: #c5282e; font-weight: 700; }
+.adm .cas-msum.is-warn { color: #c5282e; font-weight: 600; }
 .adm .cas-msum.is-past { color: #a8a5b3; }
 .adm .cas-mname { display: flex; align-items: center; gap: 6px; min-width: 0; padding-right: 8px; }
 .adm .cas-mname b { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -198,7 +203,7 @@
 .adm .cas-rule { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 6px 4px; border-bottom: .5px solid #e4e3e9; background: #fff; transition: background 150ms ease; }
 .adm .cas-rule.is-drag { background: #f4f1fd; border-radius: 10px; }
 .adm .cas-rule__grip { width: 20px; color: #a8a5b3; cursor: grab; letter-spacing: -2px; user-select: none; }
-.adm .cas-rule__n { width: 22px; font-size: 15px; font-weight: 700; color: #6b6878; }
+.adm .cas-rule__n { width: 22px; font-size: 15px; font-weight: 600; color: #6b6878; }
 .adm .cas-rule__main { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .adm .cas-rule__main b { font-size: 15px; font-weight: 600; }
 .adm .cas-rule__main b.is-off { color: #6b6878; }
@@ -218,7 +223,7 @@
 .adm .cas-blds button small { font-size: 13px; color: #6b6878; font-weight: 500; }
 .adm .cas-tier { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 16px; padding: 12px 0; border-bottom: .5px solid #e4e3e9; }
 .adm .cas-tier.is-over { background: #faf8ff; }
-.adm .cas-tier > b { font-size: 15px; font-weight: 700; padding-top: 12px; }
+.adm .cas-tier > b { font-size: 15px; font-weight: 600; padding-top: 12px; }
 .adm .cas-tier__list { display: flex; flex-direction: column; gap: 2px; }
 .adm .cas-tierp { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 0 6px; border-radius: 10px; }
 .adm .cas-tierp:hover { background: #fafafc; }
@@ -244,21 +249,21 @@
 .adm .cas-cmp-nums { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
 .adm .cas-cmp-nums > div { display: flex; flex-direction: column; gap: 4px; }
 .adm .cas-cmp-nums span, .adm .cas-cmp-nums button { font-size: 13px; color: #6b6878; }
-.adm .cas-cmp-nums b { font-size: 28px; font-weight: 700; letter-spacing: -.02em; }
+.adm .cas-cmp-nums b { font-size: 28px; font-weight: 600; letter-spacing: -.02em; }
 .adm .cas-cmp-nums b.is-warn { color: #c5282e; }
 .adm .cas-check-row { display: grid; grid-template-columns: 120px minmax(0, 1fr) auto; align-items: center; gap: 16px; min-height: 52px; border-bottom: .5px solid #e4e3e9; }
 .adm .cas-check-row b { font-size: 15px; font-weight: 600; }
 .adm .cas-check-row span { font-size: 14px; color: #3a3746; }
-.adm .cas-check-row .is-hi { color: #b4232a; font-weight: 700; }
-.adm .cas-check-row .is-lo { color: #8a4b00; font-weight: 700; }
+.adm .cas-check-row .is-hi { color: #b4232a; font-weight: 600; }
+.adm .cas-check-row .is-lo { color: #8a4b00; font-weight: 600; }
 .adm .cas-fig { margin: 0; display: flex; flex-direction: column; gap: 8px; }
 .adm .cas-fig figcaption { font-size: 13px; color: #6b6878; }
 .adm .cas-crow { display: grid; grid-template-columns: 170px 64px 84px 96px 96px 120px 112px 96px minmax(180px, 1fr); gap: 14px; align-items: center; min-height: 52px; min-width: 1100px; border-bottom: .5px solid #e4e3e9; }
 .adm .cas-crow.is-head { min-height: 36px; font-size: 12px; color: #6b6878; }
 .adm .cas-crow.is-dim { opacity: .6; }
 .adm .cas-crow .r { text-align: right; font-variant-numeric: tabular-nums; }
-.adm .cas-crow .is-hi { color: #b4232a; font-weight: 700; }
-.adm .cas-crow .is-lo { color: #8a4b00; font-weight: 700; }
+.adm .cas-crow .is-hi { color: #b4232a; font-weight: 600; }
+.adm .cas-crow .is-lo { color: #8a4b00; font-weight: 600; }
 .adm .cas-crow .sig { font-size: 13px; color: #6b6878; }
 .adm .cas-crow .sig.is-hi { color: #b4232a; font-weight: 600; }
 .adm .cas-crow .sig.is-lo { color: #8a4b00; font-weight: 600; }
@@ -293,7 +298,7 @@
 .adm .cas-swap__col { display: flex; flex-direction: column; min-width: 0; }
 .adm .cas-swap__who { display: flex; align-items: center; gap: 10px; padding-bottom: 10px; border-bottom: .5px solid #e4e3e9; }
 .adm .cas-swap__who > span:last-child { display: flex; flex-direction: column; }
-.adm .cas-swap__who b { font-size: 16px; font-weight: 700; }
+.adm .cas-swap__who b { font-size: 16px; font-weight: 600; }
 .adm .cas-swap__who small { font-size: 12px; color: #6b6878; }
 .adm .cas-swap__av { width: 34px; height: 34px; flex: none; border-radius: 50%; display: grid; place-items: center; background: #efeafb; color: #3b2a7a; font-size: 14px; font-weight: 600; }
 .adm .cas-swap__empty { margin: 0; padding: 18px 2px; font-size: 14px; line-height: 20px; color: #6b6878; }
@@ -301,7 +306,7 @@
 .adm .cas-swap__grp-h { display: flex; align-items: center; gap: 10px; min-height: 40px; font-size: 13px; cursor: pointer; }
 .adm .cas-swap__grp-h small { font-size: 13px; color: #6b6878; }
 .adm .cas-swap__room { display: flex; align-items: center; gap: 10px; min-height: 40px; padding-left: 28px; border-bottom: .5px solid #e4e3e9; cursor: pointer; }
-.adm .cas-swap__room b { width: 52px; flex: none; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.adm .cas-swap__room b { width: 52px; flex: none; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .adm .cas-swap__room span { flex: 1; min-width: 0; font-size: 12px; color: #6b6878; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .adm .cas-swap__room.is-lock { opacity: .55; cursor: default; }
 .adm .cas-swap input[type="checkbox"] { width: 18px; height: 18px; flex: none; margin: 0; accent-color: #7a52e6; }
@@ -309,7 +314,7 @@
 .adm .cas-swap__sum > small { font-size: 12px; color: #6b6878; }
 .adm .cas-swap__sum > small:first-child { font-weight: 600; }
 .adm .cas-swap__sum > span { font-size: 14px; line-height: 20px; }
-.adm .cas-swap__sum b { font-weight: 700; }
+.adm .cas-swap__sum b { font-weight: 600; }
 .adm .cas-swap__sum i { font-style: normal; color: #6b6878; margin: 0 6px; }
 .adm .cas-swap .cas-modal__f { grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; }
 .adm .cas-swap .cas-modal__f .cas-btn { padding: 0 20px; border-radius: 999px; }
@@ -328,16 +333,16 @@
 .adm .cas.has-panel { padding-right: 420px; }
 .adm .cas-mname__open { min-width: 0; padding: 4px 6px; margin-left: -6px; border: 0; border-radius: 8px; background: transparent; font: inherit; font-size: 14px; font-weight: 600; color: #16141f; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; text-decoration: underline; text-decoration-color: #dcd5f0; text-underline-offset: 4px; transition: background 150ms ease; }
 .adm .cas-mname__open:hover { background: #f4f1fd; text-decoration-color: #a98ef0; }
-.adm .cas-mname__open[aria-pressed="true"] { color: #3b2a7a; font-weight: 700; text-decoration: none; }
+.adm .cas-mname__open[aria-pressed="true"] { color: #3b2a7a; font-weight: 600; text-decoration: none; }
 .adm .cas-mrow.is-picked { background: #f6f3fe; }
 .adm .cas-mday.is-picked, .adm .cas-mcell.is-picked { background: #f4f1fd; }
 .adm .cas-mrow.is-picked .cas-mcell.is-picked { background: #e9e1fb; }
 .adm .cas-pp { width: 420px; }
 .adm .cas-pp__h { padding-bottom: 12px; }
 .adm .cas-pp__who { display: flex; align-items: center; gap: 10px; }
-.adm .cas-pp__av { width: 44px; height: 44px; flex: none; border-radius: 50%; display: grid; place-items: center; background: #efeafb; color: #5a30cf; font-size: 17px; font-weight: 700; }
+.adm .cas-pp__av { width: 44px; height: 44px; flex: none; border-radius: 50%; display: grid; place-items: center; background: #efeafb; color: #5a30cf; font-size: 17px; font-weight: 600; }
 .adm .cas-pp__name { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.adm .cas-pp__name b { font-size: 20px; font-weight: 700; line-height: 26px; color: #16141f; }
+.adm .cas-pp__name b { font-size: 20px; font-weight: 600; line-height: 26px; color: #16141f; }
 .adm .cas-pp__name span { font-size: 13px; line-height: 18px; color: #6b6878; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .adm .cas-pp__step { display: grid; place-items: center; width: 32px; height: 32px; flex: none; border: 0; border-radius: 9px; background: #f4f4f7; color: #3a3746; cursor: pointer; transition: background 150ms ease, transform 140ms ease; }
 .adm .cas-pp__step:hover { background: #ececf0; }
@@ -355,7 +360,7 @@
 /* 넣기 · 빼기(하루 보기, 시안 https://claude.ai/artifact/Evr8xVkWpHhpNtg5NCgrU1 · 2026-10-23) — docs/product/37 「4-2」
    ① 이름표: 이니셜 원 + 이름, 올리면 × (자리는 미리 잡아 둬 줄이 흔들리지 않음). ② 빈 방 「+ 사람」 → 작은 창(배정 전이 위).
    ③ 사람을 고르면 방 줄 왼쪽 체크 원 — 줄 아무 데나 눌러 넣기 ↔ 빼기, 넣으면 원이 채워지며 체크가 그려진다. */
-.adm .cas-av { width: 22px; height: 22px; flex: none; border-radius: 50%; display: inline-grid; place-items: center; background: #fff; color: #5a30cf; font-size: 11px; font-weight: 700; }
+.adm .cas-av { width: 22px; height: 22px; flex: none; border-radius: 50%; display: inline-grid; place-items: center; background: #fff; color: #5a30cf; font-size: 11px; font-weight: 600; }
 .adm .cas-token { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 3px 0 4px; border-radius: 999px; background: #f4f1fd; color: #2a2140; font-size: 13px; font-weight: 600; white-space: nowrap; transition: background 150ms ease; animation: cas-token-in 180ms cubic-bezier(.23, 1, .32, 1) both; }
 .adm .cas-token small { font-size: 11px; font-weight: 600; color: #b4500a; }
 .adm .cas-token__x { display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: #5a30cf; cursor: pointer; opacity: 0; transform: scale(.8); transition: opacity 140ms ease, transform 160ms cubic-bezier(.23, 1, .32, 1), background 140ms ease; }
@@ -403,7 +408,7 @@
 }
 
 /* 보통 인원보다 많이 넣을 때 확인 창(시안 https://claude.ai/artifact/P297A6EKX5ofrx8dEFn8t1 · 2026-10-23) — 가운데 창, 확인 버튼에 처음 포커스(Enter 넣기 · Esc 그대로). */
-.adm .cas-tag.is-over { background: #fff1e5; color: #b4500a; font-weight: 700; }
+
 .adm .modal.cas-modal.cas-over { width: 420px; padding: 24px; gap: 14px; border-radius: 20px; }
 .adm .cas-over__h { display: flex; align-items: center; gap: 10px; }
 .adm .cas-over__ic { width: 32px; height: 32px; flex: none; border-radius: 50%; display: grid; place-items: center; background: #fff1e5; color: #b4500a; }
@@ -412,7 +417,7 @@
 .adm .cas-over__body { margin: 0; font-size: 14px; line-height: 21px; color: #3a3746; }
 .adm .cas-over__faces { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-radius: 14px; background: #f7f6fa; }
 .adm .cas-over__faces b { font-size: 13px; font-weight: 600; color: #b4500a; font-variant-numeric: tabular-nums; }
-.adm .cas-over__face { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: #fff; box-shadow: 0 0 0 1px #e4e3e9; color: #3a3746; font-size: 13px; font-weight: 700; }
+.adm .cas-over__face { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: #fff; box-shadow: 0 0 0 1px #e4e3e9; color: #3a3746; font-size: 13px; font-weight: 600; }
 .adm .cas-over__face.is-new { background: #7a52e6; color: #fff; box-shadow: 0 0 0 3px #efeafb; animation: cas-over-new 320ms cubic-bezier(.23, 1, .32, 1) 120ms both; }
 .adm .cas-over__hint { margin: -4px 0 0; font-size: 12.5px; line-height: 18px; color: #6b6878; }
 .adm .cas-modal__f.is-even { grid-template-columns: 1fr 1fr; }

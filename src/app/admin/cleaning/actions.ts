@@ -39,9 +39,14 @@ import { isUnmeasuredSession } from "@/lib/cleaning-unmeasured";
 import { roomWriteErrorKind, sessionRoomKeyOf } from "@/lib/cleaning-assign/room-key";
 import { forceCompleteEndAllowed } from "@/lib/cleaning-assign/room-rules";
 import { buildActiveRoomCatalog, fetchRoomCatalogRows } from "@/lib/rooms";
-// 소요시간 포맷은 화면(오늘 현황 카드·기록 표·상세 패널)이 쓰는 fmtDur 를 그대로 재사용한다 —
-// 예전에는 여기에 같은 규칙을 한 번 더 구현해 두 벌이 갈릴 위험이 있었다.
-import { fmtDate, fmtDur, toMin, type BuildingKey, type CleaningTaskType } from "@/components/admin/cleaning/cleaning-console-data";
+// 소요 표기 · 합계는 화면(기록 표 · 모바일 기록)과 같은 함수(lib/cleaning-record-duration) — 취소 · 처리 끝은 「—」이고 합계에 안 들어간다.
+import {
+  countedCleaningMinutes,
+  formatCleaningMinutes,
+  historyRowDuration,
+  summarizeCleaningDurations,
+} from "@/lib/cleaning-record-duration";
+import { fmtDate, toMin, type BuildingKey, type CleaningTaskType } from "@/components/admin/cleaning/cleaning-console-data";
 
 // 기록 탭의 Excel/PDF 내보내기를 받치는 서버 액션. 클라이언트는 원본인
 // 이미 필터링된 기록 행(표시 문자열이 아니라 정규 건물/유형 키)을 보내면, 눈에 보이는 모든
@@ -141,6 +146,7 @@ function cleaningTableRows(
 
   return rows.map((r) => {
     const startMin = toMin(r.start) ?? 0;
+    const counted = countedCleaningMinutes(historyRowDuration(r));
     // "상태" 열은 실제 세션 상태를 쓴다. 정상/대리 완료는 상태가 아니라 완료 유형이라
     // 담당자 셀에 함께 표기한다(화면의 대리 완료 태그와 같은 축).
     const staffLabel = r.staffName || "—";
@@ -152,8 +158,8 @@ function cleaningTableRows(
       type: typeLabelOf(r.type, t),
       staff: r.closed ? `${staffLabel} · ${t.stClosed}` : r.proxy ? `${staffLabel} · ${t.stProxy}` : staffLabel,
       start: r.start,
-      end: r.dur == null ? "—" : minToHHMM(startMin + r.dur),
-      dur: fmtDur(r.dur),
+      end: counted == null ? "—" : minToHHMM(startMin + counted),
+      dur: counted == null ? "—" : formatCleaningMinutes(counted, locale, { hour: t.unitHour, min: t.unitMin }),
       status: sessionStatusLabelOf(r.status, dictionary),
       note: r.note,
     };
@@ -167,7 +173,7 @@ function cleaningSheet(
   to: string,
 ): AdminTableSheet {
   const t = getDictionary(meta.locale).cleaning.console;
-  const totalMinutes = rows.reduce((sum, r) => sum + (r.dur ?? 0), 0);
+  const { totalMin: totalMinutes } = summarizeCleaningDurations(rows.map(historyRowDuration));
   return {
     sheetName: t.exportTitle,
     title: t.exportTitle,
@@ -176,7 +182,7 @@ function cleaningSheet(
     totalLabel: meta.shared.exportTotalLabel,
     columns: cleaningColumns(meta.locale),
     rows: cleaningTableRows(rows, meta.locale, meta.localeTag),
-    totals: { dur: fmtDur(totalMinutes) },
+    totals: { dur: formatCleaningMinutes(totalMinutes, meta.locale, { hour: t.unitHour, min: t.unitMin }) },
   };
 }
 

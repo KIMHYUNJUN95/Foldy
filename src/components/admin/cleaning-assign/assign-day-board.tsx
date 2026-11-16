@@ -458,7 +458,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
             <span className="cas-tag is-pri">{room.partial ? fill(copy.statusPartial, room.partial) : copy.statusProgress}</span>
           ) : null}
           {room.status === "done" ? <span className="cas-tag">{room.resolvedHold ? copy.tagResolved : copy.statusDone}</span> : null}
-          {opts.open ? <span className="cas-room__note">{[roomInfo(room), room.note, room.holdReason].filter(Boolean).join(" · ")}</span> : null}
+          {opts.open ? (() => { const noteText = [roomInfo(room), room.note, room.holdReason].filter(Boolean).join(" · "); return <span className="cas-room__note" title={noteText}>{noteText}</span>; })() : null}
           {room.people.map((p) =>
             !picked && canRemovePerson(room, p.hasRecord) ? (
               // 이름표 — 마우스를 올리면 ×, 누르면 바로 빠지고 5초 「되돌리기」.

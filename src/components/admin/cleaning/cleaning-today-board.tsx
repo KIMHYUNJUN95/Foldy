@@ -5,6 +5,7 @@
 // docs/design/05-white-redesign.md): 타일은 테두리나 왼쪽 상태 막대 없이 옅은 채움이고,
 // 상태는 작은 텍스트 배지이며, 섹션 헤더는 단순 제목 + 진행 막대다.
 // 데이터는 2026-07-14 부로 실제 데이터다 (src/lib/admin-cleaning.ts).
+import type { Locale } from "@/lib/i18n";
 import type { ReactNode } from "react";
 import { Check, Search } from "lucide-react";
 import type { AdminCleaningTask, AdminSettingTarget } from "@/lib/admin-cleaning";
@@ -29,6 +30,7 @@ type TodayBoardProps = {
   setupTargets: AdminSettingTarget[];
   staffDirectory: StaffDirectory;
   t: ConsoleCopy;
+  locale: Locale;
   buildingLabels: Record<string, string>;
   group: "building" | "status";
   propFilter: BuildingKey | "all";
@@ -49,6 +51,7 @@ function Initial({ name }: { name: string }) {
 function RoomCard({
   task,
   t,
+  locale,
   buildingLabels,
   staffDirectory,
   showProp,
@@ -57,6 +60,7 @@ function RoomCard({
 }: {
   task: AdminCleaningTask;
   t: ConsoleCopy;
+  locale: Locale;
   buildingLabels: Record<string, string>;
   staffDirectory: StaffDirectory;
   showProp: boolean;
@@ -104,7 +108,7 @@ function RoomCard({
         <span className={`cl-tile__who${staffName ? "" : " is-none"}`}>{staffName || t.unassigned}</span>
         {task.closed ? <span className="cl-proxy">{t.stClosed}</span> : task.proxy ? <span className="cl-proxy">{t.stProxy}</span> : null}
         {minutes != null ? (
-          <span className={`cl-tile__min mono${task.status === "progress" ? " is-live" : ""}`}>{durLabel(minutes, t)}</span>
+          <span className={`cl-tile__min mono${task.status === "progress" ? " is-live" : ""}`}>{durLabel(minutes, t, locale)}</span>
         ) : null}
       </div>
     </div>
@@ -124,13 +128,14 @@ function SectionHead({ title, count, progress }: { title: string; count: number;
 function BuildingSections(props: {
   tasks: AdminCleaningTask[];
   t: ConsoleCopy;
+  locale: Locale;
   buildingLabels: Record<string, string>;
   staffDirectory: StaffDirectory;
   propFilter: BuildingKey | "all";
   selectedId: string | null;
   onSelect: (id: string) => void;
 }) {
-  const { tasks, t, buildingLabels, staffDirectory, propFilter, selectedId, onSelect } = props;
+  const { tasks, t, locale, buildingLabels, staffDirectory, propFilter, selectedId, onSelect } = props;
 
   // 먼저 알려진 BuildingKey 로 묶는다 (고정 운영 순서). 7개 표준 건물 중 어느 것으로도
   // 해석되지 않은 방 라벨의 작업은 자기 그룹을 갖고 뒤에 붙으며,
@@ -190,6 +195,7 @@ function BuildingSections(props: {
                   key={task.id}
                   task={task}
                   t={t}
+                  locale={locale}
                   buildingLabels={buildingLabels}
                   staffDirectory={staffDirectory}
                   showProp={false}
@@ -208,12 +214,13 @@ function BuildingSections(props: {
 function StatusBuckets(props: {
   tasks: AdminCleaningTask[];
   t: ConsoleCopy;
+  locale: Locale;
   buildingLabels: Record<string, string>;
   staffDirectory: StaffDirectory;
   selectedId: string | null;
   onSelect: (id: string) => void;
 }) {
-  const { tasks, t, buildingLabels, staffDirectory, selectedId, onSelect } = props;
+  const { tasks, t, locale, buildingLabels, staffDirectory, selectedId, onSelect } = props;
   // 취소 카드는 예약 대상이 없는 임의(기타) 청소가 취소된 경우에만 생긴다 — 있을 때만 4번째
   // 칼럼을 붙여 평소 3칼럼 레이아웃을 유지한다.
   const hasCancelled = tasks.some((task) => task.status === "cancelled");
@@ -246,6 +253,7 @@ function StatusBuckets(props: {
                     key={task.id}
                     task={task}
                     t={t}
+                    locale={locale}
                     buildingLabels={buildingLabels}
                     staffDirectory={staffDirectory}
                     showProp
@@ -324,10 +332,12 @@ function SetupSection({
 function StaffSummarySection({
   tasks,
   t,
+  locale,
   staffDirectory,
 }: {
   tasks: AdminCleaningTask[];
   t: ConsoleCopy;
+  locale: Locale;
   staffDirectory: StaffDirectory;
 }) {
   // 완료했거나 지금 청소 중인 사람 — 시안 「완료 1 · 진행 1」(2026-10-13, 진행만 있는 사람도 보인다).
@@ -359,7 +369,7 @@ function StaffSummarySection({
                 </div>
               </div>
               <div className="cl-staffc__stat">
-                <div className="cl-staffc__v mono">{avg == null ? "—" : durLabel(avg, t)}</div>
+                <div className="cl-staffc__v mono">{avg == null ? "—" : durLabel(avg, t, locale)}</div>
                 <div className="cl-staffc__k">{t.avg}</div>
               </div>
             </div>
@@ -375,6 +385,7 @@ export function TodayBoard({
   setupTargets,
   staffDirectory,
   t,
+  locale,
   buildingLabels,
   group,
   propFilter,
@@ -427,6 +438,7 @@ export function TodayBoard({
         <StatusBuckets
           tasks={all}
           t={t}
+          locale={locale}
           buildingLabels={buildingLabels}
           staffDirectory={staffDirectory}
           selectedId={selectedId}
@@ -436,6 +448,7 @@ export function TodayBoard({
         <BuildingSections
           tasks={all}
           t={t}
+          locale={locale}
           buildingLabels={buildingLabels}
           staffDirectory={staffDirectory}
           propFilter={propFilter}
@@ -451,7 +464,7 @@ export function TodayBoard({
           selectedSetupKey={selectedSetupKey}
           onSelectSetupTarget={onSelectSetupTarget}
         />
-        <StaffSummarySection tasks={tasks} t={t} staffDirectory={staffDirectory} />
+        <StaffSummarySection tasks={tasks} t={t} locale={locale} staffDirectory={staffDirectory} />
       </div>
     </>
   );

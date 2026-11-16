@@ -15,6 +15,7 @@ import {
   Zap,
 } from "lucide-react";
 import type { Dictionary, Locale } from "@/lib/i18n";
+import { formatCleaningMinutes } from "@/lib/cleaning-record-duration";
 import type { AdminCleaningStatus } from "@/lib/admin-cleaning";
 import type { CleaningStaffOption } from "@/lib/cleaning";
 import type { CleaningTaskType } from "./cleaning-console-data";
@@ -212,12 +213,9 @@ export function CancelledBadge({ count, t }: { count: number; t: ConsoleCopy }) 
 }
 
 /** 소요 시간 — 「46분」 · 「1시간 22분」(화이트 리디자인 2026-10-13, 시안 표기). 값이 없으면 「—」. */
-export function durLabel(min: number | null, t: ConsoleCopy): string {
+export function durLabel(min: number | null, t: ConsoleCopy, locale: Locale = "ko"): string {
   if (min == null) return "—";
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  if (h === 0) return `${m}${t.unitMin}`;
-  return m === 0 ? `${h}${t.unitHour}` : `${h}${t.unitHour} ${m}${t.unitMin}`;
+  return formatCleaningMinutes(min, locale, { hour: t.unitHour, min: t.unitMin });
 }
 
 export function localeTagOf(locale: Locale): string {

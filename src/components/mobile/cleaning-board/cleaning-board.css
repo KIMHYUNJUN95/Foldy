@@ -7,7 +7,7 @@
 
 .cbd-head { display: flex; align-items: flex-end; gap: 12px; }
 .cbd-head__t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.cbd-head h1 { margin: 0; font-size: 34px; font-weight: 700; line-height: 41px; letter-spacing: -.02em; }
+.cbd-head h1 { margin: 0; font-size: 30px; font-weight: 600; line-height: 41px; letter-spacing: -.02em; }
 .cbd-sub { font-size: 15px; line-height: 20px; color: #6b6878; }
 .cbd-live { display: inline-flex; align-items: center; gap: 6px; padding-bottom: 8px; font-size: 13px; line-height: 18px; color: #6b6878; white-space: nowrap; }
 .cbd-live i { width: 7px; height: 7px; border-radius: 50%; background: #34c759; animation: cbd-pulse 2.4s ease-in-out infinite; }
@@ -19,7 +19,7 @@
 /* 진행 — 한 문장 · 막대 하나 · 범례 = 거르기 */
 .cbd-prog { display: flex; flex-direction: column; gap: 10px; }
 .cbd-prog__t { display: flex; align-items: baseline; gap: 8px; }
-.cbd-prog__t b { flex: 1; min-width: 0; font-size: 22px; font-weight: 700; line-height: 28px; }
+.cbd-prog__t b { flex: 1; min-width: 0; font-size: 22px; font-weight: 600; line-height: 28px; }
 .cbd-prog__t span { font-size: 15px; color: #6b6878; font-variant-numeric: tabular-nums; }
 .cbd-bar { display: flex; gap: 2px; height: 8px; overflow: hidden; border-radius: 4px; background: #f2f2f7; }
 .cbd-bar i { flex-basis: 0; min-width: 4px; transition: flex-grow 400ms cubic-bezier(.23, 1, .32, 1); }
@@ -27,8 +27,11 @@
 .cbd-bar .is-progress { background: #b9a3f2; }
 .cbd-bar .is-waiting { background: #dcdce2; }
 .cbd-bar .is-open { background: #f07b1a; }
-.cbd-filters { display: flex; flex-wrap: wrap; gap: 4px 2px; margin: 0 -8px; }
-.cbd-filter { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 8px; border: 0; border-radius: 10px; background: transparent; font: inherit; font-size: 15px; color: #6b6878; cursor: pointer; transition: background 160ms ease, color 160ms ease; }
+/* 폰에서 두 줄로 꺾이지 않게 한 줄 가로 스크롤 — 스크롤바는 숨김 */
+.cbd-filters { display: flex; flex-wrap: nowrap; gap: 2px; margin: 0 -8px; overflow-x: auto; scrollbar-width: none; }
+.cbd-filters::-webkit-scrollbar { display: none; }
+.cbd-filter { flex: none; white-space: nowrap; }
+.cbd-filter { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 8px; border: 0; border-radius: 10px; background: transparent; font: inherit; font-size: 15px; color: #6b6878; cursor: pointer; transition: background 160ms ease, color 160ms ease; }
 .cbd-filter i { width: 8px; height: 8px; border-radius: 50%; flex: none; }
 .cbd-filter span { font-weight: 600; color: #16141f; font-variant-numeric: tabular-nums; }
 .cbd-filter.is-done i { background: #7a52e6; }
@@ -38,15 +41,19 @@
 .cbd-filter.is-on { background: #f2f2f7; color: #16141f; }
 
 /* 먼저 챙길 방 — 옅은 주황 묶음 */
-.cbd-attn { display: flex; flex-direction: column; padding: 2px 0 2px 14px; border-radius: 14px; background: #fff4ea; }
-.cbd-arow { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 60px; padding: 8px 14px 8px 0; border: 0; border-bottom: .5px solid #f3dcc6; background: transparent; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.cbd-attn { display: flex; flex-direction: column; }
+.cbd-arow { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 60px; padding: 8px 14px 8px 0; border: 0; border-bottom: .5px solid #e4e3e9; background: transparent; font: inherit; color: inherit; text-align: left; cursor: pointer; }
 .cbd-arow:last-child { border-bottom: 0; }
 .cbd-arow .cbd-room { font-size: 17px; }
 .cbd-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 /* 자르지 않고 줄바꿈 — 건물 이름이 긴 STAY ARI 는 폰에서 두 줄을 넘겨 다음 체크인 날짜가 잘렸다. */
-.cbd-main span { font-size: 13px; line-height: 18px; color: #6b6878; overflow-wrap: anywhere; }
-.cbd-warn { font-size: 15px; font-weight: 600; line-height: 20px; color: #b4520a; }
-.cbd-pill { flex: none; padding: 7px 14px; border-radius: 999px; background: #7a52e6; color: #fff; font-size: 15px; font-weight: 600; white-space: nowrap; }
+.cbd-main > span { font-size: 13px; line-height: 18px; color: #6b6878; overflow-wrap: break-word; word-break: auto-phrase; }
+.cbd-main > span:lang(ko), :lang(ko) .cbd-main > span { word-break: keep-all; }
+.cbd-nowrap { white-space: nowrap; }
+.cbd-seg { display: inline-block; max-width: 100%; vertical-align: top; }
+.cbd-warn { display: block; padding-left: 12px; text-indent: -12px; font-size: 15px; font-weight: 500; line-height: 20px; color: #6b6878; }
+.cbd-warn::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: #f07b1a; vertical-align: 2px; }
+.cbd-pill { flex: none; display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border-radius: 999px; background: #f4f1fd; color: #5a30cf; font-size: 15px; font-weight: 600; white-space: nowrap; }
 .cbd-link { flex: none; font-size: 15px; font-weight: 600; color: #7a52e6; white-space: nowrap; }
 
 /* 건물별 */
@@ -55,7 +62,7 @@
 .cbd-group__h { display: flex; align-items: baseline; gap: 8px; padding-bottom: 4px; }
 .cbd-group__h b { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; line-height: 18px; color: #6b6878; }
 .cbd-group__h span { font-size: 13px; line-height: 18px; color: #8e8c99; white-space: nowrap; }
-.cbd-row { position: relative; display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; padding: 0; border: 0; background: transparent; font: inherit; color: inherit; text-align: left; }
+.cbd-row { position: relative; display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 0; border: 0; background: transparent; font: inherit; color: inherit; text-align: left; }
 /* 구분선은 글자 시작점(아이콘 뒤)부터 — 공용 0.5px 규칙 */
 .cbd-row::after { content: ""; position: absolute; left: 34px; right: 0; bottom: 0; height: .5px; background: #e4e3e9; }
 .cbd-group .cbd-row:last-child::after { display: none; }
@@ -66,10 +73,11 @@ button.cbd-row { cursor: pointer; }
 .cbd-room { flex: none; width: 76px; font-size: 17px; font-weight: 600; line-height: 22px; overflow-wrap: anywhere; }
 .cbd-who { flex: 1; min-width: 0; font-size: 15px; line-height: 20px; color: #3c3a46; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cbd-who.is-open, .cbd-who.is-done { color: #8e8c99; }
+.cbd-who.is-open::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: #f07b1a; vertical-align: 1px; }
 .cbd-st { flex: none; font-size: 15px; line-height: 20px; color: #6b6878; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .cbd-st.is-progress { color: #5a30cf; font-weight: 600; }
-.cbd-st.is-late { color: #b4520a; font-weight: 600; }
-.cbd-st.is-open { color: #7a52e6; font-weight: 600; }
+.cbd-st.is-late { color: #b4520a; font-weight: 500; }
+.cbd-st.is-open { color: #5a30cf; font-weight: 600; }
 
 /* 아래 링크 */
 .cbd-links { display: flex; flex-direction: column; padding-left: 16px; border-radius: 12px; background: #f2f2f7; }
@@ -84,7 +92,7 @@ button.cbd-row { cursor: pointer; }
 .cbd-assign__head { display: flex; flex-direction: column; gap: 4px; }
 .cbd-assign__head > span { font-size: 13px; font-weight: 600; line-height: 18px; color: #6b6878; }
 .cbd-assign__head > span.is-warn { color: #b4520a; }
-.cbd-assign__head h2 { margin: 0; font-size: 22px; font-weight: 700; line-height: 28px; }
+.cbd-assign__head h2 { margin: 0; font-size: 22px; font-weight: 600; line-height: 28px; }
 .cbd-assign__head p { margin: 0; font-size: 15px; line-height: 20px; color: #6b6878; }
 .cbd-assign__list { display: flex; flex-direction: column; }
 .cbd-cap { display: block; padding-bottom: 4px; font-size: 13px; line-height: 18px; color: #6b6878; }

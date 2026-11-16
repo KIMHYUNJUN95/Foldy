@@ -34,6 +34,7 @@ import { startableListTargets } from "@/lib/cleaning-assign/room-rules";
 import { loadAddBlockedRoomKeys, loadAssignDayRooms } from "@/lib/cleaning-assign/rooms";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import { formatCleaningMinutes } from "@/lib/cleaning-record-duration";
 import { getOnboardingState } from "@/lib/onboarding";
 import {
   buildLegacyAliasToRoomKeyMap,
@@ -244,15 +245,11 @@ function getRowRoomLabel(
   return getDisplayRoomLabel(canonicalPropertyName, canonicalRoomLabel);
 }
 
-function minutesLabel(totalSeconds: number | null, copy: ReturnType<typeof getDictionary>["cleaning"]) {
+function minutesLabel(totalSeconds: number | null, copy: ReturnType<typeof getDictionary>["cleaning"], locale: Locale) {
   // 0초 = 잰 적 없음(다음 날 「청소했어요」로 닫은 기록 · 취소) — 「0분」 대신 빈칸.
   if (totalSeconds === null || totalSeconds === 0) return "—";
-  const min = Math.round(totalSeconds / 60);
-  const h = Math.floor(min / 60);
-  const m = min % 60;
   const { unitHour, unitMin } = copy.console;
-  if (h === 0) return `${m}${unitMin}`;
-  return m === 0 ? `${h}${unitHour}` : `${h}${unitHour} ${m}${unitMin}`;
+  return formatCleaningMinutes(Math.round(totalSeconds / 60), locale, { hour: unitHour, min: unitMin });
 }
 
 /** 하루치 청소 결과 한 줄 — 과거 날짜 줄 오른쪽에 보여준다. */
@@ -882,7 +879,7 @@ export default async function MobileCleaningPage({
                       key={item.id}
                       room={sessionLabelToLocalizedRoomTitleMap.get(item.room_label) ?? item.room_label}
                       title={copy.taskDone.replace("{task}", getTaskLabel(item.task_label, copy))}
-                      sub={[copy.durTaken.replace("{dur}", minutesLabel(item.duration_seconds, copy)), item.notes]
+                      sub={[copy.durTaken.replace("{dur}", minutesLabel(item.duration_seconds, copy, locale)), item.notes]
                         .filter(Boolean)
                         .join(" · ")}
                       right={

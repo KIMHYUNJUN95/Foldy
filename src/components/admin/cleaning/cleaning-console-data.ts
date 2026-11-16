@@ -53,12 +53,6 @@ export function toMin(hhmm: string | null): number | null {
   const [h, m] = hhmm.split(":").map(Number);
   return h * 60 + m;
 }
-export function fmtDur(min: number | null): string {
-  if (min == null) return "—";
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return h > 0 ? `${h}h ${String(m).padStart(2, "0")}m` : `${m}m`;
-}
 export function todayDateKeyTokyo(): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Tokyo",

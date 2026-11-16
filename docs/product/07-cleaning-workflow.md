@@ -572,6 +572,12 @@ A date-grouped **cleaning record sheet** so staff can review their cleaning hist
 - New i18n: `cleaning.records.*` (ko/ja/en). Files: `src/app/mobile/cleaning/records/page.tsx`,
   `src/components/cleaning/cleaning-records-view.tsx`, `canViewOthersCleaning` in `src/config/roles.ts`.
 
+### 2026-11-16 unslop (청소 기록, 모바일 + PC)
+
+- 소요 표기 · 월 합계는 PC · 모바일이 `src/lib/cleaning-record-duration.ts` 하나를 쓴다(「18분」 · 「1시간 10분」). 취소 · 진행 중 · 처리 끝 · 시각 모름은 소요 「–」이고 합계에 안 들어간다(문서 45 C10). 테스트: `cleaning-record-duration.test.ts`.
+- 모바일: 취소 기록도 끝난 시각 · 소요 「–」, 시각 모름 기록에는 「끝난 시각 모름」 안내, 월 머리는 월 이동 + 숫자 두 개(상자 없음), 건물 · 직원은 옅은 배경 44px 칸, 날짜 묶음 카드 테두리 없음, 태블릿 선택 줄은 옅은 배경만(왼쪽 막대 없음), 태블릿 상세 칸이 열려 있으면 날짜 묶음 한 열. 굵기 600 이하.
+- PC: 첫 기간은 「이번 달 1일 – 오늘」(`resolveHistoryRange`, URL `?from=&to=` 를 주면 그대로). 날짜 · 시각 400 · 객실 600 · 담당 500 · 소요 500, 취소 · 처리 끝 · 대리 완료는 담당 옆 점 + 글자, 메모 칸은 메모만. 상세 패널은 상태를 점 + 글자로, 「소요」 큰 상자 없이 타임라인 하나, 연동 리포트가 없으면 섹션 숨김.
+
 ## 2026-06-18 청소 대상 룸 라벨 — 캘린더 표시 라벨과 일치
 
 - "청소 대상" 카드의 룸 제목(`getLocalizedRoomTitle` in `src/app/mobile/cleaning/page.tsx`)이

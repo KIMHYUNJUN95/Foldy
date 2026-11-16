@@ -1,19 +1,15 @@
 "use client";
 
 import { recordListChip } from "@/lib/cleaning-record-rules";
+import {
+  countedCleaningMinutes,
+  formatCleaningMinutes,
+  summarizeCleaningDurations,
+} from "@/lib/cleaning-record-duration";
 import { useCallback, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  Building2,
-  CalendarDays,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Clock3,
-  ListChecks,
-  UserRound,
-} from "lucide-react";
+import { CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { useIsTablet } from "@/components/shell/split-list";
 import type { Dictionary, Locale } from "@/lib/i18n";
@@ -38,19 +34,6 @@ export type CleaningRecordItem = {
   status: string;
   notes: string | null;
 };
-
-// 간결한 사람용 시간 표기("1h 54m" / "8m 47s" / "34s"). 순수 함수 — lib/cleaning 을 클라이언트
-// 컴포넌트로 가져올 수 없다(서버 전용 Supabase 클라이언트를 끌어들이므로).
-function formatDuration(totalSeconds: number | null): string {
-  // 0초 = 잰 적 없음(다음 날 「청소했어요」로 닫은 기록 · 취소) — 「0s」 대신 빈칸.
-  if (totalSeconds === null || totalSeconds === 0) return "-";
-  const h = Math.floor(totalSeconds / 3600);
-  const m = Math.floor((totalSeconds % 3600) / 60);
-  const s = totalSeconds % 60;
-  if (h > 0) return `${h}h ${m}m`;
-  if (m > 0) return `${m}m ${s.toString().padStart(2, "0")}s`;
-  return `${s}s`;
-}
 
 const STATUSES = ["completed", "in_progress", "cancelled"] as const;
 
@@ -138,7 +121,21 @@ export function CleaningRecordsView({
   for (const rec of records) byDate.set(rec.dateKey, [...(byDate.get(rec.dateKey) ?? []), rec]);
   const dateKeys = Array.from(byDate.keys()).sort((a, b) => b.localeCompare(a));
 
-  const totalSeconds = records.reduce((sum, rec) => sum + (rec.durationSeconds ?? 0), 0);
+  // 소요 표기 · 합계는 PC 기록 표와 같은 함수(lib/cleaning-record-duration)를 쓴다 — 취소 · 처리 끝 · 시각 모름은 세지 않는다.
+  const fmtMinutes = (min: number) => formatCleaningMinutes(min, locale, { hour: r.unitHour, min: r.unitMin });
+  const countedOf = (rec: CleaningRecordItem) =>
+    countedCleaningMinutes({ finished: rec.status === "completed", closed: rec.closed, seconds: rec.durationSeconds });
+  const durationText = (rec: CleaningRecordItem) => {
+    if (rec.status === "in_progress") return r.ongoing;
+    const min = countedOf(rec);
+    return min == null ? "–" : fmtMinutes(min);
+  };
+  // 끝난 시각 · 소요를 보이지 않는 기록: 취소(끝난 게 아님) · 처리 끝 · 끝난 시각 모름.
+  const endText = (rec: CleaningRecordItem) =>
+    rec.status === "completed" && rec.completedAt && !rec.endUnknown && !rec.closed ? fmtTime(rec.completedAt) : "";
+  const { totalMin } = summarizeCleaningDurations(
+    records.map((rec) => ({ finished: rec.status === "completed", closed: rec.closed, seconds: rec.durationSeconds })),
+  );
   const statusLabel = (s: string, closed = false) =>
     closed ? r.status.closed : s === "completed" ? r.status.completed : s === "cancelled" ? r.status.cancelled : r.status.in_progress;
 
@@ -165,10 +162,10 @@ export function CleaningRecordsView({
 
   const field = (label: string, value: React.ReactNode, block = false) => (
     <div className={cn("flex gap-4", block ? "flex-col gap-1" : "items-start justify-between")}>
-      <dt className="shrink-0 text-[13px] font-semibold text-muted-foreground">{label}</dt>
+      <dt className="shrink-0 text-[13px] font-normal text-muted-foreground">{label}</dt>
       <dd
         className={cn(
-          "min-w-0 text-[13.5px] font-bold text-foreground",
+          "min-w-0 text-[13.5px] font-medium text-foreground",
           block ? "leading-relaxed whitespace-pre-wrap" : "text-right",
         )}
       >
@@ -180,17 +177,15 @@ export function CleaningRecordsView({
   // 기록 상세 — 폰 · 폴드는 바텀시트, 태블릿 가로는 오른쪽 칸(2026-10-05 넓은 화면 대응). 내용은 하나.
   const detailHeader = (selected: CleaningRecordItem) => (
       <>
-        <p className="text-[11px] font-black uppercase tracking-[0.08em] text-muted-foreground">
+        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
           {r.detailTitle}
         </p>
-        <p className="mt-1 text-[19px] font-black leading-snug tracking-[-0.02em] text-foreground">
+        <p className="mt-1 text-[19px] font-semibold leading-snug tracking-[-0.02em] text-foreground">
           {selected.title}
         </p>
         <div className="mt-2 flex items-center gap-2">
-          <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-slate-600">
-            {selected.taskLabel}
-          </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-2.5 py-0.5 text-[11px] font-bold text-foreground">
+          <span className="text-[12px] font-normal text-muted-foreground">{selected.taskLabel}</span>
+          <span className="inline-flex items-center gap-1.5 text-[12px] font-normal text-muted-foreground">
             <span className={cn("size-1.5 rounded-full", statusTone(selected.status, selected.closed))} />
             {statusLabel(selected.status, selected.closed)}
           </span>
@@ -199,23 +194,12 @@ export function CleaningRecordsView({
   );
   const detailBody = (selected: CleaningRecordItem) => (
     <dl className="mt-4 flex flex-col gap-2.5 border-t-[0.5px] border-[var(--separator)] pt-4">
-      {field(r.staffLabel, selected.staffName || "-")}
+      {field(r.staffLabel, selected.staffName || "–")}
       {field(r.dateLabel, dayLabel(selected.dateKey))}
-      {field(r.startLabel, fmtTime(selected.startedAt) || "-")}
-      {field(
-        r.endLabel,
-        selected.endUnknown || selected.closed ? "-" : selected.completedAt ? fmtTime(selected.completedAt) : r.ongoing,
-      )}
-      {field(
-        r.durationLabel,
-        <span className="font-mono">
-          {selected.durationSeconds != null
-            ? formatDuration(selected.durationSeconds)
-            : selected.closed
-              ? "-"
-              : r.ongoing}
-        </span>,
-      )}
+      {field(r.startLabel, fmtTime(selected.startedAt) || "–")}
+      {field(r.endLabel, endText(selected) || (selected.status === "in_progress" ? r.ongoing : "–"))}
+      {field(r.durationLabel, <span className="tabular-nums">{durationText(selected)}</span>)}
+      {selected.endUnknown ? field(r.statusLabel, r.endUnknownNote) : null}
       {selected.notes ? field(r.notesLabel, selected.notes, true) : null}
     </dl>
   );
@@ -226,84 +210,64 @@ export function CleaningRecordsView({
     // 두 칸은 **상세 칸이 있을 때만**(2026-10-06 아이패드 점검) — 기록이 없는 달에도 오른쪽 자리를 비워 두면 왼쪽이 반쪽 폭으로 보였다.
     <div className={paneRecord ? "tablet:grid tablet:grid-cols-[minmax(0,1fr)_400px] tablet:items-start tablet:gap-5" : undefined}>
     <div className="pb-10">
-      {/* 월 + 요약 — 깔끔한 대시보드 헤더 */}
-      <div className="mb-3 overflow-hidden rounded-[22px] border border-border bg-surface shadow-[0_18px_44px_-30px_rgba(15,23,42,0.5)]">
-        <div className="flex items-center justify-between px-2.5 py-2.5">
+      {/* 월 이동 + 숫자 두 개 — 상자 · 그림자 · 아이콘 없이 */}
+      <div className="mb-3">
+        <div className="flex items-center justify-between">
           <Link
             aria-label={r.prevMonth}
-            className="flex size-10 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-foreground active:scale-95"
+            className="flex size-11 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-foreground"
             href={hrefWith({ month: shiftMonth(monthKey, -1) })}
           >
             <ChevronLeft className="size-5" aria-hidden="true" />
           </Link>
-          <span className="text-[17px] font-black tracking-[-0.02em] text-foreground">{monthLabel}</span>
+          <span className="text-[17px] font-semibold tracking-[-0.02em] text-foreground">{monthLabel}</span>
           <Link
             aria-label={r.nextMonth}
-            className="flex size-10 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-foreground active:scale-95"
+            className="flex size-11 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-foreground"
             href={hrefWith({ month: shiftMonth(monthKey, 1) })}
           >
             <ChevronRight className="size-5" aria-hidden="true" />
           </Link>
         </div>
-        <div className="grid grid-cols-2 divide-x divide-border border-t-[0.5px] border-[var(--separator)] bg-background/40">
-          <div className="flex items-center gap-2.5 px-4 py-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <ListChecks className="size-[18px]" aria-hidden="true" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
-                {r.summaryCount}
-              </p>
-              <p className="text-[18px] font-black leading-tight tracking-[-0.02em] text-foreground">
-                {records.length}
-                <span className="ml-0.5 text-[12px] font-bold text-muted-foreground">{r.countUnit}</span>
-              </p>
-            </div>
+        <div className="grid grid-cols-2 gap-4 px-1 pt-1">
+          <div className="min-w-0">
+            <p className="text-[12px] font-normal text-muted-foreground">{r.summaryCount}</p>
+            <p className="text-[22px] font-semibold leading-tight tracking-[-0.02em] text-foreground tabular-nums">
+              {records.length}
+              <span className="ml-1 text-[13px] font-normal text-muted-foreground">{r.countUnit}</span>
+            </p>
           </div>
-          <div className="flex items-center gap-2.5 px-4 py-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <Clock3 className="size-[18px]" aria-hidden="true" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
-                {r.summaryDuration}
-              </p>
-              <p className="font-mono text-[18px] font-black leading-tight tracking-[-0.02em] text-foreground">
-                {formatDuration(totalSeconds)}
-              </p>
-            </div>
+          <div className="min-w-0">
+            <p className="text-[12px] font-normal text-muted-foreground">{r.summaryDuration}</p>
+            <p className="text-[22px] font-semibold leading-tight tracking-[-0.02em] text-foreground tabular-nums">
+              {fmtMinutes(totalMin)}
+            </p>
           </div>
         </div>
       </div>
 
-      {/* 건물 + 직원 — 바텀시트 선택기를 여는 맞춤 알약 트리거 */}
+      {/* 건물 + 직원 — 바텀시트 선택기를 여는 옅은 배경 칸 */}
       <div className="mb-2.5 flex gap-2">
         <button
-          className={cn(
-            "relative flex h-11 flex-1 items-center rounded-2xl border px-9 shadow-[0_2px_8px_-6px_rgba(15,23,42,0.3)] transition-colors active:bg-slate-50",
-            selectedBuilding ? "border-primary/40 bg-primary/[0.05]" : "border-border bg-surface",
-          )}
+          className="flex h-11 min-w-0 flex-1 items-center justify-between gap-2 rounded-xl bg-slate-100/80 px-3.5 text-left transition-colors"
           onClick={() => openPicker("building")}
           type="button"
         >
-          <Building2 className="absolute left-3 size-[17px] text-primary" aria-hidden="true" />
-          <span className="w-full truncate text-center text-[13px] font-bold text-foreground">
+          <span className={cn("min-w-0 truncate text-[13.5px]", selectedBuilding ? "font-medium text-foreground" : "font-normal text-muted-foreground")}>
             {buildingDisplay}
           </span>
+          <ChevronDown className="size-4 shrink-0 text-slate-400" aria-hidden="true" />
         </button>
         {canViewOthers && members.length > 0 ? (
           <button
-            className={cn(
-              "relative flex h-11 flex-1 items-center rounded-2xl border px-9 shadow-[0_2px_8px_-6px_rgba(15,23,42,0.3)] transition-colors active:bg-slate-50",
-              selectedStaff ? "border-primary/40 bg-primary/[0.05]" : "border-border bg-surface",
-            )}
+            className="flex h-11 min-w-0 flex-1 items-center justify-between gap-2 rounded-xl bg-slate-100/80 px-3.5 text-left transition-colors"
             onClick={() => openPicker("staff")}
             type="button"
           >
-            <UserRound className="absolute left-3 size-[17px] text-primary" aria-hidden="true" />
-            <span className="w-full truncate text-center text-[13px] font-bold text-foreground">
+            <span className={cn("min-w-0 truncate text-[13.5px]", selectedStaff ? "font-medium text-foreground" : "font-normal text-muted-foreground")}>
               {staffDisplay}
             </span>
+            <ChevronDown className="size-4 shrink-0 text-slate-400" aria-hidden="true" />
           </button>
         ) : null}
       </div>
@@ -312,7 +276,7 @@ export function CleaningRecordsView({
       <div className="mb-4 flex gap-1 rounded-2xl bg-slate-100 p-1">
         <Link
           className={cn(
-            "flex h-8 flex-1 items-center justify-center rounded-xl text-[12.5px] font-bold transition-colors",
+            "flex h-9 flex-1 items-center justify-center rounded-xl text-[12.5px] font-medium transition-colors",
             !selectedStatus ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground",
           )}
           href={hrefWith({ status: "" })}
@@ -322,7 +286,7 @@ export function CleaningRecordsView({
         {STATUSES.map((s) => (
           <Link
             className={cn(
-              "flex h-8 flex-1 items-center justify-center rounded-xl text-[12.5px] font-bold transition-colors",
+              "flex h-9 flex-1 items-center justify-center rounded-xl text-[12.5px] font-medium transition-colors",
               selectedStatus === s ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground",
             )}
             href={hrefWith({ status: s })}
@@ -339,32 +303,31 @@ export function CleaningRecordsView({
           <span className="mb-4 flex size-[60px] items-center justify-center rounded-[18px] bg-slate-50 text-slate-400">
             <CalendarDays className="size-7" aria-hidden="true" />
           </span>
-          <p className="text-[15px] font-extrabold text-foreground">{r.empty}</p>
+          <p className="text-[15px] font-semibold text-foreground">{r.empty}</p>
           <p className="mt-1.5 text-[13px] text-muted-foreground">{r.emptySub}</p>
         </div>
       ) : (
-        <div className="grid items-start gap-5 fold:grid-cols-2">
+        // 상세 칸이 열려 있으면(태블릿) 목록 칸이 좁아 소요가 잘리므로 한 열.
+        <div className={cn("grid items-start gap-5", !paneRecord && "fold:grid-cols-2")}>
           {dateKeys.map((key) => {
             const items = byDate.get(key)!;
             return (
               <div key={key}>
-                <div className="mb-2 flex items-center gap-2 px-0.5">
-                  <span className="text-[12.5px] font-black tracking-[-0.01em] text-foreground">
-                    {dayLabel(key)}
-                  </span>
-                  <span className="rounded-full bg-slate-100 px-[7px] py-px font-mono text-[10.5px] font-semibold text-muted-foreground">
+                <div className="mb-1 flex items-baseline gap-2 px-0.5">
+                  <span className="text-[13px] font-semibold tracking-[-0.01em] text-foreground">{dayLabel(key)}</span>
+                  <span className="text-[11.5px] font-normal tabular-nums text-muted-foreground">
                     {items.length}
-                    {r.countUnit}
+                    {r.countSep}
+                    {items.length === 1 ? r.countUnitOne : r.countUnit}
                   </span>
-                  <span className="h-px flex-1 bg-border" />
                 </div>
-                <div className="overflow-hidden rounded-2xl border border-border bg-surface">
+                <div className="overflow-hidden rounded-2xl bg-surface">
                   {items.map((rec, i) => (
                     <button
                       className={cn(
-                        "flex w-full flex-col gap-0.5 px-3 py-2.5 text-left transition-colors active:bg-slate-50",
+                        "flex min-h-11 w-full flex-col gap-0.5 px-3 py-2.5 text-left transition-colors active:bg-slate-50",
                         i > 0 && "border-t-[0.5px] border-[var(--separator)]",
-                        isTablet && paneRecord?.id === rec.id && "bg-primary/[0.06] shadow-[inset_3px_0_0_var(--primary)]",
+                        isTablet && paneRecord?.id === rec.id && "bg-primary/[0.06]",
                       )}
                       key={rec.id}
                       onClick={() => openDetail(rec)}
@@ -372,24 +335,25 @@ export function CleaningRecordsView({
                     >
                       <div className="flex items-center gap-2">
                         <span className={cn("size-1.5 shrink-0 rounded-full", statusTone(rec.status, rec.closed))} />
-                        <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
-                          {fmtTime(rec.startedAt)}–{rec.completedAt && !rec.endUnknown && !rec.closed ? fmtTime(rec.completedAt) : ""}
+                        <span className="shrink-0 text-[11.5px] font-normal tabular-nums text-muted-foreground">
+                          {fmtTime(rec.startedAt)}–{endText(rec)}
                         </span>
-                        <span className="min-w-0 flex-1 truncate text-[12.5px] font-bold tracking-[-0.01em] text-foreground">
+                        <span className="min-w-0 flex-1 truncate text-[13px] font-semibold tracking-[-0.01em] text-foreground">
                           {rec.title}
                         </span>
-                        <span className="shrink-0 rounded-full bg-slate-100 px-2 py-px text-[10px] font-bold text-slate-600">
-                          {recordListChip(rec, r.status.closed)}
-                        </span>
-                        <span className="shrink-0 font-mono text-[11px] tabular-nums text-foreground">
-                          {rec.durationSeconds != null ? formatDuration(rec.durationSeconds) : rec.closed ? "-" : r.ongoing}
+                        <span className="shrink-0 text-[11.5px] font-normal tabular-nums text-foreground">
+                          {durationText(rec)}
                         </span>
                       </div>
-                      {canViewOthers && rec.staffName ? (
-                        <span className="pl-[14px] text-[11px] font-semibold text-muted-foreground">
-                          {rec.staffName}
-                        </span>
-                      ) : null}
+                      <span className="truncate pl-[14px] text-[11px] font-normal text-muted-foreground">
+                        {[
+                          recordListChip(rec, r.status.closed),
+                          canViewOthers ? rec.staffName : "",
+                          rec.endUnknown ? r.endUnknownNote : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -411,7 +375,7 @@ export function CleaningRecordsView({
         <BottomSheet
           ariaLabel={picker === "building" ? r.buildingTitle : r.staffTitle}
           header={
-            <p className="mb-3 text-[16px] font-black tracking-[-0.01em] text-foreground">
+            <p className="mb-3 text-[16px] font-semibold tracking-[-0.01em] text-foreground">
               {picker === "building" ? r.buildingTitle : r.staffTitle}
             </p>
           }
@@ -432,7 +396,7 @@ export function CleaningRecordsView({
                 >
                   <span
                     className={cn(
-                      "min-w-0 flex-1 truncate text-[14px] font-bold",
+                      "min-w-0 flex-1 truncate text-[14px] font-medium",
                       on ? "text-primary" : "text-foreground",
                     )}
                   >
@@ -449,7 +413,7 @@ export function CleaningRecordsView({
       ) : null}
     </div>
     {isTablet && paneRecord ? (
-      <aside className="sticky top-3 hidden max-h-[calc(100dvh-24px)] overflow-y-auto rounded-[22px] border border-border bg-surface px-5 pb-5 pt-5 tablet:block">
+      <aside className="sticky top-3 hidden max-h-[calc(100dvh-24px)] overflow-y-auto rounded-[22px] bg-surface px-5 pb-5 pt-5 tablet:block">
         {detailHeader(paneRecord)}
         {detailBody(paneRecord)}
       </aside>

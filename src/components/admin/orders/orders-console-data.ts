@@ -206,3 +206,11 @@ export function calEvents(orders: AdminOrderVM[], calProp: string): CalEvents {
 export function tpl(s: string, vars: Record<string, string | number>): string {
   return s.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ""));
 }
+
+/** 줄 둘째 줄 — 「품목 n개 · 나머지 품목」. 제목이 첫 품목 이름과 같을 때만 첫 품목을 뺀다(제목이 따로 고쳐졌으면 품목을 숨기지 않음). */
+export function queueItemLine(title: string, names: string[], t: { wQItemOne: string; wQItems: string }): string {
+  if (names.length === 0) return "";
+  const rest = names[0].trim() === title.trim() ? names.slice(1) : names;
+  if (names.length === 1) return t.wQItemOne;
+  return tpl(t.wQItems, { n: names.length, rest: rest.join(" · ") });
+}

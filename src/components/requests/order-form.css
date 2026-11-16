@@ -1,7 +1,7 @@
 /* 주문 요청 폼 화이트 리디자인(2026-10-14, 시안 OrderNew-Phone · OrderConfirm-Phone · Order-Fold) —
    상자 없는 한 장 · 이름표(notched) 칸 · 가로선만 · 보라 #7A52E6. 폴드 · 태블릿은 520px 가운데 열. */
 .ofw-head { display: flex; flex-direction: column; gap: 4px; margin: 2px 0 18px; }
-.ofw-head h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.03em; color: #16141f; }
+.ofw-head h1 { margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.03em; color: #16141f; }
 .ofw-head p { margin: 0; font-size: 13px; color: #6b6878; }
 .ofw-page { width: 100%; max-width: 520px; margin: 0 auto; padding-bottom: 32px; }
 .ofw-page .ofw-error { margin: 0 0 14px; font-size: 13px; font-weight: 600; color: #c5282e; }
@@ -10,7 +10,7 @@
 .ofw-sec { display: flex; flex-direction: column; gap: 16px; }
 .ofw-sec + .ofw-sec { padding-top: 20px; border-top: 0.5px solid var(--separator); }
 .ofw-sec__h { display: flex; align-items: baseline; justify-content: space-between; }
-.ofw-sec__h b { font-size: 15px; font-weight: 700; color: #16141f; }
+.ofw-sec__h b { font-size: 15px; font-weight: 600; color: #16141f; }
 .ofw-sec__h span { font-size: 12px; color: #6b6878; }
 .ofw-items { gap: 0; }
 .ofw-hint { margin: 2px 0 8px; font-size: 12px; color: #6b6878; }
@@ -99,7 +99,7 @@
 /* 확인 시트 */
 .ofw-sheet { display: flex; flex-direction: column; gap: 14px; padding-top: 4px; }
 .ofw-sheet__h { display: flex; flex-direction: column; gap: 4px; }
-.ofw-sheet__h h3 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.02em; color: #16141f; }
+.ofw-sheet__h h3 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -0.02em; color: #16141f; }
 .ofw-sheet__h span { font-size: 13px; color: #6b6878; }
 .ofw-sheet__list { display: flex; flex-direction: column; max-height: 40vh; overflow-y: auto; }
 .ofw-sheet__row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; border-top: 0.5px solid var(--separator); font-size: 14px; color: #16141f; }

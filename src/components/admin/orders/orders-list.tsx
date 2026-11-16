@@ -85,7 +85,7 @@ export function OrdersList({ rows, t, selectedId, onSelect, onClearFilters, load
               </span>
               <span className="ell">{o.buildingLabel}</span>
               <span className="ell">{o.reporterName}</span>
-              <span className={o.status === "closed" ? "dim" : ""}>
+              <span className={`ow-gr__s ow-gr__s--${o.status}${o.status === "closed" ? " dim" : ""}`}>
                 {o.status === "closed" ? t.wStClosed : copyOf(t, STATUS[o.status].key)}
               </span>
               <span className="r num">{deliv ?? <span className="dim">—</span>}</span>

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { ExternalLink, ImageIcon } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { OrderActionBar } from "@/components/requests/order-action-bar";
 import { LightboxThumbs } from "@/components/shell/lightbox-thumbs";
 import { MobileShell } from "@/components/shell/mobile-shell";
@@ -274,11 +274,7 @@ export default async function MobileOrderRequestDetailPage({
                     />
                     {item.imageUrls.length > 1 ? <span className="odw-item__phn">{item.imageUrls.length}</span> : null}
                   </div>
-                ) : (
-                  <span className="odw-item__ph is-none" aria-hidden="true">
-                    <ImageIcon />
-                  </span>
-                )}
+                ) : null}
                 <span className="odw-item__b">
                   <span className="odw-item__n">{item.name}</span>
                   {isValidAbsoluteUrl(item.link) || item.memo ? (

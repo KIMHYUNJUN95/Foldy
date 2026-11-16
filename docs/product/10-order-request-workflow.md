@@ -33,6 +33,17 @@
   줄(제목 / 건물 · 신청자 · 기간 | 상태). 예전 아이콘 머리 · 테두리 카드 · 주말 빨강/파랑 글자 제거.
 - 움직임: 누르면 살짝 눌림, 줄 차례로 떠오름, 진행 막대 채워짐, 처리 창 살짝 커지며 등장, 시트 달력 날짜 누르면 가벼운 진동, 성공 진동 + 체크 그리기. `prefers-reduced-motion` 이면 끈다.
 
+## unslop 다듬기 (2026-11-16)
+
+색 · 글꼴 · 간격 · 셸은 그대로, 굵기와 줄 문구만 정리했다.
+
+- 굵기: 주문 CSS 네 파일(`orders-console.css` · `requests-list.css` · `order-detail.css` · `order-form.css`)의 700 이상은 모두 600. 위계는 크기 · 색으로. 배송일 큰 글자는 22px/700 → 17px/600.
+- PC 처리 중 줄: 둘째 줄은 「품목 2개 · 나머지 품목」(하나면 「품목 1개」, ja `n品目`, en `n items`/`1 item`) — 제목과 겹치던 전체 품목 나열 제거. 제목이 첫 품목 이름과 같을 때만 첫 품목을 빼고, 관리자가 제목을 따로 고쳐 다르면 품목을 모두 보인다(개수는 항상 실제 개수, 품목이 없으면 둘째 줄을 그리지 않음). 건물 이름은 보통 굵기. 나이는 「2일 전」으로 통일(`wReqAgo` 키 삭제). 문구 조립은 `queueItemLine()`(테스트 `orders-queue-item-line.test.ts`).
+- PC 배송 캘린더: 칩은 품목 이름만(건물은 오른쪽 목록 · 칩 `title`에 있음). 오늘이 선택된 날은 옅은 회색 배경(`#faf9fc`)이고 보라 칸 채움은 없다 — 오늘 표시는 보라 동그라미 하나. 칩 `title` · `aria-label`에 「품목 · 건물」.
+- PC 전체 기록: 상태 칸 앞에 6px 점(승인 대기 보라 · 주문 대기 파랑 · 주문 처리됨 초록 · 거절 빨강). 색은 상태 값(`ow-gr__s--status`)에서 정함.
+- 모바일 요청 목록: 처리 중 상태는 보라 글자 대신 옅은 글자 + 작은 보라 점. 줄 휴지통은 **그대로 둠** — 모바일 상세 화면(주문 · 시설 · 분실물)에는 삭제가 없어 줄에서만 지울 수 있다.
+- 모바일 주문 상세: 사진 없는 품목은 빈 사진 칸을 그리지 않음(글이 왼쪽부터).
+
 ## Purpose
 
 The order request workflow lets staff and part-time staff request amenities, supplies, equipment, or any other items needed for operations.

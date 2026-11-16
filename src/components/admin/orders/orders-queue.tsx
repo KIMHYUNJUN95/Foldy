@@ -7,7 +7,7 @@ import { LiveWash } from "@/components/shared/live-wash";
 import { CircleCheck, TriangleAlert } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import type { AdminOrderVM } from "@/lib/admin-orders";
-import { delivOnDate, iso, parseTs, sortForBoard, tpl, weekWindow, WD } from "./orders-console-data";
+import { delivOnDate, iso, parseTs, queueItemLine, sortForBoard, tpl, weekWindow, WD } from "./orders-console-data";
 import type { OrdersCopy } from "./orders-console-shared";
 import type { OrdActionKind } from "./orders-detail-panel";
 
@@ -33,10 +33,6 @@ export function ageText(reqAt: string, t: OrdersCopy): string {
   if (mins < 60) return t.wAgoNow;
   if (mins < 24 * 60) return tpl(t.wAgoH, { n: Math.floor(mins / 60) });
   return tpl(t.wAgoD, { n: Math.floor(mins / (24 * 60)) });
-}
-
-function itemLine(o: AdminOrderVM): string {
-  return o.items.map((it) => it.name).join(" · ");
 }
 
 export function OrdersQueue({ orders, t, locale, todayKey, selectedId, loadError, onRetry, onSelect, onAction, onOpenCalendar }: QueueProps) {
@@ -119,6 +115,7 @@ export function OrdersQueue({ orders, t, locale, todayKey, selectedId, loadError
               <div className="lfw-rows">
                 <LiveWash move sig={g.rows.map((o) => o.id).join(",")}>{g.rows.map((o) => {
                   const age = ageText(o.reqAt, t);
+                  const line = queueItemLine(o.title, o.items.map((it) => it.name), t);
                   return (
                     <div
                       key={o.id} data-live={o.id}
@@ -138,14 +135,14 @@ export function OrdersQueue({ orders, t, locale, todayKey, selectedId, loadError
                           {o.urgency === "high" ? <em className="ow-urg">{t.urgent}</em> : null}
                           <b>{o.title}</b>
                         </span>
-                        <span>{itemLine(o)}</span>
+                        {line ? <span>{line}</span> : null}
                       </span>
                       <span className="lfw-tr__loc">
                         <b>{o.buildingLabel}</b>
                       </span>
                       <span className="ow-qr__who">{o.reporterName}</span>
                       <span className="ow-qr__age num" suppressHydrationWarning>
-                        {g.key === "approved" ? tpl(t.wReqAgo, { t: age }) : age}
+                        {age}
                       </span>
                       <button
                         type="button"

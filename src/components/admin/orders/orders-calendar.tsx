@@ -142,8 +142,13 @@ export function OrdersCalendar({
                     return (
                       <>
                         {list.slice(0, MAX_CHIPS).map((o) => (
-                          <span key={o.id} className={`ow-chip${o.urgency === "high" ? " is-urg" : ""}`}>
-                            {o.items[0]?.name ?? o.title} · {o.buildingLabel}
+                          <span
+                            key={o.id}
+                            className={`ow-chip${o.urgency === "high" ? " is-urg" : ""}`}
+                            title={`${o.items[0]?.name ?? o.title} · ${o.buildingLabel}`}
+                            aria-label={`${o.items[0]?.name ?? o.title} · ${o.buildingLabel}`}
+                          >
+                            {o.items[0]?.name ?? o.title}
                           </span>
                         ))}
                         {list.length > MAX_CHIPS ? <span className="ow-day__more">+{list.length - MAX_CHIPS}</span> : null}

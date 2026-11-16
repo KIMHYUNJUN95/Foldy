@@ -6466,6 +6466,7 @@ const FALLBACK_DICTIONARY = {
     starsOne: "{n} star",
     starsMany: "{n} stars",
     pickerSearchPh: "Building · room · name",
+    pickerSearchPhPc: "Booking · room · name",
     pickerBack: "Back",
     ratingOf: (val: string, max: number) => `${val} / ${max}`,
     // 모바일 — 외부 리뷰 목록/상세 (2026-08-05)
@@ -16099,6 +16100,7 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
       starsOne: "별 {n}개",
       starsMany: "별 {n}개",
       pickerSearchPh: "건물 · 객실 · 이름",
+      pickerSearchPhPc: "예약 · 객실 · 이름",
       pickerBack: "뒤로",
       ratingOf: (val: string, max: number) => `${val} / ${max}`,
       // 모바일 — 외부 리뷰 목록/상세 (2026-08-05)
@@ -25652,6 +25654,7 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
       starsOne: "星{n}",
       starsMany: "星{n}",
       pickerSearchPh: "建物 · 客室 · 名前",
+      pickerSearchPhPc: "予約 · 客室 · 名前",
       pickerBack: "戻る",
       ratingOf: (val: string, max: number) => `${val} / ${max}`,
       // モバイル — 外部レビュー一覧・詳細 (2026-08-05)

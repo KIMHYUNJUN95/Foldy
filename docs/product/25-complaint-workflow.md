@@ -1078,4 +1078,6 @@ FBManual-Phone · FBCx-Phone · FBNew-Phone · FBNewConfirm-Phone · FBRooms-Pho
 - **PC 플랫폼 「Other」**: 데이터 키는 `other` 그대로, 이름만 `platformOther`(기타 / その他 / Other)로 — `platformName()` · PC 패널 `platformLabel()`.
 - **별점 읽기 이름**: 숫자만 읽히던 별 버튼이 `starsOne` / `starsMany`(`{n}` 자리표시자; 영어만 1 단수)로 읽힌다 — `starsLabel()` (모바일 · PC 공용).
 - **굵기 · 카피**: 제목 · 시트 제목 · 행 이름 · 라벨 700/800/900 → 600. 짧은 안내 · 자리표시자 끝 마침표 제거(`ratingNone` · `fieldBodyPlaceholder` · `fieldGuestPlaceholder`), `text-wrap: pretty`. 여러 문장 안내(`wLinkHint` · `linkModeHint`)는 그대로.
+- **PC 검색 안내**: PC 패널 검색칸은 예약을 찾으므로 `pickerSearchPhPc` = 「예약 · 객실 · 이름」(모바일 `pickerSearchPh` 는 건물 · 객실 · 이름).
+- **PC 사진 ×**: 썸네일 간격 12px, 누름 영역 `::after` inset -13px(약 45px) — 옆 사진과 겹치지 않는다. 5장 한 줄은 64×5+12×4=368px, 좁으면 줄바꿈.
 - 테스트: `src/lib/__tests__/complaint-create-copy.test.ts`.

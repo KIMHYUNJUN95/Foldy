@@ -766,7 +766,7 @@
 .adm .cxupgrid {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 12px;
 }
 .adm .cxupthumb {
   position: relative;
@@ -797,7 +797,7 @@
   color: #fff;
   cursor: pointer;
 }
-.adm .cxupthumb button::after { content: ""; position: absolute; inset: -10px; }
+.adm .cxupthumb button::after { content: ""; position: absolute; inset: -13px; }
 .adm .cxupthumb button svg {
   width: 12px;
   height: 12px;

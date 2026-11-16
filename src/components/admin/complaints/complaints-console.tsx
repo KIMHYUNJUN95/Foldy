@@ -318,7 +318,7 @@ export function ComplaintsConsole(props: Props) {
           linkModeHint: copy.wLinkHint,
           pickBuilding: copy.pickBuilding,
           pickRoom: copy.pickRoom,
-          pickerSearch: copy.pickerSearchPh,
+          pickerSearch: copy.pickerSearchPhPc,
           pickerStaying: copy.pickerStaying,
           pickerUpcoming: copy.pickerUpcoming,
           pickerLiveTag: copy.pickerLiveTag,

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { platformName, starsLabel } from "@/components/complaints/cx-platform";
 import { getDictionary, locales } from "@/lib/i18n";
 
-const NEW_KEYS = ["submitPending", "starsOne", "starsMany", "pickerSearchPh", "pickerBack"] as const;
+const NEW_KEYS = ["submitPending", "starsOne", "starsMany", "pickerSearchPh", "pickerSearchPhPc", "pickerBack"] as const;
 
 describe("컴플레인 등록 화면 카피", () => {
   it.each(locales)("%s — 새 키가 모두 있다", (locale) => {
@@ -28,7 +28,7 @@ describe("컴플레인 등록 화면 카피", () => {
 
   it.each(locales)("%s — 짧은 힌트 · 자리표시자 끝에 마침표가 없다", (locale) => {
     const t = getDictionary(locale).complaints;
-    for (const key of ["ratingNone", "fieldBodyPlaceholder", "fieldGuestPlaceholder", "pickerSearchPh"] as const) {
+    for (const key of ["ratingNone", "fieldBodyPlaceholder", "fieldGuestPlaceholder", "pickerSearchPh", "pickerSearchPhPc"] as const) {
       expect(t[key], key).not.toMatch(/[.。]$/);
     }
   });

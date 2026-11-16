@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SessionProvider } from "@/components/providers/session-provider";
-import { AdmDropdown, ddMenuClassName, menuOverflowsRight, nextOptionIndex, returnsToSearch } from "@/components/admin/shared/adm-dropdown";
+import { AdmDropdown, ddMenuClassName, menuOverflowsRight, menuShiftX, menuVerticalPlan, nextOptionIndex, returnsToSearch } from "@/components/admin/shared/adm-dropdown";
 
 // 환경이 node 라 DOM 이벤트(Esc 전파 · 포커스 복귀)는 못 돌린다 — 키 이동 계산 · 방향 클래스 · 접근성 속성만 검증하고,
 // Esc · 포커스는 화면에서 확인한다.
@@ -64,5 +64,35 @@ describe("menuOverflowsRight", () => {
   it("오른쪽 여백 8px 를 넘으면 뒤집는다", () => {
     expect(menuOverflowsRight(1272, 1280)).toBe(false);
     expect(menuOverflowsRight(1273, 1280)).toBe(true);
+  });
+});
+
+describe("menuShiftX (모바일 .dd-scope)", () => {
+  it("안에 들어가면 그대로", () => {
+    expect(menuShiftX(16, 200, 390)).toBe(0);
+  });
+  it("오른쪽으로 넘치면 넘친 만큼 왼쪽으로", () => {
+    expect(menuShiftX(250, 200, 390)).toBe(-68);
+  });
+  it("왼쪽 여백 8px 밑으로는 밀지 않는다", () => {
+    expect(menuShiftX(20, 400, 390)).toBe(-12);
+  });
+});
+
+describe("menuVerticalPlan (모바일 .dd-scope)", () => {
+  const base = { viewportTop: 0, viewportBottom: 760 };
+  it("아래 자리가 넉넉하면 아래로, 높이는 아래 자리", () => {
+    expect(menuVerticalPlan({ ...base, menuHeight: 200, triggerTop: 100, triggerBottom: 144 })).toEqual({ up: false, maxHeight: 602 });
+  });
+  it("탭바 가까이에서 아래가 모자라고 위가 넓으면 위로", () => {
+    expect(menuVerticalPlan({ ...base, menuHeight: 300, triggerTop: 600, triggerBottom: 644 })).toEqual({ up: true, maxHeight: 586 });
+  });
+  it("아래가 모자라도 위가 더 좁으면 아래로 열고 스크롤", () => {
+    expect(menuVerticalPlan({ ...base, menuHeight: 900, triggerTop: 200, triggerBottom: 244 })).toEqual({ up: false, maxHeight: 502 });
+  });
+  it("양쪽 다 좁아도 높이는 120px(메뉴가 더 작으면 그 높이) 밑으로 줄지 않는다", () => {
+    const tight = { menuHeight: 300, triggerTop: 40, triggerBottom: 84, viewportTop: 0, viewportBottom: 110 };
+    expect(menuVerticalPlan(tight)).toEqual({ up: true, maxHeight: 120 });
+    expect(menuVerticalPlan({ ...tight, menuHeight: 90 })).toEqual({ up: true, maxHeight: 90 });
   });
 });

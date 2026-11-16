@@ -4,6 +4,7 @@ import { MobileShell } from "@/components/shell/mobile-shell";
 import { Beds24LiveRefresh } from "@/components/shared/beds24-live-refresh";
 import { shiftMonthKey } from "@/components/admin/shared/admin-month-key";
 import "@/components/admin/admin-console.css";
+import "@/components/admin/shared/adm-dropdown.css";
 import "@/components/admin/ops/ops-console.css";
 import { hasAdminWebAccess } from "@/config/capabilities";
 import { countOpsHistoryAlerts } from "@/lib/beds24/ops-history-alerts";

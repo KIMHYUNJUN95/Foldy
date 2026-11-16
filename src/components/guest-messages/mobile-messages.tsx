@@ -13,6 +13,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
+import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
 import { AutoRunsList } from "@/components/guest-messages/auto-runs-list";
 import { useBuildingName } from "@/components/shared/building-names";
 import { TaskToast } from "@/components/tasks/task-toast";
@@ -179,43 +180,43 @@ export function MobileInbox({
       <div className="gm-mlist-head">
         <h1>{copy.title}</h1>
         <StallNoticeLine notice={stall} copy={copy} locale={locale} notify={(message) => notify(message)} />
-        <div className="gm-mselects">
-          <select
-            className="gm-select"
-            aria-label={copy.filterStatus}
+        {/* 공용 드롭다운(관리자 콘솔과 같은 것) — iOS 네이티브 select 의 시스템 메뉴 대신(2026-11-16). */}
+        <div className="gm-mselects dd-scope">
+          <AdmDropdown
+            ariaLabel={copy.filterStatus}
             value={status}
-            onChange={(event) => router.replace(listHref(event.target.value as InboxStatusFilter, building, channel))}
-          >
-            <option value="awaiting">{list ? fill(copy.filterAwaitingCount, { n: list.awaitingCount }) : copy.filterAwaiting}</option>
-            <option value="snoozed">{copy.filterSnoozed}</option>
-            <option value="done">{copy.filterDone}</option>
-            <option value="all">{copy.filterAll}</option>
-          </select>
-          <select
-            className="gm-select"
-            aria-label={copy.filterBuilding}
+            options={[
+              { value: "awaiting", label: list ? fill(copy.filterAwaitingCount, { n: list.awaitingCount }) : copy.filterAwaiting },
+              { value: "snoozed", label: copy.filterSnoozed },
+              { value: "done", label: copy.filterDone },
+              { value: "all", label: copy.filterAll },
+            ]}
+            onChange={(value) => {
+              haptic("light");
+              router.replace(listHref(value as InboxStatusFilter, building, channel));
+            }}
+          />
+          <AdmDropdown
+            ariaLabel={copy.filterBuilding}
             value={building ?? ""}
-            onChange={(event) => router.replace(listHref(status, event.target.value || null, channel))}
-          >
-            <option value="">{copy.buildingAll}</option>
-            {(list?.buildings ?? []).map((name) => (
-              <option key={name} value={name}>
-                {buildingName(name)}
-              </option>
-            ))}
-          </select>
-          <select
-            className="gm-select"
-            aria-label={copy.filterChannel}
+            options={[
+              { value: "", label: copy.buildingAll },
+              ...(list?.buildings ?? []).map((name) => ({ value: name, label: buildingName(name) })),
+            ]}
+            onChange={(value) => {
+              haptic("light");
+              router.replace(listHref(status, value || null, channel));
+            }}
+          />
+          <AdmDropdown
+            ariaLabel={copy.filterChannel}
             value={channel}
-            onChange={(event) => router.replace(listHref(status, building, parseChannelFilter(event.target.value)))}
-          >
-            {INBOX_CHANNEL_FILTERS.map((value) => (
-              <option key={value} value={value}>
-                {channelFilterLabel(value, copy)}
-              </option>
-            ))}
-          </select>
+            options={INBOX_CHANNEL_FILTERS.map((value) => ({ value, label: channelFilterLabel(value, copy) }))}
+            onChange={(value) => {
+              haptic("light");
+              router.replace(listHref(status, building, parseChannelFilter(value)));
+            }}
+          />
         </div>
       </div>
       {!list ? (

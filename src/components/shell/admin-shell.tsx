@@ -7,6 +7,7 @@ import { ChevronDown, Search, Smartphone } from "lucide-react";
 import { AdminGuestSearch } from "@/components/shell/admin-guest-search";
 import { MobilePreview } from "@/components/shell/mobile-preview";
 import "@/components/admin/admin-console.css";
+import "@/components/admin/shared/adm-dropdown.css";
 import { useAdminNavBadges } from "@/components/admin/admin-nav-badges";
 import { NotificationBell } from "@/components/admin/notification-bell";
 import { useSession } from "@/components/providers/session-provider";

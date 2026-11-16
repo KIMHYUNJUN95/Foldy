@@ -427,9 +427,14 @@
 .gm-mlist-head { display: flex; flex-direction: column; gap: 12px; margin-bottom: 8px; }
 .gm-mlist-head h1 { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.01em; }
 .gm-mselects { display: flex; gap: 8px; flex-wrap: wrap; }
-/* 세 선택은 줄이 바뀌어도 줄 폭을 채운다(혼자 남은 칸이 짧게 떠 보이지 않게) — 글자는 한 줄, 넘치면 말줄임. 넓은 화면(폴드 ↑)은 내용 폭. */
-.gm-mselects > .gm-select { flex: 1 1 auto; min-width: 0; white-space: nowrap; text-overflow: ellipsis; }
-@media (min-width: 600px) { .gm-mselects > .gm-select { flex: 0 1 auto; } }
+/* 세 고르기는 공용 드롭다운(.dd, admin-console.css) — 줄이 바뀌어도 줄 폭을 채운다(혼자 남은 칸이 짧게 떠 보이지 않게) ·
+   글자는 한 줄, 넘치면 말줄임. 넓은 화면(폴드 ↑)은 내용 폭. 버튼만 모바일 필터 칸 모양(회색 바탕 · 테두리 없음), 열린 메뉴는 공용 카드 그대로. */
+.gm-mselects > .dd { flex: 1 1 auto; min-width: 0; }
+@media (min-width: 600px) { .gm-mselects > .dd { flex: 0 1 auto; } }
+.gm-mselects.dd-scope .dd__btn { height: 34px; gap: 6px; padding: 0 10px 0 12px; border: 0; border-radius: 10px; background: var(--gm-fill); font-size: 13px; font-weight: 400; color: var(--gm-ink); }
+.gm-mselects.dd-scope .dd__btn:hover { border-color: transparent; }
+.gm-mselects.dd-scope .dd.open .dd__btn { box-shadow: 0 0 0 3px var(--gm-select); }
+.gm-mselects.dd-scope .dd__chev svg { width: 14px; height: 14px; }
 .gm-select {
   appearance: none;
   -webkit-appearance: none;
@@ -528,6 +533,7 @@ html[data-pane] [data-shell-scroll]:has(.gm-mthread) { padding-bottom: 0 !import
 /* 손가락 화면 — 누르는 자리 44px 이상(HIG). 글자가 커져도(최대 1.35배) 줄바꿈으로 버틴다. */
 @media (pointer: coarse) {
   .gm-select { height: auto; min-height: 44px; }
+  .gm-mselects.dd-scope .dd__btn { height: auto; min-height: 44px; }
   .gm-btn,
   .gm-btn--sm { min-height: 44px; }
   .gm-chipbtn { height: auto; min-height: 44px; }

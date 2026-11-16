@@ -4,6 +4,7 @@ import { getAdminTransportReceiptsForUser } from "@/lib/admin-attendance";
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { getDictionary } from "@/lib/i18n";
 import "@/components/admin/admin-console.css";
+import "@/components/admin/shared/adm-dropdown.css";
 
 // 직원 한 명의 한 달을 보는 데스크톱 마스터-디테일 영수증 검토 페이지. 교통비 패널의 버튼으로 들어온다.
 // 권한 필요 + 조직 범위 (getAdminTransportReceiptsForUser 에서 강제).

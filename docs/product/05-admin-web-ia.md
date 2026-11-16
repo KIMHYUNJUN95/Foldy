@@ -294,7 +294,7 @@ Permissions · Invite Codes · Attendance Sites/QR 등)은 위 3개 그룹의 �
   보기 · 이동(영수증 보기 등)은 결정 줄에 넣지 않는다. 처리 끝난 건은 `.panel__foot--end` + `.btn--text`(재오픈). 지금: 교통비 · 정정 요청 · 검토 큐.
 - `AdmDropdown`(`.dd`) — **어드민 콘솔의 단일 드롭다운 표준**. 네이티브 `<select>`와 필터 드롭다운을
   모두 대체한다. 값 편집·필터·정렬 어디서든 이 하나만 쓴다. 폼 제출용은 `DdFormSelect`(숨은 input
-  래퍼)를 쓴다. CSS는 `admin-console.css`에 있어 모든 `.adm` 페이지에서 로드된다. **화면마다 다른
+  래퍼)를 쓴다. CSS는 `src/components/admin/shared/adm-dropdown.css`(2026-11-16 `admin-console.css` 에서 분리 — 컴포넌트가 직접 가져오고, `admin-console.css` 를 가져오는 곳은 바로 뒤에 같이 가져와 예전 순서 그대로). **화면마다 다른
   드롭다운을 만들지 않는다**(구 칩형 `ChipDropdown`/`.adp` 드롭다운은 폐기·삭제됨, 2026-07-13).
   단, 달력형 `AdminDatePicker`/`AdminTimePicker`/`AdminMonthPicker`는 드롭다운이 아닌 별도 피커 컨트롤이다.
   **메뉴 폭 규칙(2026-11-16)**: 일반 메뉴는 **내용 폭**(`width: max-content`, 트리거보다 좁지 않게 `min-width: 100%`, 최대 `min(360px, 100vw - 32px)`)이고 옵션 글자는 한 줄 — 넘치면 말줄임(`.dd__opt__k`). 「답장 기다림 42」 같은 옵션이 좁은 트리거 폭에서 두 줄로 꺾이던 문제의 공용 해결. 메뉴가 화면 오른쪽으로 삐져나가면 열 때 한 번 재서 `.dd__menu--end`(오른쪽 맞춤)로 뒤집는다. `wide`(설명 `<small>` 있는 여러 줄 옵션) · `rich` · `searchable` 메뉴는 예전 폭 규칙(트리거 폭, wide 는 최소 280px) 그대로.
@@ -305,6 +305,7 @@ Permissions · Invite Codes · Attendance Sites/QR 등)은 위 3개 그룹의 �
   - **키보드 · 닫기**(2026-11-13): 버튼에서 ↓ ↑ Enter Space 로 열림(키보드로 열면 등장 애니메이션 없음). 열리면 고른 옵션(없으면 첫 옵션)에 초점,
     ↓ ↑ Home End 로 옮김(끝에서 멈춤), Enter · Space 로 선택, Tab 은 닫고 초점을 버튼으로 돌려 다음 칸으로. `searchable` 이면 검색 입력에서 ↓ 로 목록에 들어간다.
     Esc 는 **캡처 단계에서 가로채** 이 메뉴만 닫는다(바깥 패널 · 모달의 Esc 가 같이 닫히지 않음). Esc · 선택으로 닫으면 초점이 버튼으로 돌아간다(바깥 클릭은 아님). 옵션 초점은 `.dd__opt:focus-visible`.
+  - **모바일과 같이 쓴다**(2026-11-16): `/mobile` 화면도 이 드롭다운 하나를 쓴다 — 감싸는 칸에 `.dd-scope` 를 붙이면 같은 규칙이 걸린다(규칙은 `:is(.adm, .dd-scope) .dd…` — `.adm` 과 세부도가 같아 관리자 화면은 그대로). `.dd-scope` 는 드롭다운이 쓰는 토큰 11개(`--mono` 포함)만 받는다(값은 `.adm` 과 같음, `adm-dropdown-css.test.ts` 가 확인). `.dd-scope` 안에서만: 옵션 44px · 15px, 메뉴가 탭바 위까지 자리가 모자라면 위로 열고(`menuVerticalPlan`) 높이를 묶어 안에서 스크롤(양쪽 다 좁아도 최소 120px · 메뉴가 더 작으면 그 높이), 화면 좌우 8px 안으로 밀어 넣는다(`menuShiftX`). 관리자 콘솔의 뒤집기는 예전대로 오른쪽 맞춤(`.dd__menu--end`)만. 바깥 닫기는 `pointerdown`(iOS 는 누를 수 없는 자리 탭에 mousedown 을 안 보낸다). 트리거 모양은 화면이 덮어 쓴다(손님 메시지 = 회색 필터 칸). 16 「드롭다운 — 공용」.
 - `AdminReasonModal`
 - `useAdminPanelA11y`
 - `AdminExportButtons` — 콘솔의 **유일한** 내보내기 컨트롤 (아래 참조)

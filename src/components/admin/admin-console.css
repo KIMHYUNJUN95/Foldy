@@ -2476,56 +2476,9 @@
   .adm .jp { box-shadow:none !important; border:none !important; margin:0 !important; transform:none !important; width:210mm !important; }
 }
 
-/* ===================================================================
-   커스텀 드롭다운 (.dd) — 모든 관리자 콘솔(사용자 / 근태 / 청소 / …)에서 네이티브
-   <select> 를 대체하는 단일 공용 드롭다운 표준.
-   users-console.css 에서 옮겨 와 모든 `.adm` 페이지가 쓴다. 두 번째
-   드롭다운 스타일을 추가하지 말 것 (예전 칩형 `.adp` 드롭다운은 폐기됨).
-   =================================================================== */
-.adm .dd { position: relative; }
-.adm .dd__btn { width: 100%; display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 12px; border-radius: 11px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font-size: 13.5px; font-weight: 700; text-align: left; cursor: pointer; }
-.adm .dd__btn:hover { border-color: color-mix(in oklab, var(--adm-primary) 34%, var(--line)); }
-.adm .dd__btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.adm .dd__btn--sm { height: 38px; border-radius: 10px; font-size: 12.5px; padding: 0 11px; }
-.adm .dd__val { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.adm .dd__val.ph { color: var(--faint); font-weight: 600; }
-.adm .dd__chev { flex: 0 0 auto; color: var(--adm-muted); transition: transform 0.16s; display: inline-flex; }
-.adm .dd__chev svg { width: 17px; height: 17px; }
-.adm .dd.open .dd__btn { border-color: var(--adm-primary); box-shadow: 0 0 0 3.5px var(--primary-soft); }
-.adm .dd.open .dd__chev { transform: rotate(180deg); }
-/* 화이트 리디자인(2026-10-13): 필터 줄의 작은 드롭다운은 상자 없이 「전체 건물 ⌄」 글자 버튼(시안 — 칩 대신 단순 필터).
-   폼 안의 기본 크기 드롭다운은 그대로 테두리 칸이다. 메뉴는 버튼보다 넓게 열린다. */
-.adm .dd__btn--sm { width: auto; height: 34px; padding: 0 8px; gap: 4px; border: 0; border-radius: 9px; background: transparent; font-size: 14px; font-weight: 500; color: #3a3746; }
-.adm .dd__btn--sm:hover { background: #f4f4f7; }
-.adm .dd__btn--sm .dd__chev svg { width: 15px; height: 15px; }
-.adm .dd.open .dd__btn--sm { box-shadow: none; background: #f4f4f7; }
-.adm .dd:has(.dd__btn--sm) .dd__menu { right: auto; min-width: max(100%, 180px); }
-/* 메뉴 폭 = 내용 폭(트리거보다 좁지 않게, 최대 360px). 옵션 글자는 한 줄 — 넘치면 말줄임. 오른쪽 끝에 붙은 트리거는 .dd__menu--end 로 오른쪽 맞춤. */
-.adm .dd__menu { position: absolute; z-index: 50; top: calc(100% + 6px); left: 0; right: auto; width: max-content; min-width: 100%; max-width: min(360px, calc(100vw - 32px)); background: var(--card); border: 1px solid var(--line); border-radius: 13px; box-shadow: var(--sh-pop); padding: 6px; animation: ddIn 0.14s ease; overflow: hidden; }
-.adm .dd__menu--up { top: auto; bottom: calc(100% + 6px); transform-origin: bottom; }
-.adm .dd__menu--end { left: auto; right: 0; }
-.adm .dd:has(.dd__btn--sm) .dd__menu.dd__menu--end { left: auto; right: 0; }
-.adm .dd__menu--wide { right: 0; width: auto; min-width: 280px; max-width: none; }
-.adm .dd--search .dd__menu { right: 0; width: auto; max-width: none; }
-.adm .dd__opt__k { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.adm .dd__opt__k:has(> b) { white-space: normal; overflow: visible; }
+/* 커스텀 드롭다운(.dd) 본체는 src/components/admin/shared/adm-dropdown.css 로 옮겼다(2026-11-16 — `/mobile` 도 같은 것을 쓰게).
+   이 파일을 가져오는 곳은 바로 뒤에 그 파일도 가져온다(예전 순서 그대로: 콘솔 → 드롭다운). */
 @keyframes ddIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
-.adm .dd__opt { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 9px; border: none; background: none; text-align: left; font-size: 13px; font-weight: 700; color: var(--ink-soft); cursor: pointer; }
-.adm .dd__opt:hover { background: var(--card2); color: var(--ink); }
-.adm .dd__opt.on { background: var(--primary-soft); color: var(--adm-primary); }
-.adm .dd__opt:focus-visible { outline: none; background: var(--card2); color: var(--ink); box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--adm-primary) 45%, transparent); }
-.adm .dd__opt.on:focus-visible { background: var(--primary-soft); color: var(--adm-primary); }
-.adm .dd__menu--instant { animation: none; }
-.adm .dd__opt__k { flex: 1; min-width: 0; }
-.adm .dd__opt__k b { display: block; font-size: 13px; font-weight: 800; color: inherit; letter-spacing: -0.01em; }
-.adm .dd__opt__k small { display: block; font-size: 11.5px; font-weight: 500; color: var(--adm-muted); margin-top: 2px; line-height: 1.4; }
-.adm .dd__opt.on .dd__opt__k small { color: color-mix(in oklab, var(--adm-primary) 70%, var(--adm-muted)); }
-.adm .dd__opt__key { display: block; font-family: var(--mono); font-size: 10.5px; font-weight: 700; color: var(--faint); letter-spacing: -0.02em; margin-top: 3px; }
-.adm .dd__opt.on .dd__opt__key { color: color-mix(in oklab, var(--adm-primary) 62%, var(--faint)); }
-.adm .dd__menu--wide .dd__opt { align-items: flex-start; }
-.adm .dd__menu--wide .dd__chk { margin-top: 2px; }
-.adm .dd__chk { margin-left: auto; flex: 0 0 auto; color: var(--adm-primary); display: inline-flex; }
-.adm .dd__chk svg { width: 16px; height: 16px; }
 
 /* DD — searchable mode (<AdmDropdown searchable />). 옵션이 수십 개로 늘어나는 필터
    (등록자 / 담당자 등)를 위해 메뉴 안에 공용 .qsearch 를 넣고 목록을 스크롤한다.

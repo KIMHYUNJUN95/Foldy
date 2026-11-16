@@ -9,6 +9,7 @@ import type { AdminReceiptItem, AdminTransportReceiptsView } from "@/lib/admin-a
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { adminTransportStatusPill } from "../shared/admin-format";
 import "@/components/admin/admin-console.css";
+import "@/components/admin/shared/adm-dropdown.css";
 
 // 데스크톱 영수증 검토 화면 — 그 달 영수증의 컨택트 시트 그리드(썸네일 전부 한눈에,
 // 각각 날짜/금액/건물 캡션 포함)라서, 사진을 한 장씩 보는 레이아웃의 낭비되는 여백 없이

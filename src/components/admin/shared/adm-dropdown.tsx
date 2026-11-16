@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Keyboar
 import { Check, ChevronDown, Search, X } from "lucide-react";
 import { useSession } from "@/components/providers/session-provider";
 import { dictionaries } from "@/lib/i18n";
+import "./adm-dropdown.css";
 
 export type AdmOption = {
   value: string;
@@ -52,11 +53,58 @@ export function menuOverflowsRight(menuRight: number, viewportWidth: number): bo
   return menuRight > viewportWidth - 8;
 }
 
+/** 모바일(`.dd-scope`) 메뉴를 뷰포트 좌우 8px 안에 두는 가로 이동(px, 왼쪽으로 음수). 좁은 폰에서 오른쪽 맞춤만으로는 왼쪽이 잘릴 수 있다. */
+export function menuShiftX(menuLeft: number, menuWidth: number, viewportWidth: number): number {
+  const overflow = menuLeft + menuWidth - (viewportWidth - 8);
+  if (overflow <= 0) return 0;
+  return -Math.min(overflow, Math.max(0, menuLeft - 8));
+}
+
+/**
+ * 모바일(`.dd-scope`) 메뉴의 세로 자리 — 아래 자리(탭바 위까지)가 모자라고 위가 더 넓으면 위로 열고,
+ * 고른 쪽 자리만큼 높이를 묶는다(넘치면 메뉴 안에서 스크롤). 양쪽 다 좁아도 120px(메뉴가 더 작으면 그 높이) 밑으로는 줄이지 않는다.
+ */
+const MENU_MIN_HEIGHT = 120;
+
+export function menuVerticalPlan(opts: {
+  menuHeight: number;
+  triggerTop: number;
+  triggerBottom: number;
+  viewportTop: number;
+  viewportBottom: number;
+}): { up: boolean; maxHeight: number } {
+  const gap = 6 + 8;
+  const below = opts.viewportBottom - opts.triggerBottom - gap;
+  const above = opts.triggerTop - opts.viewportTop - gap;
+  const up = opts.menuHeight > below && above > below;
+  const floor = Math.min(MENU_MIN_HEIGHT, opts.menuHeight);
+  return { up, maxHeight: Math.max(floor, Math.floor(up ? above : below)) };
+}
+
 /** 열 때 한 번 재서 `.dd__menu--end` 를 붙인다 — 그리기 전에 클래스만 붙여 깜빡임 · 재렌더 없음. `.dd__menu` 를 직접 그리는 곳도 같이 쓴다. */
 export function useDdMenuEdgeFlip(menuRef: RefObject<HTMLElement | null>, open: boolean) {
   useLayoutEffect(() => {
     const menu = menuRef.current;
-    if (open && menu && menuOverflowsRight(menu.getBoundingClientRect().right, window.innerWidth)) menu.classList.add("dd__menu--end");
+    if (!open || !menu) return;
+    // 모바일(`.dd-scope`)은 탭바 · 화면 끝을 피해 위로 뒤집고 가로로 밀어 넣는다. 관리자 콘솔은 예전 그대로(오른쪽 맞춤만).
+    if (menu.closest(".dd-scope")) {
+      const trigger = menu.parentElement?.getBoundingClientRect();
+      const tabbar = document.querySelector("nav.tabbar")?.getBoundingClientRect();
+      const vv = window.visualViewport;
+      const viewportTop = vv?.offsetTop ?? 0;
+      let viewportBottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
+      if (tabbar && tabbar.height > 0 && tabbar.top < viewportBottom) viewportBottom = tabbar.top;
+      if (trigger) {
+        const plan = menuVerticalPlan({ menuHeight: menu.scrollHeight, triggerTop: trigger.top, triggerBottom: trigger.bottom, viewportTop, viewportBottom });
+        if (plan.up) menu.classList.add("dd__menu--up");
+        menu.style.maxHeight = `${plan.maxHeight}px`;
+      }
+      const rect = menu.getBoundingClientRect();
+      const shift = menuShiftX(rect.left, rect.width, window.innerWidth);
+      if (shift) menu.style.left = `${shift}px`;
+      return;
+    }
+    if (menuOverflowsRight(menu.getBoundingClientRect().right, window.innerWidth)) menu.classList.add("dd__menu--end");
   }, [menuRef, open]);
 }
 
@@ -82,7 +130,8 @@ export function ddMenuClassName(opts: { wide: boolean; placement: "down" | "up";
 /**
  * 모든 관리자 콘솔(사용자 / 근태 / 청소 / …)에서 네이티브 <select> 를 대체하는
  * 단일 공용 관리자 드롭다운. 디자인 핸드오프의 `.dd` 컴포넌트와 같으며, CSS 는
- * admin-console.css 에 있어 모든 `.adm` 페이지가 가져다 쓴다. 바깥 클릭 + Esc 로 열림 상태를 스스로 관리한다.
+ * admin-console.css 에 있어 모든 `.adm` 페이지가 가져다 쓴다. `/mobile` 화면은 감싸는 칸에 `.dd-scope` 를 붙여
+ * 같은 것을 쓴다(2026-11-16 — 네이티브 <select> 대신). 바깥 클릭 + Esc 로 열림 상태를 스스로 관리한다.
  * 두 번째 드롭다운 스타일을 추가하지 말 것 — 이것이 유일한 것이다.
  */
 export function AdmDropdown({
@@ -124,7 +173,7 @@ export function AdmDropdown({
 
   useEffect(() => {
     if (!open) return;
-    function onDocClick(event: MouseEvent) {
+    function onDocClick(event: PointerEvent) {
       if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
         close();
       }
@@ -137,10 +186,11 @@ export function AdmDropdown({
       close();
       btnRef.current?.focus();
     }
-    document.addEventListener("mousedown", onDocClick);
+    // pointerdown — iOS 는 누를 수 없는 자리를 탭하면 mousedown 을 보내지 않아 바깥 탭으로 안 닫혔다.
+    document.addEventListener("pointerdown", onDocClick);
     window.addEventListener("keydown", onKey, true);
     return () => {
-      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("pointerdown", onDocClick);
       window.removeEventListener("keydown", onKey, true);
     };
   }, [close, open]);

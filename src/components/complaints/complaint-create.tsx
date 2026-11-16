@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition, type ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type ChangeEvent } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
@@ -17,7 +17,7 @@ import { compressImageFile } from "@/components/announcements/announcement-image
 import { ImageLightbox } from "./image-lightbox";
 import { type LinkTarget, type PlatformKey } from "./complaint-mock";
 import { CIc, CxIcon } from "./cx-icons";
-import { PLATFORMS, platformName, ratingMax } from "./cx-platform";
+import { platformName, ratingMax, starsLabel } from "./cx-platform";
 // 예약 고르기 시트 안쪽은 기존 모양(.cx-*)을 그대로 쓴다.
 import "./complaints.css";
 import "./feedback-mobile.css";
@@ -61,7 +61,7 @@ function RatingInput({
             haptic("light");
             onChange(index + 1 === value ? 0 : index + 1);
           }}
-          aria-label={`${index + 1}`}
+          aria-label={starsLabel(index + 1, dict.complaints)}
         >
           <Star aria-hidden="true" />
         </button>
@@ -72,6 +72,20 @@ function RatingInput({
 }
 
 type LinkMode = "reservation" | "place" | "none";
+
+/**
+ * 시트 검색칸 — 터치 기기에선 자동으로 포커스하지 않는다(키보드가 시트를 가리고 열림 움직임이 끊긴다).
+ * 마우스 기기만 시트가 다 열린 뒤에 포커스.
+ */
+function PickerSearch({ value, onChange, placeholder }: { value: string; onChange: (value: string) => void; placeholder: string }) {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!window.matchMedia("(pointer: fine)").matches) return;
+    const timer = window.setTimeout(() => ref.current?.focus({ preventScroll: true }), 320);
+    return () => window.clearTimeout(timer);
+  }, []);
+  return <input ref={ref} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} />;
+}
 
 /**
  * 컴플레인 등록 — 모바일. 화이트 리디자인(2026-10-14, 시안 FBNew-Phone · FBNewConfirm-Phone):
@@ -117,6 +131,7 @@ export function ComplaintCreate({
   const [submitError, setSubmitError] = useState(false);
   const [photoError, setPhotoError] = useState(false);
   const [titleText, setTitleText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const placeBuildings = useMemo(() => {
     const seen = new Map<string, string>();
@@ -184,6 +199,7 @@ export function ComplaintCreate({
   }
 
   function handleSubmit() {
+    setSubmitting(true);
     startTransition(async () => {
       const formData = new FormData();
       formData.append("platform", plat ?? "other");
@@ -208,16 +224,23 @@ export function ComplaintCreate({
       if (submissionRef.current?.sig !== sig) submissionRef.current = { sig, id: crypto.randomUUID() };
       formData.append("submission_id", submissionRef.current.id);
 
-      const result = await createComplaintAction(formData);
-      if ("id" in result) {
+      let created: string | null = null;
+      try {
+        const result = await createComplaintAction(formData);
+        if ("id" in result) created = result.id;
+      } catch {
+        // 네트워크 · 서버 예외도 저장 실패와 같은 문구로 — 「등록 중…」에 굳지 않게
+      }
+      if (created) {
         submissionRef.current = null;
         haptic("success");
-        router.push(`/mobile/complaints/${result.id}`);
-      } else {
-        setConfirmOpen(false);
-        setSubmitError(true);
-        haptic("error");
+        router.push(`/mobile/complaints/${created}`);
+        return;
       }
+      setConfirmOpen(false);
+      setSubmitting(false);
+      setSubmitError(true);
+      haptic("error");
     });
   }
 
@@ -250,11 +273,18 @@ export function ComplaintCreate({
 
       <section className="ofw-sec">
         <label className="ofw-nf">
-          <span className="ofw-nf__l">{t.fieldTitle}</span>
+          <span className="ofw-nf__l">
+            {t.fieldTitle}
+            <span className="fbw-req" aria-hidden="true">
+              {" "}
+              {t.required}
+            </span>
+          </span>
           <input
             ref={titleRef}
             name="title"
             autoComplete="off"
+            aria-required="true"
             className={`ofw-nf__in${titleError ? " is-err" : ""}`}
             aria-invalid={titleError}
             aria-describedby={titleError ? "cxn-title-err" : undefined}
@@ -389,7 +419,7 @@ export function ComplaintCreate({
                 <button type="button" className="fbw-photo__img" aria-label={`${t.photosTitle} ${index + 1}`} onClick={() => setLightboxIndex(index)}>
                   <Image src={url} alt="" fill sizes="72px" />
                 </button>
-                <button type="button" className="fbw-photo__x" aria-label={t.lightboxClose} onClick={() => handleRemoveImage(index)}>
+                <button type="button" className="fbw-photo__x" aria-label={t.wRemovePhoto} onClick={() => handleRemoveImage(index)}>
                   <X aria-hidden="true" />
                 </button>
               </div>
@@ -416,8 +446,8 @@ export function ComplaintCreate({
         </p>
       ) : null}
 
-      <button type="button" className="ofw-submit" onClick={openConfirm} disabled={isPending}>
-        {t.submit}
+      <button type="button" className="ofw-submit" onClick={openConfirm} disabled={isPending || submitting} aria-busy={submitting}>
+        {submitting ? t.submitPending : t.submit}
       </button>
 
       {confirmOpen ? (
@@ -506,12 +536,7 @@ export function ComplaintCreate({
                   </div>
                   <div className="cx-search">
                     <span className="ic cx-search__ic">{CxIcon.search}</span>
-                    <input
-                      value={search}
-                      onChange={(event) => setSearch(event.target.value)}
-                      placeholder={t.pickerTitle}
-                      autoFocus
-                    />
+                    <PickerSearch key="buildings" value={search} onChange={setSearch} placeholder={t.pickerSearchPh} />
                   </div>
                   <div className="cx-picker-scroll">
                     {filtered.length === 0 ? (
@@ -580,19 +605,14 @@ export function ComplaintCreate({
               return (
                 <div className="cx cx-sheet">
                   <div className="cx-sheet__head cx-sheet__head--nav">
-                    <button type="button" className="cx-back" onClick={goBack}>
+                    <button type="button" className="cx-back" onClick={goBack} aria-label={t.pickerBack}>
                       <CIc>{CxIcon.chevR}</CIc>
                     </button>
                     <p className="cx-sheet__title">{headerBuilding}</p>
                   </div>
                   <div className="cx-search">
                     <span className="ic cx-search__ic">{CxIcon.search}</span>
-                    <input
-                      value={search}
-                      onChange={(event) => setSearch(event.target.value)}
-                      placeholder={t.metaRoom}
-                      autoFocus
-                    />
+                    <PickerSearch key="rooms" value={search} onChange={setSearch} placeholder={t.pickerSearchPh} />
                   </div>
                   <div className="cx-picker-scroll">
                     {filtered.length === 0 ? (
@@ -667,7 +687,7 @@ export function ComplaintCreate({
               return (
                 <div className="cx cx-sheet">
                   <div className="cx-sheet__head cx-sheet__head--nav">
-                    <button type="button" className="cx-back" onClick={goBack}>
+                    <button type="button" className="cx-back" onClick={goBack} aria-label={t.pickerBack}>
                       <CIc>{CxIcon.chevR}</CIc>
                     </button>
                     <div>
@@ -678,12 +698,7 @@ export function ComplaintCreate({
                   {stayingRows.length + upcomingRows.length > 1 && (
                     <div className="cx-search">
                       <span className="ic cx-search__ic">{CxIcon.search}</span>
-                      <input
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                        placeholder={t.metaGuest}
-                        autoFocus
-                      />
+                      <PickerSearch key="guests" value={search} onChange={setSearch} placeholder={t.pickerSearchPh} />
                     </div>
                   )}
                   <div className="cx-picker-scroll">
@@ -738,11 +753,9 @@ function PickRow({
   liveLabel: string;
   onClick: () => void;
 }) {
-  const platform = PLATFORMS[row.plat];
-
   return (
     <button type="button" className="cx-rrow" onClick={onClick}>
-      <span className="cx-rrow__av" style={{ background: platform.avg }}>
+      <span className="cx-rrow__av">
         {row.guest.slice(0, 1)}
       </span>
       <div className="cx-rrow__b">

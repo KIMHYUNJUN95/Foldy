@@ -24,7 +24,7 @@ import {
   uploadManualComplaintImageAction,
 } from "@/app/admin/complaints/actions";
 import type { PlacePickRow, ReservationPickRow } from "@/lib/complaint-reservations";
-import { PLATFORMS, ratingMax, type ComplaintPlatform } from "@/components/complaints/cx-platform";
+import { PLATFORMS, ratingMax, starsLabel, type ComplaintPlatform } from "@/components/complaints/cx-platform";
 
 const MAX_IMAGES = 5;
 
@@ -68,6 +68,10 @@ export type CreatePanelLabels = {
   titleRequired: string;
   createFailed: string;
   platformDirect: string;
+  platformOther: string;
+  submitPending: string;
+  starsOne: string;
+  starsMany: string;
   /** 사진 빼기 버튼(아이콘만) 이름. */
   removePhoto: string;
   photoUploadFailed: string;
@@ -81,7 +85,9 @@ type Props = {
 };
 
 function platformLabel(plat: ComplaintPlatform, labels: CreatePanelLabels): string {
-  return plat === "direct" ? labels.platformDirect : PLATFORMS[plat].name;
+  if (plat === "direct") return labels.platformDirect;
+  if (plat === "other") return labels.platformOther;
+  return PLATFORMS[plat].name;
 }
 
 export function ComplaintCreatePanel({ labels, reservations, places, onClose }: Props) {
@@ -98,6 +104,7 @@ export function ComplaintCreatePanel({ labels, reservations, places, onClose }: 
   const [guestName, setGuestName] = useState("");
   const [images, setImages] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [titleError, setTitleError] = useState(false);
 
   const draftId = useRef(crypto.randomUUID()).current;
   // 중복 막기 id — 보낼 값이 지난 시도와 같을 때만 다시 쓴다(응답 전 다시 누름 · 실패 뒤 그대로 다시 보내기).
@@ -167,10 +174,11 @@ export function ComplaintCreatePanel({ labels, reservations, places, onClose }: 
     if (isPending) return;
     const title = titleRef.current?.value.trim() ?? "";
     if (!title) {
-      setError(labels.titleRequired);
+      setTitleError(true);
       titleRef.current?.focus();
       return;
     }
+    setTitleError(false);
     setError(null);
 
     const formData = new FormData();
@@ -239,10 +247,28 @@ export function ComplaintCreatePanel({ labels, reservations, places, onClose }: 
         <div className="panel__body cxw-pb cxw-form">
           <label className="cxw-nf">
             <span className="cxw-nf__l">
-              {labels.fieldTitle} <b className="req">{labels.required}</b>
+              {labels.fieldTitle}{" "}
+              <b className="req" aria-hidden="true">
+                {labels.required}
+              </b>
             </span>
-            <input id="cxc-title" name="title" ref={titleRef} autoComplete="off" />
+            <input
+              id="cxc-title"
+              name="title"
+              ref={titleRef}
+              autoComplete="off"
+              aria-required="true"
+              className={titleError ? "is-err" : undefined}
+              aria-invalid={titleError}
+              aria-describedby={titleError ? "cxc-title-err" : undefined}
+              onChange={() => titleError && setTitleError(false)}
+            />
           </label>
+          {titleError ? (
+            <p className="cxerr cxerr--field" id="cxc-title-err" role="alert">
+              {labels.titleRequired}
+            </p>
+          ) : null}
 
           <label className="cxw-nf">
             <span className="cxw-nf__l">
@@ -285,7 +311,7 @@ export function ComplaintCreatePanel({ labels, reservations, places, onClose }: 
                     key={index}
                     type="button"
                     className={index < rating ? "cxstar is-on" : "cxstar"}
-                    aria-label={String(index + 1)}
+                    aria-label={starsLabel(index + 1, labels)}
                     onClick={() => setRating(index + 1 === rating ? 0 : index + 1)}
                   >
                     <Star aria-hidden="true" />
@@ -418,6 +444,7 @@ export function ComplaintCreatePanel({ labels, reservations, places, onClose }: 
                 <button
                   type="button"
                   className="cxupadd"
+                  aria-label={labels.fieldImages}
                   disabled={isPending}
                   onClick={() => fileRef.current?.click()}
                 >
@@ -434,13 +461,17 @@ export function ComplaintCreatePanel({ labels, reservations, places, onClose }: 
             />
           </div>
 
-          {error ? <p className="cxerr">{error}</p> : null}
+          {error ? (
+            <p className="cxerr" role="alert">
+              {error}
+            </p>
+          ) : null}
         </div>
 
         <div className="cxw-pf">
-          <button type="button" className="cxw-btn is-pri" onClick={handleSubmit} disabled={isPending}>
+          <button type="button" className="cxw-btn is-pri" onClick={handleSubmit} disabled={isPending} aria-busy={isPending}>
             {isPending ? <span className="cxw-spin" aria-hidden="true" /> : null}
-            {labels.submit}
+            {isPending ? labels.submitPending : labels.submit}
           </button>
         </div>
       </aside>

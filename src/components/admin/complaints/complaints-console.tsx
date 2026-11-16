@@ -318,7 +318,7 @@ export function ComplaintsConsole(props: Props) {
           linkModeHint: copy.wLinkHint,
           pickBuilding: copy.pickBuilding,
           pickRoom: copy.pickRoom,
-          pickerSearch: copy.pickerSearch,
+          pickerSearch: copy.pickerSearchPh,
           pickerStaying: copy.pickerStaying,
           pickerUpcoming: copy.pickerUpcoming,
           pickerLiveTag: copy.pickerLiveTag,
@@ -328,6 +328,10 @@ export function ComplaintsConsole(props: Props) {
           removePhoto: copy.wRemovePhoto,
           photoUploadFailed: copy.photoUploadFailed,
           platformDirect: copy.platformDirect,
+          platformOther: copy.platformOther,
+          submitPending: copy.submitPending,
+          starsOne: copy.starsOne,
+          starsMany: copy.starsMany,
         }}
       />
     ) : null;

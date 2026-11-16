@@ -104,7 +104,14 @@ export function ratingMax(plat: ComplaintPlatform): number {
 }
 
 export function platformName(plat: ComplaintPlatform, dict: Dictionary): string {
-  return plat === "direct" ? dict.complaints.platformDirect : PLATFORMS[plat].name;
+  if (plat === "direct") return dict.complaints.platformDirect;
+  if (plat === "other") return dict.complaints.platformOther;
+  return PLATFORMS[plat].name;
+}
+
+/** 별 버튼 이름 — 숫자만 읽히지 않게. 복수형이 없는 언어는 두 문구가 같다. */
+export function starsLabel(n: number, copy: { starsOne: string; starsMany: string }): string {
+  return (n === 1 ? copy.starsOne : copy.starsMany).replace("{n}", String(n));
 }
 
 /** 정사각형 출처 배지 (목록 카드 / 생성 셀). */

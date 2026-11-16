@@ -215,7 +215,9 @@ a.fbw-pct { display: inline-flex; align-items: center; justify-content: flex-end
 .fbw-send svg { width: 18px; height: 18px; }
 .fbw-send:disabled { opacity: .4; cursor: default; }
 .fbw-send:not(:disabled):active { transform: scale(.94); }
-.fbw-err { margin: 0; font-size: 13px; font-weight: 600; color: #c5282e; }
+.fbw-err { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: #c5282e; text-wrap: pretty; animation: fbw-err-in 160ms ease-out both; }
+@keyframes fbw-err-in { from { opacity: 0; transform: translateY(-2px); } }
+@media (prefers-reduced-motion: reduce) { .fbw-err { animation: none; } }
 .fbw-info { margin: 0; font-size: 13px; font-weight: 600; color: var(--primary); }
 .fbw-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 50px; padding: 0 16px; border: 0; border-radius: 14px; font: inherit; font-size: 16px; font-weight: 600; text-decoration: none; cursor: pointer; transition: background 150ms ease, transform 140ms ease, opacity 150ms ease; }
 .fbw-btn svg { width: 18px; height: 18px; }
@@ -272,7 +274,7 @@ a.fbw-pct { display: inline-flex; align-items: center; justify-content: flex-end
 .fbw-stars button.on { color: #f5b400; }
 .fbw-stars button:active { transform: scale(.88); }
 .fbw-stars .num { margin-left: 8px; font-size: 13px; color: #6b6878; }
-.fbw-hint { margin: -6px 0 0; font-size: 12px; line-height: 1.5; color: #6b6878; }
+.fbw-hint { margin: -6px 0 0; font-size: 12px; line-height: 1.5; color: #6b6878; text-wrap: pretty; }
 .fbw-pickbtn { justify-content: space-between; gap: 8px; text-align: left; cursor: pointer; }
 .fbw-pickbtn > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fbw-pickbtn.is-ph > span:first-child { color: var(--text-3); }
@@ -285,6 +287,8 @@ a.fbw-pct { display: inline-flex; align-items: center; justify-content: flex-end
 .fbw-photo__img img { object-fit: cover; }
 .fbw-photo__x { position: absolute; top: 3px; right: 3px; display: grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 50%; background: rgba(22, 20, 31, .62); color: #fff; cursor: pointer; }
 .fbw-photo__x svg { width: 13px; height: 13px; }
+/* 보이는 크기는 24px 그대로, 누르는 영역만 44px 로 */
+.fbw-photo__x::after { content: ""; position: absolute; inset: -10px; }
 .fbw-photo__add { display: grid; place-items: center; width: 72px; height: 72px; border: 0; border-radius: 10px; background: #f4f4f7; color: #7a52e6; cursor: pointer; transition: transform 140ms ease; }
 .fbw-photo__add svg { width: 20px; height: 20px; }
 .fbw-photo__add:active { transform: scale(.96); }
@@ -338,3 +342,7 @@ a.fbw-pct { display: inline-flex; align-items: center; justify-content: flex-end
 .split-list a.fbw-rv[data-split-active], .split-list a.fbw-mr[data-split-active],
 .split-list a.fbw-rv[data-split-active] + .fbw-rv, .split-list a.fbw-mr[data-split-active] + .fbw-mr { border-image: none; border-top-color: transparent; }
 
+
+/* ── 등록 폼 다듬기 (2026-11-16) — 공용 주문 폼(.ofw-*)은 건드리지 않고 이 화면 안에서만 덮는다 ── */
+.fbw-form .ofw-head h1 { font-weight: 600; }
+.fbw-req { color: #c5282e; }

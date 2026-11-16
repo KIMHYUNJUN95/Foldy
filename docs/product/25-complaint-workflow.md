@@ -1065,3 +1065,17 @@ FBManual-Phone · FBCx-Phone · FBNew-Phone · FBNewConfirm-Phone · FBRooms-Pho
 
 - 손님 메시지 대화의 「업무 만들기 → 게스트 피드백」이 피드백을 만든다 — 기존 `createComplaint` 그대로(`complaint.write` 를 스스로 확인, `submissionId` 중복 막기). 메시지를 보려면 `guest_messages.view` 도 필요. 플랫폼 = 대화 채널(Airbnb · Booking.com · 직접, 그 밖 = 기타), 건물 · 방 · 예약 · 손님 이름 = 대화 값. 손님 사진은 옮기지 않는다.
 - 상세(PC 패널 · 모바일)에 「손님 메시지에서」 링크(`guest_messages.view` 가 있을 때만). PC 패널 `ComplaintDetailPanel` 이 `locale` 을 받는다. 해결(`resolved`)되면 그 대화에 「해결됐어요」 초안(보내지 않음). 문서 47 §6-4 · §5-7. 링크는 `guest_message_links`(202611130005, 운영 적용 2026-11-13).
+
+## 등록 화면 unslop 다듬기 (2026-11-16, 모바일 + PC)
+
+새 색 · 글꼴 없이 기존 토큰만. 목록 · 상세 · 셸은 그대로.
+
+- **제목 필수 표시**: 라벨 뒤 빨간 `*`(`aria-hidden`) + 입력칸 `aria-required`. 모바일 `.fbw-req`, PC `.req`.
+- **칸 아래 오류**: 제목이 비면 입력칸 바로 아래에 `titleRequired`(빨간 테두리 · `aria-invalid` · `aria-describedby` · `role="alert"`), 160ms 페이드(`prefers-reduced-motion` 이면 없음). 사진 · 저장 실패 같은 일반 오류는 버튼 근처에 둔다. PC 는 제목 오류와 일반 오류를 나눴다(`titleError` / `error`).
+- **등록 중**: 버튼이 「등록 중…」(`submitPending`) + `aria-busy` + 비활성. 모바일은 사진 올리는 동안이 아니라 보내는 동안만(`submitting`). PC 는 스피너 + 글자.
+- **예약 고르기 시트**: 검색칸 자동 포커스는 마우스(`pointer: fine`) 기기에서 열림 애니메이션 뒤(320ms)에만, 터치 기기는 포커스하지 않는다(`PickerSearch`). 검색 안내 `pickerSearchPh` = 「건물 · 객실 · 이름」(PC 검색칸도 같은 문구). 뒤로 단추는 `pickerBack` 이름 + 44px. 「투숙 중」 알약은 PC 와 같은 보라, 아바타는 플랫폼 그라데이션 대신 옅은 보라 단색, 「건물 · 객실만 연결」은 실선 hairline.
+- **사진 빼기 ×**: 보이는 크기 그대로, 누르는 영역만 44px(`::after`). 이름은 `wRemovePhoto`.
+- **PC 플랫폼 「Other」**: 데이터 키는 `other` 그대로, 이름만 `platformOther`(기타 / その他 / Other)로 — `platformName()` · PC 패널 `platformLabel()`.
+- **별점 읽기 이름**: 숫자만 읽히던 별 버튼이 `starsOne` / `starsMany`(`{n}` 자리표시자; 영어만 1 단수)로 읽힌다 — `starsLabel()` (모바일 · PC 공용).
+- **굵기 · 카피**: 제목 · 시트 제목 · 행 이름 · 라벨 700/800/900 → 600. 짧은 안내 · 자리표시자 끝 마침표 제거(`ratingNone` · `fieldBodyPlaceholder` · `fieldGuestPlaceholder`), `text-wrap: pretty`. 여러 문장 안내(`wLinkHint` · `linkModeHint`)는 그대로.
+- 테스트: `src/lib/__tests__/complaint-create-copy.test.ts`.

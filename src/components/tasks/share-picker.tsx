@@ -50,7 +50,7 @@ export function SharePicker({
       className="flex max-h-[82dvh] flex-col"
       header={
         <div className="mb-3">
-          <p className="text-[16px] font-black text-foreground">{copy.shareTitle}</p>
+          <p className="text-[16px] font-semibold text-foreground">{copy.shareTitle}</p>
           <p className="mt-0.5 text-[12px] text-muted-foreground">{copy.shareSub}</p>
         </div>
       }
@@ -89,11 +89,11 @@ export function SharePicker({
                       onClick={() => toggle(u.id)}
                       type="button"
                     >
-                      <span className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-sm font-extrabold text-primary">
+                      <span className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
                         {u.name.slice(0, 1)}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-bold text-foreground">{u.name}</span>
+                        <span className="block truncate text-sm font-semibold text-foreground">{u.name}</span>
                         <span className="block truncate text-xs text-muted-foreground">{u.role}</span>
                       </span>
                       <span
@@ -113,7 +113,7 @@ export function SharePicker({
 
           <button
             className={cn(
-              "mt-3 h-[52px] w-full rounded-2xl text-[15px] font-extrabold transition-colors",
+              "mt-3 h-[52px] w-full rounded-2xl text-[15px] font-semibold transition-colors",
               selected.length
                 ? "bg-primary text-primary-foreground"
                 : "bg-slate-100 text-slate-400",

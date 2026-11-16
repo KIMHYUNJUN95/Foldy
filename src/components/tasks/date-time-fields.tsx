@@ -58,7 +58,7 @@ export function MiniCalendar({
     cells.push(
       <button
         className={cn(
-          "flex aspect-square items-center justify-center rounded-[10px] text-[13px] font-bold transition-colors",
+          "flex aspect-square items-center justify-center rounded-[10px] text-[13px] font-semibold transition-colors",
           isSel
             ? "bg-primary text-primary-foreground shadow-[0_6px_14px_-8px_hsl(var(--primary-hsl)/0.7)]"
             : isT
@@ -89,7 +89,7 @@ export function MiniCalendar({
         >
           <ChevronLeft className="size-[17px]" aria-hidden="true" />
         </button>
-        <span className="text-[14px] font-black tracking-[-0.01em] text-foreground">{monthLabel}</span>
+        <span className="text-[14px] font-semibold tracking-[-0.01em] text-foreground">{monthLabel}</span>
         <button
           aria-label={copy.calNextMonth}
           className="flex size-8 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-foreground"
@@ -99,7 +99,7 @@ export function MiniCalendar({
           <ChevronRight className="size-[17px]" aria-hidden="true" />
         </button>
       </div>
-      <div className="grid grid-cols-7 gap-0.5 text-center text-[11px] font-bold text-muted-foreground">
+      <div className="grid grid-cols-7 gap-0.5 text-center text-[11px] font-semibold text-muted-foreground">
         {weekdays.map((w, i) => (
           <span className={cn(i === 0 && "text-rose-500", i === 6 && "text-blue-600")} key={i}>
             {w}
@@ -109,14 +109,14 @@ export function MiniCalendar({
       <div className="mt-1 grid grid-cols-7 gap-0.5">{cells}</div>
       <div className="mt-2.5 flex items-center justify-between border-t-[0.5px] border-[var(--separator)] pt-2.5">
         <button
-          className="rounded-full px-2.5 py-1 text-[12px] font-bold text-muted-foreground transition-colors hover:bg-slate-100"
+          className="rounded-full px-2.5 py-1 text-[12px] font-semibold text-muted-foreground transition-colors hover:bg-slate-100"
           onClick={onClear}
           type="button"
         >
           {copy.clearValue}
         </button>
         <button
-          className="rounded-full bg-primary/[0.07] px-3 py-1 text-[12px] font-bold text-primary transition-colors hover:bg-primary/10"
+          className="rounded-full bg-primary/[0.07] px-3 py-1 text-[12px] font-semibold text-primary transition-colors hover:bg-primary/10"
           onClick={() => onSelect(today)}
           type="button"
         >
@@ -154,7 +154,7 @@ export function TimeWheels({
     "flex max-h-[176px] flex-1 flex-col gap-1 overflow-y-auto px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
   const item = (active: boolean) =>
     cn(
-      "shrink-0 rounded-xl py-2 text-center text-[14px] font-bold transition-colors",
+      "shrink-0 rounded-xl py-2 text-center text-[14px] font-semibold transition-colors",
       active ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-slate-50",
     );
 
@@ -162,7 +162,7 @@ export function TimeWheels({
     <div className="mt-2 rounded-2xl border border-border bg-surface p-3 shadow-[0_14px_44px_-28px_rgba(15,23,42,0.4)]">
       {/* 직접 입력 */}
       <input
-        className="mb-2.5 h-10 w-full rounded-xl border border-border bg-background/60 px-3 text-center text-sm font-bold tracking-wide text-foreground outline-none focus:border-primary"
+        className="mb-2.5 h-10 w-full rounded-xl border border-border bg-background/60 px-3 text-center text-sm font-semibold tracking-wide text-foreground outline-none focus:border-primary"
         inputMode="numeric"
         onChange={(e) => {
           const v = e.target.value;

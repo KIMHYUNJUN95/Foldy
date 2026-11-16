@@ -63,7 +63,7 @@
 .adm .atw:not(.has-side) .atw-main { padding-right: 40px; }
 .adm .atw-head { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }
 .adm .atw-head__t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.adm .atw-head__t h1 { margin: 0; font-size: 24px; font-weight: 700; line-height: 1.25; letter-spacing: -0.03em; color: #16141f; overflow-wrap: anywhere; }
+.adm .atw-head__t h1 { margin: 0; font-size: 24px; font-weight: 600; line-height: 1.25; letter-spacing: -0.03em; color: #16141f; overflow-wrap: anywhere; }
 .adm .atw-head__t span { font-size: 13px; color: var(--text-3); }
 .adm .atw-head__r { display: flex; align-items: center; gap: 14px; flex: none; }
 
@@ -78,7 +78,7 @@
 }
 .adm .atw-pring__fg.is-zero { opacity: 0; }
 @keyframes atw-ring { from { stroke-dashoffset: var(--atw-ring-c); } }
-.adm .atw-pring__n { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #16141f; }
+.adm .atw-pring__n { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: #16141f; }
 
 /* 도구 줄 */
 .adm .atw-tools { display: flex; align-items: center; gap: 4px; margin: -4px 0 6px; }
@@ -188,7 +188,7 @@
 .adm .atw-selbar + .atw-sec,
 .adm .atw-head + .atw-sec { margin-top: 8px; }
 .adm .atw-sec__h { display: flex; align-items: center; gap: 8px; min-height: 32px; padding-bottom: 4px; }
-.adm .atw-sec__h > b { font-size: 14px; font-weight: 700; color: #16141f; }
+.adm .atw-sec__h > b { font-size: 14px; font-weight: 600; color: #16141f; }
 .adm .atw-sec__h > .num { font-size: 12px; color: var(--text-3); }
 .adm .atw-sec.is-over .atw-sec__h > b { color: #c5282e; }
 .adm .atw-sec.is-done .atw-sec__h > b { color: var(--text-3); }
@@ -306,7 +306,7 @@
 
 /* 현장 활동 줄(읽기 전용) */
 .adm .atw-field { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-top: 0.5px solid var(--separator); }
-.adm .atw-field__ic { display: grid; place-items: center; width: 22px; height: 22px; flex: none; border-radius: 6px; background: #f2f2f5; font-size: 11px; font-weight: 700; color: #6b6878; }
+.adm .atw-field__ic { display: grid; place-items: center; width: 22px; height: 22px; flex: none; border-radius: 6px; background: #f2f2f5; font-size: 11px; font-weight: 600; color: #6b6878; }
 
 /* 「+ 작업 추가」 줄 */
 .adm .atw-addrow {
@@ -368,7 +368,7 @@
 .adm .atw-empty__ic { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 8px; border-radius: 50%; background: #f4f1fd; color: #7a52e6; }
 
 /* 프로젝트 멤버 */
-.adm .atw .av { width: 26px; height: 26px; border-radius: 50%; background: #f1ecfd; color: #5a30cf; font-size: 11px; font-weight: 700; }
+.adm .atw .av { width: 26px; height: 26px; border-radius: 50%; background: #f1ecfd; color: #5a30cf; font-size: 11px; font-weight: 600; }
 .adm .atw-avs { display: inline-flex; }
 .adm .atw-avs .av + .av { margin-left: -6px; box-shadow: 0 0 0 2px #fff; }
 .adm .atw-members { display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 8px 0 4px; border: 0; border-radius: 10px; background: transparent; font: inherit; font-size: 13px; color: #6b6878; cursor: pointer; transition: background 150ms ease; }
@@ -390,7 +390,7 @@
 @keyframes atw-swap { from { opacity: 0; filter: blur(4px); transform: translateY(4px); } }
 .adm .atw-d__bar { display: flex; justify-content: flex-end; gap: 2px; margin: 0 -10px -8px 0; }
 .adm .atw-d__head { display: flex; align-items: flex-start; gap: 12px; }
-.adm .atw-d__head h2 { flex: 1; min-width: 0; margin: 0; font-size: 20px; font-weight: 700; line-height: 1.4; letter-spacing: -0.02em; color: #16141f; overflow-wrap: anywhere; transition: color 200ms ease; }
+.adm .atw-d__head h2 { flex: 1; min-width: 0; margin: 0; font-size: 20px; font-weight: 600; line-height: 1.4; letter-spacing: -0.02em; color: #16141f; overflow-wrap: anywhere; transition: color 200ms ease; }
 .adm .atw-d__head h2.is-done { color: var(--text-done); text-decoration: line-through; text-decoration-color: #c9c6d3; }
 .adm .atw-d__desc { margin: 0; font-size: 14px; line-height: 1.6; color: #3a3746; white-space: pre-wrap; overflow-wrap: anywhere; }
 .adm .atw-d__desc.is-clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; overflow: hidden; }
@@ -448,7 +448,7 @@
 
 /* 업데이트 */
 .adm .atw-d__log { display: flex; flex-direction: column; gap: 10px; padding-top: 16px; border-top: 0.5px solid var(--separator); }
-.adm .atw-d__lt { font-size: 14px; font-weight: 700; color: #16141f; }
+.adm .atw-d__lt { font-size: 14px; font-weight: 600; color: #16141f; }
 .adm .atw-sys { padding-left: 36px; font-size: 12px; line-height: 1.5; color: var(--text-3); }
 .adm .atw-note { display: flex; gap: 10px; font-size: 13px; line-height: 1.5; animation: atw-in 240ms cubic-bezier(.23, 1, .32, 1) both; }
 .adm .atw-note__b { flex: 1; min-width: 0; }
@@ -476,7 +476,7 @@
 .adm .atw-edit { display: flex; flex-direction: column; gap: 10px; }
 .adm .atw-edit__title,
 .adm .atw-edit__desc { width: 100%; box-sizing: border-box; border: 1px solid #e0e0e6; border-radius: 10px; background: #fff; font: inherit; color: #16141f; outline: none; transition: border-color 150ms ease, box-shadow 150ms ease; }
-.adm .atw-edit__title { height: 44px; padding: 0 12px; font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
+.adm .atw-edit__title { height: 44px; padding: 0 12px; font-size: 18px; font-weight: 600; letter-spacing: -0.02em; }
 .adm .atw-edit__desc { min-height: 72px; padding: 10px 12px; font-size: 14px; line-height: 1.6; resize: vertical; }
 .adm .atw-edit__title:focus,
 .adm .atw-edit__desc:focus { border-color: #7a52e6; box-shadow: 0 0 0 3px rgba(122, 82, 230, .14); }
@@ -488,7 +488,7 @@
 .adm .atw.is-cal .atw-main > .atw-fade { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .adm .atw-cal { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 14px; }
 .adm .atw-cal__top { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; }
-.adm .atw-cal__m { min-width: 108px; text-align: center; font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
+.adm .atw-cal__m { min-width: 108px; text-align: center; font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
 .adm .atw-cal__lg { margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: 12px; color: #6b6878; }
 .adm .atw-cal__lg > span { display: inline-flex; align-items: center; gap: 4px; }
 .adm .atw-cal__lg i { width: 6px; height: 6px; border-radius: 50%; }
@@ -524,8 +524,8 @@
 .adm .atw-cc__d { display: grid; place-items: center; width: 26px; height: 26px; flex: none; margin: -3px 0 2px -4px; border-radius: 50%; font-size: 13px; font-weight: 500; color: #3a3746; transition: background 150ms ease, color 150ms ease; }
 .adm .atw-cc__d.is-sat { color: #2f6fde; }
 .adm .atw-cc__d.is-sun { color: #d8455a; }
-.adm .atw-cc.is-sel:not(.is-today) .atw-cc__d { box-shadow: inset 0 0 0 1.5px #7a52e6; color: #5a30cf; font-weight: 700; }
-.adm .atw-cc.is-today .atw-cc__d { background: #7a52e6; color: #fff; font-weight: 700; }
+.adm .atw-cc.is-sel:not(.is-today) .atw-cc__d { box-shadow: inset 0 0 0 1.5px #7a52e6; color: #5a30cf; font-weight: 600; }
+.adm .atw-cc.is-today .atw-cc__d { background: #7a52e6; color: #fff; font-weight: 600; }
 .adm .atw-cev {
   display: block; min-width: 0; margin: 0 -4px; padding: 1px 4px; border-radius: 5px;
   font-size: 12px; line-height: 18px; color: #3a3746; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -581,7 +581,7 @@
 @keyframes atw-rpt-in { from { opacity: 0; transform: scale(.97); } }
 .adm .atw-rpt__h { display: flex; align-items: flex-start; gap: 12px; }
 .adm .atw-rpt__ht { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.adm .atw-rpt__ht h2 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+.adm .atw-rpt__ht h2 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
 .adm .atw-rpt__ht span { font-size: 13px; color: #6b6878; font-variant-numeric: tabular-nums; }
 .adm .atw-rpt__x { display: grid; place-items: center; width: 40px; height: 40px; flex: none; margin: -6px -8px 0 0; border: 0; border-radius: 10px; background: transparent; color: #6b6878; cursor: pointer; transition: background 150ms ease, transform 140ms ease; }
 .adm .atw-rpt__x:hover { background: #f4f4f7; }
@@ -656,7 +656,7 @@
 /* 건너뛴 날 — 상세 패널 (2026-10-28). 상자 없이 0.5px 구분선, 보라 글자 단추. */
 .adm .atw-d__sk { display: flex; flex-direction: column; padding-top: 16px; border-top: 0.5px solid var(--separator); }
 .adm .atw-d__skh { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-bottom: 4px; }
-.adm .atw-d__skh b { font-size: 14px; font-weight: 700; color: #16141f; }
+.adm .atw-d__skh b { font-size: 14px; font-weight: 600; color: #16141f; }
 .adm .atw-d__skh span { font-size: 12px; color: var(--text-3); }
 .adm .atw-d__skr { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; font-size: 13px; color: #16141f; border-top: 0.5px solid var(--separator); }
 .adm .atw-d__skh + .row-collapse .atw-d__skr { border-top: 0; }

@@ -366,11 +366,11 @@ export function ReportSheet({
       <span className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-slate-50 text-slate-400">
         {icon}
       </span>
-      <p className="text-[15px] font-extrabold text-foreground">{title}</p>
+      <p className="text-[15px] font-semibold text-foreground">{title}</p>
       <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">{body}</p>
       {retry ? (
         <button
-          className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-4 py-2 text-[13px] font-bold text-primary"
+          className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-4 py-2 text-[13px] font-semibold text-primary"
           onClick={run}
           type="button"
         >

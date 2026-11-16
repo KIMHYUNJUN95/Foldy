@@ -194,7 +194,7 @@ export function TaskSchedulePicker({
     cells.push(
       <button
         className={cn(
-          "flex aspect-square items-center justify-center rounded-[11px] text-[13.5px] font-bold transition-colors",
+          "flex aspect-square items-center justify-center rounded-[11px] text-[13.5px] font-semibold transition-colors",
           isSel
             ? "bg-primary text-primary-foreground shadow-[0_6px_14px_-8px_hsl(var(--primary-hsl)/0.7)]"
             : isT
@@ -282,11 +282,11 @@ export function TaskSchedulePicker({
       className="flex max-h-[88dvh] flex-col"
       header={
         <div className="mb-2 flex items-baseline gap-2">
-          <p className="text-[17px] font-black tracking-[-0.02em] text-foreground">
+          <p className="text-[17px] font-semibold tracking-[-0.02em] text-foreground">
             {hasDate ? fmtFull(date) : (title ?? copy.scheduleTitle)}
           </p>
           {hasDate ? (
-            <span className="text-[12px] font-bold text-muted-foreground">{copy.scheduleTitle}</span>
+            <span className="text-[12px] font-semibold text-muted-foreground">{copy.scheduleTitle}</span>
           ) : null}
         </div>
       }
@@ -322,7 +322,7 @@ export function TaskSchedulePicker({
                     >
                       {o.icon}
                     </span>
-                    <span className="flex-1 text-[14.5px] font-bold text-foreground">{o.label}</span>
+                    <span className="flex-1 text-[14.5px] font-semibold text-foreground">{o.label}</span>
                     {o.hint ? (
                       <span className="text-[12.5px] font-semibold text-muted-foreground">{o.hint}</span>
                     ) : null}
@@ -348,7 +348,7 @@ export function TaskSchedulePicker({
                 >
                   <ChevronLeft className="size-[17px]" aria-hidden="true" />
                 </button>
-                <span className="text-[14px] font-black tracking-[-0.01em] text-foreground">{monthLabel}</span>
+                <span className="text-[14px] font-semibold tracking-[-0.01em] text-foreground">{monthLabel}</span>
                 <button
                   aria-label={copy.calNextMonth}
                   className="flex size-8 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-foreground"
@@ -358,7 +358,7 @@ export function TaskSchedulePicker({
                   <ChevronRight className="size-[17px]" aria-hidden="true" />
                 </button>
               </div>
-              <div className="grid grid-cols-7 gap-0.5 text-center text-[11px] font-bold text-muted-foreground">
+              <div className="grid grid-cols-7 gap-0.5 text-center text-[11px] font-semibold text-muted-foreground">
                 {weekdays.map((w, i) => (
                   <span className={cn(i === 0 && "text-rose-500", i === 6 && "text-blue-600")} key={i}>
                     {w}
@@ -383,9 +383,9 @@ export function TaskSchedulePicker({
                 <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
                   <Clock className="size-[18px]" aria-hidden="true" />
                 </span>
-                <span className="flex-1 text-[14.5px] font-bold text-foreground">{copy.scheduleAddTime}</span>
+                <span className="flex-1 text-[14.5px] font-semibold text-foreground">{copy.scheduleAddTime}</span>
                 {timeLabel ? (
-                  <span className="text-[13px] font-bold text-primary">{timeLabel}</span>
+                  <span className="text-[13px] font-semibold text-primary">{timeLabel}</span>
                 ) : null}
                 {timeLabel ? (
                   <span
@@ -414,7 +414,7 @@ export function TaskSchedulePicker({
                     {["09:00", "12:00", "15:00", "18:00", "21:00"].map((tv) => (
                       <button
                         className={cn(
-                          "flex items-center justify-center rounded-full border py-1.5 text-[12.5px] font-bold transition-colors",
+                          "flex items-center justify-center rounded-full border py-1.5 text-[12.5px] font-semibold transition-colors",
                           time === tv
                             ? "border-primary bg-primary/10 text-primary"
                             : "border-border bg-surface text-slate-600",
@@ -431,10 +431,10 @@ export function TaskSchedulePicker({
 
                   {/* 소요 시간 — Todoist 식 시간 블록 길이 (단일 일). */}
                   <div className="mt-3 flex items-center justify-between rounded-2xl border border-border bg-surface px-3.5 py-2.5">
-                    <span className="text-[13.5px] font-bold text-foreground">{copy.durationLabel}</span>
+                    <span className="text-[13.5px] font-semibold text-foreground">{copy.durationLabel}</span>
                     <button
                       aria-expanded={durationOpen}
-                      className="flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-[12.5px] font-bold text-slate-600"
+                      className="flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-[12.5px] font-semibold text-slate-600"
                       onClick={() => setDurationOpen((v) => !v)}
                       type="button"
                     >
@@ -450,7 +450,7 @@ export function TaskSchedulePicker({
                       <div className="flex flex-wrap gap-2">
                         <button
                           className={cn(
-                            "rounded-full border px-3 py-1.5 text-[12.5px] font-bold transition-colors",
+                            "rounded-full border px-3 py-1.5 text-[12.5px] font-semibold transition-colors",
                             duration === 0
                               ? "border-primary bg-primary/10 text-primary"
                               : "border-border bg-surface text-slate-600",
@@ -463,7 +463,7 @@ export function TaskSchedulePicker({
                         {DURATIONS.map((d) => (
                           <button
                             className={cn(
-                              "rounded-full border px-3 py-1.5 text-[12.5px] font-bold transition-colors",
+                              "rounded-full border px-3 py-1.5 text-[12.5px] font-semibold transition-colors",
                               duration === d
                                 ? "border-primary bg-primary/10 text-primary"
                                 : "border-border bg-surface text-slate-600",
@@ -477,9 +477,9 @@ export function TaskSchedulePicker({
                         ))}
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-[12px] font-bold text-muted-foreground">{copy.durationCustom}</span>
+                        <span className="text-[12px] font-semibold text-muted-foreground">{copy.durationCustom}</span>
                         <input
-                          className="h-9 w-24 rounded-xl border border-border bg-surface px-3 text-center text-[13px] font-bold text-foreground outline-none focus:border-primary"
+                          className="h-9 w-24 rounded-xl border border-border bg-surface px-3 text-center text-[13px] font-semibold text-foreground outline-none focus:border-primary"
                           inputMode="numeric"
                           max={1440}
                           min={1}
@@ -511,9 +511,9 @@ export function TaskSchedulePicker({
                 <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
                   <Repeat className="size-[18px]" aria-hidden="true" />
                 </span>
-                <span className="flex-1 text-[14.5px] font-bold text-foreground">{copy.scheduleAddRepeat}</span>
+                <span className="flex-1 text-[14.5px] font-semibold text-foreground">{copy.scheduleAddRepeat}</span>
                 {currentRepeatLabel ? (
-                  <span className="text-[13px] font-bold text-primary">{currentRepeatLabel}</span>
+                  <span className="text-[13px] font-semibold text-primary">{currentRepeatLabel}</span>
                 ) : null}
                 <ChevronDown
                   className={cn("size-4 text-slate-400 transition-transform", repeatOpen && "rotate-180")}
@@ -529,7 +529,7 @@ export function TaskSchedulePicker({
                       onClick={() => setRepeat(o.rule)}
                       type="button"
                     >
-                      <span className="flex-1 text-[14px] font-bold text-foreground">{o.label}</span>
+                      <span className="flex-1 text-[14px] font-semibold text-foreground">{o.label}</span>
                       {repeat === o.rule ? (
                         <Check className="size-4 text-primary" strokeWidth={3} aria-hidden="true" />
                       ) : null}
@@ -541,7 +541,7 @@ export function TaskSchedulePicker({
                       onClick={() => setRepeat("custom")}
                       type="button"
                     >
-                      <span className="flex-1 text-[14px] font-bold text-foreground">{copy.repeatCustom}</span>
+                      <span className="flex-1 text-[14px] font-semibold text-foreground">{copy.repeatCustom}</span>
                       {repeat === "custom" ? (
                         <Check className="size-4 text-primary" strokeWidth={3} aria-hidden="true" />
                       ) : null}
@@ -554,7 +554,7 @@ export function TaskSchedulePicker({
                     onClick={() => setRepeat(inCustomMode ? "" : CUSTOM_RECURRENCE_PREFIX)}
                     type="button"
                   >
-                    <span className="flex-1 text-[14px] font-bold text-foreground">
+                    <span className="flex-1 text-[14px] font-semibold text-foreground">
                       {copy.repeatPickDays}
                     </span>
                     {inCustomMode ? (
@@ -570,7 +570,7 @@ export function TaskSchedulePicker({
                             <button
                               aria-pressed={on}
                               className={cn(
-                                "h-10 rounded-xl border text-[13px] font-extrabold transition-colors",
+                                "h-10 rounded-xl border text-[13px] font-semibold transition-colors",
                                 on
                                   ? "border-primary bg-primary text-primary-foreground"
                                   : "border-border bg-surface text-muted-foreground active:bg-slate-100",
@@ -600,7 +600,7 @@ export function TaskSchedulePicker({
 
           <button
             className={cn(
-              "mt-3 h-[52px] w-full shrink-0 rounded-2xl text-[15px] font-extrabold transition-colors",
+              "mt-3 h-[52px] w-full shrink-0 rounded-2xl text-[15px] font-semibold transition-colors",
               (isDate && !hasDate) || repeatIncomplete
                 ? "bg-slate-100 text-slate-400"
                 : "bg-primary text-primary-foreground",

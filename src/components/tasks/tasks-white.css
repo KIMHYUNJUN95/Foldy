@@ -20,22 +20,25 @@
 /* ── 보기 탭 — 글자 탭(상자 · 칩 없음), 가로로 넘어감 ── */
 .tkw-tabs { display: flex; gap: 18px; margin: 0 -20px 14px; padding: 0 20px; overflow-x: auto; scrollbar-width: none; }
 .tkw-tabs::-webkit-scrollbar { display: none; }
+/* 넘칠 때만(끝이 아닐 때) 오른쪽 끝을 흐리게 — 잘린 탭이 더 있다는 단서 */
+.tkw-tabs.is-fade { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent); }
+@media (min-width: 1000px) and (min-height: 600px) { .tkw-tabs { gap: 8px; } .tkw-tab { font-size: 14px; } }
 .tkw-tab { display: inline-flex; align-items: center; gap: 5px; height: 44px; padding: 0 2px; flex: none; border: 0; background: transparent; font: inherit; font-size: 15px; color: var(--text-3); white-space: nowrap; cursor: pointer; transition: color 150ms ease; }
 .tkw-tab b { font-weight: 500; color: var(--text-done); font-variant-numeric: tabular-nums; }
-.tkw-tab.is-on { color: #16141f; font-weight: 700; }
+.tkw-tab.is-on { color: #16141f; font-weight: 600; }
 .tkw-tab.is-on b { color: #7a52e6; }
 
 /* 선택 모드 — 탭 자리를 대신하는 한 줄 */
 .tkw-selbar { display: flex; align-items: center; gap: 6px; height: 44px; margin: 0 0 14px; }
 .tkw-selbar__x { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; margin-left: -10px; border: 0; border-radius: 10px; background: transparent; color: #4c4958; cursor: pointer; }
 .tkw-selbar__x svg { width: 20px; height: 20px; }
-.tkw-selbar__n { flex: 1; font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
+.tkw-selbar__n { flex: 1; font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
 
 /* ── 머리 ── */
 .tkw-head { display: flex; align-items: center; gap: 16px; margin: 0 0 18px; }
 .tkw-head__b { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
 /* 큰 제목(HIG 다듬기 2차 · iOS Large Title 34/41) — 스크롤해 화면 밖으로 나가면 셸 위 줄에 작은 제목으로 뜬다. */
-.tkw-head h1 { margin: 0; font-size: 34px; font-weight: 700; letter-spacing: -0.02em; line-height: 41px; }
+.tkw-head h1 { margin: 0; font-size: 34px; font-weight: 600; letter-spacing: -0.02em; line-height: 41px; }
 .tkw-head__s { font-size: 15px; line-height: 1.4; color: var(--text-3); }
 .tkw-icon { position: relative; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; flex: none; margin-right: -10px; border: 0; border-radius: 12px; background: transparent; color: #4c4958; cursor: pointer; transition: background 150ms ease, transform 140ms ease; }
 .tkw-icon:active { background: #f4f4f7; transform: scale(.97); }
@@ -50,7 +53,7 @@
 .tkw-ring__track { fill: none; stroke: #efeafb; stroke-width: 6; }
 .tkw-ring__fill { fill: none; stroke: #7a52e6; stroke-width: 6; stroke-linecap: round; stroke-dasharray: 150.8; transition: stroke-dashoffset 700ms cubic-bezier(.23, 1, .32, 1); animation: tkw-ring-in 900ms cubic-bezier(.23, 1, .32, 1) both; }
 @keyframes tkw-ring-in { from { stroke-dashoffset: 150.8; } }
-.tkw-ring__n { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tkw-ring__n { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
 
 /* ── 검색 · 날짜 필터 ── */
 .tkw-search { display: flex; flex-direction: column; gap: 10px; margin: -6px 0 18px; animation: tkw-drop 220ms cubic-bezier(.23, 1, .32, 1) both; }
@@ -73,7 +76,7 @@
 .tkw-search__cal > div:last-child { margin-top: 4px; padding: 0; border: 0; box-shadow: none; background: transparent; }
 .tkw-search__modes { display: flex; gap: 18px; margin-bottom: 8px; }
 .tkw-search__modes button, .tkw-search__ends button { height: 32px; padding: 0 2px; border: 0; background: transparent; font: inherit; font-size: 13px; color: var(--text-3); cursor: pointer; }
-.tkw-search__modes button.is-on { color: #16141f; font-weight: 700; }
+.tkw-search__modes button.is-on { color: #16141f; font-weight: 600; }
 .tkw-search__ends { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-3); }
 .tkw-search__ends button { height: 36px; padding: 0 12px; border-radius: 10px; background: #f4f4f7; color: #3a3746; }
 .tkw-search__ends button.is-on { background: #f1ecfd; color: #5a30cf; font-weight: 600; }
@@ -129,7 +132,8 @@
 .tkw-row__m .is-pri { color: #5a30cf; }
 .tkw-row__tr { flex: none; padding-top: 2px; font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums; }
 .tkw-row.is-done .tkw-row__t { color: var(--text-done); text-decoration: line-through; text-decoration-color: #c9c6d3; }
-.tkw-row__grip { display: flex; align-items: center; align-self: stretch; margin: -12px -8px -12px 0; padding: 0 8px; border: 0; background: transparent; color: #c9c6d3; cursor: grab; touch-action: none; }
+.tkw-row__grip { display: flex; align-items: center; align-self: stretch; margin: -12px -8px -12px 0; padding: 0 8px; border: 0; background: transparent; color: #d9d7e0; cursor: grab; touch-action: none; position: relative; }
+.tkw-row__grip::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; right: -6px; }
 .tkw-row__grip svg { width: 17px; height: 17px; }
 .tkw-row__grip:active { cursor: grabbing; color: var(--text-3); }
 .tkw-row.is-drag .tkw-row__in { border-radius: 12px; box-shadow: 0 18px 36px -14px rgba(22, 20, 31, .35); transform: scale(1.015); }
@@ -199,7 +203,7 @@ button.tkw-ck:active { transform: scale(.88); }
 /* 글자 필터(전체 · 일반 · 프로젝트) */
 .tkw-ftabs { display: flex; gap: 16px; margin: -8px 0 14px; }
 .tkw-ftabs button { height: 32px; padding: 0 2px; border: 0; background: transparent; font: inherit; font-size: 14px; color: var(--text-3); cursor: pointer; }
-.tkw-ftabs button.is-on { color: #16141f; font-weight: 700; }
+.tkw-ftabs button.is-on { color: #16141f; font-weight: 600; }
 
 /* 지시 */
 .tkw-instr__seg { display: flex; align-items: center; gap: 12px; margin: -4px 0 18px; }
@@ -207,7 +211,7 @@ button.tkw-ck:active { transform: scale(.88); }
 
 /* 완료 · 기록 — 현장 활동 줄 */
 .tkw-field { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-top: 0.5px solid var(--separator); animation: tkw-in 320ms cubic-bezier(.23, 1, .32, 1) both; }
-.tkw-field__ic { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; flex: none; margin-top: 1px; border-radius: 6px; background: #f2f2f5; font-size: 11px; font-weight: 700; color: #6b6878; }
+.tkw-field__ic { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; flex: none; margin-top: 1px; border-radius: 6px; background: #f2f2f5; font-size: 11px; font-weight: 600; color: #6b6878; }
 .tkw-field__b { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .tkw-field__t { font-size: 15px; line-height: 1.4; }
 .tkw-field__s { font-size: 12px; color: var(--text-3); }
@@ -217,7 +221,7 @@ button.tkw-ck:active { transform: scale(.88); }
 .tkw-cal__nav { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border: 0; border-radius: 10px; background: transparent; color: #4c4958; cursor: pointer; transition: background 150ms ease; }
 .tkw-cal__nav:active { background: #f4f4f7; }
 .tkw-cal__nav svg { width: 18px; height: 18px; }
-.tkw-cal__m { min-width: 112px; text-align: center; font-size: 17px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.tkw-cal__m { min-width: 112px; text-align: center; font-size: 17px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .tkw-cal__today { height: 30px; margin-left: 2px; padding: 0 10px; border: 0; border-radius: 15px; background: #f1ecfd; font: inherit; font-size: 12px; font-weight: 600; color: #5a30cf; cursor: pointer; }
 .tkw-sw { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; padding: 0; border: 0; background: transparent; font: inherit; font-size: 13px; color: #4c4958; cursor: pointer; }
 .tkw-sw__t { position: relative; width: 40px; height: 24px; flex: none; border-radius: 12px; background: #e6e5ec; transition: background 200ms ease; }
@@ -236,15 +240,15 @@ button.tkw-ck:active { transform: scale(.88); }
 .tkw-cal__grid { row-gap: 4px; margin-bottom: 18px; }
 .tkw-cal__d { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 3px; width: 44px; height: 46px; margin: 0 auto; padding: 8px 0 0; box-sizing: border-box; border: 0; border-radius: 12px; background: transparent; font: inherit; font-size: 15px; color: #16141f; font-variant-numeric: tabular-nums; cursor: pointer; transition: background 180ms ease, color 180ms ease, transform 140ms ease; }
 .tkw-cal__d:active { transform: scale(.94); }
-.tkw-cal__d.is-today { color: #5a30cf; font-weight: 700; }
-.tkw-cal__d.is-sel { background: #7a52e6; color: #fff; font-weight: 700; }
+.tkw-cal__d.is-today { color: #5a30cf; font-weight: 600; }
+.tkw-cal__d.is-sel { background: #7a52e6; color: #fff; font-weight: 600; }
 .tkw-cal__dots { display: flex; gap: 2px; height: 5px; }
 .tkw-cal__dots i { width: 5px; height: 5px; border-radius: 50%; background: #d98a1f; }
 .tkw-cal__dots i.is-s { background: #7a52e6; }
 .tkw-cal__dots i.is-r { background: #c5282e; }
 .tkw-cal__d.is-sel .tkw-cal__dots i { background: #fff; }
 .tkw-cal__dh { display: flex; align-items: center; gap: 8px; padding-bottom: 4px; }
-.tkw-cal__dh b { font-size: 14px; font-weight: 700; }
+.tkw-cal__dh b { font-size: 14px; font-weight: 600; }
 
 /* ── 프로젝트 ── */
 .tkw-prow { display: flex; flex-direction: column; gap: 8px; padding: 14px 0; border-top: 0.5px solid var(--separator); color: inherit; text-decoration: none; animation: tkw-in 320ms cubic-bezier(.23, 1, .32, 1) both; transition: transform 140ms ease; }
@@ -258,15 +262,17 @@ button.tkw-ck:active { transform: scale(.88); }
 @keyframes tkw-bar-in { from { transform: scaleX(0); } }
 .tkw-prow__m { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-3); }
 .tkw-avs { display: inline-flex; align-items: center; }
-.tkw-av { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; flex: none; border-radius: 50%; background: #f1ecfd; color: #5a30cf; font-size: 11px; font-weight: 700; box-shadow: 0 0 0 2px #fff; }
+.tkw-av { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; flex: none; border-radius: 50%; background: #f1ecfd; color: #5a30cf; font-size: 11px; font-weight: 600; box-shadow: 0 0 0 2px #fff; }
 .tkw-avs .tkw-av + .tkw-av { margin-left: -6px; }
 .tkw-av.is-gray { background: #f2f2f5; color: #6b6878; }
 .tkw-back { display: inline-flex; align-items: center; gap: 4px; height: 32px; margin: -4px 0 6px -4px; padding: 0 4px; border: 0; background: transparent; font: inherit; font-size: 13px; font-weight: 600; color: #4c4958; text-decoration: none; cursor: pointer; }
 .tkw-back svg { width: 16px; height: 16px; }
 .tkw-pmeta { display: flex; align-items: center; gap: 8px; margin: -8px 0 18px; padding: 0; border: 0; background: transparent; font: inherit; font-size: 13px; color: #6b6878; cursor: pointer; }
-.tkw-sech__ic { display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border: 0; border-radius: 8px; background: transparent; color: #b4b1bf; cursor: pointer; }
-.tkw-sech__ic svg { width: 15px; height: 15px; }
-.tkw-sech__ic:active { background: #f4f4f7; color: #6b6878; }
+.tkw-sech__ic { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin: -7px 0; border: 0; border-radius: 8px; background: transparent; color: #cfcdd8; cursor: pointer; position: relative; }
+.tkw-sech__ic::before { content: ""; position: absolute; inset: 7px; border-radius: 8px; background: transparent; }
+.tkw-sech__ic svg { position: relative; width: 15px; height: 15px; }
+.tkw-sech__ic:active { color: #6b6878; }
+.tkw-sech__ic:active::before { background: #f4f4f7; }
 .tkw-sech__grip { display: flex; align-items: center; justify-content: center; width: 22px; height: 28px; margin-left: -6px; border: 0; background: transparent; color: #c9c6d3; cursor: grab; touch-action: none; }
 .tkw-sech__grip svg { width: 15px; height: 15px; }
 .tkw-secform { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
@@ -274,7 +280,7 @@ button.tkw-ck:active { transform: scale(.88); }
 .tkw-secform input:focus { border-color: #7a52e6; box-shadow: 0 0 0 4px #eee8fc; }
 
 /* ── 떠 있는 추가 버튼 ── */
-.tkw-fab { position: fixed; right: 16px; bottom: calc(6rem + env(safe-area-inset-bottom)); z-index: 30; display: flex; align-items: center; justify-content: center; gap: 6px; height: 56px; min-width: 56px; padding: 0; border: 0; border-radius: 28px; background: #7a52e6; color: #fff; font: inherit; font-size: 14px; font-weight: 600; box-shadow: 0 14px 28px -12px rgba(122, 82, 230, .7); cursor: pointer; transition: transform 200ms cubic-bezier(.22, 1, .36, 1), opacity 200ms ease; animation: tkw-fab-in 360ms cubic-bezier(.23, 1, .32, 1) both; }
+.tkw-fab { position: fixed; right: 16px; bottom: calc(6rem + env(safe-area-inset-bottom)); z-index: 30; display: flex; align-items: center; justify-content: center; gap: 6px; height: 56px; min-width: 56px; padding: 0; border: 0; border-radius: 28px; background: #7a52e6; color: #fff; font: inherit; font-size: 14px; font-weight: 600; box-shadow: 0 10px 24px -10px rgba(22, 20, 31, .45); cursor: pointer; transition: transform 200ms cubic-bezier(.22, 1, .36, 1), opacity 200ms ease; animation: tkw-fab-in 360ms cubic-bezier(.23, 1, .32, 1) both; }
 .tkw-fab svg { width: 24px; height: 24px; }
 .tkw-fab.is-pill { padding: 0 20px 0 16px; }
 .tkw-fab.is-pill svg { width: 20px; height: 20px; }
@@ -285,7 +291,7 @@ button.tkw-ck:active { transform: scale(.88); }
 
 /* ── 시트 ── */
 .tkw-sheet { color: #16141f; }
-.tkw-sheet h2 { margin: 0 0 14px; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+.tkw-sheet h2 { margin: 0 0 14px; font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
 .tkw-sheet__sub { margin: -8px 0 14px; font-size: 13px; line-height: 1.5; color: var(--text-3); }
 .tkw-qa__in { display: block; width: 100%; height: 52px; padding: 0 16px; box-sizing: border-box; border: 1.5px solid #7a52e6; border-radius: 14px; background: #fff; font: inherit; font-size: 16px; color: #16141f; outline: none; box-shadow: 0 0 0 4px #eee8fc; -webkit-appearance: none; appearance: none; }
 .tkw-qa__in::placeholder { color: #8b8898; }
@@ -329,7 +335,7 @@ button.tkw-ck:active { transform: scale(.88); }
 .tkw-d__title { display: flex; align-items: flex-start; gap: 12px; }
 .tkw-d__title .tkw-ck { width: 26px; height: 26px; margin-top: 2px; }
 .tkw-d__title .tkw-ck svg { width: 13px; height: 13px; }
-.tkw-d h1 { flex: 1; margin: 0; font-size: 20px; font-weight: 700; line-height: 1.4; letter-spacing: -0.02em; overflow-wrap: anywhere; transition: color 220ms ease; }
+.tkw-d h1 { flex: 1; margin: 0; font-size: 20px; font-weight: 600; line-height: 1.4; letter-spacing: -0.02em; overflow-wrap: anywhere; transition: color 220ms ease; }
 .tkw-d h1.is-done { color: var(--text-done); text-decoration: line-through; text-decoration-color: #c9c6d3; }
 .tkw-d__desc { margin: 0; font-size: 14px; line-height: 1.6; color: #3a3746; white-space: pre-line; overflow-wrap: anywhere; }
 .tkw-d__note { margin: -8px 0 0; font-size: 12px; line-height: 1.5; color: var(--text-3); }
@@ -382,7 +388,7 @@ button.tkw-ck:active { transform: scale(.88); }
 /* ── 만들기 · 수정 폼 ── */
 .tkw-form { display: flex; flex-direction: column; gap: 18px; padding: 2px 0 28px; animation: tkw-fade 220ms ease both; }
 .tkw-form__head { display: flex; align-items: center; gap: 12px; }
-.tkw-form__head h1 { flex: 1; min-width: 0; margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.03em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tkw-form__head h1 { flex: 1; min-width: 0; margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.03em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tkw-form__head .tkw-btn { width: auto; height: 40px; padding: 0 18px; font-size: 14px; border-radius: 10px; }
 .tkw-form__err { margin: 0; padding: 10px 14px; border-radius: 12px; background: #fdecec; font-size: 13px; color: #c5282e; }
 .tkw-nf { position: relative; display: block; min-width: 0; }
@@ -456,7 +462,7 @@ button.tkw-nf__in .tkw-nf__v small { display: block; margin-top: 2px; font-size:
 /* 업무일지 시트 — 화이트 리디자인(2026-10-15, 시안 TodoReport-Phone). PC 업무일지 창(atw-rpt)과 같은 구성.
    움직임: 체크 그리기 · 누름 반응. 움직임 줄이기 설정이면 끈다. */
 .tkw-rpt__h { display: flex; flex-direction: column; gap: 3px; margin-bottom: 14px; }
-.tkw-rpt__h h2 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: #16141f; }
+.tkw-rpt__h h2 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.02em; color: #16141f; }
 .tkw-rpt__h span { font-size: 13px; color: #6b6878; font-variant-numeric: tabular-nums; }
 .tkw-rpt { display: flex; flex-direction: column; gap: 14px; color: #16141f; }
 .tkw-rpt button { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
@@ -512,7 +518,7 @@ button.tkw-nf__in .tkw-nf__v small { display: block; margin-top: 2px; font-size:
 .tkw-when__chip[aria-checked="true"] { background: #7a52e6; color: #fff; font-weight: 600; }
 .tkw-when__chip:disabled { background: #f7f7f9; color: #c9c7d1; text-decoration: line-through; cursor: default; }
 .tkw-when__rd { display: flex; align-items: baseline; gap: 10px; margin: 0; min-height: 48px; }
-.tkw-when__rd b { font-size: 40px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; color: #16141f; }
+.tkw-when__rd b { font-size: 40px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; color: #16141f; }
 .tkw-when__rd span { font-size: 15px; color: #6b6878; }
 .tkw-when > .tkw-rpt__btn { width: 100%; }
 .tkw-rpt__banner { display: flex; align-items: center; gap: 10px; padding: 0 6px 0 14px; min-height: 48px; border-radius: 14px; background: #f4f1fd; color: #5a30cf; font-size: 14px; animation: tkw-rpt-banner 200ms cubic-bezier(.23, 1, .32, 1) both; }

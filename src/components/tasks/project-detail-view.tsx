@@ -27,6 +27,7 @@ import type { ProjectDetailData, ProjectSectionInfo } from "@/lib/projects";
 import type { ShareableUser } from "@/lib/tasks";
 import type { TaskRecord } from "@/lib/tasks";
 import { isStandardRecurrence } from "@/lib/tasks-recurrence";
+import { formatMonthDayTokyo } from "@/lib/tasks-date-label";
 import { tokyoToday } from "@/lib/tokyo-date";
 import { cn } from "@/lib/utils";
 import "./tasks-white.css";
@@ -36,11 +37,7 @@ type Copy = Dictionary["tasks"];
 function anchorChip(task: TaskRecord, locale: Locale): string | null {
   const iso = task.dueAt ?? (task.scheduledDate ? `${task.scheduledDate}T00:00:00+09:00` : null);
   if (!iso) return null;
-  return new Intl.DateTimeFormat(locale, {
-    month: "numeric",
-    day: "numeric",
-    timeZone: "Asia/Tokyo",
-  }).format(new Date(iso));
+  return formatMonthDayTokyo(iso, locale);
 }
 
 /** 프로젝트 작업 한 줄 — 투두 줄(`TaskCard`)과 같은 모양(고리 · 제목 · 회색 메타), 완료하면 끝에 완료 날짜. */
@@ -264,7 +261,7 @@ export function ProjectDetailView({
   );
 
   return (
-    <div className="tkw relative min-h-[60vh] pb-24" data-wide="projects">
+    <div className="tkw relative min-h-[60vh] pb-[calc(var(--tabbar-h,72px)+56px)] fold:pb-24" data-wide="projects">
       <Link className="tkw-back" href="/mobile/tasks?view=projects">
         <ChevronLeft aria-hidden="true" />
         {w.backToProjects}

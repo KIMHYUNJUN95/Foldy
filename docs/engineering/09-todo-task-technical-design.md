@@ -1433,3 +1433,9 @@ myOwn(t, meId)      // !sentInstr — 내 일정 뷰(오늘/내일/관리함/캘
 - 목록은 서버 props 를 `useOptimistic` 으로 그리므로 `router.refresh()` 가 그대로 흘러 들어간다(로컬 복사본 없음). 소프트 삭제라 삭제 · 되살리기도 UPDATE 신호로 온다.
   회차 완료 되돌리기 · 「건너뛴 날」 되살리기 · 참여자 빼기(행 삭제)는 DB 트리거가 부모 할 일 `updated_at` 을 새로 써 UPDATE 신호로 온다 —
   다만 빠진 그 사람에게는 신호가 없어(이제 못 봄) 다음 갱신 때. 공용 규칙: `docs/product/16-mobile-navigation.md` 「실시간 갱신 — 공용」.
+
+## 2026-11-16 — unslop 다듬기 구현 메모
+
+- 공용 순수 함수: `src/lib/tasks-today-progress.ts`(오늘 완료 집계 · 진행 고리), `src/lib/tasks-date-label.ts`(도쿄 「월 일」 라벨 · 업데이트 시각), `src/lib/tasks-shared-copy.ts`(모바일 · PC 가 같이 쓰는 문구). 테스트: `src/lib/__tests__/tasks-unslop-2026-11-16.test.ts`.
+- 모바일 상단 탭 띠(`.tkw-tabs`): 넘칠 때만 오른쪽 끝 56px 마스크 · 고른 탭은 띠 안에서만 `strip.scrollTo({left})`(처음엔 즉시, 화면 전체는 안 움직임) · 넘치는 동안 `data-swipe-back="off"`. 태블릿(≥1000×600)은 글자 14px · 간격 8px — 400px 목록 칸에 ko 7개가 다 들어간다(실측 393px). ja(약 474px) · en(약 554px)은 짧은 이름으로 줄여도 안 들어가서(2026-11-16 실측) 이름은 그대로 두고 흐림 + 가로 밀기로 둔다.
+- 영어 호실 접미사(`contextPickerRoomSuffix`)는 빈 문자열 — "201". 한국어 「호」 · 일본어 「号室」 유지.

@@ -60,7 +60,7 @@ export function TaskToast({
         ) : null}
         <span
           className={cn(
-            "min-w-0 flex-1 text-[13px] font-bold leading-[1.35] tracking-[-0.01em] text-white",
+            "min-w-0 flex-1 text-[13px] font-semibold leading-[1.35] tracking-[-0.01em] text-white",
             action ? "pl-0.5" : "text-center",
           )}
         >
@@ -70,7 +70,7 @@ export function TaskToast({
           <button
             className={cn(
               "inline-flex h-9 flex-none items-center gap-1.5 rounded-[14px] bg-white/12 px-3",
-              "text-[12.5px] font-extrabold tracking-[-0.01em] text-white",
+              "text-[12.5px] font-semibold tracking-[-0.01em] text-white",
               "transition-[transform,background-color] duration-150 active:scale-[0.94] active:bg-white/20",
             )}
             onClick={action.onAction}

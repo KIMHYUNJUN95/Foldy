@@ -34,18 +34,18 @@ function ChannelBadge({ channel, directLabel }: { channel: LinkedTaskContext["ch
   if (!channel) return null;
   if (channel === "airbnb")
     return (
-      <span className="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-extrabold text-rose-700">
+      <span className="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
         Airbnb
       </span>
     );
   if (channel === "booking")
     return (
-      <span className="inline-flex items-center rounded-full bg-cyan-50 px-2 py-0.5 text-[10px] font-extrabold text-cyan-700">
+      <span className="inline-flex items-center rounded-full bg-cyan-50 px-2 py-0.5 text-[10px] font-semibold text-cyan-700">
         Booking
       </span>
     );
   return (
-    <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-extrabold text-slate-600">
+    <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
       {directLabel}
     </span>
   );
@@ -96,7 +96,7 @@ export function LinkedContextBlock({
       {/* 섹션 헤더 */}
       <div className="mb-[9px] ml-0.5 flex items-center gap-[7px]">
         <Link2 className="size-[15px] text-primary" aria-hidden="true" />
-        <span className="text-[12.5px] font-extrabold text-foreground">
+        <span className="text-[12.5px] font-semibold text-foreground">
           {copy.contextLinkedSection}
         </span>
       </div>
@@ -125,7 +125,7 @@ export function LinkedContextBlock({
         {/* lctx__b */}
         <div className="min-w-0 flex-1">
           {/* lctx__n */}
-          <div className="flex items-center gap-1.5 text-[15px] font-extrabold tracking-[-0.01em] text-foreground">
+          <div className="flex items-center gap-1.5 text-[15px] font-semibold tracking-[-0.01em] text-foreground">
             {nameStr ? (
               <>
                     <span>{localizedPropertyName}</span>
@@ -159,7 +159,7 @@ export function LinkedContextBlock({
 
           {/* lctx__go — 카드가 이동할 수 있을 때만 */}
           {href ? (
-            <div className="mt-2 inline-flex items-center gap-1 text-[11px] font-extrabold text-primary">
+            <div className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-primary">
               <ArrowUpRight className="size-[13px]" aria-hidden="true" />
               {copy.contextGoToReservation}
             </div>

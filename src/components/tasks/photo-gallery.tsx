@@ -108,7 +108,7 @@ export function PhotoGallery({
           >
             <Image alt="" aria-hidden="true" className="object-cover" fill sizes="72px" src={url} />
             {overflow > 0 && i === MAX_THUMBS - 1 ? (
-              <span className="absolute inset-0 flex items-center justify-center bg-slate-950/55 text-[13px] font-extrabold text-white backdrop-blur-[1px]">
+              <span className="absolute inset-0 flex items-center justify-center bg-slate-950/55 text-[13px] font-semibold text-white backdrop-blur-[1px]">
                 +{overflow}
               </span>
             ) : null}
@@ -122,8 +122,8 @@ export function PhotoGallery({
           ariaLabel={title}
           header={
             <div className="mb-3 flex items-center gap-2">
-              <p className="text-[16px] font-black text-foreground">{title}</p>
-              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary">
+              <p className="text-[16px] font-semibold text-foreground">{title}</p>
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
                 {urls.length}
               </span>
             </div>
@@ -146,7 +146,7 @@ export function PhotoGallery({
                   sizes="33vw"
                   src={url}
                 />
-                <span className="absolute bottom-1.5 right-1.5 flex size-5 items-center justify-center rounded-full bg-slate-950/55 text-[10px] font-bold text-white backdrop-blur-[2px]">
+                <span className="absolute bottom-1.5 right-1.5 flex size-5 items-center justify-center rounded-full bg-slate-950/55 text-[10px] font-semibold text-white backdrop-blur-[2px]">
                   {i + 1}
                 </span>
               </button>
@@ -164,7 +164,7 @@ export function PhotoGallery({
             >
               {/* 상단 글래스 바 — 카운터 + 닫기. */}
               <div className="flex items-center justify-between px-4 pb-3 pt-[max(14px,env(safe-area-inset-top))]">
-                <span className="rounded-full bg-white/12 px-3 py-1 text-[12.5px] font-bold tabular-nums text-white/90 backdrop-blur-md ring-1 ring-inset ring-white/15">
+                <span className="rounded-full bg-white/12 px-3 py-1 text-[12.5px] font-semibold tabular-nums text-white/90 backdrop-blur-md ring-1 ring-inset ring-white/15">
                   {activeIndex + 1} / {urls.length}
                 </span>
                 <button

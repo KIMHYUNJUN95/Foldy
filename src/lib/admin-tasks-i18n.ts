@@ -1,4 +1,5 @@
 import type { Locale } from "@/lib/i18n";
+import { tasksSharedCopy } from "@/lib/tasks-shared-copy";
 
 // Admin Todoist 콘솔(데스크톱) 전용 i18n. 모바일/공용 tasks 문자열과 분리(공지 콘솔 패턴).
 // 뷰 라벨·섹션·우선순위·상태·반복·기간·일정/공유 팝오버·빈 상태·상세·보고서·토스트.
@@ -102,7 +103,7 @@ export type AdminTasksDictionary = {
   dpFirstRecipient: string;
   dpMe: string;
   dpShareManage: string;
-  dpShareCta: string; // "멤버에게 공유 / 지시"
+  dpShareCta: string; // "공유하기" (모바일과 같은 말 — tasks-shared-copy)
   dpPhotos: string; // "첨부 사진 {n}"
   dpLog: string;
   dpLogCreated: string; // "{name} 님이 작업 생성"
@@ -523,7 +524,7 @@ const ko: AdminTasksDictionary = {
   dpDue: "마감", dpSched: "예정", dpTime: "시간", dpRepeat: "반복", dpNoDate: "일정 없음",
   dpLinked: "연결됨", dpViewResv: "예약 보기", dpParticipants: "참여자 · {n}명 · 상태 공통",
   dpAuthor: "작성자", dpFirstRecipient: "최초 수신", dpMe: "나", dpShareManage: "멤버 추가 / 공유 관리",
-  dpShareCta: "멤버에게 공유 / 지시", dpPhotos: "첨부 사진 {n}", dpLog: "업데이트 로그",
+  dpShareCta: tasksSharedCopy.ko.share, dpPhotos: "첨부 사진 {n}", dpLog: tasksSharedCopy.ko.updates,
   dpLogCreated: "{name} 님이 작업 생성",
   logShared: "{name} 님이 공유", logEdited: "{name} 님이 내용 수정", logCompleted: "{name} 님이 완료 처리",
   logReopened: "{name} 님이 다시 열기", logInProgress: "{name} 님이 진행 중으로 변경",
@@ -663,7 +664,7 @@ const ja: AdminTasksDictionary = {
   dpDue: "締切", dpSched: "予定", dpTime: "時間", dpRepeat: "繰り返し", dpNoDate: "日程なし",
   dpLinked: "リンク", dpViewResv: "予約を見る", dpParticipants: "参加者 · {n}名 · 状態共通",
   dpAuthor: "作成者", dpFirstRecipient: "最初の受信", dpMe: "自分", dpShareManage: "メンバー追加 / 共有管理",
-  dpShareCta: "メンバーに共有 / 指示", dpPhotos: "添付写真 {n}", dpLog: "更新ログ",
+  dpShareCta: tasksSharedCopy.ja.share, dpPhotos: "添付写真 {n}", dpLog: tasksSharedCopy.ja.updates,
   dpLogCreated: "{name} さんがタスク作成",
   logShared: "{name} さんが共有", logEdited: "{name} さんが内容を編集", logCompleted: "{name} さんが完了",
   logReopened: "{name} さんが再オープン", logInProgress: "{name} さんが進行中に変更",
@@ -803,7 +804,7 @@ const en: AdminTasksDictionary = {
   dpDue: "Due", dpSched: "Scheduled", dpTime: "Time", dpRepeat: "Repeat", dpNoDate: "No date",
   dpLinked: "Linked", dpViewResv: "View reservation", dpParticipants: "Participants · {n} · shared status",
   dpAuthor: "Author", dpFirstRecipient: "First recipient", dpMe: "You", dpShareManage: "Add member / manage sharing",
-  dpShareCta: "Share / assign directive", dpPhotos: "Attached photos {n}", dpLog: "Update log",
+  dpShareCta: tasksSharedCopy.en.share, dpPhotos: "Attached photos {n}", dpLog: tasksSharedCopy.en.updates,
   dpLogCreated: "{name} created the task",
   logShared: "{name} shared it", logEdited: "{name} edited the content", logCompleted: "{name} completed it",
   logReopened: "{name} reopened it", logInProgress: "{name} set it to in progress",

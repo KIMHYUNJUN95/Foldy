@@ -34,6 +34,7 @@ import { haptic } from "@/lib/haptics";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import type { ShareableUser, TaskDetail } from "@/lib/tasks";
 import { formatCustomWeekdays, isStandardRecurrence } from "@/lib/tasks-recurrence";
+import { formatUpdateStampTokyo } from "@/lib/tasks-date-label";
 import { tokyoDateOf, tokyoToday, ymdShift } from "@/lib/tokyo-date";
 import { cn } from "@/lib/utils";
 import "./tasks-white.css";
@@ -47,27 +48,6 @@ function longDate(value: string, locale: Locale): string {
     weekday: "short",
     timeZone: "Asia/Tokyo",
   }).format(new Date(`${value}T00:00:00+09:00`));
-}
-function clockTime(iso: string, locale: Locale): string {
-  return new Intl.DateTimeFormat(locale, {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "Asia/Tokyo",
-  }).format(new Date(iso));
-}
-/** "M/D HH:MM"(도쿄) — 업데이트 기록의 짧은 시각. 로케일 숫자 표기("7. 29. 15:10")보다 읽기 쉽다. */
-function shortDateTime(iso: string): string {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    month: "numeric",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "Asia/Tokyo",
-  }).formatToParts(new Date(iso));
-  const get = (type: string) => parts.find((x) => x.type === type)?.value ?? "";
-  return `${get("month")}/${get("day")} ${get("hour")}:${get("minute")}`;
 }
 function repeatLabel(rule: string, copy: Copy, locale: Locale): string {
   // 사용자 지정 요일 반복(`custom:1,3,5`)은 고정 매핑에 없으므로 먼저 처리한다 — 빠뜨리면
@@ -596,7 +576,7 @@ export function TaskDetailView({
               <span>
                 <b>{u.byName}</b>
                 <time dateTime={u.createdAt}>
-                  {tokyoDateOf(u.createdAt) === today ? clockTime(u.createdAt, locale) : shortDateTime(u.createdAt)}
+                  {formatUpdateStampTokyo(u.createdAt, today)}
                 </time>
                 {u.body ? <p>{u.body}</p> : null}
                 {u.imageUrls.length ? (
@@ -607,7 +587,7 @@ export function TaskDetailView({
           ) : (
             <div className="tkw-up__sys" key={u.id}>
               {systemLabel(u.type, u.body, copy)}
-              {u.byName ? ` · ${u.byName}` : ""} · {shortDateTime(u.createdAt)}
+              {u.byName ? ` · ${u.byName}` : ""} · {formatUpdateStampTokyo(u.createdAt, today)}
             </div>
           ),
         )}

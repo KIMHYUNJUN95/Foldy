@@ -51,7 +51,7 @@ function StepBar({ copy, activeStep }: { copy: Copy; activeStep: 1 | 2 | 3 }) {
             <div className="inline-flex items-center gap-1.5">
               <span
                 className={cn(
-                  "flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold",
+                  "flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold",
                   active
                     ? "bg-primary text-primary-foreground"
                     : done
@@ -63,7 +63,7 @@ function StepBar({ copy, activeStep }: { copy: Copy; activeStep: 1 | 2 | 3 }) {
               </span>
               <span
                 className={cn(
-                  "text-[12px] font-bold",
+                  "text-[12px] font-semibold",
                   active ? "text-primary" : done ? "text-primary/70" : "text-slate-400",
                 )}
               >
@@ -107,7 +107,7 @@ function Breadcrumb({
   return (
     <div className="mb-3 flex flex-wrap items-center gap-1.5">
       <button
-        className="inline-flex items-center gap-1 rounded-full bg-primary/[0.09] px-[11px] py-[5px] text-[12px] font-bold text-primary transition-colors active:bg-primary/[0.14]"
+        className="inline-flex items-center gap-1 rounded-full bg-primary/[0.09] px-[11px] py-[5px] text-[12px] font-semibold text-primary transition-colors active:bg-primary/[0.14]"
         onClick={onBuildingTap}
         type="button"
       >
@@ -117,7 +117,7 @@ function Breadcrumb({
       {displayRoomNumber ? (
         <>
           <span className="text-[12px] text-muted-foreground/50">›</span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-primary/[0.09] px-[11px] py-[5px] text-[12px] font-bold text-primary">
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/[0.09] px-[11px] py-[5px] text-[12px] font-semibold text-primary">
               <DoorOpen className="size-3" aria-hidden="true" />
             {displayRoomNumber}
             {isPropertyLabel ? null : roomSuffix}
@@ -148,7 +148,7 @@ function BuildingRow({
         <Building2 className="size-5" aria-hidden="true" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[14px] font-extrabold tracking-[-0.01em] text-foreground">
+        <span className="block text-[14px] font-semibold tracking-[-0.01em] text-foreground">
           {building.name}
         </span>
         <span className="mt-0.5 block text-[11.5px] font-semibold text-muted-foreground">
@@ -197,7 +197,7 @@ function RoomCell({
       ) : null}
       <span
         className={cn(
-          "text-[15px] font-black tracking-[-0.02em]",
+          "text-[15px] font-semibold tracking-[-0.02em]",
           selected ? "text-primary" : "text-foreground",
         )}
       >
@@ -205,7 +205,7 @@ function RoomCell({
       </span>
       <span
         className={cn(
-          "text-[9.5px] font-bold",
+          "text-[9.5px] font-semibold",
           // 투숙 > 차단 > 공실. 막아 둔 방에 수기 예약이 들어와 있으면 손님이 먼저다.
           room.occupied
             ? "text-rose-600"
@@ -251,7 +251,7 @@ function ReservationRow({
       {/* 아바타 */}
       <span
         className={cn(
-          "flex size-[38px] shrink-0 items-center justify-center rounded-[11px] text-[14px] font-black text-white",
+          "flex size-[38px] shrink-0 items-center justify-center rounded-[11px] text-[14px] font-semibold text-white",
           isAir
             ? "bg-gradient-to-br from-[#ff718c] to-[#f05273]"
             : res.channel === "booking"
@@ -264,10 +264,10 @@ function ReservationRow({
       </span>
 
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5 text-[13.5px] font-extrabold text-foreground">
+        <div className="flex items-center gap-1.5 text-[13.5px] font-semibold text-foreground">
           <span className="truncate">{res.guestName}</span>
           {res.isLive ? (
-            <span className="shrink-0 rounded-full bg-green-100 px-[7px] py-[2px] text-[9.5px] font-extrabold text-green-700">
+            <span className="shrink-0 rounded-full bg-green-100 px-[7px] py-[2px] text-[9.5px] font-semibold text-green-700">
               {copy.contextPickerLive}
             </span>
           ) : null}
@@ -321,7 +321,7 @@ function ReservationSearchRow({
       {/* 아바타 */}
       <span
         className={cn(
-          "flex size-[38px] shrink-0 items-center justify-center rounded-[11px] text-[14px] font-black text-white",
+          "flex size-[38px] shrink-0 items-center justify-center rounded-[11px] text-[14px] font-semibold text-white",
           isAir
             ? "bg-gradient-to-br from-[#ff718c] to-[#f05273]"
             : result.channel === "booking"
@@ -335,10 +335,10 @@ function ReservationSearchRow({
 
       <div className="min-w-0 flex-1">
         {/* 게스트 이름 + 라이브 배지 */}
-        <div className="flex items-center gap-1.5 text-[13.5px] font-extrabold text-foreground">
+        <div className="flex items-center gap-1.5 text-[13.5px] font-semibold text-foreground">
           <span className="truncate">{result.guestName}</span>
           {result.isLive ? (
-            <span className="shrink-0 rounded-full bg-green-100 px-[7px] py-[2px] text-[9.5px] font-extrabold text-green-700">
+            <span className="shrink-0 rounded-full bg-green-100 px-[7px] py-[2px] text-[9.5px] font-semibold text-green-700">
               {copy.contextPickerLive}
             </span>
           ) : null}
@@ -377,7 +377,7 @@ function AltButton({
   return (
     <button
       className={cn(
-        "inline-flex h-[42px] flex-1 items-center justify-center gap-1.5 rounded-[12px] border text-[12.5px] font-bold transition-colors active:bg-slate-50",
+        "inline-flex h-[42px] flex-1 items-center justify-center gap-1.5 rounded-[12px] border text-[12.5px] font-semibold transition-colors active:bg-slate-50",
         emphasized
           ? "border-primary/20 bg-primary/[0.045] text-primary/85"
           : "border-border bg-surface text-muted-foreground",
@@ -678,7 +678,7 @@ function ContextPickerBody({
               </button>
             ) : null}
             <div className="min-w-0 flex-1">
-              <p className="text-[17px] font-black tracking-[-0.02em] text-foreground">
+              <p className="text-[17px] font-semibold tracking-[-0.02em] text-foreground">
                 {sheetTitle}
               </p>
               <p className="mt-[3px] text-[12px] font-medium text-muted-foreground">{sheetSub}</p>
@@ -830,7 +830,7 @@ function ContextPickerBody({
           {/* ── 단계: 방 + 예약 ── */}
           {isRoomStep ? (
             <>
-              <p className="mb-2 text-[10.5px] font-extrabold uppercase tracking-[0.06em] text-muted-foreground">
+              <p className="mb-2 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
                 {copy.contextPickerRoom}
               </p>
               {roomsLoading ? (
@@ -863,7 +863,7 @@ function ContextPickerBody({
                 <>
                   {/* 기간이 있는 섹션 라벨 */}
                   <div className="mb-2 mt-[14px] flex items-center gap-1.5">
-                    <p className="text-[10.5px] font-extrabold uppercase tracking-[0.06em] text-muted-foreground">
+                    <p className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
                       {copy.contextPickerResSec}
                     </p>
                     {resPeriodLabel ? (
@@ -933,12 +933,12 @@ function ContextPickerBody({
               </div>
 
               <div>
-                <p className="mb-2 px-0.5 text-[12px] font-extrabold text-foreground">
+                <p className="mb-2 px-0.5 text-[12px] font-semibold text-foreground">
                   {copy.contextPickerGuestLabel}
                 </p>
                 <input
                   autoFocus
-                  className="h-12 w-full rounded-2xl border border-border bg-surface px-4 text-[15px] font-bold text-foreground outline-none placeholder:text-muted-foreground/50 focus:border-primary"
+                  className="h-12 w-full rounded-2xl border border-border bg-surface px-4 text-[15px] font-semibold text-foreground outline-none placeholder:text-muted-foreground/50 focus:border-primary"
                   onChange={(e) => setGuestDraft(e.target.value)}
                   onKeyDown={(e) => {
                     // 한글 · 일본어 조합 중 Enter 는 글자 확정이라 제출하지 않는다(keyCode 229 = 조합 중).
@@ -952,7 +952,7 @@ function ContextPickerBody({
                 />
               </div>
               <button
-                className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-[14px] font-extrabold text-primary-foreground transition-opacity disabled:opacity-40"
+                className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-[14px] font-semibold text-primary-foreground transition-opacity disabled:opacity-40"
                 disabled={!guestDraft.trim()}
                 onClick={handleGuestConfirm}
                 type="button"
@@ -969,7 +969,7 @@ function ContextPickerBody({
           <div className="-mx-5 shrink-0 border-t-[0.5px] border-[var(--separator)] bg-surface px-5 pt-3">
             <button
               className={cn(
-                "flex h-[50px] w-full items-center justify-center gap-2 rounded-[14px] text-[14.5px] font-extrabold transition-colors",
+                "flex h-[50px] w-full items-center justify-center gap-2 rounded-[14px] text-[14.5px] font-semibold transition-colors",
                 canConfirm
                   ? "bg-primary text-primary-foreground"
                   : "bg-slate-100 text-muted-foreground/60",

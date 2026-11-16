@@ -142,6 +142,8 @@ import { haptic } from "@/lib/haptics";
 import { SKIPPED_DAYS_VISIBLE, selectRecentSkippedDays, selectUpcomingSkippedDays } from "@/lib/task-skipped-days";
 import { shiftMonthKey } from "@/components/admin/shared/admin-month-key";
 import { compressImageFile } from "@/components/announcements/announcement-image-uploader";
+import { formatUpdateStampTokyo } from "@/lib/tasks-date-label";
+import { doneTodayEntries, todayProgress } from "@/lib/tasks-today-progress";
 import { ProgressRing, TaskRing, ViewNav, type NavItem } from "./atw-parts";
 import { ImageLightbox } from "@/components/shell/image-lightbox";
 import {
@@ -2023,24 +2025,11 @@ export function AdminTasksConsole({
 
   /** 오늘 완료한 내 작업 — 「완료」 묶음과 진행 고리가 같이 쓴다. 반복은 완료 로그에서만 보인다. */
   const doneTodayRows = (applyFilter: boolean) => {
-    const ok = (t: TaskRecord) =>
-      !applyFilter || (matchQuery(t, deferredQuery, nameOf) && matchPrio(t, prioFilter));
-    const seen = new Set<string>();
-    const rows: { t: TaskRecord; recurring: boolean }[] = [];
-    for (const t of personalTasks) {
-      if (!myOwn(t, meId) || t.status !== "completed" || completedDateOf(t) !== today) continue;
-      if (isStandardRecurrence(t.recurrenceRule) || !ok(t)) continue;
-      seen.add(t.id);
-      rows.push({ t, recurring: false });
-    }
-    for (const r of data.completions) {
-      if (r.day !== today || seen.has(r.taskId)) continue;
-      const t = personalTasks.find((x) => x.id === r.taskId);
-      if (!t || !myOwn(t, meId) || !isStandardRecurrence(t.recurrenceRule) || !ok(t)) continue;
-      seen.add(t.id);
-      rows.push({ t, recurring: true });
-    }
-    return rows;
+    return doneTodayEntries(personalTasks, data.completions, today, {
+      isMine: (t) => myOwn(t, meId),
+      isRecurring: (t) => isStandardRecurrence(t.recurrenceRule),
+      accept: (t) => !applyFilter || (matchQuery(t, deferredQuery, nameOf) && matchPrio(t, prioFilter)),
+    });
   };
 
   const todayData = () => {
@@ -3368,8 +3357,7 @@ export function AdminTasksConsole({
       );
     }
     if (view === "today") {
-      const total = todayCount + doneTodayRows(false).length;
-      const done = total - todayCount;
+      const { done, total } = todayProgress(todayCount, doneTodayRows(false).length);
       return headBlock(
         dict.vToday,
         fill(dict.w.todaySub, { date: fmtLong(today, locale), total, done }),
@@ -4051,7 +4039,7 @@ export function AdminTasksConsole({
                   <div className="atw-note__b">
                     <span className="atw-note__h">
                       <b>{u.byName}</b>
-                      <span className="num">{fmtLog(u.createdAt, locale)}</span>
+                      <span className="num">{fmtLog(u.createdAt, today)}</span>
                     </span>
                     {u.body && <p>{u.body}</p>}
                     {u.imageUrls.length > 0 && (
@@ -4072,7 +4060,7 @@ export function AdminTasksConsole({
                 </div>
               ) : (
                 <div key={u.id} className="atw-sys">
-                  {systemLogLabel(u.type, u.body, u.byName, dict)} · <span className="num">{fmtLog(u.createdAt, locale)}</span>
+                  {systemLogLabel(u.type, u.body, u.byName, dict)} · <span className="num">{fmtLog(u.createdAt, today)}</span>
                 </div>
               ),
             )}
@@ -5296,14 +5284,6 @@ function fmtMonthTitle(y: number, m: number, locale: Locale): string {
   }).format(new Date(Date.UTC(y, m - 1, 1)));
 }
 
-function fmtLog(iso: string, locale: Locale): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return new Intl.DateTimeFormat(locale === "ja" ? "ja-JP" : locale === "en" ? "en-US" : "ko-KR", {
-    month: "numeric",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "Asia/Tokyo",
-  }).format(d);
+function fmtLog(iso: string, today: string): string {
+  return formatUpdateStampTokyo(iso, today);
 }

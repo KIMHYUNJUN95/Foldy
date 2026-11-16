@@ -73,6 +73,7 @@ import {
   prioSort,
 } from "@/lib/task-predicates";
 import { tokyoDateOf, tokyoToday, ymdShift } from "@/lib/tokyo-date";
+import { doneTodayEntries, todayProgress } from "@/lib/tasks-today-progress";
 import { ProjectsBoard } from "@/components/tasks/projects-board";
 import { MiniCalendar } from "@/components/tasks/date-time-fields";
 import type { FieldActivityRecord } from "@/lib/field-activity";
@@ -241,16 +242,32 @@ export function TasksWorkspace({
   const [view, setView] = useState<View>(initialView);
   // 고른 보기 탭이 가로 띠 밖에 있으면(캘린더 · 완료) 띠만 옆으로 밀어 보이게 한다 — 화면은 세로로 움직이지 않게.
   const tabsRef = useRef<HTMLDivElement | null>(null);
+  const tabsMountedRef = useRef(false);
+  // 띠가 넘칠 때만(그리고 끝이 아닐 때만) 오른쪽 끝을 흐리게 — 잘린 글자가 «더 있다» 는 단서. 넘치는 동안은 뒤로가기 스와이프를 막는다.
+  const [tabsFade, setTabsFade] = useState(false);
+  const [tabsScrollable, setTabsScrollable] = useState(false);
+  const measureTabs = useCallback(() => {
+    const strip = tabsRef.current;
+    if (!strip) return;
+    const over = strip.scrollWidth - strip.clientWidth > 2;
+    setTabsScrollable(over);
+    setTabsFade(over && strip.scrollLeft + strip.clientWidth < strip.scrollWidth - 2);
+  }, []);
   useEffect(() => {
     const strip = tabsRef.current;
     const on = strip?.querySelector<HTMLElement>(".tkw-tab.is-on");
-    if (!strip || !on) return;
-    const left = on.offsetLeft - strip.offsetLeft;
-    const right = left + on.offsetWidth;
-    if (left < strip.scrollLeft + 8) strip.scrollTo({ left: Math.max(0, left - 20), behavior: "smooth" });
-    else if (right > strip.scrollLeft + strip.clientWidth - 8)
-      strip.scrollTo({ left: right - strip.clientWidth + 20, behavior: "smooth" });
-  }, [view]);
+    if (strip && on) {
+      // 띠만 가로로 — scrollIntoView 는 세로 조상 스크롤까지 움직인다. 처음엔 즉시, 이후엔 부드럽게.
+      const left = on.offsetLeft - strip.offsetLeft;
+      const right = left + on.offsetWidth;
+      const behavior: ScrollBehavior = tabsMountedRef.current ? "smooth" : "instant";
+      if (left < strip.scrollLeft + 8) strip.scrollTo({ left: Math.max(0, left - 20), behavior });
+      else if (right > strip.scrollLeft + strip.clientWidth - 8)
+        strip.scrollTo({ left: right - strip.clientWidth + 20, behavior });
+    }
+    tabsMountedRef.current = true;
+    measureTabs();
+  }, [view, measureTabs]);
   /** 지시 탭 안의 받은/보낸 세그먼트. */
   const [instrTab, setInstrTab] = useState<"recv" | "sent">("recv");
   /**
@@ -382,6 +399,13 @@ export function TasksWorkspace({
   }, [moveNotice]);
 
   const [selectMode, setSelectMode] = useState(false);
+  useEffect(() => {
+    const strip = tabsRef.current;
+    if (!strip || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measureTabs);
+    ro.observe(strip);
+    return () => ro.disconnect();
+  }, [measureTabs, selectMode]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [confirmIds, setConfirmIds] = useState<string[] | null>(null);
   const [deleting, startDelete] = useTransition();
@@ -1136,11 +1160,20 @@ export function TasksWorkspace({
     );
 
   // 오늘 「완료」 묶음 — 오늘(도쿄) 완료 로그 중 일반 작업(프로젝트 작업은 오늘 목록에 없으므로 뺀다). 최신 먼저.
+  // 「완료」 묶음과 진행 고리는 같은 `doneTodayEntries` 에서 나온다(PC 도 같은 함수) — 두 숫자가 어긋나지 않는다.
+  // 묶음 줄은 완료 로그(최신 먼저, 작업당 한 줄).
+  const doneTodayList = doneTodayEntries(
+    tasks.filter((t) => !t.projectId),
+    visibleCompletions,
+    today,
+    { isMine: () => true, isRecurring: (t) => isStandardRecurrence(t.recurrenceRule) },
+  );
+  const doneTodayIds = new Set(doneTodayList.map((e) => e.t.id));
   const todayDoneRows = completionRows
-    .filter((r) => r.completion.day === today && !r.task.projectId)
-    .sort((a, b) => b.completion.at.localeCompare(a.completion.at));
-  const ringDone = todayDoneRows.length;
-  const ringTotal = ringDone + tabCounts.today;
+    .filter((r) => r.completion.day === today && doneTodayIds.has(r.task.id))
+    .sort((a, b) => b.completion.at.localeCompare(a.completion.at))
+    .filter((r, i, arr) => arr.findIndex((x) => x.task.id === r.task.id) === i);
+  const { done: ringDone, total: ringTotal } = todayProgress(tabCounts.today, doneTodayList.length);
   /** 이번 주(월요일 시작, 도쿄) 완료 수 — 완료·기록 머리. */
   const weekStart = (() => {
     const [y, m, d] = today.split("-").map(Number);
@@ -2041,7 +2074,14 @@ export function TasksWorkspace({
           </button>
         </div>
       ) : (
-        <div aria-label={w.views} className="tkw-tabs" ref={tabsRef} role="tablist">
+        <div
+          aria-label={w.views}
+          className={cn("tkw-tabs", tabsFade && "is-fade")}
+          data-swipe-back={tabsScrollable ? "off" : undefined}
+          onScroll={measureTabs}
+          ref={tabsRef}
+          role="tablist"
+        >
           {tabs.map((t) => {
             // 시안처럼 숫자는 오늘 · 내일 · 지시에만(관리함 · 완료는 숫자 없이).
             const n = t.key === "today" || t.key === "tomorrow" || t.key === "instr" ? tabCounts[t.key] : 0;

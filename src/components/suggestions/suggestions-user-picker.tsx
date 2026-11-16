@@ -1,22 +1,21 @@
 "use client";
 
 /**
- * Frame 8 — member picker sheet (수신자 / 참조 선택).
- * Feedback Box.html 핸드오프의 `framePicker()` 시각 이식: 큰 하단 시트에
- * 검색 필드, 구성원 행, 확인 버튼이 있다. 이제 데이터 기반이며 필수
- * 단일 선택 받는 사람과 선택적 다중 선택 참조(mode prop) 둘 다에 쓴다. 시각 처리
- * (시트, 행, 라디오)는 디자인 슬라이스에서 바뀌지 않았다.
- * 참고: docs/product/22-staff-suggestions-workflow.md.
+ * 받는 사람(단일) / 참조(다중) 고르기 — 공용 `BottomSheet` 안에 검색 · 구성원 줄 · 확인 버튼.
+ * 마운트 기반: 부모가 열 때만 렌더하고, 확인 · 끌어 닫기 · 스크림 · Esc 는 시트가 닫는 애니메이션 뒤 `onClose`.
+ * 참고: docs/product/22-staff-suggestions-workflow.md 「화이트 리디자인 — 모바일」.
  */
 
-import { useMemo, useState, useSyncExternalStore } from "react";
-import { createPortal } from "react-dom";
-import { useSheetDragDismiss } from "@/components/shell/use-sheet-drag-dismiss";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { BottomSheet } from "@/components/shell/bottom-sheet";
 import type { ShareableUser } from "@/lib/tasks";
+import "./suggestions-white.css";
 import { SgIcon } from "./sg-icons";
 
+// 공용 시트의 여는 시간(bottom-sheet.tsx SHEET_OPEN_MS)과 같게 — 다 올라온 뒤에 검색 칸에 포커스.
+const SHEET_OPEN_MS = 480;
+
 export function SuggestionsUserPicker({
-  open,
   onClose,
   mode,
   users,
@@ -33,7 +32,6 @@ export function SuggestionsUserPicker({
   excludeIds = [],
   onConfirm,
 }: {
-  open: boolean;
   onClose: () => void;
   mode: "single" | "multi";
   users: ShareableUser[];
@@ -52,12 +50,15 @@ export function SuggestionsUserPicker({
 }) {
   const [selected, setSelected] = useState<string[]>(initialSelectedIds);
   const [query, setQuery] = useState("");
-  const hydrated = useSyncExternalStore(
-    () => () => {},
-    () => true,
-    () => false,
-  );
-  const drag = useSheetDragDismiss({ shown: open, onDismiss: onClose });
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // 열자마자 포커스하면 iOS 키보드가 시트가 올라오는 도중에 떠서 화면 크기 · 시트 높이가 같이 움직여 끊긴다.
+  // 터치 기기는 자동 포커스 없이(필요하면 검색 칸을 누른다), 키보드가 있는 기기만 다 열린 뒤에 포커스.
+  useEffect(() => {
+    if (!window.matchMedia("(pointer: fine)").matches) return;
+    const timer = window.setTimeout(() => searchRef.current?.focus({ preventScroll: true }), SHEET_OPEN_MS);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   const excluded = useMemo(() => new Set(excludeIds), [excludeIds]);
   const list = useMemo(() => {
@@ -67,19 +68,12 @@ export function SuggestionsUserPicker({
       .filter((u) => !q || u.name.includes(q) || roleLabel(u.role).includes(q));
   }, [users, excluded, query, roleLabel]);
 
-  if (!hydrated || !open) return null;
-
   const toggle = (id: string) => {
     if (mode === "single") {
       setSelected([id]);
       return;
     }
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-  };
-
-  const confirm = () => {
-    onConfirm(selected);
-    onClose();
   };
 
   const confirmLabel =
@@ -89,85 +83,81 @@ export function SuggestionsUserPicker({
         : confirmEmpty
       : confirmMulti.replace("{count}", String(selected.length));
 
-  return createPortal(
-    <div className="sg">
-      <div className="dim show" onClick={onClose} style={drag.scrimStyle} aria-hidden="true" />
-      <div
-        className="sheet show"
-        data-sheet
-        style={{
-          height: "88%",
-          display: "flex",
-          flexDirection: "column",
-          paddingBottom: 0,
-          ...drag.sheetStyle,
-        }}
-        role="dialog"
-        aria-modal="true"
-      >
-        <div {...drag.handleProps}>
-          <div className="sheet__grab">
-            <div className="sheet__handle" />
+  return (
+    <BottomSheet
+      ariaLabel={title}
+      className="flex h-[88dvh] flex-col tablet:h-[min(86dvh,720px)]"
+      header={
+        <div className="sgw-pk__h">
+          <b>{title}</b>
+          <span>{sub}</span>
+        </div>
+      }
+      onClose={onClose}
+    >
+      {({ close }) => (
+        <div className="sgw-pk">
+          <div className="sgw-pk__search">
+            <span aria-hidden="true" className="sgw-pk__sic">
+              {SgIcon.search}
+            </span>
+            <input
+              aria-label={searchPlaceholder}
+              enterKeyHint="search"
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={searchPlaceholder}
+              ref={searchRef}
+              type="search"
+              value={query}
+            />
           </div>
-          <p className="sheet__title" style={{ padding: "0 0 2px" }}>
-            {title}
-          </p>
-          <p className="sheet__sub">{sub}</p>
-        </div>
-        <div className="search">
-          <span className="ic search__ic">{SgIcon.search}</span>
-          <input
-            type="search"
-            enterKeyHint="search"
-            autoFocus
-            placeholder={searchPlaceholder}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </div>
-        <div style={{ flex: 1, overflowY: "auto", margin: "0 -2px" }}>
-          {list.length === 0 ? (
-            <p className="sheet__sub" style={{ padding: "20px 2px" }}>
-              {emptyLabel}
-            </p>
-          ) : (
-            <>
-              <p className="glabel">{groupLabel}</p>
-              {list.map((m, i) => {
-                const on = selected.includes(m.id);
-                return (
-                  <div key={m.id}>
-                    <button
-                      type="button"
-                      className={`urow${on ? " on" : ""}`}
-                      onClick={() => toggle(m.id)}
-                    >
-                      <span className="urow__av">{m.name.slice(0, 1)}</span>
-                      <div className="urow__b">
-                        <div className="urow__n">{m.name}</div>
-                        <div className="urow__r">{roleLabel(m.role)}</div>
-                      </div>
-                      <span className="urow__radio">{on ? SgIcon.check : null}</span>
-                    </button>
-                    {i < list.length - 1 ? <div className="usep" /> : null}
-                  </div>
-                );
-              })}
-            </>
-          )}
-        </div>
-        <div style={{ padding: "12px 0 max(18px, env(safe-area-inset-bottom))" }}>
+          <div className="sgw-pk__list">
+            {list.length === 0 ? (
+              <p className="sgw-pk__empty">{emptyLabel}</p>
+            ) : (
+              <>
+                <p className="sgw-pk__g">{groupLabel}</p>
+                <div aria-label={groupLabel} role="group">
+                  {list.map((m) => {
+                    const on = selected.includes(m.id);
+                    return (
+                      <button
+                        aria-pressed={on}
+                        className="sgw-pk__row"
+                        key={m.id}
+                        onClick={() => toggle(m.id)}
+                        type="button"
+                      >
+                        <span aria-hidden="true" className="sgw-pk__av">
+                          {m.name.slice(0, 1)}
+                        </span>
+                        <span className="sgw-pk__b">
+                          <span className="sgw-pk__n">{m.name}</span>
+                          <span className="sgw-pk__r">{roleLabel(m.role)}</span>
+                        </span>
+                        <span aria-hidden="true" className="sgw-pk__radio">
+                          {on ? SgIcon.check : null}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
           <button
+            className="sgw-pk__go"
+            data-press="off"
+            onClick={() => {
+              onConfirm(selected);
+              close();
+            }}
             type="button"
-            className="ctxbar__save"
-            style={{ width: "100%", height: "50px", borderRadius: "14px", fontSize: "14.5px" }}
-            onClick={confirm}
           >
             {confirmLabel}
           </button>
         </div>
-      </div>
-    </div>,
-    document.body,
+      )}
+    </BottomSheet>
   );
 }

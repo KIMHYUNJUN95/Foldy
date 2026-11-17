@@ -36,7 +36,16 @@ import {
   type InboxThread,
   type SnoozeInput,
 } from "@/lib/guest-messages/inbox-model";
-import { loadConversationRow, loadInboxList, loadInboxRowsByIds, loadInboxThread, type InboxRowsResult } from "@/lib/guest-messages/inbox-server";
+import {
+  loadConversationRow,
+  loadInboxList,
+  loadInboxRowsByIds,
+  loadInboxThread,
+  searchInbox,
+  type InboxRowsResult,
+  type InboxSearchResult,
+} from "@/lib/guest-messages/inbox-server";
+import { normalizeSearchQuery } from "@/lib/guest-messages/inbox-search";
 import { isGuestMessageSendEnabled, runGuestOutbox } from "@/lib/guest-messages/outbox-runner";
 import { createTranslationBudget, deeplTranslate } from "@/lib/review-translate";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
@@ -194,6 +203,39 @@ export async function getGuestConversationRows(input: {
     return { ok: true, ...result };
   } catch (error) {
     logFailure("live rows", error);
+    return { ok: false, errorKey: "failed" };
+  }
+}
+
+export type SearchGuestConversationsResult = ({ ok: true; query: string } & InboxSearchResult) | Failure;
+
+/** 검색 — 그 조직의 대화 전체(목록 창 밖 포함). 상태 · 건물 · 채널 필터는 그대로 건다. 47 §5-10. */
+export async function searchGuestConversations(input: {
+  query: string;
+  status?: string | null;
+  building?: string | null;
+  channel?: string | null;
+}): Promise<SearchGuestConversationsResult> {
+  const auth = await gate(false);
+  if (!auth.ok) return auth;
+  const query = normalizeSearchQuery(input?.query);
+  if (!query) return { ok: false, errorKey: "invalid" };
+  const status = (INBOX_STATUS_FILTERS as readonly string[]).includes(input.status ?? "")
+    ? (input.status as InboxStatusFilter)
+    : "all";
+  const building = typeof input.building === "string" && input.building.trim() ? input.building.trim().slice(0, 120) : null;
+  try {
+    const result = await searchInbox(
+      db(),
+      auth.organizationId,
+      query,
+      { status, building, channel: parseChannelFilter(input.channel) },
+      new Date(),
+      visibilityOf(auth.capabilities),
+    );
+    return { ok: true, query, ...result };
+  } catch (error) {
+    logFailure("search", error);
     return { ok: false, errorKey: "failed" };
   }
 }

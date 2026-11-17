@@ -5,6 +5,7 @@ import { MobileShell } from "@/components/shell/mobile-shell";
 import { SplitList } from "@/components/shell/split-list";
 import { INBOX_STATUS_FILTERS, parseChannelFilter, type InboxStatusFilter } from "@/lib/guest-messages/inbox-model";
 import { getDictionary } from "@/lib/i18n";
+import { normalizeSearchQuery } from "@/lib/guest-messages/inbox-search";
 import { loadStallNotice } from "@/lib/guest-messages/channel-overview-server";
 import { getMobileNavBadges } from "@/lib/nav-badges";
 import { getOnboardingState } from "@/lib/onboarding";
@@ -20,7 +21,7 @@ export const dynamic = "force-dynamic";
 export default async function MobileMessagesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; building?: string; channel?: string }>;
+  searchParams: Promise<{ status?: string; building?: string; channel?: string; q?: string }>;
 }) {
   const [state, session, params] = await Promise.all([getOnboardingState(), getCurrentAppSession(), searchParams]);
   if (state.status === "unauthenticated") redirect(`/auth/login?next=${encodeURIComponent("/mobile/messages")}`);
@@ -56,6 +57,7 @@ export default async function MobileMessagesPage({
           building={building}
           channel={channel}
           stall={stall}
+          initialQuery={normalizeSearchQuery(params.q) ?? ""}
         />
       </SplitList>
     </MobileShell>

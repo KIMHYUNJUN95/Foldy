@@ -11,6 +11,16 @@ import { pickResolvedLink, type ResolvedDraft, type ThreadLinkView } from "@/lib
 
 import { loadBookingAutoRuns } from "@/lib/guest-messages/auto-rules-server";
 import { maskEntryCodes } from "@/lib/guest-messages/auto-model";
+import {
+  buildSearchArgs,
+  CODE_LIKE_SOURCE,
+  pickSearchMatches,
+  SEARCH_FETCH_LIMIT,
+  SEARCH_RESULT_LIMIT,
+  type InboxSearchMatch,
+  type SearchRpcRow,
+} from "@/lib/guest-messages/inbox-search";
+import { dictionaries } from "@/lib/i18n";
 import { buildingBaseFor, loadBuildingGuestInfo, loadBuildingGuestInfos, type BuildingGuestInfo } from "@/lib/guest-messages/guest-info-server";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -110,7 +120,7 @@ function codesOf(building: BuildingGuestInfo | null): string[] {
 
 /** 코드 값을 못 읽었을 때 — 세 자리 이상 숫자 · 기호 묶음을 모두 가린다(덜 가리는 것보다 더 가리는 쪽). */
 function maskAllCodeLike(text: string): string {
-  return text.replace(/[0-9#*]{3,}/g, "••••");
+  return text.replace(new RegExp(CODE_LIKE_SOURCE, "g"), "••••");
 }
 
 /**
@@ -330,6 +340,74 @@ export async function loadInboxRowsByIds(
     missing: ids.filter((id) => !seen.has(id)),
     ...headerCounts(openRows, filter, now),
   };
+}
+
+export type InboxSearchResult = {
+  results: Array<{ row: InboxConversationRow; match: InboxSearchMatch }>;
+  /** DB 후보가 받은 만큼 꽉 찼다 — 더 있을 수 있다(말을 더 넣어 좁히기). */
+  truncated: boolean;
+};
+
+const BUILDING_LABEL_SETS = Object.values(dictionaries).map((dictionary) => dictionary.cleaning.buildingLabels as Record<string, string>);
+
+/**
+ * 검색 — 그 조직의 대화 전체에서(목록 창 500 · 200 과 무관) 이름 · 예약번호 · 건물 · 방 · 전화 · 이메일 · 메시지 내용. 47 §5-10.
+ * `query` 는 `normalizeSearchQuery` 를 거친 값. 결과는 마지막 메시지 최신순 50개, 줄 모양은 목록과 같다(코드 가리기 포함).
+ */
+export async function searchInbox(
+  db: Client,
+  organizationId: string,
+  query: string,
+  filter: InboxFilter,
+  now: Date = new Date(),
+  visibility: CodeVisibility = { canSeeCodes: true, canManageAuto: true },
+): Promise<InboxSearchResult> {
+  // 코드를 못 보는 사람 — 조직의 모든 건물 코드를 모아 우리 쪽 말에서 가린 뒤에 맞춘다(코드 숫자로 찾아 코드를 알아내지 못하게).
+  let codes: string[] | null = [];
+  if (!visibility.canSeeCodes) {
+    try {
+      codes = (await loadBuildingGuestInfos(db, organizationId)).flatMap((building) => codesOf(building));
+    } catch {
+      codes = null;
+    }
+  }
+  const args = buildSearchArgs(query, { labelSets: BUILDING_LABEL_SETS, canSeeCodes: visibility.canSeeCodes, codes });
+  const { data, error } = await db.rpc("guest_conversation_search", {
+    p_organization_id: organizationId,
+    ...args,
+    p_reference: args.p_reference ?? undefined,
+    p_phone_pattern: args.p_phone_pattern ?? undefined,
+    p_email: args.p_email ?? undefined,
+    p_code_mask: args.p_code_mask ?? undefined,
+    p_status: filter.status,
+    p_building: filter.building ?? undefined,
+    p_channel: filter.channel ?? "all",
+    p_now: now.toISOString(),
+    p_limit: SEARCH_FETCH_LIMIT,
+  });
+  if (error) throw new Error(`conversation search failed: ${error.code ?? "unknown"}`);
+  const candidates = (data ?? []) as SearchRpcRow[];
+  const picked = pickSearchMatches(candidates, query, { canSeeCodes: visibility.canSeeCodes, codes });
+  const truncated = candidates.length >= SEARCH_FETCH_LIMIT || picked.length >= SEARCH_RESULT_LIMIT;
+  if (picked.length === 0) return { results: [], truncated };
+
+  const ids = picked.map((item) => item.id);
+  const found = await db.from("guest_conversations").select(CONVERSATION_COLUMNS).eq("organization_id", organizationId).in("id", ids);
+  if (found.error) throw new Error(`conversation read failed: ${found.error.message}`);
+  const rows = (found.data ?? []) as ConversationDbRow[];
+  const [lastLines, outbox] = await Promise.all([loadLastLines(db, organizationId, ids), loadOpenOutbox(db, organizationId, ids)]);
+  if (!visibility.canSeeCodes) await maskHostLines(db, organizationId, rows, lastLines);
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  const results: InboxSearchResult["results"] = [];
+  for (const item of picked) {
+    const row = byId.get(item.id);
+    if (!row) continue;
+    results.push({
+      row: toInboxRow(row, { lastLine: lastLines.get(row.id) ?? null, outboxStatuses: outbox.get(row.id) ?? [] }, now),
+      match: item.match,
+    });
+  }
+  return { results, truncated };
 }
 
 /** 메뉴 · 탭 숫자 — 답장 기다림(끝난 「나중에」 포함). 실패하면 0. */

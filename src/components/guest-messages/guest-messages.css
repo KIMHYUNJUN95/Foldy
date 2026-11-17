@@ -1147,3 +1147,55 @@ button.gm-photo:focus-visible { outline: 2px solid var(--gm-primary); outline-of
   .gm-newpill,
   .gm-newpill[data-shown] { transform: translate(-50%, 0); transition: opacity 160ms ease; }
 }
+
+/* ══ 검색(47 §5-10) ══════════════════════════════════════════════════════════
+   관리자 콘솔 검색 칸(.adm .search)과 같은 모양 — 옅은 면 · 테두리 없음 · 초점 때 흰 바탕 + 보라 테. 결과는 목록 자리에 그대로. */
+.gm-search { position: relative; display: flex; flex-direction: column; gap: 6px; }
+.gm-console__list > .gm-search { margin: 0 0 10px 12px; }
+.gm-search input {
+  width: 100%;
+  height: 36px;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 9px;
+  background: #f4f4f7;
+  padding: 0 38px 0 34px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--gm-ink);
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.gm-search input::-webkit-search-cancel-button,
+.gm-search input::-webkit-search-decoration { -webkit-appearance: none; appearance: none; display: none; }
+.gm-search input::placeholder { color: #8e8b99; font-weight: 500; }
+.gm-search input:focus { background: #fff; box-shadow: 0 0 0 1.5px var(--gm-primary), 0 0 0 4px #eee8fc; }
+.gm-search__ic { position: absolute; left: 11px; top: 18px; transform: translateY(-50%); color: var(--gm-muted); pointer-events: none; }
+.gm-search__clear {
+  position: absolute;
+  right: 2px;
+  top: 2px;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--gm-muted);
+  cursor: pointer;
+}
+.gm-search__clear:focus-visible { outline: 2px solid var(--gm-primary); outline-offset: -2px; }
+.gm-search__hint { font-size: 12px; color: var(--gm-muted); padding-left: 2px; }
+.gm-search__status { margin: 0; padding: 4px 0 8px 12px; font-size: 12px; color: var(--gm-muted); display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.gm-mlist-head + .gm-search__status { padding-left: 0; }
+.gm-row__hit { font-size: 12px; color: var(--gm-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gm-root [data-stale] { opacity: 0.55; transition: opacity 160ms var(--gm-ease); }
+/* 폰 · 터치 — 44px 칸, 글자 16px(iOS 가 초점 때 화면을 키우지 않게). */
+@media (pointer: coarse) {
+  .gm-search input { height: 44px; font-size: 16px; }
+  .gm-search__ic { top: 22px; }
+  .gm-search__clear { width: 40px; height: 40px; }
+}
+.gm-mlist-head .gm-search input { font-size: 16px; }

@@ -41,6 +41,8 @@ import {
 } from "@/components/guest-messages/gm-format";
 import { useThread } from "@/components/guest-messages/use-thread";
 import { useInboxLive } from "@/components/guest-messages/use-inbox-live";
+import { useInboxSearch } from "@/components/guest-messages/use-inbox-search";
+import { InboxSearchBox, InboxSearchState, searchRows } from "@/components/guest-messages/inbox-search-view";
 import { NewMessagesPill, useThreadFollow } from "@/components/guest-messages/thread-follow";
 import { useLiveChanges } from "@/components/shared/live-refresh";
 import { guestInboxLiveSources, guestThreadLiveSources } from "@/lib/live-sources";
@@ -83,6 +85,7 @@ export function MessagesConsole({
   stall = null,
   taskKinds = [],
   taskCategoryCopy,
+  initialQuery = "",
 }: {
   /** 실시간 구독 필터(조직) — 권한 · 조직 판정은 서버 액션이 다시 한다. */
   organizationId: string;
@@ -102,12 +105,16 @@ export function MessagesConsole({
   /** 이 사람이 메시지에서 만들 수 있는 업무(6단계 — 서버 `creatableKinds`). */
   taskKinds?: LinkTargetType[];
   taskCategoryCopy: TaskCategoryCopy;
+  /** 주소 `q` — 필터를 바꿔 다시 그려도 검색이 이어진다. */
+  initialQuery?: string;
 }) {
   const router = useRouter();
   const now = useNow();
   const buildingName = useBuildingName();
   const inbox = useInboxLive(data, { status, building, channel });
   const list = inbox.list;
+  const search = useInboxSearch({ status, building, channel }, initialQuery);
+  const found = search.active ? searchRows(search) : null;
   const [selected, setSelected] = useState<string | null>(selectedId ?? data?.rows[0]?.id ?? null);
   const [leaving, setLeaving] = useState<ReadonlySet<string>>(new Set());
   const { toast, showToast, dismiss } = useAdminToast();
@@ -138,8 +145,15 @@ export function MessagesConsole({
   const listSources = useMemo(() => guestInboxLiveSources(organizationId), [organizationId]);
   useLiveChanges(listSources, {
     toKeys: (change) => liveKeysOf(change).filter((key) => key.startsWith("c:")),
-    onFlush: (keys) => void inbox.applyIds(idsOfKind(keys, "c")),
-    onCatchUp: () => void inbox.reload(),
+    // 검색 중이면 결과는 같은 검색어로 다시 찾아 갈아 끼운다(줄을 하나씩 고치면 필터 · 순서가 어긋난다).
+    onFlush: (keys) => {
+      void inbox.applyIds(idsOfKind(keys, "c"));
+      search.refresh();
+    },
+    onCatchUp: () => {
+      void inbox.reload();
+      search.refresh();
+    },
   });
   // 열린 대화 채널 — 대화를 바꾸면 이것만 다시 구독하고, 다시 붙으면 따라잡기(그 대화 다시 읽기).
   const threadSources = useMemo(
@@ -182,10 +196,11 @@ export function MessagesConsole({
       if (b) params.set("building", b);
       if (ch !== "all") params.set("channel", ch);
       if (c) params.set("c", c);
+      if (search.query) params.set("q", search.query);
       const query = params.toString();
       return query ? `/admin/messages?${query}` : "/admin/messages";
     },
-    [building, channel, selected, status],
+    [building, channel, search.query, selected, status],
   );
 
   const choose = (id: string) => {
@@ -199,6 +214,7 @@ export function MessagesConsole({
   const afterChange = () => {
     controller.refresh();
     if (selected) void inbox.applyIds([selected]);
+    search.refresh();
   };
   const afterSend = () => {
     follow.follow();
@@ -237,6 +253,7 @@ export function MessagesConsole({
         if (done) setUndo({ id, stamp: Date.now() });
         else showToast(copy.reopenToast);
         void inbox.applyIds([id]);
+        search.refresh();
       } else {
         setLeaving((prev) => {
           const next = new Set(prev);
@@ -261,6 +278,7 @@ export function MessagesConsole({
           }),
         );
         void inbox.applyIds([id]);
+        search.refresh();
       } else {
         setLeaving((prev) => {
           const next = new Set(prev);
@@ -277,6 +295,7 @@ export function MessagesConsole({
   return (
     <div className="gm-root gm-console">
       <section className="gm-console__list" aria-label={copy.listLabel}>
+        <InboxSearchBox search={search} copy={copy} />
         <div className="gm-filters">
           <AdmDropdown
             options={statusOptions}
@@ -299,7 +318,29 @@ export function MessagesConsole({
         </div>
         {canManage ? <StallNoticeLine notice={stall} copy={copy} locale={locale} notify={(message) => showToast(message)} /> : null}
         <div className="gm-scroll">
-          {!list ? (
+          {search.active ? (
+            <>
+              <InboxSearchState search={search} copy={copy} />
+              {found && found.length > 0 ? (
+                <div data-stale={search.loading ? "" : undefined}>
+                  {found.map(({ row, match }) => (
+                    <div className="row-collapse" key={row.id} data-leaving={leaving.has(row.id) ? "" : undefined}>
+                      <div>
+                        <button
+                          type="button"
+                          className="gm-row"
+                          aria-current={row.id === selected ? "true" : undefined}
+                          onClick={() => choose(row.id)}
+                        >
+                          <ConversationRowBody row={row} copy={copy} locale={locale} now={now} withDates match={match} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </>
+          ) : !list ? (
             <InboxError copy={copy} onRetry={() => void inbox.reload()} />
           ) : list.rows.length === 0 ? (
             <InboxEmpty filter={status} copy={copy} />

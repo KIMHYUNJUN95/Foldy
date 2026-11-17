@@ -63,9 +63,11 @@ import {
   lastLineText,
   newIdempotencyKey,
   outboxErrorText,
+  searchHitText,
   waitBadge,
   type GmCopy,
 } from "@/components/guest-messages/gm-format";
+import type { InboxSearchMatch } from "@/lib/guest-messages/inbox-search";
 import { InsertTools } from "@/components/guest-messages/composer-inserts";
 import { MessageBodyView } from "@/components/guest-messages/message-body-view";
 import { messagePlainText, messageTextForTranslation } from "@/lib/guest-messages/message-body";
@@ -144,12 +146,15 @@ export function ConversationRowBody({
   locale,
   now,
   withDates,
+  match = null,
 }: {
   row: InboxConversationRow;
   copy: GmCopy;
   locale: string;
   now: Date;
   withDates: boolean;
+  /** 검색 결과 줄 — 메시지 내용으로 맞았으면 마지막 줄 대신 맞은 말을, 맨 아래에 맞은 곳을 적는다(47 §5-10). */
+  match?: InboxSearchMatch | null;
 }) {
   const placeLabel = usePlaceLabel();
   const badge = waitBadge(row, copy, locale, now);
@@ -184,7 +189,9 @@ export function ConversationRowBody({
           </span>
         </span>
         <span className="gm-row__line" data-unread={unread ? "" : undefined}>
-          {lastLineText(row, copy, now) || " "}
+          {match?.snippet
+            ? fill(match.snippet.direction === "guest" ? copy.prefixGuest : copy.prefixReply, { text: match.snippet.text })
+            : lastLineText(row, copy, now) || " "}
         </span>
         <span className="gm-row__meta">
           {alert ? (
@@ -206,6 +213,7 @@ export function ConversationRowBody({
           </span>
           <span className="gm-row__metatext">{meta}</span>
         </span>
+        {match ? <span className="gm-row__hit">{searchHitText(match, copy)}</span> : null}
       </span>
     </>
   );

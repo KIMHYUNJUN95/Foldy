@@ -10,6 +10,7 @@ import { AdminShell } from "@/components/shell/admin-shell";
 import { adminNavigation, getNavigationLabel } from "@/config/navigation";
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { loadChannelOverview, loadStallNotice } from "@/lib/guest-messages/channel-overview-server";
+import { normalizeSearchQuery } from "@/lib/guest-messages/inbox-search";
 import { INBOX_STATUS_FILTERS, UUID_RE, parseChannelFilter, type InboxStatusFilter } from "@/lib/guest-messages/inbox-model";
 import { loadAutoPreviewBookings, loadAutoRuleSummaries, loadUpcomingAutoRuns } from "@/lib/guest-messages/auto-rules-server";
 import { isGuestMessageSendEnabled } from "@/lib/guest-messages/outbox-runner";
@@ -36,7 +37,7 @@ type Tab = "conversations" | "auto" | "replies" | "settings";
 export default async function AdminMessagesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; building?: string; channel?: string; c?: string; tab?: string }>;
+  searchParams: Promise<{ status?: string; building?: string; channel?: string; c?: string; tab?: string; q?: string }>;
 }) {
   const [session, params] = await Promise.all([requireAdminPageSession({ nextPath: "/admin/messages" }), searchParams]);
   const locale = session.user.preferredLanguage;
@@ -157,6 +158,7 @@ export default async function AdminMessagesPage({
         stall={stall}
         taskKinds={creatableKinds(session.capabilities)}
         taskCategoryCopy={{ maintenance: dict.maintenance.form.categories, lostFound: dict.lostFound.categoryLabels }}
+        initialQuery={normalizeSearchQuery(params.q) ?? ""}
       />
     );
   }

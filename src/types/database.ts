@@ -8105,6 +8105,40 @@ export type Database = {
         Args: { p_conversation_ids: string[]; p_organization_id: string }
         Returns: { body: string; conversation_id: string; direction: string; sent_at: string }[]
       }
+      guest_conversation_search: {
+        Args: {
+          p_body?: boolean
+          p_body_since?: string
+          p_building?: string
+          p_channel?: string
+          p_email?: string
+          p_code_mask?: string
+          p_like: string
+          p_limit?: number
+          p_name_fragments?: string[]
+          p_now?: string
+          p_organization_id: string
+          p_phone_pattern?: string
+          p_place_names?: string[]
+          p_reference?: string
+          p_status?: string
+        }
+        Returns: {
+          body: string
+          body_direction: string
+          body_message_id: string
+          conversation_id: string
+          email_hit: boolean
+          guest_name: string
+          last_message_at: string
+          mobile: string
+          name_hit: boolean
+          phone: string
+          place_hit: boolean
+          reference_hit: boolean
+          reservation_guest_name: string
+        }[]
+      }
       guest_message_claim_manual_check: {
         Args: {
           p_interval_seconds?: number

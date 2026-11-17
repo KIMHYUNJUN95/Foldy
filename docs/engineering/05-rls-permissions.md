@@ -1922,3 +1922,10 @@ Supabase advisor `anon_security_definer_function_executable` 정리. 운영 `pg_
   - 프로젝트 Realtime 「Allow public access」 가 켜져 있으면, anon 키와 조직 uuid 를 아는 사람이 같은 이름의 **public** 채널에 가짜 신호를 보낼 수 있다(그 신호가 우리 구독까지 오는지는 운영에서 확인 못 함). 와도 받는 쪽이 하는 일은 권한 검사하는 다시 읽기뿐이라 데이터는 안 샌다 — beds24-live 와 같다. 끌지는 사용자 결정 대기.
   - 대화 화면도 이제 조직 전체 UPDATE 신호를 받아 브라우저에서 거른다 — 예전(서버 필터)보다 받는 신호가 많다(id 만이라 작다).
 - **남은 노출**: authenticated 의 네 표 select GRANT 는 그대로다 — `guest_messages.view` 가진 사람은 REST select 로 가려지기 전 큐 글(채워진 출입 코드)을 읽을 수 있다. 칸 단위 GRANT 줄이기는 따로 결정.
+
+## 2026-11-17 손님 메시지 검색 (`202611180001_guest_message_search`, **운영 적용 전**)
+
+- 함수 `guest_conversation_search`: **security invoker** · `search_path = ''`. 실행 권한은 **`service_role` 만** — public · anon · authenticated 모두 회수(브라우저에서 직접 RPC 로 불러 코드 가림을 건너뛸 수 없게). 조직 id 는 언제나 인자로 받아 조건에 건다.
+- 화면은 서버 액션 `searchGuestConversations`(`src/actions/guest-messages.ts`, `guest_messages.view`, 못 하면 `forbidden` 결과)이 service_role + **세션 조직** 으로 부른다 — 클라이언트가 조직 id 를 넘기지 않는다.
+- 출입 코드 가림(47 §5-6 · §5-10): 코드를 볼 수 없는 사람(`guest_messages.manage` · `property_info.edit` 없음)이면 서버가 그 조직 모든 건물 코드 정규식(`p_code_mask`)을 넘겨 메시지 내용(손님 말 · 우리 답장 모두)을 가린 글에서만 맞춘다 — 코드 숫자로 찾아 코드를 알아낼 수 없다. 미리보기 글도 방향과 상관없이 서버에서 가려 보낸다. 대화 화면의 손님 말은 그대로다.
+- 로컬 확인(2026-11-17, gm-stack 게이트웨이): service_role 이름 · 채널 번호 · Beds24 번호 · 전화 · 이메일 · 건물(ja/en → ko) · 내용 맞음, 코드 가림 정규식 · 숫자 묶음 가림이면 코드 숫자 0행 · 다른 말은 그대로 맞음, 다른 조직 id 로 그 조직 말 0행 · 손님 말 속 코드도 가림이면 0행 · authenticated(owner · `guest_messages.view` 없는 사람) 403(42501) · anon 401(42501).

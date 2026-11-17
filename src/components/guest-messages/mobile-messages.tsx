@@ -41,6 +41,8 @@ import {
 } from "@/components/guest-messages/gm-format";
 import { useThread } from "@/components/guest-messages/use-thread";
 import { useInboxLive } from "@/components/guest-messages/use-inbox-live";
+import { useInboxSearch } from "@/components/guest-messages/use-inbox-search";
+import { InboxSearchBox, InboxSearchState, searchRows } from "@/components/guest-messages/inbox-search-view";
 import { NewMessagesPill, useThreadFollow } from "@/components/guest-messages/thread-follow";
 import { useLiveChanges } from "@/components/shared/live-refresh";
 import { guestInboxLiveSources, guestThreadLiveSources } from "@/lib/live-sources";
@@ -104,11 +106,12 @@ function useMobileToast() {
   return { toast, show, dismiss };
 }
 
-function listHref(status: InboxStatusFilter, building: string | null, channel: InboxChannelFilter) {
+function listHref(status: InboxStatusFilter, building: string | null, channel: InboxChannelFilter, q: string | null = null) {
   const params = new URLSearchParams();
   if (status !== "all") params.set("status", status);
   if (building) params.set("building", building);
   if (channel !== "all") params.set("channel", channel);
+  if (q) params.set("q", q);
   const query = params.toString();
   return query ? `/mobile/messages?${query}` : "/mobile/messages";
 }
@@ -124,6 +127,7 @@ export function MobileInbox({
   building,
   channel,
   stall = null,
+  initialQuery = "",
 }: {
   /** 실시간 구독 필터(조직) — 권한 · 조직 판정은 서버 액션이 다시 한다. */
   organizationId: string;
@@ -135,6 +139,8 @@ export function MobileInbox({
   channel: InboxChannelFilter;
   /** `guest_messages.manage` 일 때만 서버가 채운다 — 받는 통로 멈춤 줄. */
   stall?: StallNotice | null;
+  /** 주소 `q` — 필터를 바꿔 다시 그려도 검색이 이어진다. */
+  initialQuery?: string;
 }) {
   const router = useRouter();
   const { toast, show: notify, dismiss } = useMobileToast();
@@ -143,11 +149,20 @@ export function MobileInbox({
   const [leaving, setLeaving] = useState<ReadonlySet<string>>(new Set());
   const inbox = useInboxLive(data, { status, building, channel });
   const list = inbox.list;
+  const search = useInboxSearch({ status, building, channel }, initialQuery);
+  const found = search.active ? searchRows(search) : null;
   const liveSources = useMemo(() => guestInboxLiveSources(organizationId), [organizationId]);
+  // 검색 중에도 목록은 계속 합쳐 둔다(지우면 바로 맞는 목록). 결과는 같은 검색어로 다시 찾아 갈아 끼운다 — 줄을 하나씩 고치면 필터 · 순서가 어긋난다.
   useLiveChanges(liveSources, {
     toKeys: (change) => liveKeysOf(change).filter((key) => key.startsWith("c:")),
-    onFlush: (keys) => void inbox.applyIds(idsOfKind(keys, "c")),
-    onCatchUp: () => void inbox.reload(),
+    onFlush: (keys) => {
+      void inbox.applyIds(idsOfKind(keys, "c"));
+      search.refresh();
+    },
+    onCatchUp: () => {
+      void inbox.reload();
+      search.refresh();
+    },
   });
 
   // 칸 안 대화가 보낸 「빠짐 / 되돌림」 — 서버 응답 전에 줄을 접고, 실패하면 다시 편다(16 「줄 접힘」).
@@ -181,6 +196,7 @@ export function MobileInbox({
       <div className="gm-mlist-head">
         <h1>{copy.title}</h1>
         <StallNoticeLine notice={stall} copy={copy} locale={locale} notify={(message) => notify(message)} />
+        <InboxSearchBox search={search} copy={copy} />
         {/* 공용 드롭다운(관리자 콘솔과 같은 것) — iOS 네이티브 select 의 시스템 메뉴 대신(2026-11-16). */}
         <div className="gm-mselects dd-scope">
           <AdmDropdown
@@ -194,7 +210,7 @@ export function MobileInbox({
             ]}
             onChange={(value) => {
               haptic("light");
-              router.replace(listHref(value as InboxStatusFilter, building, channel));
+              router.replace(listHref(value as InboxStatusFilter, building, channel, search.query));
             }}
           />
           <AdmDropdown
@@ -206,7 +222,7 @@ export function MobileInbox({
             ]}
             onChange={(value) => {
               haptic("light");
-              router.replace(listHref(status, value || null, channel));
+              router.replace(listHref(status, value || null, channel, search.query));
             }}
           />
           <AdmDropdown
@@ -215,12 +231,29 @@ export function MobileInbox({
             options={INBOX_CHANNEL_FILTERS.map((value) => ({ value, label: channelFilterLabel(value, copy) }))}
             onChange={(value) => {
               haptic("light");
-              router.replace(listHref(status, building, parseChannelFilter(value)));
+              router.replace(listHref(status, building, parseChannelFilter(value), search.query));
             }}
           />
         </div>
       </div>
-      {!list ? (
+      {search.active ? (
+        <>
+          <InboxSearchState search={search} copy={copy} />
+          {found && found.length > 0 ? (
+            <div className="gm-mrows" data-stale={search.loading ? "" : undefined}>
+              {found.map(({ row, match }) => (
+                <div className="row-collapse" key={row.id} data-leaving={leaving.has(row.id) ? "" : undefined}>
+                  <div>
+                    <Link className="gm-row" href={`/mobile/messages/${row.id}`}>
+                      <ConversationRowBody row={row} copy={copy} locale={locale} now={now} withDates={false} match={match} />
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </>
+      ) : !list ? (
         <InboxError copy={copy} onRetry={() => void inbox.reload()} />
       ) : list.rows.length === 0 ? (
         <InboxEmpty filter={status} copy={copy} />

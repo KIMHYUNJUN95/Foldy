@@ -7,6 +7,7 @@ import {
   escapeIlikeFragment,
   matchesDigits,
   matchesGuestName,
+  phoneLikePattern,
 } from "@/lib/guest-search";
 import { canAccessOpsAdmin } from "@/lib/ops-admin";
 import { resolveOpsReservationPlacements, type OpsReservationPlacement } from "@/lib/ops-calendar";
@@ -117,9 +118,8 @@ export async function searchOpsReservations(rawQuery: string): Promise<Reservati
 
   // 전화번호는 하이픈·공백·국가번호가 섞여 저장된다 — 숫자 사이에 `%` 를 끼워 넓게 받고
   // `matchesDigits` 로 다시 본다. 6자리 미만은 우연히 맞는 번호가 너무 많다.
-  if (plan.digits && plan.digits.length >= 6) {
-    const core = plan.digits.startsWith("0") ? plan.digits.slice(1) : plan.digits;
-    const pattern = `%${core.split("").join("%")}%`;
+  const pattern = phoneLikePattern(plan.digits);
+  if (pattern) {
     lookups.push(
       Promise.resolve(
         supabase

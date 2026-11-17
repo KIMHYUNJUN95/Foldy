@@ -2597,3 +2597,18 @@ INSERT · UPDATE 신호만, DELETE 는 오지 않는다. 대신 `task_occurrence
   `{ kind: "image_copy", source: "airbnb", sourceUrl: "<정본 — https://a0.muscache.com/im/…, 쿼리 없음>", path: "<org>/<conversation>/<message>/<index>.<ext>", thumbPath: "<…>/<index>-t.<ext>" | null, index, mime, bytes, width: 1200, copiedAt }`.
   예전 통로 첨부 줄 `{ name, mimeType, url, inline }`(kind 없음)과 섞일 수 있고 `kind` 로 가른다. 복사 작업만 덧붙인다(웹훅 다시 받기는 `ignoreDuplicates` 라 덮지 않음).
 - 저장소: 비공개 버킷 `guest-message-media`(10MB, jpeg · png · webp · gif). 경로 `<organization_id>/<conversation_id>/<message_id>/<사진 번호>.<ext>`(1200 폭) + `<사진 번호>-t.<ext>`(480 폭 작은 사진). 지우기 작업 없음(보관 기준 Q7 과 함께 정한다 — 메시지 · 대화가 지워져도 파일은 남으므로 그때 같이).
+
+## 2026-11-17 손님 메시지 검색 — `guest_conversation_search` · 메시지 내용 trigram 색인 (`202611180001_guest_message_search.sql`, **운영 적용 전**)
+
+기준 문서: `docs/product/47-guest-messaging.md` §5-10. 표 · 칸은 늘지 않는다.
+
+- 확장 `pg_trgm`(schema `extensions`).
+- 색인 `guest_messages_body_trgm_idx` — `gin (body extensions.gin_trgm_ops) where direction in ('guest', 'host')`(부분 색인 — 내부 메모 · 시스템 줄은 찾지 않는다). 3글자 이상 검색어만 쓰인다(2글자는 순차 읽기). 로컬 12만 줄 · 211MB 에서 만들기 2.4초 · 크기 23MB.
+- 함수 `guest_conversation_search(p_organization_id, p_like, p_name_fragments, p_reference, p_phone_pattern, p_email, p_place_names, p_body, p_body_since, p_code_mask, p_status, p_building, p_channel, p_now, p_limit)` → 대화마다 한 줄 `(conversation_id, last_message_at, guest_name, reservation_guest_name, name_hit, reference_hit, place_hit, phone, mobile, email_hit, body_message_id, body_direction, body)`.
+  - 그 조직 대화(상태 · 건물 · 채널 필터 — 상태 판정은 `effectiveRowState` 와 같게, 끝난 「나중에」 = 답장 기다림) ⟕ `reservations`(`reservation_id`, 같은 조직) 에서 이름 조각 · 예약번호(`provider_booking_id` · `source_reservation_id` 앞에서부터, `original_reservation_id` · `raw_payload.apiReference` 가운데) · 건물 · 방(ilike + 정본 이름 목록) · 전화(`raw_payload.phone` · `mobile` 넓은 거름 — 맞으면 값을 돌려줘 앱이 숫자로 다시 본다) · 이메일(`full` · `local`) · 메시지 내용(guest · host, 대화마다 가장 새 것 하나 `distinct on`)을 본다. 하나라도 맞은 대화를 `last_message_at desc` 로 `p_limit`(1~200, 기본 80)개.
+  - `p_code_mask`(앱이 코드를 볼 수 없는 사람일 때 넘기는 코드 정규식) — 메시지 내용(guest · host 모두)은 `regexp_replace(body, p_code_mask, '••••', 'g')` 한 글에서도 맞아야 한다.
+  - `p_body_since` 는 기간 제한 자리(지금 앱은 넘기지 않는다).
+  - `language plpgsql` · `stable` · **security invoker** · `search_path = ''`. 본문은 `return query execute … using`(부를 때마다 실제 값으로 계획 — 인자를 모르는 일반 계획은 대화 수를 1로 잡아 대화마다 trigram 색인을 다시 읽어 로컬에서 2분 넘게 걸렸다).
+  - 실행 권한: public · anon · authenticated 회수, `service_role` 만(05).
+- 서버 쓰는 곳: `searchInbox`(`src/lib/guest-messages/inbox-server.ts`, service_role + 세션 조직). 타입은 `src/types/database.ts` 손으로 맞춤.
+- **운영 적용 메모**: 이 파일의 `create index` 는 만드는 동안 `guest_messages` 에 쓰기 잠금(SHARE)을 건다 — 웹훅이 넣는 메시지가 기다린다(로컬 2.4초 · 운영 12만 줄 비슷한 크기라 몇 초 예상). 잠금 없이 하려면 SQL 편집기에서 먼저 한 문장만(트랜잭션 밖) `create index concurrently if not exists guest_messages_body_trgm_idx on public.guest_messages using gin (body extensions.gin_trgm_ops) where direction in ('guest', 'host');` 를 돌린 뒤 이 파일을 적용한다(`if not exists` 라 그 줄은 건너뛴다).

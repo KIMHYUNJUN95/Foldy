@@ -128,6 +128,21 @@ export function buildGuestSearchPlan(rawQuery: string): GuestSearchPlan | null {
   };
 }
 
+/**
+ * 전화번호 넓은 거름 — 하이픈 · 공백 · 국가번호가 섞여 저장되므로 숫자 사이에 `%` 를 끼운다(국내식 앞자리 0 은 뗀다).
+ * 최종 판정은 `matchesDigits`. 6자리 미만은 우연히 맞는 번호가 너무 많아 null.
+ */
+export function phoneLikePattern(digits: string | null): string | null {
+  if (!digits || digits.length < 6) return null;
+  const core = digits.startsWith("0") ? digits.slice(1) : digits;
+  return `%${core.split("").join("%")}%`;
+}
+
+/** DB 함수 인자로 넘기는 ilike 글(PostgREST 필터 문법을 거치지 않는 자리) — 글자는 남기고 `\` · `%` · `_` 만 막는다. */
+export function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, "\\$&");
+}
+
 /** PostgREST `or()` / `ilike` 안에서 의미가 있는 글자를 뺀다. */
 export function escapeIlikeFragment(value: string): string {
   return value.replace(/[%_\\,().*"]/g, "");

@@ -15,6 +15,7 @@ import { bookingStateCategory, isLongWait } from "@/lib/guest-messages/waiting";
 import type { GuestChannelKey } from "@/lib/guest-messages/types";
 import { tokyoDateOf } from "@/lib/tokyo-date";
 import { messagePlainText } from "@/lib/guest-messages/message-body";
+import type { InboxSearchHit, InboxSearchMatch } from "@/lib/guest-messages/inbox-search";
 
 export type GmCopy = Dictionary["guestMessages"];
 
@@ -281,6 +282,20 @@ export function lastLineText(row: InboxConversationRow, copy: GmCopy, now: Date)
   const body = plain.text.replace(/\s+/g, " ").trim() || (plain.imageCount > 0 ? copy.photoLabel : copy.attachmentOnly);
   if (liveRowState(row, now) === "awaiting" && row.lastLine.direction === "guest") return body;
   return fill(row.lastLine.direction === "guest" ? copy.prefixGuest : copy.prefixReply, { text: body });
+}
+
+const SEARCH_HIT_KEYS: Record<InboxSearchHit, keyof GmCopy> = {
+  name: "searchHitName",
+  booking: "searchHitBooking",
+  place: "searchHitPlace",
+  phone: "searchHitPhone",
+  email: "searchHitEmail",
+  message: "searchHitMessage",
+};
+
+/** 검색 결과 줄 맨 아래 — 「맞은 곳: 이름 · 메시지」. 전화 · 이메일은 값 없이 맞았다는 것만(47 §5-10). */
+export function searchHitText(match: InboxSearchMatch, copy: GmCopy): string {
+  return fill(copy.searchMatched, { hits: match.hits.map((hit) => String(copy[SEARCH_HIT_KEYS[hit]])).join(" · ") });
 }
 
 /** 멈춘 이유 코드(보정 조회 · 가져오기) → 문구. 모르는 코드는 「그 밖」. */

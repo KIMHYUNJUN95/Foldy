@@ -27,7 +27,7 @@ import {
   localizeRecruitStartDate,
   localizeRecruitWorkDays,
 } from "@/lib/recruit/choice-labels";
-import { filterApplicationsBySearch } from "@/lib/recruit/search";
+import { filterApplicationsBySearch, recruitSearchWithQuery } from "@/lib/recruit/search";
 import { nextStatusOf, type JobApplicationStatus } from "@/lib/recruit/status";
 import { tokyoDateOf } from "@/lib/tokyo-date";
 
@@ -102,16 +102,23 @@ export function RecruitConsole({
   }
 
   /**
-   * 검색어는 **브라우저에만 있다.** 다른 필터처럼 쿼리스트링에 넣지 않는다.
+   * 검색어는 **브라우저에서 거른다.** 서버 필터처럼 `router.push` 하지 않는다.
    *
-   * 넣으면 글자마다 서버를 다시 타고, 그 사이 목록은 이전 결과에 머문다. 특히 글자를 **지울 때**
+   * 글자마다 서버를 다시 타면 그 사이 목록은 이전 결과에 머문다. 특히 글자를 **지울 때**
    * 손에 있는 건 이미 좁혀진 목록뿐이라 응답이 올 때까지 넓어지지 않는다 — 「한 글자만 쳐도 바로,
    * 지우면 바로 전체」가 안 되던 원인이다. 목록은 탭 기준 전량이 이미 와 있으므로
    * (`page.tsx` 가 `query: null` 로 부른다) 여기서 거르면 즉시 끝난다.
    *
-   * 링크로 들어온 `?q=` 는 초기값으로만 받는다.
+   * 주소의 `?q=` 는 `changeQuery` 가 `replaceState` 로 따라 맞춘다(새로고침 · 공유용). 들어온 `?q=` 는 초기값이 된다.
    */
   const [query, setQuery] = useState(filter.query ?? "");
+
+  /** 검색어를 주소에 남긴다 — 새로고침 · 링크 공유 때 복원. 서버를 다시 타지 않고(`replaceState`) 기록도 쌓지 않는다. */
+  function changeQuery(next: string) {
+    setQuery(next);
+    setPage(0);
+    syncQueryToUrl(next);
+  }
 
   const visibleRows = useMemo(() => filterApplicationsBySearch(rows, query), [rows, query]);
 
@@ -195,15 +202,15 @@ export function RecruitConsole({
     label: string;
     /** 쿼리스트링 필터는 URL 을 고쳐 지운다. */
     clear?: Record<string, string | null>;
-    /** 검색어는 URL 에 없으므로 로컬 상태를 지운다. */
+    /** 검색어는 화면 상태가 먼저고 주소는 따라온다. */
     onClear?: () => void;
   }[] = [];
   if (filter.status !== "all") {
     activeFilters.push({ label: copy.status[filter.status], clear: { status: "all" } });
   }
-  // 검색 결과가 0건일 때 「무엇 때문에 비었는지」가 보여야 한다. 검색어는 URL 에 없으므로
-  // 다른 칩들과 달리 로컬 상태를 지우는 칩으로 넣는다.
-  if (query.trim()) activeFilters.push({ label: query.trim(), onClear: () => setQuery("") });
+  // 검색 결과가 0건일 때 「무엇 때문에 비었는지」가 보여야 한다. 검색어는 서버 필터가 아니라
+  // 브라우저에서 거르므로 다른 칩들과 달리 화면 상태를 지우는 칩으로 넣는다.
+  if (query.trim()) activeFilters.push({ label: query.trim(), onClear: () => changeQuery("") });
   if (filter.jobTitle) activeFilters.push({ label: filter.jobTitle, clear: { job: null } });
   if (filter.employmentType) {
     activeFilters.push({
@@ -318,10 +325,7 @@ export function RecruitConsole({
             ref={searchRef}
             name="q"
             value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setPage(0);
-            }}
+            onChange={(event) => changeQuery(event.target.value)}
             placeholder={copy.wSearch}
             aria-label={copy.wSearch}
             autoComplete="off"
@@ -333,8 +337,7 @@ export function RecruitConsole({
               className="rcw-search__x"
               aria-label={copy.searchClear}
               onClick={() => {
-                setQuery("");
-                setPage(0);
+                changeQuery("");
                 searchRef.current?.focus();
               }}
             >
@@ -372,8 +375,7 @@ export function RecruitConsole({
           <b>{summary.total === 0 ? copy.emptyNoData : copy.emptyTitle}</b>
           {summary.total > 0 ? (
             <>
-              {/* 「없습니다」로 끝내지 않고 어떤 조건이 걸려 0건인지 그 자리에 보여 준다. */}
-              <span>{copy.emptyBodyPrefix}</span>
+              {/* 부제 없이 — 어떤 조건이 걸려 0건인지는 아래 칩이 그 자리에서 보여 준다. */}
               <div className="rcw-empty__acts">
                 {activeFilters.map((item) => (
                   <button
@@ -399,7 +401,10 @@ export function RecruitConsole({
                 <button
                   type="button"
                   className="rcw-btn is-gray"
-                  onClick={() => pushFilter({ status: null, job: null, employment: null, from: null, to: null, resume: null, q: null })}
+                  onClick={() => {
+                    changeQuery("");
+                    pushFilter({ status: null, job: null, employment: null, from: null, to: null, resume: null, q: null });
+                  }}
                 >
                   {copy.emptyResetAll}
                 </button>
@@ -525,6 +530,12 @@ export function RecruitConsole({
       {toast ? <AdminToast message={toast.message} onDismiss={dismiss} /> : null}
     </div>
   );
+}
+
+function syncQueryToUrl(value: string) {
+  const url = new URL(window.location.href);
+  url.search = recruitSearchWithQuery(url.search, value);
+  window.history.replaceState(null, "", url);
 }
 
 function detailQuery(id: string): string {

@@ -28,3 +28,27 @@ export function filterApplicationsBySearch<T extends Pick<ApplicationListRow, "n
       (row.phoneTail !== null && row.phoneTail.includes(needle)),
   );
 }
+
+/**
+ * 검색어를 주소의 `q` 에 반영한 새 쿼리스트링(앞의 `?` 포함, 비면 빈 문자열)을 돌려준다 (2026-11-17).
+ * 앞뒤 공백만 있는 검색어는 「검색 안 함」이라 `q` 를 지운다. 다른 필터는 그대로 둔다.
+ */
+export function recruitSearchWithQuery(search: string, value: string): string {
+  const params = new URLSearchParams(search);
+  const trimmed = value.trim();
+  if (trimmed) params.set("q", trimmed);
+  else params.delete("q");
+  const next = params.toString();
+  return next ? `?${next}` : "";
+}
+
+/**
+ * 상세 패널을 닫는 주소 — 지금 주소에서 `application` 만 뺀다(2026-11-17).
+ * 서버가 렌더 때 만든 주소를 쓰면 패널을 연 뒤 바꾼 검색어(`q`)가 옛 값으로 돌아간다.
+ */
+export function recruitCloseHref(search: string): string {
+  const params = new URLSearchParams(search);
+  params.delete("application");
+  const next = params.toString();
+  return next ? `/admin/recruit?${next}` : "/admin/recruit";
+}

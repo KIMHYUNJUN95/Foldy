@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filterApplicationsBySearch } from "@/lib/recruit/search";
+import { filterApplicationsBySearch, recruitCloseHref, recruitSearchWithQuery } from "@/lib/recruit/search";
 
 /**
  * 「한 글자만 쳐도 바로, 지우면 바로 전체」 (2026-09-11).
@@ -47,5 +47,29 @@ describe("filterApplicationsBySearch", () => {
 
   it("맞는 게 없으면 빈 목록이다", () => {
     expect(filterApplicationsBySearch(rows, "홍길동")).toHaveLength(0);
+  });
+});
+
+describe("recruitSearchWithQuery", () => {
+  it("검색어를 q 로 넣고 다른 필터는 그대로 둔다", () => {
+    expect(recruitSearchWithQuery("?status=screening", "최지민")).toBe(
+      "?status=screening&q=%EC%B5%9C%EC%A7%80%EB%AF%BC",
+    );
+  });
+  it("이미 있는 q 를 바꾼다", () => {
+    expect(recruitSearchWithQuery("?q=a&job=x", "ab")).toBe("?q=ab&job=x");
+  });
+  it("비었거나 공백뿐이면 q 를 지운다", () => {
+    expect(recruitSearchWithQuery("?q=a", "")).toBe("");
+    expect(recruitSearchWithQuery("?q=a&job=x", "   ")).toBe("?job=x");
+  });
+});
+
+describe("recruitCloseHref", () => {
+  it("지금 주소의 q 와 필터를 두고 application 만 뺀다", () => {
+    expect(recruitCloseHref("?status=screening&q=ab&application=x")).toBe("/admin/recruit?status=screening&q=ab");
+  });
+  it("남는 게 없으면 쿼리 없이", () => {
+    expect(recruitCloseHref("?application=x")).toBe("/admin/recruit");
   });
 });

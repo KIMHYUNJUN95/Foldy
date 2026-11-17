@@ -1,6 +1,8 @@
 /*
  * 채용 콘솔 (/admin/recruit) — 디자인 「Foldy Recruiting Console」(2026-09-09) 구현.
  *
+ * (2026-11-17: 옛 표 · 카드 규칙 `.rckpi` `.rcrow` 등은 쓰는 곳이 없어 지웠다 — 지금 화면은 아래 `.rcw-*`.)
+ *
  * **변수는 전부 `--rc-*`.** `.adm` 스코프가 클래스는 막아 주지만 CSS 변수는 상속되므로, globals 의
  * Tailwind 토큰과 같은 이름을 여기서 재정의하면 `.adm` 안의 공용 컴포넌트가 조용히 다른 색이 된다
  * (`admin-console.css` 머리말의 2026-08-03 사고). 색·반경·그림자는 `admin-console.css` 의
@@ -10,535 +12,9 @@
  */
 
 .adm .rc {
-  --rc-row-grid: minmax(210px, 1.3fr) 186px minmax(210px, 1.2fr) 122px 104px 132px;
   display: flex;
   flex-direction: column;
   gap: 20px;
-}
-
-/* ── 요약 카드 ─────────────────────────────────────────────────────────── */
-.adm .rc__kpis {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
-}
-.adm .rckpi {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--r-card);
-  padding: 16px 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-.adm .rckpi__k { font-size: 11px; font-weight: 800; letter-spacing: 0.04em; color: var(--adm-muted); }
-.adm .rckpi__v {
-  font-family: var(--serif);
-  font-size: 32px;
-  font-weight: 700;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-}
-.adm .rckpi__v--pri { color: var(--primary-ink); }
-.adm .rckpi__v--warn { color: var(--warn); }
-.adm .rckpi__unit { font-size: 16px; color: var(--faint); }
-.adm .rckpi__s { font-size: 11.5px; color: var(--adm-muted); }
-
-/* ── 필터 줄 ───────────────────────────────────────────────────────────── */
-.adm .rc__filters { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.adm .rcseg {
-  display: flex;
-  gap: 3px;
-  padding: 4px;
-  background: var(--bg2);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--r-pill);
-}
-.adm .rcseg__b {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 30px;
-  padding: 0 13px;
-  border: none;
-  background: transparent;
-  border-radius: var(--r-pill);
-  font-size: 12px;
-  font-weight: 800;
-  color: var(--adm-muted);
-  white-space: nowrap;
-  cursor: pointer;
-}
-.adm .rcseg__b.on { background: var(--adm-primary); color: #fff; }
-.adm .rcseg__n { font-family: var(--mono); opacity: 0.75; }
-.adm .rcseg__b:not(.on) .rcseg__n { opacity: 1; }
-.adm .rc__spacer { margin-left: auto; }
-
-/* ── 표 ────────────────────────────────────────────────────────────────── */
-.adm .rctbl {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--r-card);
-  overflow: hidden;
-}
-.adm .rctbl__h,
-.adm .rcrow {
-  display: grid;
-  grid-template-columns: 34px var(--rc-row-grid);
-  gap: 14px;
-  align-items: start;
-}
-.adm .rctbl__h {
-  padding: 11px 18px;
-  border-bottom: 0.5px solid var(--separator);
-  background: var(--card2);
-  align-items: center;
-}
-.adm .rctbl__h span {
-  font-size: 10.5px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  color: var(--adm-muted);
-}
-.adm .rctbl__h .rccol--end { text-align: right; }
-.adm .rcrow {
-  width: 100%;
-  padding: 13px 18px;
-  border-bottom: 0.5px solid var(--separator);
-  border-left: none;
-  border-right: none;
-  border-top: none;
-  background: transparent;
-  text-align: left;
-  font: inherit;
-  color: inherit;
-  cursor: pointer;
-}
-.adm .rcrow:last-of-type { border-bottom: none; }
-.adm .rcrow:hover { background: var(--card2); }
-.adm .rcrow.on { background: var(--primary-soft); }
-.adm .rcrow__name { display: flex; align-items: center; gap: 7px; min-width: 0; }
-.adm .rcrow__nm { font-size: 13.5px; font-weight: 800; letter-spacing: -0.01em; white-space: nowrap; }
-.adm .rcrow__meta { font-size: 11.5px; color: var(--adm-muted); white-space: nowrap; }
-.adm .rcrow__cell { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
-.adm .rcrow__main { font-size: 12.5px; font-weight: 600; color: var(--ink-soft); }
-.adm .rcrow__sub { font-size: 11px; color: var(--faint); }
-.adm .rcrow__mono { font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--ink-soft); padding-top: 1px; }
-.adm .rcrow__mono--soft { color: var(--adm-muted); font-weight: 400; }
-.adm .rcrow__end { display: flex; justify-content: flex-end; align-items: center; gap: 6px; }
-.adm .rcrow__chips { display: flex; flex-wrap: wrap; gap: 4px; }
-.adm .rcemp {
-  font-size: 10.5px;
-  font-weight: 800;
-  padding: 2px 7px;
-  border-radius: var(--r-pill);
-  background: var(--bg2);
-  color: var(--adm-muted);
-  align-self: flex-start;
-  white-space: nowrap;
-}
-
-/* 행 hover 시 나타나는 전진 버튼 — 자리는 항상 잡아 두어 표가 흔들리지 않게 한다. */
-.adm .rcadv {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 30px;
-  padding: 0 12px;
-  border: none;
-  border-radius: 9px;
-  background: var(--adm-primary);
-  color: #fff;
-  font-size: 11.5px;
-  font-weight: 800;
-  white-space: nowrap;
-  cursor: pointer;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.12s;
-}
-.adm .rcrow:hover .rcadv,
-.adm .rcadv:focus-visible { opacity: 1; pointer-events: auto; }
-
-/* ── 신호 칩 ───────────────────────────────────────────────────────────── */
-.adm .rcchip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 10.5px;
-  font-weight: 800;
-  padding: 3px 8px;
-  border-radius: var(--r-pill);
-  white-space: nowrap;
-  background: var(--bg2);
-  color: var(--adm-muted);
-}
-.adm .rcchip--good { background: var(--done-bg); color: var(--done); }
-.adm .rcchip--info { background: var(--info-bg); color: var(--info); }
-.adm .rcchip--warn { background: var(--warn-bg); color: var(--warn); }
-.adm .rcchip--danger { background: var(--danger-bg); color: var(--danger); }
-
-.adm .rcstat {
-  font-size: 10.5px;
-  font-weight: 800;
-  padding: 4px 10px;
-  border-radius: var(--r-pill);
-  background: var(--open-bg);
-  color: var(--open);
-  white-space: nowrap;
-  /* 3개국어 폭 계약: 「書類選考」/「Screening」이 들어가도 배지가 흔들리지 않는다. */
-  min-width: 66px;
-  text-align: center;
-}
-.adm .rcstat--screening { background: var(--info-bg); color: var(--info); }
-.adm .rcstat--interview { background: var(--warn-bg); color: var(--warn); }
-
-/* ── 선택 체크박스 · 벌크 바 ───────────────────────────────────────────── */
-.adm .rcsel {
-  width: 17px;
-  height: 17px;
-  margin-top: 3px;
-  border-radius: 5px;
-  border: 1.5px solid var(--line);
-  background: var(--bg2);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  cursor: pointer;
-  flex: 0 0 auto;
-}
-/* 누를 수 있는 면적을 넓힌다 — 보이는 상자는 그대로 17px.
-   17px 는 접근성 권장(24px)에도 못 미치는데, 이 표는 **행 전체가 상세로 가는 버튼**이라 빗나가면
-   화면이 바뀐다. 「고르려다 이동」이 반복되면 선택 자체를 포기하게 된다.
-   여백은 셀(34px) 과 행 안쪽 여백(좌 18px · 상하 13px) 안에서만 늘려 지원자 이름을 침범하지
-   않는다. 결과 ≈ 47 × 41px. 벌크 바의 장식용 `span.rcsel` 에는 걸지 않는다. */
-.adm button.rcsel { position: relative; }
-.adm button.rcsel::before {
-  content: "";
-  position: absolute;
-  inset: -12px -14px -12px -16px;
-}
-.adm .rcsel.on { background: var(--adm-primary); border-color: var(--adm-primary); }
-.adm .rcsel svg { width: 11px; height: 11px; opacity: 0; }
-.adm .rcsel.on svg { opacity: 1; }
-.adm .rcbulk {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  background: var(--adm-primary);
-  border-radius: 12px;
-  padding: 11px 14px;
-  color: #fff;
-}
-.adm .rcbulk__n { font-size: 12px; font-weight: 700; }
-/* 내보내기가 선택분만 나간다는 안내. 버튼은 위쪽 툴바에 있어 시선이 떨어져 있으므로, 선택한
-   자리에서 미리 알려 준다. 바 배경이 짙어 본문보다 한 단계 흐린 흰색을 쓴다. */
-.adm .rcbulk__hint { font-size: 11.5px; font-weight: 500; color: rgb(255 255 255 / 0.62); margin-left: 10px; }
-.adm .rcbulk__cta {
-  display: inline-flex;
-  align-items: center;
-  height: 30px;
-  padding: 0 13px;
-  border: none;
-  border-radius: 10px;
-  background: #fff;
-  color: var(--primary-ink);
-  font-size: 11.5px;
-  font-weight: 800;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.adm .rcbulk__ghost {
-  display: inline-flex;
-  align-items: center;
-  height: 30px;
-  padding: 0 13px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  background: transparent;
-  color: #fff;
-  font-size: 11.5px;
-  font-weight: 700;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-/* ── 페이저 ────────────────────────────────────────────────────────────── */
-.adm .rcpager {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 18px;
-  background: var(--card2);
-}
-.adm .rcpager__t { font-size: 11.5px; color: var(--adm-muted); }
-.adm .rcpager__t b { font-family: var(--mono); font-weight: 500; color: var(--ink-soft); }
-.adm .rcpager__b {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 9px;
-  border: 1px solid var(--line);
-  background: var(--card);
-  color: var(--ink-soft);
-  cursor: pointer;
-}
-.adm .rcpager__b:disabled { color: var(--faint); cursor: default; }
-
-/* ── 빈 상태 ───────────────────────────────────────────────────────────── */
-.adm .rcempty {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--r-card);
-  padding: 44px 32px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 13px;
-  text-align: center;
-}
-.adm .rcempty__ic {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 48px;
-  height: 48px;
-  border-radius: 15px;
-  background: var(--bg2);
-  color: var(--faint);
-}
-.adm .rcempty__t { font-size: 14.5px; font-weight: 800; }
-.adm .rcempty__s { font-size: 12.5px; line-height: 1.7; color: var(--adm-muted); max-width: 460px; text-wrap: pretty; }
-.adm .rcempty__acts { display: flex; gap: 8px; margin-top: 4px; flex-wrap: wrap; justify-content: center; }
-
-/* 걸려 있는 조건을 하나씩 떼어낼 수 있는 칩. */
-.adm .rcactive {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  height: 30px;
-  padding: 0 11px;
-  border: none;
-  border-radius: var(--r-pill);
-  background: var(--open-bg);
-  color: var(--open);
-  font-size: 11.5px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-/* ── 상세 패널 (공용 .panel 위에 얹는 것만) ────────────────────────────── */
-.adm .rcsteps { display: flex; align-items: center; gap: 0; }
-.adm .rcsteps__s { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; color: var(--faint); }
-.adm .rcsteps__s.on { color: var(--adm-primary); font-weight: 800; }
-.adm .rcsteps__dot { width: 8px; height: 8px; border-radius: var(--r-pill); border: 1.5px solid currentColor; }
-.adm .rcsteps__s.on .rcsteps__dot { background: var(--adm-primary); border-color: var(--adm-primary); }
-.adm .rcsteps__line { flex: 1; height: 0.5px; background: var(--separator); margin: 0 8px; }
-
-.adm .rckv { display: grid; grid-template-columns: 104px 1fr; gap: 8px 14px; font-size: 12.5px; }
-.adm .rckv__k { color: var(--adm-muted); }
-.adm .rckv__v { color: var(--ink-soft); font-weight: 600; }
-.adm .rckv__v--mono { font-family: var(--mono); font-weight: 500; }
-.adm .rckv__v--none { color: var(--faint); font-weight: 400; display: flex; align-items: center; gap: 8px; }
-
-.adm .rcdays { display: flex; flex-wrap: wrap; gap: 4px; }
-.adm .rcday {
-  font-size: 11px;
-  font-weight: 700;
-  padding: 3px 9px;
-  border-radius: var(--r-pill);
-  background: var(--bg2);
-  color: var(--faint);
-}
-.adm .rcday.on { background: var(--open-bg); color: var(--open); font-weight: 800; }
-
-.adm .rcnote {
-  background: var(--card2);
-  border: 1px solid var(--line-soft);
-  border-radius: 12px;
-  padding: 13px 14px;
-  font-size: 12.5px;
-  line-height: 1.75;
-  color: var(--ink-soft);
-  text-wrap: pretty;
-  white-space: pre-wrap;
-}
-
-.adm .rcinfo {
-  display: flex;
-  align-items: flex-start;
-  gap: 9px;
-  background: var(--bg2);
-  border: 1px solid var(--line-soft);
-  border-radius: 10px;
-  padding: 9px 11px;
-  font-size: 11.5px;
-  line-height: 1.6;
-  color: var(--ink-soft);
-}
-.adm .rcinfo svg { flex: 0 0 auto; margin-top: 1px; color: var(--adm-muted); }
-
-/* 첨부 */
-.adm .rcfile {
-  display: flex;
-  gap: 13px;
-  align-items: center;
-  background: var(--card2);
-  border: 1px solid var(--line-soft);
-  border-radius: 12px;
-  padding: 12px 13px;
-}
-.adm .rcfile__b { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
-.adm .rcfile__n { font-size: 12.5px; font-weight: 700; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.adm .rcfile__m { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--adm-muted); flex-wrap: wrap; }
-.adm .rcext {
-  font-family: var(--mono);
-  font-weight: 600;
-  padding: 2px 6px;
-  border-radius: 5px;
-  background: var(--info-bg);
-  color: var(--info);
-  text-transform: uppercase;
-}
-.adm .rcext--plain { background: var(--warn-bg); color: var(--warn); }
-.adm .rcfile__acts { display: flex; gap: 6px; margin-top: 2px; flex-wrap: wrap; }
-.adm .rcnofile {
-  border: 1px dashed var(--line);
-  border-radius: 12px;
-  padding: 15px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  background: var(--card2);
-}
-.adm .rcnofile__t { display: flex; align-items: center; gap: 9px; font-size: 12.5px; font-weight: 700; color: var(--ink-soft); }
-.adm .rcnofile__t svg { color: var(--faint); }
-.adm .rcnofile__s { font-size: 11.5px; line-height: 1.65; color: var(--adm-muted); }
-
-/* 지원 이력 */
-.adm .rchist { display: flex; flex-direction: column; gap: 10px; }
-.adm .rchist__row { display: flex; gap: 11px; }
-.adm .rchist__dot { flex: 0 0 auto; width: 8px; height: 8px; border-radius: var(--r-pill); border: 1.5px solid var(--faint); margin-top: 5px; }
-.adm .rchist__dot.on { background: var(--adm-primary); border-color: var(--adm-primary); }
-.adm .rchist__b { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-.adm .rchist__h { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.adm .rchist__d { font-family: var(--mono); font-size: 11.5px; font-weight: 600; color: var(--ink-soft); }
-.adm .rchist__s { font-size: 11.5px; color: var(--adm-muted); }
-.adm .rchist__note {
-  font-size: 11.5px;
-  line-height: 1.6;
-  color: var(--ink-soft);
-  background: var(--card);
-  border: 1px solid var(--line-soft);
-  border-radius: 9px;
-  padding: 8px 10px;
-  white-space: pre-wrap;
-}
-
-/* 메모 입력 */
-.adm .rcnoteedit {
-  width: 100%;
-  min-height: 84px;
-  resize: vertical;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--card);
-  padding: 11px 12px;
-  font: inherit;
-  font-size: 12.5px;
-  line-height: 1.7;
-  color: var(--ink);
-}
-.adm .rcnoteedit:focus-visible { outline: 2px solid var(--adm-primary); outline-offset: 1px; }
-
-/* 패널 하단 액션 바 — 주 버튼은 항상 오른쪽 끝, 파괴적 액션은 항상 왼쪽 끝.
- *
- * **버튼은 줄어들지 않는다.** flex 기본값(flex-shrink: 1)이면 패널 폭(436px)에서 셋이 서로를
- * 밀어내 「삭제」가 세로로 쪼개진다(2026-09-09 실제로 그랬다). 버튼은 내용 너비로 고정하고,
- * 양보는 가운데 안내 문구가 한다 — 없어도 조작에 지장이 없는 유일한 요소다. 그래도 모자라면
- * 줄바꿈해 아래로 흐른다(3개국어에서 라벨이 더 길어질 수 있다). */
-.adm .rcbar {
-  flex: 0 0 auto;
-  padding: 14px 18px;
-  border-top: 0.5px solid var(--separator);
-  background: var(--card2);
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 9px;
-}
-.adm .rcbar .btn { flex: 0 0 auto; white-space: nowrap; }
-.adm .rcbar__note {
-  flex: 1 1 120px;
-  min-width: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11.5px;
-  line-height: 1.4;
-  color: var(--adm-muted);
-}
-.adm .rcbar__cta { min-width: 150px; justify-content: center; }
-
-@media (max-width: 1180px) {
-  .adm .rc { --rc-row-grid: minmax(180px, 1.4fr) 150px minmax(150px, 1fr) 104px 92px 120px; }
-  .adm .rc__kpis { grid-template-columns: repeat(2, 1fr); }
-}
-
-/* CJK 자간 보정 (2차) — uppercase 없이 자간만 걸려 있던 라벨·표 머리글.
-   숫자 표시(`__v` `__amt` `score` 등)와 라틴 전용(초대코드 입력·워드마크·일본어 서식
-   `.jp__*`)은 제외했다 — 그쪽 자간은 의도된 것이다. */
-:lang(ko) .adm .rctbl__h span,
-:lang(ja) .adm .rctbl__h span,
-:lang(ko) .adm .rckpi__k,
-:lang(ja) .adm .rckpi__k {
-  letter-spacing: 0;
-}
-
-/* ===================================================================
-   검색으로 목록이 바뀔 때 (2026-09-11)
-
-   검색은 브라우저에서 즉시 걸러진다. 즉시라는 건 좋지만 그대로 두면 목록이 **툭 끊기듯**
-   바뀐다 — 한 글자 칠 때마다 화면이 튀는 느낌이 든다.
-
-   그래서 **새로 들어온 줄만** 짧게 떠오르게 한다. React 가 `row.id` 로 키를 잡으므로 검색어를
-   좁혀도 남아 있는 줄은 같은 DOM 노드이고, CSS 애니메이션은 새로 삽입된 요소에서만 돈다.
-   결과적으로 「그대로 있는 줄은 가만히, 새로 나타난 줄만 부드럽게」가 공짜로 나온다.
-   목록 전체를 감싸서 페이드하면 반대로 매번 통째로 깜빡인다 — 그게 더 산만하다.
-
-   170ms 는 「보였다」고 느낄 만큼은 되고 타이핑을 따라오는 데 방해되지 않는 선이다.
-   =================================================================== */
-@keyframes rc-row-in {
-  from {
-    opacity: 0;
-    transform: translateY(3px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-/* `both` 를 쓰지 않는다 — fill-mode 로 남는 `transform: none` 이 나중에 누가 추가할 hover
-   transform 을 조용히 눌러버린다. 지연이 없으므로 fill 없이도 첫 프레임부터 제대로 시작한다. */
-.adm .rcrow {
-  animation: rc-row-in 0.17s ease;
-}
-
-/* 결과가 0건이 될 때도 같은 속도로 들어온다 — 목록과 빈 화면이 서로 다른 속도로 바뀌면
-   「무언가 잘못됐나」로 읽힌다. */
-.adm .rcempty {
-  animation: rc-row-in 0.2s ease;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .adm .rcrow,
-  .adm .rcempty {
-    animation: none;
-  }
 }
 
 /* ── 지원서 인쇄 (A4 한 장) ─────────────────────────────────────────────────
@@ -728,23 +204,24 @@
    연락처 흐림 → 선명 · 누름 반응. reduced-motion 이면 끈다. */
 .adm .rcw .num, .adm .rcw-panel .num { font-variant-numeric: tabular-nums; }
 .adm .rcw-bar { flex-wrap: wrap; row-gap: 8px; margin-bottom: 8px; }
+.adm .rcw-bar .axb-pair { gap: 12px; }
 .adm .rcw-bar .lviews button { font-weight: 600; }
-.adm .rcw-tabn { margin-left: 4px; font-weight: 600; color: #7a52e6; }
+.adm .rcw-tabn { margin-left: 4px; font-weight: 400; color: #8a8798; }
+.adm .rcw-bar .lviews button.on .rcw-tabn { color: #16141f; }
 .adm .rcw-sp { flex: 1; }
 .adm .rcw-site { text-decoration: none; }
 .adm .rcw-site svg { width: 16px; height: 16px; flex: none; color: var(--adm-muted); }
 .adm .rcw-live { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #6b6878; }
-.adm .rcw-live i { width: 6px; height: 6px; border-radius: 50%; background: #7a52e6; box-shadow: 0 0 0 0 rgba(122, 82, 230, .5); animation: rcw-ping 2.4s ease-out infinite; }
-@keyframes rcw-ping { 0% { box-shadow: 0 0 0 0 rgba(122, 82, 230, .45); } 70%, 100% { box-shadow: 0 0 0 7px rgba(122, 82, 230, 0); } }
+.adm .rcw-live i { width: 6px; height: 6px; border-radius: 50%; background: #7a52e6; }
 .adm .rcw-filters { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-bottom: 10px; }
 .adm .rcw-filters .dd > button { border: 0; background: transparent; box-shadow: none; }
 .adm .rcw-filters .datepick { border: 0; background: transparent; padding: 0 8px; font-size: 14px; font-weight: 600; color: #16141f; }
 .adm .rcw-filters .datepick:hover { background: #f4f4f7; }
 .adm .rcw-toggle { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; font: inherit; font-size: 14px; color: #3a3746; cursor: pointer; }
 .adm .rcw-toggle:hover { background: #f4f4f7; }
-.adm .rcw-box { display: grid; place-items: center; width: 17px; height: 17px; flex: none; border-radius: 5px; background: #ededf1; color: transparent; transition: background 150ms ease, transform 140ms ease; }
+.adm .rcw-box { display: grid; place-items: center; width: 17px; height: 17px; flex: none; border-radius: 5px; background: #fff; box-shadow: inset 0 0 0 1px #c9c6d3; color: transparent; transition: background 150ms ease, transform 140ms ease; }
 .adm .rcw-box svg { width: 12px; height: 12px; }
-.adm .rcw-box.on { background: #7a52e6; color: #fff; }
+.adm .rcw-box.on { background: #7a52e6; box-shadow: none; color: #fff; }
 .adm .rcw-box.on svg path, .adm .rcw-box.on svg polyline { stroke-dasharray: 24; animation: rcw-draw 220ms cubic-bezier(.23, 1, .32, 1) both; }
 @keyframes rcw-draw { from { stroke-dashoffset: 24; } }
 .adm .rcw-search { position: relative; display: flex; align-items: center; gap: 7px; width: 260px; height: 36px; margin-left: auto; box-sizing: border-box; padding: 0 10px 0 12px; border-radius: 10px; background: #f4f4f7; color: var(--text-3); }
@@ -754,12 +231,12 @@
 
 .adm .rcw-note { margin: 4px 0 8px; padding: 10px 12px; border-radius: 12px; background: #f4f1fd; color: #55526a; font-size: 13px; line-height: 1.5; }
 .adm .rcw-bulk { display: flex; align-items: center; gap: 14px; min-height: 52px; margin: 4px 0 8px; padding: 0 12px; border-radius: 12px; background: #f4f1fd; color: #16141f; animation: rcw-up 180ms cubic-bezier(.23, 1, .32, 1) both; }
-.adm .rcw-bulk b { font-size: 14px; }
+.adm .rcw-bulk b { font-size: 14px; font-weight: 600; }
 .adm .rcw-bulk > span:not(.rcw-sp) { font-size: 12px; color: #6b6878; }
 .adm .rcw-bulk__go { height: 34px; padding: 0 14px; border: 0; border-radius: 9px; background: #7a52e6; font: inherit; font-size: 13px; font-weight: 600; color: #fff; cursor: pointer; transition: transform 140ms ease, opacity 150ms ease; }
 .adm .rcw-bulk__go:active { transform: scale(.97); }
 .adm .rcw-bulk__go:disabled { opacity: .55; }
-.adm .rcw-bulk__clear { height: 34px; padding: 0 10px; border: 0; border-radius: 9px; background: transparent; font: inherit; font-size: 13px; font-weight: 600; color: #5a30cf; cursor: pointer; }
+.adm .rcw-bulk__clear { height: 34px; padding: 0 10px; border: 0; border-radius: 9px; background: transparent; font: inherit; font-size: 13px; font-weight: 500; color: #5a30cf; cursor: pointer; }
 @keyframes rcw-up { from { opacity: 0; transform: translateY(6px); } }
 
 .adm .rcw-th, .adm .rcw-tr { display: grid; grid-template-columns: 34px minmax(0, 1fr) minmax(120px, 170px) minmax(150px, 210px) 92px 116px; column-gap: 16px; align-items: center; padding: 0 12px; }
@@ -785,9 +262,10 @@
 .adm .rcw-who__h { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .adm .rcw-who__h b { font-size: 15px; font-weight: 600; color: #16141f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .adm .rcw-who__h span { font-size: 12px; color: #6b6878; white-space: nowrap; }
-.adm .rcw-who__h em { font-style: normal; font-size: 12px; font-weight: 600; color: #5a30cf; white-space: nowrap; }
+.adm .rcw-who__h em { display: inline-flex; align-items: center; gap: 5px; font-style: normal; font-size: 12px; font-weight: 400; color: #6b6878; white-space: nowrap; }
+.adm .rcw-who__h em::before { content: ""; width: 6px; height: 6px; flex: none; border-radius: 50%; background: #7a52e6; }
 .adm .rcw-who__s { font-size: 12px; color: #6b6878; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.adm .rcw-who__s b.is-bad { font-weight: 600; color: #c5282e; }
+.adm .rcw-who__s b.is-bad { font-weight: 500; color: #c5282e; }
 .adm .rcw-two { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 13px; color: #3a3746; }
 .adm .rcw-two > * { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .adm .rcw-two small { font-size: 12px; color: #6b6878; }
@@ -796,52 +274,53 @@
 .adm .rcw-adv { display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 10px; border: 0; border-radius: 9px; background: #f4f1fd; font: inherit; font-size: 12px; font-weight: 600; color: #5a30cf; white-space: nowrap; cursor: pointer; opacity: 0; transition: opacity 120ms ease, transform 140ms ease; }
 .adm .rcw-tr:hover .rcw-adv, .adm .rcw-tr:focus-within .rcw-adv, .adm .rcw-tr.on .rcw-adv, .adm .rcw-adv:focus-visible { opacity: 1; }
 .adm .rcw-adv:active { transform: scale(.96); }
-@media (hover: none) { .adm .rcw-adv { opacity: 1; } }
+@media (hover: none), (pointer: coarse) { .adm .rcw-adv { opacity: 1; } }
 .adm .rcw-pager { display: flex; align-items: center; gap: 6px; padding: 14px 12px 4px; font-size: 13px; color: #6b6878; }
 .adm .rcw-pg { display: grid; place-items: center; width: 34px; height: 34px; border: 0; border-radius: 9px; background: #f4f4f7; color: #16141f; cursor: pointer; }
 .adm .rcw-pg:disabled { color: #c9c6d3; cursor: default; }
 
-.adm .rcw-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 64px 20px; text-align: center; }
-.adm .rcw-empty__ic { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 6px; border-radius: 14px; background: #f4f1fd; color: #7a52e6; }
-.adm .rcw-empty b { font-size: 15px; color: #16141f; }
+.adm .rcw-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 72px 20px; text-align: center; }
+.adm .rcw-empty__ic { display: grid; place-items: center; width: 40px; height: 40px; margin-bottom: 6px; background: none; color: #a9a6b8; }
+.adm .rcw-empty b { font-size: 15px; font-weight: 600; color: #16141f; }
 .adm .rcw-empty > span { font-size: 13px; color: #6b6878; }
 .adm .rcw-empty__acts { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 6px; }
 .adm .rcw-active { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 0; border-radius: 8px; background: #f4f4f7; font: inherit; font-size: 13px; color: #3a3746; cursor: pointer; }
 
 /* 상세 패널 */
 .adm .rcw-panel { width: 420px; background: #fff; }
-.adm .rcw-ph { display: flex; align-items: flex-start; gap: 2px; padding: 22px 24px 12px; }
+.adm .rcw-ph { display: flex; align-items: flex-start; gap: 2px; padding: 18px 24px 12px; }
 .adm .rcw-ph__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .adm .rcw-kick { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 13px; color: #6b6878; }
 .adm .rcw-kick > * + *::before { content: "·"; margin-right: 6px; color: #c9c6d3; }
-.adm .rcw-kick em { font-style: normal; font-weight: 600; color: #5a30cf; }
-.adm .rcw-name { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: #16141f; overflow-wrap: anywhere; }
-.adm .rcw-name small { margin-left: 6px; font-size: 14px; font-weight: 500; letter-spacing: 0; color: #6b6878; }
+.adm .rcw-kick em { display: inline-flex; align-items: center; gap: 6px; font-style: normal; font-weight: 400; color: #3a3746; }
+.adm .rcw-kick em::before { content: ""; width: 6px; height: 6px; flex: none; border-radius: 50%; background: #7a52e6; }
+.adm .rcw-name { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; color: #16141f; overflow-wrap: anywhere; }
+.adm .rcw-name small { margin-left: 6px; font-size: 14px; font-weight: 400; letter-spacing: 0; color: #6b6878; }
 .adm .rcw-job { font-size: 13px; color: #6b6878; }
-.adm .rcw-ph__ic, .adm .rcw-ph__x { display: grid; place-items: center; width: 40px; height: 40px; flex: none; border: 0; border-radius: 10px; background: transparent; color: #6b6878; cursor: pointer; transition: background 150ms ease, transform 140ms ease; }
+.adm .rcw-ph__ic, .adm .rcw-ph__x { display: grid; place-items: center; width: 44px; height: 44px; flex: none; border: 0; border-radius: 10px; background: transparent; color: #6b6878; cursor: pointer; transition: background 150ms ease, transform 140ms ease; }
 .adm .rcw-ph__ic svg, .adm .rcw-ph__x svg { width: 20px; height: 20px; }
 .adm .rcw-ph__ic:hover, .adm .rcw-ph__x:hover { background: #f4f4f7; }
 .adm .rcw-ph__ic.is-danger { color: #c5282e; }
 .adm .rcw-ph__ic.is-danger:hover { background: #fdecec; }
 .adm .rcw-ph__ic:active, .adm .rcw-ph__x:active { transform: scale(.94); }
-.adm .rcw-ph__x { margin-right: -10px; }
+.adm .rcw-ph__x { margin-right: -12px; }
 .adm .rcw-pb { display: flex; flex-direction: column; gap: 16px; padding: 4px 24px 24px; }
 .adm .rcw-contact { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #3a3746; }
-.adm .rcw-contact__row { display: flex; align-items: center; gap: 10px; }
-.adm .rcw-contact__ph { font-family: var(--font-mono, ui-monospace), "Noto Sans KR", monospace; }
+.adm .rcw-contact__row { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; }
+.adm .rcw-contact__ph { white-space: nowrap; font-family: var(--font-mono, ui-monospace), "Noto Sans KR", monospace; }
 .adm .rcw-contact__ph.is-open, .adm .rcw-contact__more.is-open { animation: rcw-clear 200ms ease both; }
 @keyframes rcw-clear { from { opacity: .4; filter: blur(2px); } }
 .adm .rcw-contact__hint { color: #6b6878; }
 .adm .rcw-contact__hint::before { content: "·"; margin-right: 8px; color: #c9c6d3; }
-.adm .rcw-link { margin-left: auto; height: 32px; padding: 0; border: 0; background: none; font: inherit; font-size: 13px; font-weight: 600; color: #5a30cf; cursor: pointer; }
+.adm .rcw-link { margin-left: auto; white-space: nowrap; height: 32px; padding: 0; border: 0; background: none; font: inherit; font-size: 13px; font-weight: 500; color: #5a30cf; cursor: pointer; }
 .adm .rcw-link:hover { text-decoration: underline; text-underline-offset: 3px; }
 .adm .rcw-legacy { margin: 0; font-size: 12px; line-height: 1.5; color: #6b6878; }
-.adm .rcw-dl { margin: 0; display: flex; flex-direction: column; gap: 9px; padding-top: 14px; border-top: 0.5px solid var(--separator); }
-.adm .rcw-dl > div { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 10px; font-size: 13px; }
+.adm .rcw-dl { margin: 0; display: grid; grid-template-columns: minmax(76px, max-content) minmax(0, 1fr); gap: 9px 10px; padding-top: 14px; border-top: 0.5px solid #e4e3e9; }
+.adm .rcw-dl > div { display: contents; font-size: 13px; }
 .adm .rcw-dl dt { color: #6b6878; }
 .adm .rcw-dl dd { margin: 0; color: #16141f; overflow-wrap: anywhere; }
-.adm .rcw-dl b.is-bad { font-weight: 600; color: #c5282e; }
-.adm .rcw-sec { display: flex; flex-direction: column; gap: 6px; padding-top: 14px; border-top: 0.5px solid var(--separator); }
+.adm .rcw-dl b.is-bad { font-weight: 500; color: #c5282e; }
+.adm .rcw-sec { display: flex; flex-direction: column; gap: 6px; padding-top: 14px; border-top: 0.5px solid #e4e3e9; }
 .adm .rcw-k { font-size: 12px; font-weight: 600; color: #6b6878; }
 .adm .rcw-p { margin: 0; font-size: 14px; line-height: 1.6; color: #3a3746; white-space: pre-wrap; overflow-wrap: anywhere; }
 .adm .rcw-hist { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
@@ -878,15 +357,15 @@
 .adm .rcw-btn.is-danger { background: #c5282e; color: #fff; }
 .adm .modal.rcw-modal { width: 440px; padding: 24px; gap: 14px; border: 0; }
 .adm .rcw-modal__h { display: flex; flex-direction: column; gap: 4px; }
-.adm .rcw-modal__h h2 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.02em; color: #16141f; }
+.adm .rcw-modal__h h2 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -0.02em; color: #16141f; }
 .adm .rcw-modal__h span { font-size: 13px; color: #6b6878; }
 .adm .rcw-modal__b { margin: 0; font-size: 14px; line-height: 1.6; color: #3a3746; }
-.adm .rcw-modal__b.is-warn { font-weight: 600; color: #c5282e; }
+.adm .rcw-modal__b.is-warn { font-weight: 500; color: #c5282e; }
 .adm .rcw-modal__f { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; margin-top: 4px; }
 /* 지원서 보기(2026-10-20) — 가운데 큰 창, 옅은 회색 바닥 위에 A4 종이 한 장. 위 줄: 제목 · 인쇄 · ✕. */
 .adm .modal.rcw-viewer { width: 880px; height: calc(100vh - 60px); border: 0; background: #f4f4f7; }
 .adm .rcw-viewer__h { display: flex; align-items: center; gap: 8px; padding: 12px 20px 12px 24px; background: #fff; border-bottom: 0.5px solid #e4e3e9; }
-.adm .rcw-viewer__h h2 { flex: 1; margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.02em; color: #16141f; }
+.adm .rcw-viewer__h h2 { flex: 1; margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.02em; color: #16141f; }
 .adm .rcw-viewer__h .rcw-btn { height: 40px; }
 .adm .rcw-viewer__h .rcw-ph__x { margin-right: -6px; }
 .adm .rcw-viewer__b { flex: 1; overflow: auto; padding: 28px 24px 40px; overscroll-behavior: contain; }
@@ -897,7 +376,7 @@
 .adm .rcw button:focus-visible, .adm .rcw a:focus-visible, .adm .rcw-panel button:focus-visible, .adm .rcw-panel a:focus-visible, .adm .rcw-modal button:focus-visible { outline: 2px solid #7a52e6; outline-offset: 2px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .adm .rcw-live i, .adm .rcw-rows > .rcw-tr, .adm .rcw-bulk, .adm .rcw-box.on svg path, .adm .rcw-contact__ph.is-open, .adm .rcw-contact__more.is-open { animation: none; }
+  .adm .rcw-rows > .rcw-tr, .adm .rcw-bulk, .adm .rcw-box.on svg path, .adm .rcw-contact__ph.is-open, .adm .rcw-contact__more.is-open { animation: none; }
   .adm .rcw-tr, .adm .rcw-adv, .adm .rcw-btn, .adm .rcw-box { transition: none; }
 }
 .adm .rc.rcw { gap: 0; }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, MoveRight, Printer, Trash2, X } from "lucide-react";
 import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
@@ -11,6 +12,7 @@ import {
 } from "@/app/admin/recruit/actions";
 import type { Dictionary } from "@/lib/i18n";
 import type { ApplicationDetail } from "@/lib/recruit/applications";
+import { recruitCloseHref } from "@/lib/recruit/search";
 import { nextStatusOf, prevStatusOf } from "@/lib/recruit/status";
 import { haptic } from "@/lib/haptics";
 
@@ -181,7 +183,7 @@ export type DeleteLabels = {
 };
 
 /** 위 휴지통 → 가운데 확인 창(그대로 두기 / 삭제). 이력서 파일까지 지우는 하드 삭제라 확인을 거친다(CLAUDE.md §9). */
-export function RecruitDeleteButton({ applicationId, closeHref, labels }: { applicationId: string; closeHref: string; labels: DeleteLabels }) {
+export function RecruitDeleteButton({ applicationId, labels }: { applicationId: string; labels: DeleteLabels }) {
   const router = useRouter();
   const { toast, showToast, dismiss } = useAdminToast();
   const [open, setOpen] = useState(false);
@@ -206,7 +208,7 @@ export function RecruitDeleteButton({ applicationId, closeHref, labels }: { appl
         haptic("success");
         showToast(labels.deleted);
         setOpen(false);
-        router.push(closeHref);
+        router.push(recruitCloseHref(window.location.search));
         return;
       }
       haptic("error");
@@ -280,5 +282,28 @@ export function RecruitPanelActions({ application, copy }: { application: Applic
       </div>
       {toast ? <AdminToast message={toast.message} onDismiss={dismiss} /> : null}
     </div>
+  );
+}
+
+/**
+ * 패널 닫기 링크 — 서버가 렌더 때 만든 `href` 는 그 뒤 바뀐 검색어(`?q=`)를 모른다.
+ * 누를 때 지금 주소에서 `application` 만 빼서 간다. `href` 는 스크립트 전의 대체값.
+ */
+export function RecruitCloseLink({ href, className, label, children }: { href: string; className?: string; label: string; children?: ReactNode }) {
+  const router = useRouter();
+  return (
+    <Link
+      href={href}
+      className={className}
+      aria-label={label}
+      data-panel-close
+      onClick={(event) => {
+        if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+        event.preventDefault();
+        router.push(recruitCloseHref(window.location.search));
+      }}
+    >
+      {children}
+    </Link>
   );
 }

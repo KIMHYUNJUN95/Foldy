@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { FileText, X } from "lucide-react";
 import type { Dictionary } from "@/lib/i18n";
 import type { ApplicationDetail, ApplicationHistoryRow } from "@/lib/recruit/applications";
@@ -15,6 +14,7 @@ import {
 import { tokyoDateOf } from "@/lib/tokyo-date";
 import { ApplicationPrintSheet } from "./application-print-sheet";
 import {
+  RecruitCloseLink,
   RecruitContactLine,
   RecruitDeleteButton,
   RecruitNoteField,
@@ -88,7 +88,7 @@ export function ApplicationDetailPanel({ application: a, history, resumeUrl, cop
 
   return (
     <>
-      <Link href={closeHref} className="panel-scrim" aria-label={copy.close} data-panel-close />
+      <RecruitCloseLink href={closeHref} className="panel-scrim" label={copy.close} />
       <aside className="panel rcw-panel" role="dialog" aria-label={copy.detailAria}>
         <div className="rcw-ph">
           <div className="rcw-ph__main">
@@ -110,7 +110,6 @@ export function ApplicationDetailPanel({ application: a, history, resumeUrl, cop
           <RecruitPrintIcon label={copy.wPrint} />
           <RecruitDeleteButton
             applicationId={a.id}
-            closeHref={closeHref}
             labels={{
               aria: copy.wDeleteAria,
               title: copy.wDeleteTitle,
@@ -123,9 +122,9 @@ export function ApplicationDetailPanel({ application: a, history, resumeUrl, cop
               failed: copy.actionFailed,
             }}
           />
-          <Link href={closeHref} className="rcw-ph__x" aria-label={copy.close} data-panel-close>
+          <RecruitCloseLink href={closeHref} className="rcw-ph__x" label={copy.close}>
             <X aria-hidden="true" />
-          </Link>
+          </RecruitCloseLink>
         </div>
 
         <div className="panel__body rcw-pb">

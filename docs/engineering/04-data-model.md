@@ -2506,7 +2506,7 @@ INSERT · UPDATE 신호만, DELETE 는 오지 않는다. 대신 `task_occurrence
   칸: `provider_booking_id`(Beds24 자기 예약 번호 v2 `id`) · `reservation_id` → `reservations`(set null — 예약 행은 웹훅이 다시 만들 수 있다) ·
   `property_id` → `properties` · `room_id` → `rooms`(set null) · 표시용 `property_name` · `room_label`(정본 이름) · `channel`(airbnb · booking · expedia · agoda · vrbo · direct · other, check 없음) ·
   `booking_status`(통로 상태 원문) · `check_in_date` · `check_out_date` · `guest_name` · `guest_language` ·
-  `status`(`awaiting` · `done` · `snoozed`, 기본 `done`) · `snooze_until`(`snoozed` 면 필수) · `last_guest_at` · `last_reply_at`(host 메시지만) · `last_message_at`.
+  `status`(`awaiting` · `done` · `snoozed`, 기본 `done`) · `snooze_until`(`snoozed` 면 필수) · `last_guest_at` · `last_reply_at`(host 메시지만) · `last_message_at`(guest · host 메시지만 — system · internal 줄은 올리지 않음, 목록 정렬 기준).
   인덱스: (조직, status, last_guest_at desc) · (조직, last_message_at desc) · reservation · property · room(부분). `(id, organization_id)` 고유 — 하위 표 복합 외래 키 대상.
 - `guest_messages` — 원본. `(conversation_id, organization_id)` → 대화(cascade, 조직 어긋남 막음). `provider` · `external_id`(내부 메모 · 번호 모르는 보낸 줄은 null) ·
   `provider_source`(통로 출처 원문) · `direction`(`guest` · `host` · `internal` · `system`) · `body`(기본 '') · `body_translated` · `translated_lang` · `sent_at` · `read_at` ·

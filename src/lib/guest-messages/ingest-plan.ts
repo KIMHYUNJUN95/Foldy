@@ -128,7 +128,7 @@ export type ApplyMessagesParams = {
  * 새로 들어온 메시지(넣은 것 + 합친 것) → DB 함수 인자.
  * - 통로가 이미 읽음(`read = true`)이라고 준 손님 말은 기다림을 만들지 않는다(누군가 Beds24 에서 이미 봤다).
  * - 새 대화이고 가장 늦은 안 읽은 손님 말이 48시간보다 오래됐으면 기다림을 만들지 않는다(첫 웹훅의 옛 이력).
- * - 내부 메모 · 시스템 줄은 시각만 남기고(last_message_at) 답장으로 치지 않는다.
+ * - 내부 메모 · 시스템 줄(리뷰 알림 등)은 답장으로 치지 않고 last_message_at(목록 순서)도 올리지 않는다 — 순서는 손님 말 · 우리 답장만.
  */
 export function summarizeAddedMessages(
   added: readonly Pick<NormalizedMessage, "direction" | "sentAt" | "read">[],
@@ -139,7 +139,9 @@ export function summarizeAddedMessages(
   let replyAt: string | null = null;
   let messageAt: string | null = null;
   for (const message of added) {
-    messageAt = maxIso(messageAt, message.sentAt);
+    if (message.direction === "guest" || message.direction === "host") {
+      messageAt = maxIso(messageAt, message.sentAt);
+    }
     if (message.direction === "guest") {
       guestAt = maxIso(guestAt, message.sentAt);
       if (!message.read) unreadGuestAt = maxIso(unreadGuestAt, message.sentAt);

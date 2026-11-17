@@ -350,15 +350,35 @@ describe("summarizeAddedMessages — first webhook flood", () => {
     expect(summarizeAddedMessages(recent, { isNewConversation: true, now }).unreadGuestAt).toBe("2026-11-11T12:00:00Z");
   });
 
-  it("internal and system lines only move last_message_at", () => {
+  it("system lines alone do not move last_message_at", () => {
+    const params = summarizeAddedMessages(
+      [{ direction: "system", sentAt: "2026-11-12T02:40:00Z", read: false }],
+      { isNewConversation: false, now },
+    );
+    expect(params).toEqual({ guestAt: null, unreadGuestAt: null, replyAt: null, messageAt: null });
+  });
+
+  it("guest + system mix: messageAt is the guest time", () => {
     const params = summarizeAddedMessages(
       [
-        { direction: "internal", sentAt: "2026-11-12T02:30:00Z", read: false },
+        { direction: "guest", sentAt: "2026-11-12T02:00:00Z", read: false },
         { direction: "system", sentAt: "2026-11-12T02:40:00Z", read: false },
       ],
       { isNewConversation: false, now },
     );
-    expect(params).toEqual({ guestAt: null, unreadGuestAt: null, replyAt: null, messageAt: "2026-11-12T02:40:00Z" });
+    expect(params.messageAt).toBe("2026-11-12T02:00:00Z");
+  });
+
+  it("internal notes do not move last_message_at", () => {
+    const params = summarizeAddedMessages(
+      [
+        { direction: "host", sentAt: "2026-11-12T02:10:00Z", read: true },
+        { direction: "internal", sentAt: "2026-11-12T02:30:00Z", read: false },
+      ],
+      { isNewConversation: false, now },
+    );
+    expect(params.messageAt).toBe("2026-11-12T02:10:00Z");
+    expect(params.replyAt).toBe("2026-11-12T02:10:00Z");
   });
 });
 

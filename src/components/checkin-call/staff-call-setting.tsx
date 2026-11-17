@@ -31,14 +31,14 @@ export function StaffCallSetting({ propertyKey, enabled, copy }: { propertyKey: 
   }
 
   return (
-    <div className="ck">
+    <div className="ck-instant">
       <section className="ck-set" aria-labelledby="ck-s-staff-call">
         <div>
           <h3 id="ck-s-staff-call">{copy.secStaffCall}</h3>
           <p className="ck-set__d">{copy.secStaffCallBody}</p>
         </div>
         <div className="ck-set__b">
-          <div className="ck-checks">
+          <div className="ck-set__row">
             <button
               type="button"
               role="switch"
@@ -54,6 +54,7 @@ export function StaffCallSetting({ propertyKey, enabled, copy }: { propertyKey: 
               </i>
               {on ? copy.staffCallOn : copy.staffCallOff}
             </button>
+            <span className="ck-soft">{copy.staffCallInstant}</span>
           </div>
         </div>
       </section>

@@ -43,8 +43,8 @@ export default async function AdminCheckinSettingsPage({ searchParams }: { searc
         properties={[...CHECKIN_PROPERTIES]}
         propertyKey={propertyKey}
         result={result}
+        instant={staffCall.ok ? <StaffCallSetting key={propertyKey} propertyKey={propertyKey} enabled={staffCall.enabled} copy={copy} /> : undefined}
       />
-      {staffCall.ok ? <StaffCallSetting key={propertyKey} propertyKey={propertyKey} enabled={staffCall.enabled} copy={copy} /> : null}
     </AdminShell>
   );
 }

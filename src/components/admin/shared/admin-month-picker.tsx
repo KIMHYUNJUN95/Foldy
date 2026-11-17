@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { shiftMonthKey } from "./admin-month-key";
+import { usePopoverAlign } from "./popover-align";
 
 export type AdminMonthPickerLabels = {
   prevMonth: string;
@@ -46,6 +47,8 @@ export function AdminMonthPicker({
   const [selY, selM] = ym.split("-").map(Number);
   const [viewYear, setViewYear] = useState(selY);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const popRef = useRef<HTMLDivElement | null>(null);
+  const align = usePopoverAlign(open, rootRef, popRef);
 
   useEffect(() => {
     if (!open) return;
@@ -144,7 +147,7 @@ export function AdminMonthPicker({
       </button>
 
       {open ? (
-        <div className="amp__pop" role="dialog" aria-label={labels.open}>
+        <div ref={popRef} className="amp__pop" data-align={align} role="dialog" aria-label={labels.open}>
           <div className="amp__hd">
             <button
               type="button"

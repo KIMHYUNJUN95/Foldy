@@ -77,7 +77,9 @@ export function CheckinDevicesConsole({
   return (
     <div className="ck">
       <div className="ck-bar">
-        <span className="ck-soft num">{fill(copy.deviceSummary, { total: sum.total, connected: sum.connected, disconnected: sum.disconnected })}</span>
+        <span className="ck-soft num">{fill(copy.deviceSummary, { total: sum.total, connected: sum.connected, disconnected: sum.disconnected })}
+          {sum.never > 0 ? <span className="ck-faint">{fill(copy.deviceSummaryNever, { n: sum.never })}</span> : null}
+        </span>
         <span className="ck-sp" />
         {addButton}
       </div>
@@ -105,16 +107,16 @@ export function CheckinDevicesConsole({
               >
                 <span className="ck-nm">
                   <b>{device.name}</b>
-                  <span className={`ck-pill${device.disconnected ? " is-off" : ""}`}>
+                  <span className={`ck-pill${device.connection === "disconnected" ? " is-off" : device.connection === "never" ? " is-never" : ""}`}>
                     <i aria-hidden="true" />
-                    {device.disconnected ? copy.deviceDisconnected : copy.deviceConnected}
+                    {device.connection === "disconnected" ? copy.deviceDisconnected : device.connection === "never" ? copy.deviceNever : copy.deviceConnected}
                   </span>
                 </span>
                 <span className="ck-c">{buildingName(device.propertyName)}</span>
                 <span className="ck-c">{[device.deviceModel, device.osVersion].filter(Boolean).join(" · ") || "—"}</span>
                 <span className="ck-c num">{device.appVersion ?? "—"}</span>
                 <span className="ck-c num">{device.battery !== null ? `${device.battery}%` : "—"}</span>
-                <span className="ck-c is-soft num">{device.lastSeenAt ? formatTokyoStamp(device.lastSeenAt) : copy.neverSeen}</span>
+                <span className="ck-c is-soft num">{device.lastSeenAt ? formatTokyoStamp(device.lastSeenAt) : "—"}</span>
               </button>
             ))}
           </div>
@@ -391,11 +393,17 @@ function DevicePanel({
             <div className="ck-lead">
               <b>{device.name}</b>
             </div>
-            {device.disconnected ? (
+            {device.connection === "never" ? (
+              <span className="ck-pill is-never">
+                <i aria-hidden="true" />
+                {copy.deviceNever}
+              </span>
+            ) : null}
+            {device.connection === "disconnected" ? (
               <div className="ck-warn" role="note">
                 <TriangleAlert aria-hidden="true" />
                 <div>
-                  <b>{fill(copy.disconnectedTitle, { at: device.lastSeenAt ? formatTokyoStamp(device.lastSeenAt) : copy.neverSeen })}</b>
+                  <b>{fill(copy.disconnectedTitle, { at: formatTokyoStamp(device.lastSeenAt) })}</b>
                   <p>{copy.disconnectedBody}</p>
                 </div>
               </div>

@@ -209,9 +209,16 @@ export function summarizeArrivals(rows: readonly CheckinArrivalRow[]): CheckinAr
 /** 태블릿은 5분마다 핑을 보낸다 — 세 번 빠지면 끊김. */
 export const DEVICE_DISCONNECTED_AFTER_MS = 15 * 60_000;
 
+export type DeviceConnection = "connected" | "disconnected" | "never";
+
+/** 등록만 하고 한 번도 핑이 안 온 기기는 「끊김」 경고 대신 「아직 연결 안 됨」으로 따로 본다. */
+export function deviceConnection(lastSeenAt: string | null, now: Date): DeviceConnection {
+  if (!lastSeenAt) return "never";
+  return now.getTime() - Date.parse(lastSeenAt) > DEVICE_DISCONNECTED_AFTER_MS ? "disconnected" : "connected";
+}
+
 export function isDeviceDisconnected(lastSeenAt: string | null, now: Date): boolean {
-  if (!lastSeenAt) return true;
-  return now.getTime() - Date.parse(lastSeenAt) > DEVICE_DISCONNECTED_AFTER_MS;
+  return deviceConnection(lastSeenAt, now) !== "connected";
 }
 
 /** 태블릿이 넣는 8자리 등록 코드 모양(apps/checkin `/api/device/enroll`, DB check 와 같다). */

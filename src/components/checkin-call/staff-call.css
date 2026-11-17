@@ -1,10 +1,6 @@
 /* 직원 통화 — Tailwind 로 못 쓰는 것만. 다른 화면으로 새지 않게 전부 staff-call 접두어. docs/product/46 §6 */
 
-@keyframes staff-call-pulse {
-  from { transform: scale(1); opacity: .45; }
-  to { transform: scale(1.7); opacity: 0; }
-}
-
+/* 울리는 표시는 끝없이 퍼지는 맥박 대신 멈춘 링 하나(2026-11-17 unslop) — 벨소리가 이미 울림을 알린다. */
 .staff-call-pulse { position: relative; }
 .staff-call-pulse::before {
   content: "";
@@ -12,7 +8,8 @@
   inset: 0;
   border-radius: 50%;
   border: 1.5px solid #1f9d4d;
-  animation: staff-call-pulse 2s cubic-bezier(.23, 1, .32, 1) infinite;
+  opacity: .25;
+  transform: scale(1.25);
   pointer-events: none;
 }
 
@@ -24,7 +21,6 @@
 .staff-call-enter { animation: staff-call-enter 200ms cubic-bezier(.23, 1, .32, 1) both; }
 
 @media (prefers-reduced-motion: reduce) {
-  .staff-call-pulse::before { animation: none; opacity: .25; transform: scale(1.25); }
   .staff-call-enter { animation: none; }
 }
 

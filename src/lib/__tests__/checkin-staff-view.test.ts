@@ -195,7 +195,7 @@ describe("시각 · 기기", () => {
   });
 
   it("기기 요약", () => {
-    expect(summarizeDevices([{ disconnected: false }, { disconnected: true }, { disconnected: false }])).toEqual({ total: 3, connected: 2, disconnected: 1 });
+    expect(summarizeDevices([{ connection: "connected" }, { connection: "disconnected" }, { connection: "connected" }, { connection: "never" }])).toEqual({ total: 4, connected: 2, disconnected: 1, never: 1 });
   });
 });
 

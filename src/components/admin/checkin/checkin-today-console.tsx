@@ -185,7 +185,7 @@ function ArrivalRow({ row, copy, selected, onSelect }: { row: CheckinArrivalRow;
       </span>
       <span className="ck-c">{roomsText({ propertyName: row.propertyName, roomLabels: row.roomLabels, localizedProperty: buildingName(row.propertyName), unknownRoomLabel: copy.roomUnknown })}</span>
       <span className="ck-c num">{fill(copy.partyN, { n: row.partySize })}</span>
-      <span className="ck-c is-soft num" aria-label={fill(copy.rosterAria, { filled: row.rosterFilled, total: row.partySize })}>
+      <span className="ck-c is-soft num ck-nw" aria-label={fill(copy.rosterAria, { filled: row.rosterFilled, total: row.partySize })}>
         <span className="ck-pd" aria-hidden="true">
           {dots.map((filled, index) => (
             <i key={index} className={filled ? undefined : "o"} />
@@ -194,7 +194,10 @@ function ArrivalRow({ row, copy, selected, onSelect }: { row: CheckinArrivalRow;
         {row.rosterFilled}/{row.partySize}
       </span>
       <span className={`ck-c ${status.tone === "red" ? "is-red" : status.tone === "ok" ? "is-ok" : "is-soft"}`}>{statusLabel(status.key, copy)}</span>
-      <span className="ck-c is-soft num">{[time, route].filter(Boolean).join(" ")}</span>
+      <span className="ck-c is-soft num ck-when">
+        {time ? <span>{time}</span> : null}
+        {route ? <span>{route}</span> : null}
+      </span>
     </button>
   );
 }

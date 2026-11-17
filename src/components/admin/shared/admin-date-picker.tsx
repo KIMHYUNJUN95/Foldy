@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
+import { usePopoverAlign } from "./popover-align";
 
 export type AdminDatePickerLabels = {
   prevMonth: string;
@@ -136,7 +137,9 @@ function InlineDatePicker({
   labels,
 }: InlineDatePickerProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const popRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
+  const align = usePopoverAlign(open, rootRef, popRef);
   // 값이 비어 있어도(아직 선택 전) 안전하게 동작한다: min 의 달로, 없으면 오늘의 달로 대체해,
   // 첫 선택 전에도 달력이 항상 유효한 달을 그리게 한다.
   const [calendarMonth, setCalendarMonth] = useState(
@@ -199,7 +202,7 @@ function InlineDatePicker({
         <CalendarDays className="adp__trigger-ic" aria-hidden="true" />
       </button>
       {open ? (
-        <div className="adp__pop" role="dialog" aria-label={ariaLabel}>
+        <div ref={popRef} className="adp__pop" data-align={align} role="dialog" aria-label={ariaLabel}>
           <div className="adp__hd">
             <button
               type="button"
@@ -262,7 +265,9 @@ function RosterNavDatePicker({
 }: RosterNavDatePickerProps) {
   const router = useRouter();
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const popRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
+  const align = usePopoverAlign(open, rootRef, popRef);
   const [calendarMonth, setCalendarMonth] = useState(date.slice(0, 7));
   const [marks, setMarks] = useState<Record<string, Record<string, number>>>({});
   useEffect(() => {
@@ -371,7 +376,7 @@ function RosterNavDatePicker({
       </button>
 
       {open ? (
-        <div className={`amp__pop amp__pop--day${loadMarks ? " amp__pop--marks" : ""}`} role="dialog" aria-label={labels.open ?? labels.today}>
+        <div ref={popRef} className={`amp__pop amp__pop--day${loadMarks ? " amp__pop--marks" : ""}`} data-align={align} role="dialog" aria-label={labels.open ?? labels.today}>
           <div className="amp__hd">
             <button
               type="button"

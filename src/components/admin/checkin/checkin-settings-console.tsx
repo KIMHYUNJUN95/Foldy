@@ -5,7 +5,7 @@
 // 칸 설정 · 대기 시간 · MRZ 자동 입력은 이 화면에서 고치지 않고 지금 값을 그대로 보낸다(칸 추가는 P1). docs/product/44 FR-S08
 import { Check } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { saveCheckinPropertySettings, type GetCheckinPropertySettingsResult } from "@/actions/checkin/settings";
 import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
 import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
@@ -33,12 +33,15 @@ export function CheckinSettingsConsole({
   properties,
   propertyKey,
   result,
+  instant,
 }: {
   copy: CheckinCopy;
   shared: CheckinSharedCopy;
   properties: { key: string; name: string }[];
   propertyKey: string;
   result: GetCheckinPropertySettingsResult;
+  /** 누르면 바로 저장되는 설정(직원 통화) — 아래 「저장」 묶음과 섞이지 않게 고른 건물 바로 밑에 따로 둔다. */
+  instant?: ReactNode;
 }) {
   const router = useRouter();
   const buildingName = useBuildingName();
@@ -61,6 +64,7 @@ export function CheckinSettingsConsole({
     return (
       <div className="ck">
         {picker}
+        {instant}
         <CheckinState
           kind={kind}
           title={kind === "forbidden" ? shared.noAccessTitle : kind === "notReady" ? copy.notReadyTitle : copy.errorTitle}
@@ -80,6 +84,7 @@ export function CheckinSettingsConsole({
   return (
     <div className={`ck${pending ? " ck-busy" : ""}`}>
       {picker}
+      {instant}
       <SettingsEditor key={result.settings.propertyKey} initial={result.settings} copy={copy} />
     </div>
   );
@@ -124,6 +129,21 @@ function SettingsEditor({ initial, copy }: { initial: CheckinPropertySettings; c
   const [welcomeLang, setWelcomeLang] = useState<CheckinLanguage>("ja");
   const [termsLang, setTermsLang] = useState<CheckinLanguage>("ja");
   const [pinDraft, setPinDraft] = useState("");
+  const bodyRef = useRef<HTMLDivElement>(null);
+
+  // 오류 칸이 고정 저장 줄 뒤에 숨지 않게 그 구역으로 데려가 첫 입력에 포커스
+  useEffect(() => {
+    if (!invalid) return;
+    const section = bodyRef.current?.querySelector<HTMLElement>(`[data-section="${invalid.section === "other" ? "pin" : invalid.section}"]`);
+    if (!section) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    section.scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" });
+    const target =
+      section.querySelector<HTMLElement>('[aria-invalid="true"]') ??
+      section.querySelector<HTMLElement>("input:not([type=hidden]), textarea") ??
+      section.querySelector<HTMLElement>("button");
+    target?.focus({ preventScroll: true });
+  }, [invalid]);
 
   const changes = countSettingsChanges(baseline, form);
   const dirty = changes > 0;
@@ -197,8 +217,8 @@ function SettingsEditor({ initial, copy }: { initial: CheckinPropertySettings; c
           : copy.settingsNeverSaved}
       </p>
 
-      <div>
-        <section className="ck-set" aria-labelledby="ck-s-lang">
+      <div ref={bodyRef}>
+        <section className="ck-set" data-section="languages" aria-labelledby="ck-s-lang">
           <div>
             <h3 id="ck-s-lang">{copy.secLanguages}</h3>
             <p className="ck-set__d">{copy.secLanguagesBody}</p>
@@ -228,7 +248,7 @@ function SettingsEditor({ initial, copy }: { initial: CheckinPropertySettings; c
           </div>
         </section>
 
-        <section className="ck-set" aria-labelledby="ck-s-welcome">
+        <section className="ck-set" data-section="welcome" aria-labelledby="ck-s-welcome">
           <div>
             <h3 id="ck-s-welcome">{copy.secWelcome}</h3>
             <p className="ck-set__d">{copy.secWelcomeBody}</p>
@@ -246,7 +266,7 @@ function SettingsEditor({ initial, copy }: { initial: CheckinPropertySettings; c
           </div>
         </section>
 
-        <section className="ck-set" aria-labelledby="ck-s-terms">
+        <section className="ck-set" data-section="terms" aria-labelledby="ck-s-terms">
           <div>
             <h3 id="ck-s-terms">{copy.secTerms}</h3>
             <p className="ck-set__d">{copy.secTermsBody}</p>
@@ -266,7 +286,7 @@ function SettingsEditor({ initial, copy }: { initial: CheckinPropertySettings; c
           </div>
         </section>
 
-        <section className="ck-set" aria-labelledby="ck-s-verify">
+        <section className="ck-set" data-section="verify" aria-labelledby="ck-s-verify">
           <div>
             <h3 id="ck-s-verify">{copy.secVerify}</h3>
             <p className="ck-set__d">{copy.secVerifyBody}</p>
@@ -289,7 +309,7 @@ function SettingsEditor({ initial, copy }: { initial: CheckinPropertySettings; c
           </div>
         </section>
 
-        <section className="ck-set" aria-labelledby="ck-s-contacts">
+        <section className="ck-set" data-section="contacts" aria-labelledby="ck-s-contacts">
           <div>
             <h3 id="ck-s-contacts">{copy.secContacts}</h3>
             <p className="ck-set__d">{copy.secContactsBody}</p>
@@ -313,7 +333,7 @@ function SettingsEditor({ initial, copy }: { initial: CheckinPropertySettings; c
           </div>
         </section>
 
-        <section className="ck-set" aria-labelledby="ck-s-pin">
+        <section className="ck-set" data-section="pin" aria-labelledby="ck-s-pin">
           <div>
             <h3 id="ck-s-pin">{copy.secPin}</h3>
             <p className="ck-set__d">{copy.secPinBody}</p>
@@ -388,7 +408,7 @@ function SettingsEditor({ initial, copy }: { initial: CheckinPropertySettings; c
           {copy.settingsRevert}
         </button>
         <button type="button" className="ck-btn is-pri" onClick={() => void save()} disabled={!dirty || busy} aria-busy={busy}>
-          {copy.save}
+          {busy ? copy.settingsSaving : copy.save}
         </button>
       </div>
       {toast ? <AdminToast key={toast.id} message={toast.message} onDismiss={dismiss} /> : null}

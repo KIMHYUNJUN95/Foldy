@@ -3,7 +3,7 @@
 
 import { getCanonicalRoomLabel, getDisplayRoomLabel, getUnsuffixedRoomKey } from "@/lib/room-label-normalization";
 
-import { checkinPropertyName, type CheckinArrivalGroup, type CheckinArrivalRow, type CheckinStayStatus, type MissingField } from "./model";
+import { checkinPropertyName, type CheckinArrivalGroup, type CheckinArrivalRow, type CheckinStayStatus, type DeviceConnection, type MissingField } from "./model";
 import type {
   CheckinContactKey,
   CheckinLanguage,
@@ -177,6 +177,25 @@ export function rosterDots(filled: number, total: number): boolean[] {
   return Array.from({ length: count }, (_, index) => index < filled);
 }
 
+/** 직원이 봐야 하는 사람이 있으면 그 사람부터 연다 — 2번째 이후에 있어도 탭을 찾아 누르지 않게. */
+/** 직원 확인이 아직 남은 예약인지 — 경고 상자 · 탭 점 · 먼저 열 탭이 모두 이 판정 하나를 쓴다. */
+export function stayNeedsStaffCheck(stay: { group: string; staffCheckCount: number }): boolean {
+  return stay.group === "attention" && stay.staffCheckCount > 0;
+}
+
+export function firstGuestToShow(stay: { group: string; staffCheckCount: number }, guests: readonly { needsStaffCheck: boolean }[]): number {
+  if (!stayNeedsStaffCheck(stay)) return 0;
+  const index = guests.findIndex((guest) => guest.needsStaffCheck);
+  return index < 0 ? 0 : index;
+}
+
+/** 손님 앱은 `male` · `female` 원값을 저장한다 — 화면에는 그대로 내지 않는다. */
+export function genderKey(raw: string | null): "male" | "female" | "other" | null {
+  const value = raw?.trim().toLowerCase();
+  if (!value) return null;
+  return value === "male" ? "male" : value === "female" ? "female" : "other";
+}
+
 /** 사람 한 명의 MRZ 줄 상태. */
 export function mrzState(mrzValid: boolean | null): "ok" | "bad" | "none" {
   return mrzValid === true ? "ok" : mrzValid === false ? "bad" : "none";
@@ -237,9 +256,10 @@ export function formatRemaining(ms: number): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
-export function summarizeDevices(devices: readonly { disconnected: boolean }[]): { total: number; connected: number; disconnected: number } {
-  const disconnected = devices.filter((device) => device.disconnected).length;
-  return { total: devices.length, connected: devices.length - disconnected, disconnected };
+export function summarizeDevices(devices: readonly { connection: DeviceConnection }[]): { total: number; connected: number; disconnected: number; never: number } {
+  const connected = devices.filter((device) => device.connection === "connected").length;
+  const disconnected = devices.filter((device) => device.connection === "disconnected").length;
+  return { total: devices.length, connected, disconnected, never: devices.length - connected - disconnected };
 }
 
 // ── 건물 설정 폼 ────────────────────────────────────────────────────────────

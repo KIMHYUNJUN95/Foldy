@@ -11,9 +11,9 @@ import { useBuildingName, useRoomPlaceLabel } from "@/components/shared/building
 import { haptic } from "@/lib/haptics";
 import type { Locale } from "@/lib/i18n";
 import type { CheckinGuestDetail, CheckinStayDetail } from "@/lib/checkin/stays";
-import { MISSING_FIELD_ORDER, formatMonthDay, formatTokyoStamp, mrzState, nightsBetween, panelAccess } from "@/lib/checkin/staff-view";
+import { MISSING_FIELD_ORDER, firstGuestToShow, formatMonthDay, formatTokyoStamp, mrzState, nightsBetween, panelAccess, stayNeedsStaffCheck } from "@/lib/checkin/staff-view";
 import { checkinNationalityName } from "@/lib/checkin/country";
-import { channelLabel, fill, missingLabel, type CheckinCopy } from "./checkin-copy";
+import { channelLabel, fill, genderLabel, missingLabel, type CheckinCopy } from "./checkin-copy";
 import { CheckinCodeField } from "./checkin-code-field";
 import { CheckinState } from "./checkin-ui";
 
@@ -40,7 +40,8 @@ export function CheckinStayPanel({
   onChanged: () => void;
 }) {
   const [load, setLoad] = useState<Load>({ kind: "loading" });
-  const [guestIndex, setGuestIndex] = useState(0);
+  // null = 아직 안 고름 → 직원이 봐야 하는 사람부터
+  const [guestIndex, setGuestIndex] = useState<number | null>(null);
   const [viewer, setViewer] = useState<Viewer>(null);
   const [openingId, setOpeningId] = useState<string | null>(null);
   const [verifying, setVerifying] = useState(false);
@@ -160,7 +161,7 @@ export function CheckinStayPanel({
                 copy={copy}
                 locale={locale}
                 showDocuments={access.showDocuments}
-                guestIndex={Math.min(guestIndex, Math.max(0, data.detail.guests.length - 1))}
+                guestIndex={Math.min(guestIndex ?? firstGuestToShow(data.detail.stay, data.detail.guests), Math.max(0, data.detail.guests.length - 1))}
                 onGuestIndex={setGuestIndex}
                 openingId={openingId}
                 onOpenDocument={(id) => void openDocument(id)}
@@ -203,7 +204,7 @@ function PanelHead({ detail, copy }: { detail: CheckinStayDetail; copy: CheckinC
     `${channelLabel(stay.channel, copy)} ${stay.reservationNumber}`,
   ].filter(Boolean);
   const showParty = stay.group === "attention" && stay.partyMismatch;
-  const showStaff = stay.group === "attention" && stay.staffCheckCount > 0;
+  const showStaff = stayNeedsStaffCheck(stay);
   return (
     <div className="ck-sec is-head">
       <div className="ck-lead">
@@ -254,6 +255,7 @@ function RosterSection({
 }) {
   const guests = detail.guests;
   const guest = guests[guestIndex];
+  const flagGuests = stayNeedsStaffCheck(detail.stay);
   return (
     <section className="ck-sec" aria-label={copy.rosterTitle}>
       <span className="ck-k">{copy.rosterTitle}</span>
@@ -268,8 +270,10 @@ function RosterSection({
                   role="tab"
                   aria-selected={index === guestIndex}
                   className={`ck-ptab${index === guestIndex ? " on" : ""}`}
+                  aria-label={flagGuests && item.needsStaffCheck ? fill(copy.guestNeedsCheck, { guest: fill(copy.guestTab, { n: index + 1 }) }) : undefined}
                   onClick={() => onGuestIndex(index)}
                 >
+                  {flagGuests && item.needsStaffCheck ? <span className="ck-ptab__dot" aria-hidden="true" /> : null}
                   {fill(copy.guestTab, { n: index + 1 })}
                 </button>
               ))}
@@ -304,7 +308,7 @@ function GuestCard({
   const video = guest.documents?.find((doc) => doc.kind === "face_video");
   const mrz = mrzState(guest.mrzValid);
   const missing = MISSING_FIELD_ORDER.filter((field) => guest.missing.includes(field));
-  const ageGender = [guest.age !== null ? String(guest.age) : null, guest.gender].filter(Boolean).join(" · ");
+  const ageGender = [guest.age !== null ? String(guest.age) : null, genderLabel(guest.gender, copy)].filter(Boolean).join(" · ");
   const reason = guest.noPassportReason === "child" ? copy.noPassportChild : guest.noPassportReason;
 
   const rows: [string, string | null][] = [

@@ -1,5 +1,5 @@
 import type { CheckinChannel, MissingField } from "@/lib/checkin/model";
-import type { CodeErrorKey, RowStatusKey } from "@/lib/checkin/staff-view";
+import { genderKey, type CodeErrorKey, type RowStatusKey } from "@/lib/checkin/staff-view";
 import type { Dictionary, Locale } from "@/lib/i18n";
 
 // 셀프 체크인 직원 화면 문구 고르기 — 키 → `dictionary.checkinStaff` 문구. 문구 자체는 i18n.ts 에만 있다.
@@ -35,6 +35,11 @@ export function channelLabel(channel: CheckinChannel, copy: CheckinCopy): string
 
 export function routeLabel(route: "tablet" | "pre_registered" | null, copy: CheckinCopy): string {
   return route === "tablet" ? copy.routeTablet : route === "pre_registered" ? copy.routePreRegistered : "";
+}
+
+export function genderLabel(raw: string | null, copy: CheckinCopy): string | null {
+  const key = genderKey(raw);
+  return key === "male" ? copy.genderMale : key === "female" ? copy.genderFemale : key === "other" ? copy.genderOther : null;
 }
 
 export function missingLabel(field: MissingField, copy: CheckinCopy): string {

@@ -3,7 +3,7 @@
 import { randomInt } from "node:crypto";
 import { revalidatePath } from "next/cache";
 
-import { ENROLLMENT_CODE_PATTERN, checkinPropertyName, formatEnrollmentCode, isDeviceDisconnected } from "@/lib/checkin/model";
+import { ENROLLMENT_CODE_PATTERN, checkinPropertyName, deviceConnection, formatEnrollmentCode, isDeviceDisconnected, type DeviceConnection } from "@/lib/checkin/model";
 import { UUID_PATTERN, checkinDb, checkinGate, runCheckinAction, throwOnCheckinError, writeCheckinAuditAfterChange } from "@/lib/checkin/server";
 import { closeDeviceStaffCalls } from "@/lib/checkin/staff-call-server";
 
@@ -26,6 +26,7 @@ export type CheckinDevice = {
   registeredAt: string;
   lastSeenAt: string | null;
   disconnected: boolean;
+  connection: DeviceConnection;
   appVersion: string | null;
   deviceModel: string | null;
   osVersion: string | null;
@@ -139,6 +140,7 @@ export async function listCheckinDevices(input: { propertyKey?: string | null } 
         registeredAt: row.registered_at,
         lastSeenAt: row.last_seen_at,
         disconnected: isDeviceDisconnected(row.last_seen_at, now),
+        connection: deviceConnection(row.last_seen_at, now),
         appVersion: row.app_version,
         deviceModel: row.device_model,
         osVersion: row.os_version,

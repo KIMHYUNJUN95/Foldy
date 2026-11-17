@@ -21,7 +21,7 @@
 | D2 | Beds24 Auto Actions 는 쓰지 않는다. 자동 안내 규칙은 Foldy 가 갖는다 |
 | D3 | 미래에 Beds24 를 대체할 수 있는 구조(채널 어댑터) |
 | D4 | 수신은 웹훅 중심 |
-| D5 | **넣는다:** 응답 목표 시간 · 사용량 표시 · 건물별 정보 카드 · 메시지 → 업무 한 번에 |
+| D5 | **넣는다:** 기다린 시간 표시(1시간 이상이면 빨강) — 2026-11-17 사용자 결정: 목표 시간은 현업에 필요 없음 · 사용량 표시 · 건물별 정보 카드 · 메시지 → 업무 한 번에 |
 | D6 | **빼거나 미룬다:** 담당자 · 「답장 쓰는 중」 표시(필요 없음) · AI 답장 초안(AI 기능 만들 때) · 푸시 알림(알림 일괄 구현 때) |
 
 ## 3. Beds24 공식 문서 근거
@@ -117,7 +117,7 @@ Beds24 예약 웹훅 ──▶ /api/beds24/webhook (기존) ──▶ 메시지 
 | `src/lib/guest-messages/webhook-ingest.ts` | 웹훅 → 메시지. 예약 처리 뒤 `after()` 에서, **절대 던지지 않음**(웹훅 응답 · 예약 처리 영향 없음). 조직은 예약 처리와 같은 매핑 규칙 |
 | `src/lib/guest-messages/outbox.ts` | `processOutboxBatch` — 발송 큐 한 바퀴(어댑터 주입, DB 모름). 2단계 발송 작업이 줄 잡기(`sending`) · 결과 저장을 맡는다 |
 | `src/lib/guest-messages/reconcile.ts` | 보정 조회 `reconcileGuestMessages(organizationIds)` — 계정 한 번 읽기 |
-| `src/lib/guest-messages/response-target.ts` | `computeWaiting` — 기다린 시간(§6-1) |
+| `src/lib/guest-messages/waiting.ts` | `computeWaiting` — 기다린 시간(§6-1) |
 
 - **대화 상태 규칙** — DB 함수 `guest_conversation_apply_messages`(한 문장 · service_role 만 실행)가 바꾼다. 읽고 → 고치기 사이에 직원 「처리 끝」이 덮이지 않게(검토 반영).
   - 시각 칸(`last_guest_at` · `last_reply_at` · `last_message_at`)은 뒤로 가지 않는다(`greatest`).
@@ -207,8 +207,8 @@ Beds24 예약 웹훅 ──▶ /api/beds24/webhook (기존) ──▶ 메시지 
 
 ### 5-1. PC `/admin/messages` (가칭)
 
-- 탭: **대화 · 자동 안내 · 정해 둔 문구 · 설정**(설정 = 응답 목표 시간 + Beds24 연결, 시안 R2Settings). 5단계(2026-11-13)에 자동 안내 탭을 붙였다(`?tab=auto`, §5-6). 탭 줄은 `guest_messages.manage` 만 보인다(§5-5).
-- 대화 머리: 손님 · 채널 · 상태 · 언어 · 기다린 시간(목표 넘으면 빨강) + 「번역해서 보기」 · 「나중에」 · 「처리 끝」(시안 R2Main).
+- 탭: **대화 · 자동 안내 · 정해 둔 문구 · 설정**(설정 = Beds24 연결 · 과거 메시지 가져오기, 시안 R2Settings — 응답 목표 칸은 2026-11-17 뺌). 5단계(2026-11-13)에 자동 안내 탭을 붙였다(`?tab=auto`, §5-6). 탭 줄은 `guest_messages.manage` 만 보인다(§5-5).
+- 대화 머리: 손님 · 채널 · 상태 · 언어 · 기다린 시간(1시간 이상이면 빨강) + 「번역해서 보기」 · 「나중에」 · 「처리 끝」(시안 R2Main).
 - 대화: 왼쪽 목록(필터는 드롭다운 — 상태 「답장 기다림 / 전체 / 처리 끝」 · 건물) · 가운데 대화 · 오른쪽 예약 패널.
 - 목록 줄: 손님 이름 · 채널 점(회사 색) · 기다린 시간 · 마지막 말 · `건물 · 방 · 예약 상태 · 날짜`. 정렬은 **손님 말 · 우리 답장이 가장 최근인 순**(상태와 상관없이 — 6-1). 리뷰 알림 같은 시스템 줄 · 직원 메모는 순서를 바꾸지 않는다(2026-11-17). Airbnb 와 다른 점: Airbnb 는 손님의 이모지 반응도 대화를 위로 올리지만, Beds24 가 반응을 보내 주지 않아 우리 목록에는 반영되지 않는다. 처음 화면의 상태 필터는 **전체**(주소에 `status` 가 없으면 전체).
 - 대화: 손님 말(번역 · 원문 보기) · 우리 답장 · 내부 메모(자물쇠, 손님에게 안 보임) · 시스템 줄(「Airbnb 문의 · 기다린 지 32분」).
@@ -246,7 +246,7 @@ Beds24 예약 웹훅 ──▶ /api/beds24/webhook (기존) ──▶ 메시지 
 | `src/app/api/guest-messages/outbox/route.ts` | 발송 작업 수동/예약 실행용(`CRON_SECRET` 또는 pg_cron 토큰 Bearer, 둘 다 없으면 404, 플래그 꺼지면 202). 보내기 · 다시 보내기 뒤 `after()` 로 돌고, 정기 실행은 `202611130006`(pg_cron 5분, 보낼 시각이 된 queued 줄 · 멈춘 sending 줄이 있을 때만 부름 — 운영 적용 2026-11-13). 읽기는 부작용 없음 |
 | `src/lib/review-translate.ts` | `deeplTranslate()` 를 꺼내 리뷰 · 손님 메시지가 같은 키 · 같은 월 한도를 쓴다. 한도 = 리뷰 번역 글자 + `translation_usage` 합(DB 함수 `translation_usage_since` 한 번). 그 합을 못 읽으면 리뷰 번역은 **예전처럼 리뷰 글자만**, 손님 메시지(`strict`)는 번역 안 함 |
 | `src/lib/nav-badges.ts` · `src/app/admin/layout.tsx` · `src/config/navigation.ts` | 메뉴 「손님 메시지」(모바일 사이드 메뉴 · PC 운영 묶음) + 숫자 = 답장 기다림(볼 권한 있을 때만) |
-| `scripts/dev/seed-guest-messages.mjs` | 시험 데이터 8개 대화(Airbnb · Booking.com · 직접 예약 · 문의 · 숙박 중 · 목표 넘음 · 나중에 · 처리 끝 · 내부 메모 · 보내지 못한 답장). **운영 ref 면 멈춘다.** `--org <uuid>`(계획만) · `--apply` · `--reset` |
+| `scripts/dev/seed-guest-messages.mjs` | 시험 데이터 8개 대화(Airbnb · Booking.com · 직접 예약 · 문의 · 숙박 중 · 기다림 1시간 넘음 · 나중에 · 처리 끝 · 내부 메모 · 보내지 못한 답장). **운영 ref 면 멈춘다.** `--org <uuid>`(계획만) · `--apply` · `--reset` |
 
 **2단계 결정(구현 중, 2026-11-13 — 리뷰에서 바꿀 수 있음)**
 
@@ -259,7 +259,7 @@ Beds24 예약 웹훅 ──▶ /api/beds24/webhook (기존) ──▶ 메시지 
 - 「나중에」가 끝나 「답장 기다림」으로 보이는 대화에 답장이 나가면 처리 끝(DB 함수 다시 정의, 앱 거울 `nextConversationState` 도 같이).
 - **대화에서 우리 답장 고치기 · 보내기 취소는 없앴다(2026-11-13 사용자 — 헷갈림).** 대화에는 「다시 보내기」(보내지 못함 · 나갔는지 모름 확인 창)와 거절 안내만 남고, 쓸 단추가 없으면 도구 줄도 그리지 않는다. 서버 액션 `editGuestOutbox` · `cancelGuestOutbox` 삭제(DB 는 그대로 — 큐 `cancelled` 상태 · 자동 안내 `auto_cancelled` 는 발송 작업 · 자동 안내가 계속 씀).
 - **어느 OTA 인지 글자로 보인다**(2026-11-13 사용자 요청 — 점만으로는 모름). 목록 줄 아래 줄 맨 앞에 「● Airbnb」 · 「● Booking.com」 · 「● 직접 예약」(점은 채널 색 #FF385C · #003B95 · #8B8898, 글자는 진한 회색 — 칩 · 테두리 없음, 색 글자는 흰 바탕 대비가 4.5:1 이 안 돼 쓰지 않는다). 대화 머리(PC 이름 밑 · 폰 제목 밑 한 줄)와 예약 정보(PC 패널 · 폰 시트 「채널」 줄)에도 채널 이름. Airbnb · Booking.com · Expedia · Agoda · Vrbo 는 상표라 번역하지 않고, 「직접 예약 · 그 밖 · 모든 채널」은 사전(ko · ja · en).
-- **채널 필터**(PC · 모바일 같은 `AdmDropdown`, 상태 · 건물 옆): 모든 채널 / Airbnb / Booking.com / 직접 예약 / 그 밖(Expedia · Agoda · Vrbo · 모르는 채널 · 비어 있음). 주소 `?channel=airbnb|booking|direct|other`(모르는 값 = 모든 채널). 머리 숫자(답장 기다림 · 목표 넘음)도 채널 · 건물 필터를 따른다. 판정 `matchesChannelFilter()`(`inbox-model.ts`).
+- **채널 필터**(PC · 모바일 같은 `AdmDropdown`, 상태 · 건물 옆): 모든 채널 / Airbnb / Booking.com / 직접 예약 / 그 밖(Expedia · Agoda · Vrbo · 모르는 채널 · 비어 있음). 주소 `?channel=airbnb|booking|direct|other`(모르는 값 = 모든 채널). 머리 숫자(답장 기다림)도 채널 · 건물 필터를 따른다. 판정 `matchesChannelFilter()`(`inbox-model.ts`).
 - 아직 안 한 것: 읽음 표시(`markRead`) · 사진 첨부 보내기(받은 사진 보이기 · 사본은 §5-8) · 그룹 예약 묶어 보기. 발송 작업 정기 실행은 `202611130006`(pg_cron 5분, 운영 적용 2026-11-13 — §10). (정해 둔 문구 · 건물 정보 넣기는 3 · 4단계에 붙였다 — §5-5.)
 
 ### 5-5. 구현 (3 · 4단계, 2026-11-13)
@@ -267,7 +267,7 @@ Beds24 예약 웹훅 ──▶ /api/beds24/webhook (기존) ──▶ 메시지 
 | 파일 | 하는 일 |
 | --- | --- |
 | `src/app/admin/messages/page.tsx` | 탭 대화 · 정해 둔 문구 · 설정(`?tab=replies` · `?tab=settings`, **관리 권한만** — 없으면 탭 줄 없이 대화만, 주소로 와도 대화). `maxDuration = 300`(설정 탭 과거 메시지 가져오기의 `after()`) |
-| `src/components/admin/messages/messages-settings.tsx` | 설정 탭(시안 R2Settings) — 왼쪽 응답 목표(문의 · 예약 요청 · 숙박 중 · 확정 · 그 밖, 숫자 + 분/시간 `AdmDropdown`, 5분~24시간) · 밤에는 세지 않기 스위치 · 저장. 오른쪽 Beds24 연결 — 크레딧 막대(쓴 양 · 남겨 둔 양, 한도 200 가정 · 남은 값이 더 크면 그 값) · 다시 채워지기까지 · 마지막 웹훅 / 메시지 웹훅 / 보정 확인 · 보낼 차례 기다림 수 · 최근 7일 보내지 못함(누르면 그 대화) · 남겨 둘 양(10~150) · 멈춤 기준(1~72시간) · 저장. 아래 「과거 메시지 가져오기」(재기 · 시작 · 이어서 · 처음부터, 확인 창, 도는 동안 4초마다 상태). **보는 것만으로 Beds24 를 부르지 않는다**(기록된 값만) |
+| `src/components/admin/messages/messages-settings.tsx` | 설정 탭(시안 R2Settings) — Beds24 연결(응답 목표 칸 · 밤에는 세지 않기 스위치는 2026-11-17 뺌) — 크레딧 막대(쓴 양 · 남겨 둔 양, 한도 200 가정 · 남은 값이 더 크면 그 값) · 다시 채워지기까지 · 마지막 웹훅 / 메시지 웹훅 / 보정 확인 · 보낼 차례 기다림 수 · 최근 7일 보내지 못함(누르면 그 대화) · 남겨 둘 양(10~150) · 멈춤 기준(1~72시간) · 저장. 아래 「과거 메시지 가져오기」(재기 · 시작 · 이어서 · 처음부터, 확인 창, 도는 동안 4초마다 상태). **보는 것만으로 Beds24 를 부르지 않는다**(기록된 값만) |
 | `src/components/guest-messages/stall-notice.tsx` | 목록 위 「받는 통로 멈춤」 줄(PC 목록 · 모바일 목록 머리, 관리 권한만) — 마지막 웹훅 뒤 `stall_hours` 가 지났거나 한 번도 안 왔을 때만. 「지금 확인하기」 = 보정 조회 한 번 |
 | `src/actions/guest-messages-settings.ts` | `checkGuestMessagesNow()`(PC · 모바일 공용, `guest_messages.manage`) — 1분에 한 번(`settings.lastManualCheckAt` 을 조회 **전에** 남김 → 실패해도 연타로 크레딧이 안 나감), 이 조직만 보정 조회. 크레딧 · 쿨다운 판단은 보정 조회 그대로 |
 | `src/app/admin/messages/actions.ts` | PC 탭 전용 — 설정 저장(`settings` 의 다른 키는 남김) · 문구 만들기/고치기/지우기(hard delete)/순서. 관리자 웹 + `guest_messages.manage`, 아니면 `forbidden` |
@@ -299,7 +299,7 @@ Beds24 예약 웹훅 ──▶ /api/beds24/webhook (기존) ──▶ 메시지 
 - 충돌 때 **쓴 글을 지우지 않는다** — 건물 손님용 정보 패널 · 정해 둔 문구 편집 모두 「최신 값 불러오기 / 내 글로 덮기」(덮기 = 최신 버전으로 다시 저장). 문구 고치기도 `updated_at` 버전 조건(순서만 바뀌면 버전은 그대로 — 트리거).
 - 고친 채로 패널을 닫으면(바깥 · X · Esc · 닫기) 확인 창. 건물이 바뀌면 패널이 읽는 중부터 새로. 저장 성공 · 실패 햅틱.
 - 답장 칸 넣기 목록은 **열 때마다** 다시 읽고, 패널에서 저장하면 바로 다시 읽는다.
-- 「지금 확인하기」 1분 간격은 DB 함수 `guest_message_claim_manual_check`(줄 잠금 안에서 확인 + 기록 — 동시에 눌러도 조회 한 번), 설정 저장은 `guest_message_save_settings`(`settings` 의 응답 목표 키만 바꿈), 문구 순서는 `guest_message_saved_replies_reorder`(unnest with ordinality, update 한 번). 순서 단추는 저장 중 막힘.
+- 「지금 확인하기」 1분 간격은 DB 함수 `guest_message_claim_manual_check`(줄 잠금 안에서 확인 + 기록 — 동시에 눌러도 조회 한 번), 설정 저장(남겨 둘 양 · 멈춤 기준)은 2026-11-17부터 `guest_message_channel_state` 두 칸 upsert — `guest_message_save_settings` DB 함수는 앱이 안 부르고 남겨 둠, 문구 순서는 `guest_message_saved_replies_reorder`(unnest with ordinality, update 한 번). 순서 단추는 저장 중 막힘.
 - 건물 패널로 가는 값에는 **출입 코드 값이 없다**(개수만, `toGuestInfoView`).
 - 크레딧 막대 한도: 헤더가 한도를 주면(`x-five-min-limit`) 그 값, 아니면 200 으로 **추정**하고 「(한도는 추정)」을 붙인다(지금 Beds24 는 남은 양만 준다).
 
@@ -423,7 +423,7 @@ PC `/admin/messages`(대화 · 자동 안내 탭) · 모바일 `/mobile/messages
   - 신호를 못 보내도(Realtime 장애 · 로컬 시험 DB 에 `realtime.send` 없음) 원래 쓰기는 그대로 끝난다 — 트리거가 경고만 남긴다.
 - **신호는 힌트일 뿐**: 행에서 **id 만** 꺼낸다(`liveKeysOf()` — 대화 id · 메시지/큐의 `conversation_id` · 실행 줄 id · 예약 번호, `src/lib/guest-messages/live-merge.ts`). 그 항목을 권한 검사하는 서버 액션으로 다시 읽어 합친다. 소켓의 본문 · 이름은 그리지 않는다. 조직 필터는 서버가 다시 건다(다른 조직 id 가 와도 `missing`).
 - **묶기**: 600ms 디바운스 · 최대 3초에 한 번 · 같은 id 는 한 번. 열쇠가 40개를 넘으면(과거 가져오기 · 계획 바퀴 같은 홍수) 하나하나 대신 보이는 것만 통째로 한 번(따라잡기). 숨은 탭에 온 것은 보일 때, 60초 넘게 숨었다 보이거나 소켓이 다시 붙거나 네트워크가 돌아오면 따라잡기(`createLiveChangeBatcher`).
-- **목록**(PC 왼쪽 · 모바일 목록): 서버가 처음 준 목록을 손에 들고(`useInboxLive`) 신호의 대화만 `getGuestConversationRows({ ids, status, building, channel })`(`src/actions/guest-messages.ts`, `guest_messages.view`, 한 번에 50개까지)로 목록 줄 모양으로 다시 읽는다 — 미리 보기 · 상태(처리 끝 · 나중에) · 기다린 시간 · 채널 · 발송 경고 · 머리 숫자(답장 기다림 · 목표 넘음). 지금 필터에 드는지는 서버가 판정(`matches`). 새로 든 줄은 살짝 내려오며 나타나고(220ms), 필터에서 빠지거나 없어진 줄은 **예전 값 그대로 자리에서 접힌 뒤**(`.row-collapse`) 빠진다. 다시 정렬은 손님 말 · 우리 답장 최신 순(§6-1) 그대로 — 새 손님 말 · 직원 답장이 온 대화는 맨 위로 올라온다(시스템 줄 · 직원 메모는 올리지 않음). 따라잡기는 `listGuestConversations` 한 번. 메시지 **UPDATE**(사진 사본 · 되돌아옴 잇기)는 목록을 건드리지 않는다 — 사진 복사 따라잡기(분당 수십 줄)가 목록을 두드리지 않게.
+- **목록**(PC 왼쪽 · 모바일 목록): 서버가 처음 준 목록을 손에 들고(`useInboxLive`) 신호의 대화만 `getGuestConversationRows({ ids, status, building, channel })`(`src/actions/guest-messages.ts`, `guest_messages.view`, 한 번에 50개까지)로 목록 줄 모양으로 다시 읽는다 — 미리 보기 · 상태(처리 끝 · 나중에) · 기다린 시간 · 채널 · 발송 경고 · 머리 숫자(답장 기다림). 지금 필터에 드는지는 서버가 판정(`matches`). 새로 든 줄은 살짝 내려오며 나타나고(220ms), 필터에서 빠지거나 없어진 줄은 **예전 값 그대로 자리에서 접힌 뒤**(`.row-collapse`) 빠진다. 다시 정렬은 손님 말 · 우리 답장 최신 순(§6-1) 그대로 — 새 손님 말 · 직원 답장이 온 대화는 맨 위로 올라온다(시스템 줄 · 직원 메모는 올리지 않음). 따라잡기는 `listGuestConversations` 한 번. 메시지 **UPDATE**(사진 사본 · 되돌아옴 잇기)는 목록을 건드리지 않는다 — 사진 복사 따라잡기(분당 수십 줄)가 목록을 두드리지 않게.
 - **열린 대화**(PC 가운데 · 폰 대화 · 태블릿 칸): 그 대화의 신호(새 말 · 발송 큐 queued → sent / failed / uncertain · 사진 사본 · 대화 상태 · 그 예약의 자동 안내 줄)가 오면 `getGuestConversation` 으로 조용히 다시 읽어 **합친다**(`mergeThread` — 그대로인 말 · 예약 · 자동 안내 · 업무 줄은 같은 객체, 사진의 서명 URL 만 새로 나온 것은 예전 주소 그대로 — 사진이 다시 받아지며 깜빡이지 않게). 답장 칸 글 · 열린 시트 · 팝오버 · 포커스 · 번역 상태는 그대로다. 겹친 읽기는 마지막 것만 쓴다.
   - **따라가기**(`useThreadFollow`, `src/components/guest-messages/thread-follow.tsx`): 맨 아래(80px 안)에 있으면 새 말을 따라 부드럽게 내려간다. 위로 올려 읽는 중이면 자리를 지키고 답장 칸 바로 위 가운데에 「새 메시지 / 新しいメッセージ / New messages」 알약(2개 이상이면 숫자)을 띄운다 — 누르는 자리 44px, 누르면 맨 아래로, 맨 아래까지 직접 내려도 사라진다. 숫자는 화면 읽기에 조용히(`aria-live="polite"`, 「새 메시지 n개 / 新しいメッセージ n件 / New messages: n」). 내가 보낸 직후는 올려 둔 상태여도 내려간다. 셀 것은 손님 말 · 우리 답장(내부 메모 · 시스템 줄 빼고). 대화를 열거나 바꾸면 예전처럼 맨 아래.
   - **햅틱 없음** — 들어온 말은 내 동작이 아니다(16 「햅틱」). 움직임을 줄이기 설정이면 알약은 투명도만.
@@ -435,18 +435,17 @@ PC `/admin/messages`(대화 · 자동 안내 탭) · 모바일 `/mobile/messages
 
 ## 6. 추가 기능 (D5)
 
-### 6-1. 응답 목표 시간
+### 6-1. 기다린 시간 표시
 
-- 설정: 예약 상태별 목표 — 시안 기본값 문의 30분 · 예약 요청 30분 · 숙박 중 1시간 · 확정 · 그 밖 2시간(관리자가 고침). 「밤에는 세지 않기」(23:00–07:00 도쿄) 스위치를 시안에 넣었다 — 기본값은 꺼짐(Q4 확정 (2026-11-12 사용자)).
-- 「기다린 시간」 = 마지막 손님 말 이후 우리 답장(또는 「처리 끝」)이 없는 시간. 내부 메모는 답장으로 치지 않는다.
-- 구현 `computeWaiting(conversation, settings, now)`(`src/lib/guest-messages/response-target.ts`) → `{ waitingMinutes, targetMinutes, ratio, overdue }`.
-  분류: Beds24 상태 `inquiry` → 문의, `request` → 예약 요청, 도쿄 날짜로 체크인 ≤ 오늘 < 체크아웃 → 숙박 중, 그 밖. `done` · 답장 이후 · 「나중에」가 안 끝났으면 0.
-  「나중에」가 끝났으면 그 시각부터 다시 센다(직원이 그때 보겠다고 정했으니 — 1단계 결정). 목표를 **넘으면**(`>`) overdue. 밤 빼기는 도쿄 23:00–07:00, 날 · 달 경계는 `tokyo-date.ts`.
-  기본값은 꺼짐(`night_pause = false`, Q4 확정 (2026-11-12 사용자)).
-- 알고 둔 점(2026-11-17): 열린 대화 창은 최근 메시지 500개 — 열린 대화가 500개를 넘으면 머리 숫자(답장 기다림 · 목표 넘음)가 창 안에서만 세어진다(운영 열린 대화 54개). 서버 액션의 상태 기본값도 목록 페이지와 같이 전체.
-- 목록: 목표 넘으면 빨간 글자(`#c4364b`). 목표의 80% 를 넘으면 굵게. **정렬은 응답 목표와 무관 — 손님 말 · 우리 답장이 최신인 순(`last_message_at` 내림차순, 2026-11-17 사용자 결정, 상태 묶음 없음). `last_message_at` 은 guest · host 메시지로만 올라가고 리뷰 알림 같은 system 줄 · internal 메모는 올리지 않는다(마이그레이션 `202611170001` 이 기존 값을 다시 계산, 2026-11-17 운영 적용 · 남은 어긋남 0).** 열린 대화 창(500개)도 최근 메시지 순으로 자른다. 처음 화면 = 전체.
+- **응답 목표 시간은 없다**(2026-11-17 사용자 결정: 목표 시간은 현업에 필요 없음). 예약 상태별 목표 · 「밤에는 세지 않기」 · 설정 화면의 목표 칸 · 「목표 N」 문구 · 「목표 넘음 N」 머리 숫자 · 80% 굵게 단계를 모두 뺐다.
+- 「기다린 시간」 = 마지막 **손님 말**부터 지금까지. 마지막 메시지가 손님 것이고 대화가 아직 처리 끝이 아닐 때만 센다. 우리 답장(`last_reply_at` ≥ 손님 말) · 「처리 끝」이면 0 — 기존 「처리 끝」 · 「나중에」 표시 그대로. 내부 메모는 답장으로 치지 않는다. 밤도 센다.
+- 구현 `computeWaiting(conversation, now)`(`src/lib/guest-messages/waiting.ts`) → `{ waitingMinutes }`. 「나중에」가 안 끝났으면 0, 끝났으면 손님 말부터 센다. 예약 분류(`bookingStateCategory` — 문의 · 요청 · 숙박 중 · 그 밖)는 상태 글자 용도만(도쿄 날짜).
+- 화면은 서버가 준 줄의 `status` · `lastGuestAt` · `lastReplyAt` · `snoozeUntil` 로 **지금 시각마다 다시 계산**한다(`liveRowState` · `liveWaitingMinutes` — 서버와 같은 `computeWaiting`). 그래서 열어 둔 채 시간이 흘러도 숫자 · 빨강 · 나중에 만료가 따라온다. 기다린 시간이 1분 미만이면(방금 손님이 보냄 포함) 글자를 그리지 않는다.
+- 표시 `waitingText()`(`gm-format.ts`): `10분째 대기` · `1시간 20분째 대기` · 하루 이상 `N일 넘게 대기`(ja `{wait}待機中` · `{d}日以上待機中`, en `Waiting 1h 20m` · `Waiting {d}+ days`). 목록 줄 오른쪽 위와 대화 머리가 같은 함수를 쓴다.
+- **1시간(60분) 이상이면 빨간 글자(`#c4364b`) 하나**(59분까지는 회색). 고정 규칙 — 설정 화면 없음. 굵게 단계 없음.
+- **정렬은 기다린 시간과 무관 — 손님 말 · 우리 답장이 최신인 순(`last_message_at` 내림차순, 2026-11-17 사용자 결정, 상태 묶음 없음). `last_message_at` 은 guest · host 메시지로만 올라가고 리뷰 알림 같은 system 줄 · internal 메모는 올리지 않는다(마이그레이션 `202611170001` 이 기존 값을 다시 계산, 2026-11-17 운영 적용 · 남은 어긋남 0).** 열린 대화 창(500개)도 최근 메시지 순으로 자른다. 처음 화면 = 전체.
 - 「처리 끝」: 답장할 필요 없는 말(「감사합니다」 등)은 처리 끝으로 표시해 기다림에서 뺀다. 「나중에」(시각 지정) 도 같은 자리.
-- 알림(목표 넘음 → 관리자)은 알림 일괄 구현 때 붙인다(D6). 1차는 화면 표시만.
+- 알림은 알림 일괄 구현 때 다시 정한다(D6). 지금은 화면 표시만.
 - 도쿄 시간 기준(CLAUDE.md 7).
 
 ### 6-2. 사용량 표시
@@ -482,11 +481,11 @@ PC `/admin/messages`(대화 · 자동 안내 탭) · 모바일 `/mobile/messages
 
 **1단계 확정**(`202611120002_guest_messages_foundation.sql`, 운영 적용 2026-11-12 — 칸 목록은 `docs/engineering/04-data-model.md` 「손님 메시지」):
 `guest_conversations` · `guest_messages` · `guest_message_outbox` · `guest_message_channel_state`.
-- 대화에 예약 상태 · 날짜(`booking_status` · `check_in_date` · `check_out_date`)를 사본으로 둔다 — 응답 목표 분류용. 건물 · 객실은 `property_id` · `room_id`(외래 키) + 표시용 `property_name` · `room_label`.
+- 대화에 예약 상태 · 날짜(`booking_status` · `check_in_date` · `check_out_date`)를 사본으로 둔다 — 상태 글자(문의 · 숙박 중 등) 분류용. 건물 · 객실은 `property_id` · `room_id`(외래 키) + 표시용 `property_name` · `room_label`.
 - 메시지에 `provider_source`(통로가 준 출처 원문)를 더했다 — 모르는 출처를 `system` 으로 읽어도 원래 값이 남는다.
 - 발송 큐 상태에 `uncertain`(나갔는지 모름 — 다시 보내지 않음)을 더했다. 연결 상태에 `last_reconcile_error` 를 더했다.
 - 대화 상태는 DB 함수 `guest_conversation_apply_messages` 로만 바꾼다(서버 경로).
-- 설정은 새 표 `guest_message_channel_state`(조직마다 한 줄)에: 응답 목표는 `settings.responseTargetMinutes`(jsonb, 기본 문의 30 · 요청 30 · 숙박 중 60 · 그 밖 120), `night_pause` · `credit_reserve`(20) · `stall_hours`(3) 은 칸.
+- 설정은 새 표 `guest_message_channel_state`(조직마다 한 줄)에: `credit_reserve`(20) · `stall_hours`(3) 은 칸. `settings.responseTargetMinutes` · `night_pause` 는 2026-11-17부터 앱이 안 쓴다(값만 남음 — 04 문서 참고).
 - **6단계**(`202611130005_guest_message_links.sql`, 운영 적용 2026-11-13): `guest_message_links`(organization_id · conversation_id → 대화 cascade · message_id → 메시지 set null · target_type maintenance/lost_found/task/complaint · target_id(외래 키 없음 — 업무 표가 여럿, 지워지면 화면이 「지워짐」) · created_by · created_at, `unique (organization_id, target_type, target_id)`, 트리거 `guest_message_links_check` 가 대화 · 메시지의 조직을 다시 봄, 읽기 = `guest_messages.view`, 쓰기 = 서버만) · `guest_message_saved_replies.purpose`(`resolved` 하나, 조직마다 하나).
 - **5단계**(`202611130004_guest_messages_auto.sql`, 운영 적용 2026-11-13): `auto_message_rules`(읽기 = `guest_messages.manage`, 쓰기 = 서버만, 글이 바뀔 때만 `updated_at` · 켤 때 `enabled_at`) · `auto_message_runs`(읽기 = `guest_messages.view`, 쓰기 = 서버만, 상태 scheduled/skipped/paused/queued/sent/failed/cancelled + `skip_reason` · `missing_variables`) · `guest_message_outbox.rule_id` 외래 키(set null) · 서버 전용 함수 `guest_message_enqueue_auto`. 칸 목록은 04 「손님 메시지」.
 - **3 · 4단계**(`202611130003_guest_messages_stage3_4.sql`, 운영 적용 2026-11-13): `property_operation_infos.guest_info` jsonb(기본 `{}`, 객체 · 64KB 이하) + `guest_info_updated_at` + `staff_info_saved` · 트리거 `property_operation_infos_touch()`(직원 칸이 바뀌면 `updated_at` + `staff_info_saved = true`, 손님 칸이 바뀌면 `guest_info_updated_at` 만) · 새 표 `guest_message_saved_replies`(제목 · 언어별 본문 · 순서 · 만든 사람, 읽기 = `guest_messages.view`, 쓰기 = 서버만, 글이 바뀔 때만 `updated_at`) · 서버 전용 함수 `guest_message_claim_manual_check` · `guest_message_save_settings` · `guest_message_saved_replies_reorder`.
@@ -502,7 +501,7 @@ PC `/admin/messages`(대화 · 자동 안내 탭) · 모바일 `/mobile/messages
 | --- | --- |
 | `guest_messages.view` | 메시지함 보기 |
 | `guest_messages.reply` | 답장 · 내부 메모 · 처리 끝 · 나중에 |
-| `guest_messages.manage` | 자동 안내 규칙 · 정해 둔 문구 · 응답 목표 · 사용량 표시 |
+| `guest_messages.manage` | 자동 안내 규칙 · 정해 둔 문구 · 사용량 표시(남겨 둘 양 · 멈춤 기준) |
 
 - 화면 숨김만으로 막지 않는다 — 서버 액션 · RLS 에서 확인(CLAUDE.md 6). 공용 서버 액션은 `src/actions/` 에 두고 `forbidden` 을 돌려준다.
 - **메시지 → 업무(6단계)**: 새 권한 없음 — `guest_messages.view` + 그 업무의 기존 권한(수리 · 분실물 · 할 일 = 조직 구성원, 게스트 피드백 = `complaint.write`). 링크 표 읽기 = `guest_messages.view`, 쓰기 = 서버만(§5-7).
@@ -526,7 +525,7 @@ PC `/admin/messages`(대화 · 자동 안내 탭) · 모바일 `/mobile/messages
 | 0 | V1~V4 확인(코드는 웹훅 원문 임시 기록만) — **임시 기록 구현 2026-11-12**(§3-4), 확인은 배포 · 적용 뒤 |
 | 1 | 수신(웹훅 추출 · 보정 조회 · 중복 막기) + 데이터 모델 + 어댑터 골격 — **구현 2026-11-12**(§4-0, 화면 없음 · 운영 DB 적용 2026-11-12 · 보정 조회 정기 실행은 `202611130006` pg_cron 15분(운영 적용 2026-11-13)) |
 | 2 | PC 메시지함 · 모바일 3폭 · 답장 · 발송 큐 · 429 대기 · 내부 메모 · 처리 끝 — **구현 2026-11-13**(§5-4, 커밋 전 · 발송 플래그 기본 꺼짐 · `translation_usage` 마이그레이션 미적용) |
-| 3 | 응답 목표 시간 · 사용량 표시 — **구현 2026-11-13**(§5-5, 커밋 전) |
+| 3 | 사용량 표시 — **구현 2026-11-13**(§5-5). 응답 목표 시간은 2026-11-17 뺌 → 기다린 시간 표시(§6-1) |
 | 4 | 건물별 정보 카드 · 정해 둔 문구 — **구현 2026-11-13**(§5-5, 커밋 전 · 마이그레이션 `202611130003` 운영 적용 2026-11-13) |
 | 5 | 자동 안내 규칙 · 보낼 예정 목록 — **구현 2026-11-13**(§5-6, 마이그레이션 `202611130004` 운영 적용 2026-11-13 · 정기 실행은 `202611130006` pg_cron 5분(운영 적용 2026-11-13)) |
 | 6 | 메시지 → 업무 한 번에 — **구현 2026-11-13**(§5-7, 마이그레이션 `202611130005` 운영 적용 2026-11-13) |

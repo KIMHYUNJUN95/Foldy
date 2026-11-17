@@ -55,7 +55,8 @@ function row(id: string, patch: Partial<InboxConversationRow> = {}): InboxConver
     lastMessageAt: "2026-11-13T01:00:00Z",
     lastGuestAt: "2026-11-13T01:00:00Z",
     lastLine: { direction: "guest", body: "hi" },
-    waiting: { waitingMinutes: 10, targetMinutes: 60, ratio: 10 / 60, overdue: false },
+    status: "awaiting",
+    lastReplyAt: null,
     outboxAlert: null,
     replyBlock: null,
     ...patch,
@@ -423,7 +424,7 @@ describe("손님 메시지 구독 묶음", () => {
 });
 
 describe("목록 상태 리듀서 — 순서 · 접힘 (리뷰 반영)", () => {
-  const listOf = (rows: InboxConversationRow[], awaitingCount = rows.length): InboxListData => ({ rows, awaitingCount, overdueCount: 0, buildings: [] });
+  const listOf = (rows: InboxConversationRow[], awaitingCount = rows.length): InboxListData => ({ rows, awaitingCount, buildings: [] });
   const ids = (state: ReturnType<typeof initialInboxLive>) => state.list?.rows.map((r) => r.id) ?? [];
 
   it("서버가 준 새 목록에서 빠진 줄은 접힘 → drop 으로 빠지고, 되돌리기로 다시 오면 접힘이 풀린다", () => {
@@ -441,7 +442,7 @@ describe("목록 상태 리듀서 — 순서 · 접힘 (리뷰 반영)", () => {
   it("drop 은 아직 접힌 줄만 빼고, 다 빠지면 빈 목록(빈 상태가 보인다)", () => {
     let state = initialInboxLive(listOf([row(C1)]));
     state = inboxLiveReducer(state, { type: "claim", ids: [C1], seq: 1 });
-    state = inboxLiveReducer(state, { type: "rows", seq: 1, result: { updates: [{ row: row(C1, { state: "done" }), matches: false }], missing: [], awaitingCount: 0, overdueCount: 0 } });
+    state = inboxLiveReducer(state, { type: "rows", seq: 1, result: { updates: [{ row: row(C1, { state: "done" }), matches: false }], missing: [], awaitingCount: 0 } });
     expect([...state.leaving]).toEqual([C1]);
     expect(state.list?.awaitingCount).toBe(0);
     state = inboxLiveReducer(state, { type: "drop", ids: [C1] });
@@ -454,7 +455,7 @@ describe("목록 상태 리듀서 — 순서 · 접힘 (리뷰 반영)", () => {
     state = inboxLiveReducer(state, { type: "replace", seq: 1, data: listOf([]) });
     expect(state.leaving.has(C1)).toBe(true);
     state = inboxLiveReducer(state, { type: "claim", ids: [C1], seq: 2 });
-    state = inboxLiveReducer(state, { type: "rows", seq: 2, result: { updates: [{ row: row(C1, { guestName: "back" }), matches: true }], missing: [], awaitingCount: 1, overdueCount: 0 } });
+    state = inboxLiveReducer(state, { type: "rows", seq: 2, result: { updates: [{ row: row(C1, { guestName: "back" }), matches: true }], missing: [], awaitingCount: 1 } });
     expect(state.leaving.has(C1)).toBe(false);
     expect(state.list?.rows[0].guestName).toBe("back");
   });
@@ -463,8 +464,8 @@ describe("목록 상태 리듀서 — 순서 · 접힘 (리뷰 반영)", () => {
     let state = initialInboxLive(listOf([row(C1), row(C2)]));
     state = inboxLiveReducer(state, { type: "claim", ids: [C1], seq: 1 });
     state = inboxLiveReducer(state, { type: "claim", ids: [C2], seq: 2 });
-    state = inboxLiveReducer(state, { type: "rows", seq: 2, result: { updates: [{ row: row(C2, { guestName: "B2" }), matches: true }], missing: [], awaitingCount: 2, overdueCount: 0 } });
-    state = inboxLiveReducer(state, { type: "rows", seq: 1, result: { updates: [{ row: row(C1, { guestName: "A1" }), matches: true }], missing: [], awaitingCount: 9, overdueCount: 0 } });
+    state = inboxLiveReducer(state, { type: "rows", seq: 2, result: { updates: [{ row: row(C2, { guestName: "B2" }), matches: true }], missing: [], awaitingCount: 2 } });
+    state = inboxLiveReducer(state, { type: "rows", seq: 1, result: { updates: [{ row: row(C1, { guestName: "A1" }), matches: true }], missing: [], awaitingCount: 9 } });
     expect(state.list?.rows.find((r) => r.id === C1)?.guestName).toBe("A1");
     expect(state.list?.rows.find((r) => r.id === C2)?.guestName).toBe("B2");
     // 머리 숫자는 더 늦게 보낸 응답(seq 2) 것.
@@ -475,8 +476,8 @@ describe("목록 상태 리듀서 — 순서 · 접힘 (리뷰 반영)", () => {
     let state = initialInboxLive(listOf([row(C1)]));
     state = inboxLiveReducer(state, { type: "claim", ids: [C1], seq: 1 });
     state = inboxLiveReducer(state, { type: "claim", ids: [C1], seq: 2 });
-    state = inboxLiveReducer(state, { type: "rows", seq: 2, result: { updates: [{ row: row(C1, { guestName: "new" }), matches: true }], missing: [], awaitingCount: 1, overdueCount: 0 } });
-    state = inboxLiveReducer(state, { type: "rows", seq: 1, result: { updates: [{ row: row(C1, { guestName: "old" }), matches: false }], missing: [], awaitingCount: 1, overdueCount: 0 } });
+    state = inboxLiveReducer(state, { type: "rows", seq: 2, result: { updates: [{ row: row(C1, { guestName: "new" }), matches: true }], missing: [], awaitingCount: 1 } });
+    state = inboxLiveReducer(state, { type: "rows", seq: 1, result: { updates: [{ row: row(C1, { guestName: "old" }), matches: false }], missing: [], awaitingCount: 1 } });
     expect(state.list?.rows[0].guestName).toBe("new");
     expect(state.leaving.size).toBe(0);
   });
@@ -485,7 +486,7 @@ describe("목록 상태 리듀서 — 순서 · 접힘 (리뷰 반영)", () => {
     let state = initialInboxLive(listOf([row(C1)]));
     // 통째 읽기 seq 1 시작 → 줄 읽기 seq 2 시작 · 응답(새 값) → 통째 읽기 응답(옛 값, C1 없음)
     state = inboxLiveReducer(state, { type: "claim", ids: [C1], seq: 2 });
-    state = inboxLiveReducer(state, { type: "rows", seq: 2, result: { updates: [{ row: row(C1, { guestName: "fresh" }), matches: true }], missing: [], awaitingCount: 1, overdueCount: 0 } });
+    state = inboxLiveReducer(state, { type: "rows", seq: 2, result: { updates: [{ row: row(C1, { guestName: "fresh" }), matches: true }], missing: [], awaitingCount: 1 } });
     state = inboxLiveReducer(state, { type: "replace", seq: 1, data: listOf([row(C2)]) });
     expect(state.list?.rows.find((r) => r.id === C1)?.guestName).toBe("fresh");
     expect(state.leaving.has(C1)).toBe(false);
@@ -496,7 +497,7 @@ describe("목록 상태 리듀서 — 순서 · 접힘 (리뷰 반영)", () => {
     let state = initialInboxLive(listOf([row(C1)]));
     state = inboxLiveReducer(state, { type: "claim", ids: [C1], seq: 1 });
     state = inboxLiveReducer(state, { type: "replace", seq: 3, data: listOf([row(C1, { guestName: "latest" })]) });
-    state = inboxLiveReducer(state, { type: "rows", seq: 1, result: { updates: [{ row: row(C1, { guestName: "stale" }), matches: true }], missing: [], awaitingCount: 1, overdueCount: 0 } });
+    state = inboxLiveReducer(state, { type: "rows", seq: 1, result: { updates: [{ row: row(C1, { guestName: "stale" }), matches: true }], missing: [], awaitingCount: 1 } });
     state = inboxLiveReducer(state, { type: "replace", seq: 2, data: listOf([]) });
     expect(state.list?.rows[0].guestName).toBe("latest");
     expect(state.leaving.size).toBe(0);

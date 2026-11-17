@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * PC 손님 메시지 「설정」 탭(시안 R2Settings) — 응답 목표 시간 · Beds24 연결 · 과거 메시지 가져오기. docs/product/47 §6-1 · §6-2 · §4-0-2
+ * PC 손님 메시지 「설정」 탭(시안 R2Settings) — Beds24 연결 · 과거 메시지 가져오기. docs/product/47 §6-2 · §4-0-2
  * `guest_messages.manage` 만 이 탭을 본다(서버 페이지가 거르고, 액션이 다시 본다).
  * 숫자는 모두 기록된 값 — 이 화면을 열어도 Beds24 를 부르지 않는다. 「지금 확인하기」 · 「비용 재기」 · 「가져오기」만 부른다.
  */
@@ -12,35 +12,18 @@ import { useEffect, useState, useTransition } from "react";
 import { getGuestMessageBackfillStatus, startGuestMessageBackfill, type GuestMessageBackfillStatus } from "@/actions/guest-messages-backfill";
 import { checkGuestMessagesNow } from "@/actions/guest-messages-settings";
 import { saveGuestMessageSettings } from "@/app/admin/messages/actions";
-import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
 import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
 import { GmConfirm, useNow } from "@/components/guest-messages/gm-parts";
 import { durationLabel, fill, formatWhen, reasonText, type GmCopy } from "@/components/guest-messages/gm-format";
 import type { ChannelOverview } from "@/lib/guest-messages/channel-overview-server";
-import { joinTargetMinutes, RESPONSE_TARGET_KEYS, splitTargetMinutes } from "@/lib/guest-messages/settings-model";
-import type { ResponseTargetCategory } from "@/lib/guest-messages/types";
-
-const TARGET_COPY: Record<ResponseTargetCategory, { name: keyof GmCopy; hint: keyof GmCopy }> = {
-  inquiry: { name: "targetInquiry", hint: "targetInquiryHint" },
-  request: { name: "targetRequest", hint: "targetRequestHint" },
-  staying: { name: "targetStaying", hint: "targetStayingHint" },
-  other: { name: "targetOther", hint: "targetOtherHint" },
-};
 
 type Draft = {
-  targets: Record<ResponseTargetCategory, { value: string; unit: "min" | "hour" }>;
-  nightPause: boolean;
   reserve: string;
   stall: string;
 };
 
 function draftOf(settings: ChannelOverview["settings"]): Draft {
-  const targets = {} as Draft["targets"];
-  for (const key of RESPONSE_TARGET_KEYS) {
-    const split = splitTargetMinutes(settings.responseTargetMinutes[key]);
-    targets[key] = { value: String(split.value), unit: split.unit };
-  }
-  return { targets, nightPause: settings.nightPause, reserve: String(settings.creditReserve), stall: String(settings.stallHours) };
+  return { reserve: String(settings.creditReserve), stall: String(settings.stallHours) };
 }
 
 function intOrNull(value: string): number | null {
@@ -80,15 +63,6 @@ export function MessagesSettings({
   const dirty = JSON.stringify(baseline) !== JSON.stringify(draft);
 
   const save = () => {
-    const minutes = {} as Record<ResponseTargetCategory, number>;
-    for (const key of RESPONSE_TARGET_KEYS) {
-      const value = joinTargetMinutes(draft.targets[key].value, draft.targets[key].unit);
-      if (value === null || value < 5 || value > 1440) {
-        setErrorKey("settingsInvalidTarget");
-        return;
-      }
-      minutes[key] = value;
-    }
     const reserve = intOrNull(draft.reserve);
     if (reserve === null || reserve < 10 || reserve > 150) {
       setErrorKey("settingsInvalidReserve");
@@ -102,8 +76,6 @@ export function MessagesSettings({
     setErrorKey(null);
     startSaving(async () => {
       const result = await saveGuestMessageSettings({
-        responseTargetMinutes: minutes,
-        nightPause: draft.nightPause,
         creditReserve: reserve,
         stallHours: stall,
       });
@@ -112,7 +84,7 @@ export function MessagesSettings({
         router.refresh();
       } else if (result.errorKey === "invalid") {
         setErrorKey(
-          result.field === "creditReserve" ? "settingsInvalidReserve" : result.field === "stallHours" ? "settingsInvalidStall" : "settingsInvalidTarget",
+          result.field === "creditReserve" ? "settingsInvalidReserve" : "settingsInvalidStall",
         );
       } else {
         showToast(result.errorKey === "forbidden" ? copy.forbidden : copy.settingsSaveFailed);
@@ -142,10 +114,9 @@ export function MessagesSettings({
   const credit = overview.credit;
   const resetsIn = credit.known ? Math.max(0, credit.resetsInSec - Math.floor((now.getTime() - overview.nowMs) / 1000)) : 0;
   const stallTone = overview.stall.stalled ? "urgent" : undefined;
-  // 두 칸이 같은 값 묶음을 저장한다 — 안내 글(「목표 넘은 알림은…」)은 응답 목표 칸에만.
-  const footSave = (idleNote: string | null) => (
+  const footSave = (
     <div className="gm-set__foot">
-      <span className="gm-hint">{errorKey ? <span className="gm-set__error">{copy[errorKey] as string}</span> : dirty ? copy.settingsUnsaved : idleNote}</span>
+      <span className="gm-hint">{errorKey ? <span className="gm-set__error">{copy[errorKey] as string}</span> : dirty ? copy.settingsUnsaved : null}</span>
       <button type="button" className="gm-btn gm-btn--primary gm-btn--lg" disabled={!dirty || saving} onClick={save}>
         {saving ? copy.settingsSaving : copy.settingsSave}
       </button>
@@ -154,62 +125,6 @@ export function MessagesSettings({
 
   return (
     <div className="gm-root gm-settings">
-      <section className="gm-set" aria-labelledby="gm-set-targets">
-        <h2 id="gm-set-targets" className="gm-set__title">
-          {copy.targetsTitle}
-        </h2>
-        <p className="gm-set__body">{copy.targetsBody}</p>
-        {RESPONSE_TARGET_KEYS.map((key) => {
-          const name = copy[TARGET_COPY[key].name] as string;
-          const value = draft.targets[key];
-          const minutes = joinTargetMinutes(value.value, value.unit);
-          const invalid = minutes === null || minutes < 5 || minutes > 1440;
-          return (
-            <div className="gm-set__row" key={key}>
-              <span className="gm-set__label">
-                <b>{name}</b>
-                <span>{copy[TARGET_COPY[key].hint] as string}</span>
-              </span>
-              <input
-                className="gm-num"
-                inputMode="numeric"
-                aria-label={fill(copy.targetInputLabel, { name })}
-                aria-invalid={invalid || undefined}
-                value={value.value}
-                onChange={(event) =>
-                  setDraft({ ...draft, targets: { ...draft.targets, [key]: { ...value, value: event.target.value.replace(/[^\d]/g, "").slice(0, 4) } } })
-                }
-              />
-              <AdmDropdown
-                size="sm"
-                ariaLabel={fill(copy.unitLabel, { name })}
-                value={value.unit}
-                options={[
-                  { value: "min", label: copy.unitMinutes },
-                  { value: "hour", label: copy.unitHours },
-                ]}
-                onChange={(unit) => setDraft({ ...draft, targets: { ...draft.targets, [key]: { ...value, unit: unit === "hour" ? "hour" : "min" } } })}
-              />
-            </div>
-          );
-        })}
-        <div className="gm-set__row">
-          <span className="gm-set__label">
-            <b>{copy.nightPauseTitle}</b>
-            <span>{copy.nightPauseHint}</span>
-          </span>
-          <button
-            type="button"
-            role="switch"
-            className="gm-switch"
-            aria-checked={draft.nightPause}
-            aria-label={copy.nightPauseTitle}
-            onClick={() => setDraft({ ...draft, nightPause: !draft.nightPause })}
-          />
-        </div>
-        {footSave(copy.targetsAlertNote)}
-      </section>
-
       <section className="gm-set" aria-labelledby="gm-set-conn">
         <div className="gm-set__head">
           <h2 id="gm-set-conn" className="gm-set__title">
@@ -326,7 +241,7 @@ export function MessagesSettings({
           />
           <span className="gm-unit">{copy.unitHours}</span>
         </div>
-        {footSave(null)}
+        {footSave}
       </section>
 
       <BackfillSection copy={copy} locale={locale} now={now} initial={backfill} notify={showToast} />

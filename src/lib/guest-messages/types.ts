@@ -128,51 +128,23 @@ export interface GuestMessageChannelAdapter {
   markRead(externalIds: string[]): Promise<MarkReadOutcome>;
 }
 
-/** `guest_message_channel_state.settings` 의 모양(+ 칸 값). */
-export type ResponseTargetCategory = "inquiry" | "request" | "staying" | "other";
-
+/** `guest_message_channel_state` 에서 앱이 쓰는 칸. 응답 목표 · 밤 제외 값은 2026-11-17부터 안 쓴다(값만 DB 에 남음). */
 export type GuestMessageSettings = {
-  responseTargetMinutes: Record<ResponseTargetCategory, number>;
-  nightPause: boolean;
   creditReserve: number;
   stallHours: number;
 };
 
-export const DEFAULT_RESPONSE_TARGET_MINUTES: Record<ResponseTargetCategory, number> = {
-  inquiry: 30,
-  request: 30,
-  staying: 60,
-  other: 120,
-};
-
 export const DEFAULT_GUEST_MESSAGE_SETTINGS: GuestMessageSettings = {
-  responseTargetMinutes: DEFAULT_RESPONSE_TARGET_MINUTES,
-  nightPause: false,
   creditReserve: 20,
   stallHours: 3,
 };
 
 /** DB 줄(`guest_message_channel_state`) → 설정. 이상한 값은 기본값으로. */
 export function readGuestMessageSettings(row: {
-  settings?: unknown;
-  night_pause?: boolean | null;
   credit_reserve?: number | null;
   stall_hours?: number | null;
 } | null | undefined): GuestMessageSettings {
-  const targets = { ...DEFAULT_RESPONSE_TARGET_MINUTES };
-  const raw = row?.settings;
-  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
-    const minutes = (raw as Record<string, unknown>).responseTargetMinutes;
-    if (minutes && typeof minutes === "object" && !Array.isArray(minutes)) {
-      for (const key of Object.keys(targets) as ResponseTargetCategory[]) {
-        const value = (minutes as Record<string, unknown>)[key];
-        if (typeof value === "number" && Number.isFinite(value) && value > 0) targets[key] = Math.round(value);
-      }
-    }
-  }
   return {
-    responseTargetMinutes: targets,
-    nightPause: row?.night_pause ?? DEFAULT_GUEST_MESSAGE_SETTINGS.nightPause,
     creditReserve: row?.credit_reserve ?? DEFAULT_GUEST_MESSAGE_SETTINGS.creditReserve,
     stallHours: row?.stall_hours ?? DEFAULT_GUEST_MESSAGE_SETTINGS.stallHours,
   };

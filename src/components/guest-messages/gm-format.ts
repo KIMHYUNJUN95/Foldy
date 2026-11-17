@@ -10,7 +10,8 @@ import {
   type OutboxErrorKey,
   type StaffViewLang,
 } from "@/lib/guest-messages/inbox-model";
-import { responseTargetCategory } from "@/lib/guest-messages/response-target";
+import { liveRowState, liveWaitingMinutes } from "@/lib/guest-messages/inbox-model";
+import { bookingStateCategory, isLongWait } from "@/lib/guest-messages/waiting";
 import type { GuestChannelKey } from "@/lib/guest-messages/types";
 import { tokyoDateOf } from "@/lib/tokyo-date";
 import { messagePlainText } from "@/lib/guest-messages/message-body";
@@ -100,7 +101,7 @@ export function bookingStateLabel(
 ): string {
   const status = row.bookingStatus?.trim().toLowerCase() ?? "";
   if (status === "cancelled") return copy.statusCancelled;
-  const category = responseTargetCategory(
+  const category = bookingStateCategory(
     {
       booking_status: row.bookingStatus,
       check_in_date: row.checkInDate,
@@ -243,16 +244,22 @@ export function newIdempotencyKey(): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-/** 줄 오른쪽 위 기다린 시간 · 상태 글자 + 색 · 굵기. */
+/** 「N분째 대기」 · 「1시간 20분째 대기」 · 하루 넘으면 「N일 넘게 대기」. */
+export function waitingText(minutes: number, copy: GmCopy): string {
+  if (minutes >= 24 * 60) return fill(copy.waitedDays, { d: Math.floor(minutes / (24 * 60)) });
+  return fill(copy.waitedFor, { wait: durationLabel(minutes, copy) });
+}
+
+/** 줄 오른쪽 위 기다린 시간 · 상태 글자 + 색(1시간 이상이면 빨강 하나). */
 export function waitBadge(
   row: InboxConversationRow,
   copy: GmCopy,
   locale: string,
   now: Date,
-  withTarget: boolean,
-): { text: string; tone: "urgent" | "strong" | "muted" } {
-  if (row.state === "done") return { text: copy.stateDone, tone: "muted" };
-  if (row.state === "snoozed" && row.snoozeUntil) {
+): { text: string; tone: "urgent" | "muted" } {
+  const state = liveRowState(row, now);
+  if (state === "done") return { text: copy.stateDone, tone: "muted" };
+  if (state === "snoozed" && row.snoozeUntil) {
     return {
       text: fill(copy.stateSnoozedUntil, {
         time: formatWhen(row.snoozeUntil, locale, now),
@@ -260,25 +267,19 @@ export function waitBadge(
       tone: "muted",
     };
   }
-  const wait = durationLabel(row.waiting.waitingMinutes, copy);
-  const text = withTarget
-    ? fill(copy.waitWithTarget, {
-        wait,
-        target: durationLabel(row.waiting.targetMinutes, copy),
-      })
-    : wait;
-  if (row.waiting.overdue) return { text, tone: "urgent" };
-  if (row.waiting.ratio >= 0.8) return { text, tone: "strong" };
-  return { text, tone: "muted" };
+  const minutes = liveWaitingMinutes(row, now);
+  // 1분이 안 됐거나 기다리지 않는 줄(우리가 답함 등)은 글자를 그리지 않는다.
+  if (minutes <= 0) return { text: "", tone: "muted" };
+  return { text: waitingText(minutes, copy), tone: isLongWait(minutes) ? "urgent" : "muted" };
 }
 
-export function lastLineText(row: InboxConversationRow, copy: GmCopy): string {
-  if (row.replyBlock === "direct_booking" && row.state !== "done" && !row.lastLine) return copy.directNoReply;
+export function lastLineText(row: InboxConversationRow, copy: GmCopy, now: Date): string {
+  if (row.replyBlock === "direct_booking" && liveRowState(row, now) !== "done" && !row.lastLine) return copy.directNoReply;
   if (!row.lastLine) return "";
   // 사진 · 링크 앵커는 글로 바꾼다(주소 대신 「사진」, 47 §5-8).
   const plain = messagePlainText(row.lastLine.body);
   const body = plain.text.replace(/\s+/g, " ").trim() || (plain.imageCount > 0 ? copy.photoLabel : copy.attachmentOnly);
-  if (row.state === "awaiting" && row.lastLine.direction === "guest") return body;
+  if (liveRowState(row, now) === "awaiting" && row.lastLine.direction === "guest") return body;
   return fill(row.lastLine.direction === "guest" ? copy.prefixGuest : copy.prefixReply, { text: body });
 }
 

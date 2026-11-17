@@ -296,9 +296,6 @@ export function MessagesConsole({
             ariaLabel={copy.filterChannel}
             onChange={(value) => router.replace(hrefFor({ channel: parseChannelFilter(value), c: null }))}
           />
-          {list && list.overdueCount > 0 ? (
-            <span className="gm-filters__overdue">{fill(copy.overdueCount, { n: list.overdueCount })}</span>
-          ) : null}
         </div>
         {canManage ? <StallNoticeLine notice={stall} copy={copy} locale={locale} notify={(message) => showToast(message)} /> : null}
         <div className="gm-scroll">
@@ -321,7 +318,7 @@ export function MessagesConsole({
                     aria-current={row.id === selected ? "true" : undefined}
                     onClick={() => choose(row.id)}
                   >
-                    <ConversationRowBody row={row} copy={copy} locale={locale} now={now} withTarget withDates />
+                    <ConversationRowBody row={row} copy={copy} locale={locale} now={now} withDates />
                   </button>
                 </div>
               </div>

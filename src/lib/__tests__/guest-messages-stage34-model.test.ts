@@ -14,9 +14,7 @@ import { fillReplyVariables, formatGuestDate, savedReplyText, validateSavedReply
 import {
   channelStallState,
   creditBarModel,
-  joinTargetMinutes,
   reconcileNowTooSoon,
-  splitTargetMinutes,
   validateGuestMessageSettingsInput,
 } from "@/lib/guest-messages/settings-model";
 import { LOW_CREDIT_THRESHOLD } from "@/lib/beds24/calendar-client";
@@ -29,8 +27,6 @@ const FORMATS = { wifi: "Wi-Fi: {name} / {password}", wifiNameOnly: "Wi-Fi: {nam
 
 describe("설정 값 검사", () => {
   const valid = {
-    responseTargetMinutes: { inquiry: 30, request: 60, staying: 15, other: 180 },
-    nightPause: false,
     creditReserve: 20,
     stallHours: 3,
   };
@@ -39,41 +35,16 @@ describe("설정 값 검사", () => {
     expect(validateGuestMessageSettingsInput(valid)).toEqual({ ok: true, value: valid });
   });
 
-  it("응답 목표 5분 미만 · 24시간 초과 · 소수는 그 칸을 짚어 거절", () => {
-    expect(validateGuestMessageSettingsInput({ ...valid, responseTargetMinutes: { ...valid.responseTargetMinutes, request: 4 } })).toEqual({
-      ok: false,
-      error: "invalid_input",
-      field: "request",
-    });
-    expect(
-      validateGuestMessageSettingsInput({ ...valid, responseTargetMinutes: { ...valid.responseTargetMinutes, other: 24 * 60 + 1 } }),
-    ).toMatchObject({ ok: false, field: "other" });
-    expect(
-      validateGuestMessageSettingsInput({ ...valid, responseTargetMinutes: { ...valid.responseTargetMinutes, inquiry: 30.5 } }),
-    ).toMatchObject({ ok: false, field: "inquiry" });
-  });
-
   it("크레딧 남겨 둘 선은 낮은 크레딧 선(10) 아래로 못 내린다 · 150 넘지 않게", () => {
     expect(validateGuestMessageSettingsInput({ ...valid, creditReserve: LOW_CREDIT_THRESHOLD - 1 })).toMatchObject({ field: "creditReserve" });
     expect(validateGuestMessageSettingsInput({ ...valid, creditReserve: 151 })).toMatchObject({ field: "creditReserve" });
     expect(validateGuestMessageSettingsInput({ ...valid, creditReserve: LOW_CREDIT_THRESHOLD })).toMatchObject({ ok: true });
   });
 
-  it("멈춤 기준 1~72시간 · 밤 쉬기는 참거짓만", () => {
+  it("멈춤 기준은 1~72시간", () => {
     expect(validateGuestMessageSettingsInput({ ...valid, stallHours: 0 })).toMatchObject({ field: "stallHours" });
     expect(validateGuestMessageSettingsInput({ ...valid, stallHours: 73 })).toMatchObject({ field: "stallHours" });
-    expect(validateGuestMessageSettingsInput({ ...valid, nightPause: "yes" })).toMatchObject({ ok: false, field: null });
     expect(validateGuestMessageSettingsInput(null)).toMatchObject({ ok: false });
-  });
-
-  it("분 ↔ 화면 칸(60 의 배수면 시간)", () => {
-    expect(splitTargetMinutes(30)).toEqual({ value: 30, unit: "min" });
-    expect(splitTargetMinutes(120)).toEqual({ value: 2, unit: "hour" });
-    expect(splitTargetMinutes(90)).toEqual({ value: 90, unit: "min" });
-    expect(joinTargetMinutes("3", "hour")).toBe(180);
-    expect(joinTargetMinutes(" 45 ", "min")).toBe(45);
-    expect(joinTargetMinutes("1.5", "hour")).toBeNull();
-    expect(joinTargetMinutes("", "min")).toBeNull();
   });
 });
 

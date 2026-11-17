@@ -389,13 +389,12 @@ describe("정렬 · 막힘 판정", () => {
       snoozeUntil: null,
       lastGuestAt: "2026-11-12T00:00:00.000Z",
       lastMessageAt: "2026-11-12T00:00:00.000Z",
-      waiting: { waitingMinutes: 10, targetMinutes: 60, ratio: 0.1, overdue: false },
       ...over,
     }) as InboxConversationRow;
 
   it("상태 · 기다림과 상관없이 마지막 메시지가 최신인 줄이 위", () => {
     const rows = sortInboxRows([
-      base({ id: "old-over", lastMessageAt: "2026-11-10T00:00:00.000Z", waiting: { waitingMinutes: 70, targetMinutes: 60, ratio: 1.16, overdue: true } as never }),
+      base({ id: "old-over", lastMessageAt: "2026-11-10T00:00:00.000Z" }),
       base({ id: "done-new", state: "done", lastMessageAt: "2026-11-16T00:00:00.000Z" }),
       base({ id: "snoozed-mid", state: "snoozed", lastMessageAt: "2026-11-13T00:00:00.000Z" }),
     ]);

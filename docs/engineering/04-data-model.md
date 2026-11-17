@@ -2520,6 +2520,7 @@ INSERT · UPDATE 신호만, DELETE 는 오지 않는다. 대신 `task_occurrence
 - `guest_message_channel_state` — 조직마다 한 줄(PK `organization_id`). `provider` · `last_webhook_at` · `last_message_webhook_at` · `last_reconcile_at`(한 페이지라도 읽었을 때만) · `last_reconcile_error` ·
   `last_credit_remaining` · `last_credit_reset_at` · `last_request_cost`(마지막 Beds24 응답 헤더 — **이 기능 화면용 사본**. 계정 전체 기준은 `beds24_sync_locks` 의 `account_credit` 줄: `expires_at` = 리셋 시각, `metadata` = `{ remaining, resetsAt, requestCost, recordedAt, source }`) · `settings` jsonb(기본 `{"responseTargetMinutes": {"inquiry": 30, "request": 30, "staying": 60, "other": 120}}`) ·
   `night_pause`(기본 false) · `credit_reserve`(기본 20, 0~1000) · `stall_hours`(기본 3, 1~72).
+  **`settings.responseTargetMinutes` · `night_pause` 는 2026-11-17부터 앱에서 안 씀(값만 남음)** — 응답 목표 시간을 없애고 「기다린 시간」(1시간 이상이면 빨강)만 보인다(문서 47 §6-1). 앱은 `credit_reserve` · `stall_hours` 두 칸만 upsert 한다.
 - 네 표 모두 `updated_at` 트리거(`set_updated_at`).
 - 함수 `guest_conversation_apply_messages(p_conversation_id, p_organization_id, p_guest_at, p_unread_guest_at, p_reply_at, p_message_at, p_now)`: 대화 상태를 한 문장으로 바꾼다
   (시각은 `greatest` 로만 앞으로, 「답장 기다림」은 새 안 읽은 손님 말이 기존 손님 말 · 답장보다 모두 나중일 때만, 「나중에」 유지 · 해제, 답장 → done). `security definer` · `search_path=''` · 실행 service_role 만. 규칙 문서: 47 §4-0.
@@ -2563,7 +2564,7 @@ INSERT · UPDATE 신호만, DELETE 는 오지 않는다. 대신 `task_occurrence
 - `property_operation_infos.guest_info_updated_at timestamptz` — 손님 칸 버전(처음 저장 전 null). 저장은 이 값 조건(null 이면 「아직 없음」 조건).
 - 트리거 `property_operation_infos_touch()`(before insert/update, 옛 `set_updated_at` 트리거를 바꿈): 직원 칸(주소 · 출입 코드 · 메모)이 바뀌면 `updated_at`, `guest_info` 가 바뀌면 `guest_info_updated_at` 만 올린다 — 두 저장이 서로를 충돌로 막지 않게. 넣을 때 `guest_info` 가 비어 있지 않을 때만 `guest_info_updated_at` 을 채운다.
 - `property_operation_infos.staff_info_saved boolean not null default true` — 직원 칸을 사람이 저장했나. 손님용 정보 저장이 줄을 처음 만들면 false → 그 뒤 「줄 없음」 화면의 출입 코드 저장이 23505 대신 이 줄을 고친다(`staff_info_saved = false` 조건). 직원 칸이 바뀌면 트리거가 true.
-- 함수(모두 `security definer` · `search_path = ''` · 실행 service_role 만): `guest_message_claim_manual_check(org, now, interval_seconds)` → boolean(줄 잠금 안에서 `settings.lastManualCheckAt` 확인 + 기록) · `guest_message_save_settings(org, targets, night_pause, credit_reserve, stall_hours)`(`settings` 는 `responseTargetMinutes` 키만 바꿈) · `guest_message_saved_replies_reorder(org, ids[])` → 바뀐 줄 수(unnest with ordinality, 10 간격).
+- 함수(모두 `security definer` · `search_path = ''` · 실행 service_role 만): `guest_message_claim_manual_check(org, now, interval_seconds)` → boolean(줄 잠금 안에서 `settings.lastManualCheckAt` 확인 + 기록) · `guest_message_save_settings(org, targets, night_pause, credit_reserve, stall_hours)`(`settings` 는 `responseTargetMinutes` 키만 바꿈 — **2026-11-17부터 앱이 안 부름**, 함수는 남김) · `guest_message_saved_replies_reorder(org, ids[])` → 바뀐 줄 수(unnest with ordinality, 10 간격).
 - `guest_message_saved_replies` — 정해 둔 문구. `id` · `organization_id`(→ organizations, cascade) · `title`(1~80) · `body_ko` · `body_ja` · `body_en`(각 ≤ 2,000, 하나 이상 비어 있지 않음) · `sort_order`(0~100000) · `created_by`(→ auth.users, set null) · `created_at` · `updated_at`(트리거 `guest_message_saved_replies_touch` — 제목 · 본문이 바뀔 때만, 순서만 바뀌면 그대로; 앱은 고치기 저장을 이 값 조건으로). 인덱스 `(organization_id, sort_order)`. 조직마다 200개(앱). 하드 삭제.
 - 타입: `src/types/database.ts` 손으로 맞춤.
 

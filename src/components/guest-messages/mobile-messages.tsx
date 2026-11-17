@@ -47,6 +47,7 @@ import { guestInboxLiveSources, guestThreadLiveSources } from "@/lib/live-source
 import { idsOfKind, liveKeysOf, pruneLocalLeaving, touchesThread } from "@/lib/guest-messages/live-merge";
 import {
   INBOX_CHANNEL_FILTERS,
+  liveRowState,
   parseChannelFilter,
   type InboxChannelFilter,
   type InboxListData,
@@ -234,7 +235,7 @@ export function MobileInbox({
             >
               <div>
                 <Link className="gm-row" href={`/mobile/messages/${row.id}`}>
-                  <ConversationRowBody row={row} copy={copy} locale={locale} now={now} withTarget={false} withDates={false} />
+                  <ConversationRowBody row={row} copy={copy} locale={locale} now={now} withDates={false} />
                 </Link>
               </div>
             </div>
@@ -351,7 +352,7 @@ export function MobileThreadScreen({
   }
 
   const row = thread.conversation;
-  const state = controller.state ?? row.state;
+  const state = controller.state ?? liveRowState(row, now);
   const openTaskSheet = () => {
     if (picked.size === 0) {
       // 처음엔 마지막 손님 말 하나를 붙여 둔다.

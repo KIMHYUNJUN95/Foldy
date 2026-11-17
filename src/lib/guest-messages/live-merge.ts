@@ -284,7 +284,6 @@ export type InboxRowsPayload = {
   updates: readonly InboxRowUpdate[];
   missing: readonly string[];
   awaitingCount: number;
-  overdueCount: number;
 };
 
 export type InboxLiveAction =
@@ -329,7 +328,6 @@ export function inboxLiveReducer(state: InboxLiveState, action: InboxLiveAction)
           ...state.list,
           rows: merge.rows,
           awaitingCount: counts ? action.result.awaitingCount : state.list.awaitingCount,
-          overdueCount: counts ? action.result.overdueCount : state.list.overdueCount,
         },
         leaving: withAll(state.leaving, merge.left, back),
         entered: withAll(state.entered, merge.entered),
@@ -360,7 +358,6 @@ export function inboxLiveReducer(state: InboxLiveState, action: InboxLiveAction)
           rows: merge.rows,
           buildings: data.buildings,
           awaitingCount: counts ? data.awaitingCount : state.list.awaitingCount,
-          overdueCount: counts ? data.overdueCount : state.list.overdueCount,
         },
         leaving: withAll(state.leaving, merge.left, data.rows.filter((row) => !newer.has(row.id)).map((row) => row.id)),
         entered: withAll(state.entered, merge.entered),

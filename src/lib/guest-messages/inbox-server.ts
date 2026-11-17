@@ -27,7 +27,6 @@ import {
   sortInboxRows,
   strongestOutboxAlert,
   toChannelKey,
-  waitingOf,
   type InboxConversationRow,
   type InboxListData,
   type InboxMessage,
@@ -38,12 +37,7 @@ import {
   matchesChannelFilter,
   type InboxChannelFilter,
 } from "@/lib/guest-messages/inbox-model";
-import {
-  readGuestMessageSettings,
-  type GuestConversationStatus,
-  type GuestMessageDirection,
-  type GuestMessageSettings,
-} from "@/lib/guest-messages/types";
+import type { GuestConversationStatus, GuestMessageDirection } from "@/lib/guest-messages/types";
 
 type Client = SupabaseClient<Database>;
 
@@ -77,22 +71,12 @@ const DONE_LIMIT = 200;
 const THREAD_MESSAGE_LIMIT = 300;
 const IN_CHUNK = 100;
 
-export async function loadGuestMessageSettings(db: Client, organizationId: string): Promise<GuestMessageSettings> {
-  const { data } = await db
-    .from("guest_message_channel_state")
-    .select("settings, night_pause, credit_reserve, stall_hours")
-    .eq("organization_id", organizationId)
-    .maybeSingle();
-  return readGuestMessageSettings(data as Parameters<typeof readGuestMessageSettings>[0]);
-}
-
 export function toInboxRow(
   row: ConversationDbRow,
   extras: {
     lastLine: InboxConversationRow["lastLine"];
     outboxStatuses: readonly string[];
   },
-  settings: GuestMessageSettings,
   now: Date,
 ): InboxConversationRow {
   const channel = toChannelKey(row.channel);
@@ -111,7 +95,8 @@ export function toInboxRow(
     lastMessageAt: row.last_message_at,
     lastGuestAt: row.last_guest_at,
     lastLine: extras.lastLine,
-    waiting: waitingOf(row, settings, now),
+    status: row.status,
+    lastReplyAt: row.last_reply_at,
     outboxAlert: strongestOutboxAlert(extras.outboxStatuses),
     replyBlock: replyBlockReason(channel),
   };
@@ -198,7 +183,7 @@ export async function loadInboxList(
   visibility: CodeVisibility = { canSeeCodes: true, canManageAuto: true },
 ): Promise<InboxListData> {
   const channelFilter = filter.channel ?? "all";
-  const [open, done, settings] = await Promise.all([
+  const [open, done] = await Promise.all([
     db
       .from("guest_conversations")
       .select(CONVERSATION_COLUMNS)
@@ -213,7 +198,6 @@ export async function loadInboxList(
       .eq("status", "done")
       .order("last_message_at", { ascending: false, nullsFirst: false })
       .limit(DONE_LIMIT),
-    loadGuestMessageSettings(db, organizationId),
   ]);
   if (open.error) throw new Error(`conversation read failed: ${open.error.message}`);
   if (done.error) throw new Error(`conversation read failed: ${done.error.message}`);
@@ -233,13 +217,12 @@ export async function loadInboxList(
           lastLine: lastLines.get(row.id) ?? null,
           outboxStatuses: outbox.get(row.id) ?? [],
         },
-        settings,
         now,
       ),
     ),
   );
 
-  return { rows, ...headerCounts(all, filter, settings, now), buildings };
+  return { rows, ...headerCounts(all, filter, now), buildings };
 }
 
 type InboxFilter = { status: InboxStatusFilter; building: string | null; channel?: InboxChannelFilter };
@@ -254,17 +237,15 @@ function matchesInboxFilter(row: ConversationDbRow, filter: InboxFilter, now: Da
 }
 
 /** 머리 숫자는 상태 필터와 무관(건물 · 채널 필터는 따른다) — 「답장 기다림 N」 · 「목표 넘음 N」. */
-function headerCounts(rows: readonly ConversationDbRow[], filter: InboxFilter, settings: GuestMessageSettings, now: Date) {
+function headerCounts(rows: readonly ConversationDbRow[], filter: InboxFilter, now: Date) {
   let awaitingCount = 0;
-  let overdueCount = 0;
   for (const row of rows) {
     if (effectiveRowState(row, now) !== "awaiting") continue;
     if (filter.building && row.property_name !== filter.building) continue;
     if (!matchesChannelFilter(toChannelKey(row.channel), filter.channel ?? "all")) continue;
     awaitingCount += 1;
-    if (waitingOf(row, settings, now).overdue) overdueCount += 1;
   }
-  return { awaitingCount, overdueCount };
+  return { awaitingCount };
 }
 
 /** 목록 한 줄은 자동 안내인지 알 수 없다 — 우리 쪽 말(host)은 모두 그 건물 코드를 가린다. */
@@ -296,7 +277,6 @@ export type InboxRowsResult = {
   /** 이 조직에 없는 id(지워짐 · 다른 조직 — 어느 쪽인지 알리지 않는다). */
   missing: string[];
   awaitingCount: number;
-  overdueCount: number;
 };
 
 /**
@@ -312,7 +292,7 @@ export async function loadInboxRowsByIds(
   visibility: CodeVisibility = { canSeeCodes: true, canManageAuto: true },
 ): Promise<InboxRowsResult> {
   // 목록과 같은 창 — 열린 대화는 최근 메시지 500개, 처리 끝은 최근 200개. 그 밖의 줄은 목록에도 없으니 `matches` 도 아니다.
-  const [found, open, doneWindow, settings] = await Promise.all([
+  const [found, open, doneWindow] = await Promise.all([
     db.from("guest_conversations").select(CONVERSATION_COLUMNS).eq("organization_id", organizationId).in("id", [...ids]),
     db
       .from("guest_conversations")
@@ -328,7 +308,6 @@ export async function loadInboxRowsByIds(
       .eq("status", "done")
       .order("last_message_at", { ascending: false, nullsFirst: false })
       .limit(DONE_LIMIT),
-    loadGuestMessageSettings(db, organizationId),
   ]);
   if (found.error) throw new Error(`conversation read failed: ${found.error.message}`);
   if (open.error) throw new Error(`conversation read failed: ${open.error.message}`);
@@ -345,11 +324,11 @@ export async function loadInboxRowsByIds(
   const seen = new Set(foundIds);
   return {
     updates: rows.map((row) => ({
-      row: toInboxRow(row, { lastLine: lastLines.get(row.id) ?? null, outboxStatuses: outbox.get(row.id) ?? [] }, settings, now),
+      row: toInboxRow(row, { lastLine: lastLines.get(row.id) ?? null, outboxStatuses: outbox.get(row.id) ?? [] }, now),
       matches: inWindow.has(row.id) && matchesInboxFilter(row, filter, now),
     })),
     missing: ids.filter((id) => !seen.has(id)),
-    ...headerCounts(openRows, filter, settings, now),
+    ...headerCounts(openRows, filter, now),
   };
 }
 
@@ -460,7 +439,7 @@ export async function loadInboxThread(
   const conversation = await loadConversationRow(db, organizationId, conversationId);
   if (!conversation) return null;
 
-  const [messagesRes, outboxRes, settings, reservationRes, autoRuns, links] = await Promise.all([
+  const [messagesRes, outboxRes, reservationRes, autoRuns, links] = await Promise.all([
     db
       .from("guest_messages")
       .select("id, direction, body, body_translated, translated_lang, body_lang, sent_at, author_user_id, attachments, outbox_id")
@@ -473,7 +452,6 @@ export async function loadInboxThread(
       .select("id, kind, status, error_code, next_try_at")
       .eq("organization_id", organizationId)
       .eq("conversation_id", conversationId),
-    loadGuestMessageSettings(db, organizationId),
     conversation.reservation_id
       ? db
           .from("reservations")
@@ -559,7 +537,6 @@ export async function loadInboxThread(
       lastLine: lastLine ? { direction: lastLine.direction, body: lastLine.body } : null,
       outboxStatuses: [...outboxById.values()].map((o) => o.status),
     },
-    settings,
     now,
   );
 

@@ -34,6 +34,8 @@ import {
   MAX_NOTE_CHARS,
   MAX_REPLY_CHARS,
   defaultReplyTarget,
+  liveRowState,
+  liveWaitingMinutes,
   outboxErrorKey,
   replyTranslationTargets,
   type StaffViewLang,
@@ -45,11 +47,12 @@ import {
 import { haptic } from "@/lib/haptics";
 import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
 import { tokyoDateOf } from "@/lib/tokyo-date";
+import { isLongWait } from "@/lib/guest-messages/waiting";
 import {
   CHANNEL_DOT,
   bookingStateLabel,
   channelName,
-  durationLabel,
+  waitingText,
   fill,
   formatDay,
   formatShortRange,
@@ -140,19 +143,17 @@ export function ConversationRowBody({
   copy,
   locale,
   now,
-  withTarget,
   withDates,
 }: {
   row: InboxConversationRow;
   copy: GmCopy;
   locale: string;
   now: Date;
-  withTarget: boolean;
   withDates: boolean;
 }) {
   const placeLabel = usePlaceLabel();
-  const badge = waitBadge(row, copy, locale, now, withTarget);
-  const unread = row.state === "awaiting";
+  const badge = waitBadge(row, copy, locale, now);
+  const unread = liveRowState(row, now) === "awaiting";
   const meta = [
     placeLabel(row.propertyName, row.roomLabel),
     bookingStateLabel(row, copy, now),
@@ -183,7 +184,7 @@ export function ConversationRowBody({
           </span>
         </span>
         <span className="gm-row__line" data-unread={unread ? "" : undefined}>
-          {lastLineText(row, copy) || " "}
+          {lastLineText(row, copy, now) || " "}
         </span>
         <span className="gm-row__meta">
           {alert ? (
@@ -229,16 +230,10 @@ export function ThreadMetaLine({
     languageName(row.guestLanguage, locale),
   ].filter(Boolean);
   let wait: ReactNode = null;
-  if (row.state === "awaiting" && row.waiting.waitingMinutes > 0) {
-    const w = durationLabel(row.waiting.waitingMinutes, copy);
-    const t = durationLabel(row.waiting.targetMinutes, copy);
-    wait = row.waiting.overdue ? (
-      <span className="gm-urgent">
-        {fill(copy.waitedOver, { wait: w, target: t })}
-      </span>
-    ) : (
-      <span>{fill(copy.waitedFor, { wait: w })}</span>
-    );
+  const waitMinutes = liveWaitingMinutes(row, now);
+  if (liveRowState(row, now) === "awaiting" && waitMinutes > 0) {
+    const text = waitingText(waitMinutes, copy);
+    wait = isLongWait(waitMinutes) ? <span className="gm-wait-long">{text}</span> : <span>{text}</span>;
   }
   return (
     <span className="gm-metaline">

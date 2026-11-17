@@ -65,7 +65,7 @@ export function useInboxLive(
     dispatch({
       type: "replace",
       seq: mine,
-      data: { rows: result.rows, awaitingCount: result.awaitingCount, overdueCount: result.overdueCount, buildings: result.buildings },
+      data: { rows: result.rows, awaitingCount: result.awaitingCount, buildings: result.buildings },
     });
   }, []);
 

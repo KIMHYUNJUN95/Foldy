@@ -20,7 +20,10 @@ import {
 } from "@/lib/guest-messages/ingest-plan";
 import { decideMessageOrganization, decideReconcileOrganization } from "@/lib/guest-messages/org-resolve";
 import { processOutboxBatch, type OutboxRow } from "@/lib/guest-messages/outbox";
-import { computeWaiting, responseTargetCategory, tokyoNightOverlapMs } from "@/lib/guest-messages/response-target";
+import { getDictionary } from "@/lib/i18n";
+import { bookingStateCategory, computeWaiting, isLongWait } from "@/lib/guest-messages/waiting";
+import { waitBadge, waitingText } from "@/components/guest-messages/gm-format";
+import { liveRowState } from "@/lib/guest-messages/inbox-model";
 import {
   DEFAULT_GUEST_MESSAGE_SETTINGS,
   readGuestMessageSettings,
@@ -719,81 +722,123 @@ describe("organization routing", () => {
   });
 });
 
-describe("computeWaiting (Tokyo)", () => {
-  const settings = { responseTargetMinutes: DEFAULT_GUEST_MESSAGE_SETTINGS.responseTargetMinutes, nightPause: false };
+describe("computeWaiting — 손님이 기다린 시간", () => {
   const conv = {
     status: "awaiting" as const,
     snooze_until: null,
     last_guest_at: "2026-11-12T01:00:00Z", // 도쿄 10:00
     last_reply_at: null,
-    booking_status: "confirmed",
-    check_in_date: "2026-11-20",
-    check_out_date: "2026-11-23",
   };
+  const at = (minutes: number) => new Date(Date.parse(conv.last_guest_at) + minutes * 60_000);
 
-  it("counts minutes since the last guest message against the category target", () => {
-    const result = computeWaiting(conv, settings, new Date("2026-11-12T01:45:00Z"));
-    expect(result).toEqual({ waitingMinutes: 45, targetMinutes: 120, ratio: 45 / 120, overdue: false });
-    const inquiry = computeWaiting({ ...conv, booking_status: "inquiry" }, settings, new Date("2026-11-12T01:45:00Z"));
-    expect(inquiry).toMatchObject({ targetMinutes: 30, overdue: true });
+  it("손님 말부터 지금까지 분", () => {
+    expect(computeWaiting(conv, at(10))).toEqual({ waitingMinutes: 10 });
+    expect(computeWaiting(conv, new Date("2026-11-12T01:00:59Z"))).toEqual({ waitingMinutes: 0 });
   });
 
-  it("is zero when replied, done, or snoozed into the future; restarts from an expired snooze", () => {
-    const now = new Date("2026-11-12T03:00:00Z");
-    expect(computeWaiting({ ...conv, last_reply_at: "2026-11-12T01:10:00Z" }, settings, now).waitingMinutes).toBe(0);
-    expect(computeWaiting({ ...conv, status: "done" }, settings, now).waitingMinutes).toBe(0);
-    expect(computeWaiting({ ...conv, status: "snoozed", snooze_until: "2026-11-12T04:00:00Z" }, settings, now).waitingMinutes).toBe(0);
-    expect(computeWaiting({ ...conv, status: "snoozed", snooze_until: "2026-11-12T02:30:00Z" }, settings, now).waitingMinutes).toBe(30);
+  it("59분은 보통 · 60분부터 빨강(경계)", () => {
+    expect(isLongWait(computeWaiting(conv, at(59)).waitingMinutes)).toBe(false);
+    expect(isLongWait(computeWaiting(conv, at(60)).waitingMinutes)).toBe(true);
   });
 
-  it("classifies staying by Tokyo date, not UTC date", () => {
-    // 2026-11-19T15:30Z = 도쿄 11-20 00:30 → 숙박 중(UTC 날짜로는 아직 19일)
-    expect(responseTargetCategory(conv, new Date("2026-11-19T15:30:00Z"))).toBe("staying");
-    expect(responseTargetCategory(conv, new Date("2026-11-19T14:30:00Z"))).toBe("other");
-    // 체크아웃 날(도쿄)은 숙박 중이 아니다
-    expect(responseTargetCategory(conv, new Date("2026-11-23T00:30:00Z"))).toBe("other");
-  });
-
-  it("night pause skips 23:00–07:00 Tokyo across midnight", () => {
-    // 도쿄 22:00 → 다음 날 08:00 = 10시간, 밤 8시간 제외 → 120분
+  it("하루 넘게 기다려도 그대로 센다 · 밤에도 센다", () => {
+    expect(computeWaiting(conv, at(24 * 60 + 5)).waitingMinutes).toBe(1445);
+    // 도쿄 22:00 → 다음 날 08:00 = 600분, 밤을 빼지 않는다
     const night = { ...conv, last_guest_at: "2026-11-12T13:00:00Z" };
-    const now = new Date("2026-11-12T23:00:00Z");
-    expect(computeWaiting(night, settings, now).waitingMinutes).toBe(600);
-    expect(computeWaiting(night, { ...settings, nightPause: true }, now).waitingMinutes).toBe(120);
+    expect(computeWaiting(night, new Date("2026-11-12T23:00:00Z")).waitingMinutes).toBe(600);
   });
 
-  it("night pause crosses a month boundary in Tokyo (10/31 → 11/1)", () => {
-    // 도쿄 10-31 22:30 = UTC 10-31 13:30, 도쿄 11-01 07:30 = UTC 10-31 22:30 → 9시간, 밤 8시간 → 60분
-    const night = { ...conv, last_guest_at: "2026-10-31T13:30:00Z" };
-    const result = computeWaiting(night, { ...settings, nightPause: true }, new Date("2026-10-31T22:30:00Z"));
-    expect(result.waitingMinutes).toBe(60);
+  it("마지막이 우리 답장(host)이면 0 — 답장 시각이 손님 말과 같아도", () => {
+    expect(computeWaiting({ ...conv, last_reply_at: "2026-11-12T01:10:00Z" }, at(120)).waitingMinutes).toBe(0);
+    expect(computeWaiting({ ...conv, last_reply_at: conv.last_guest_at }, at(120)).waitingMinutes).toBe(0);
+    // 답장 뒤에 손님이 또 말하면 다시 센다
+    expect(computeWaiting({ ...conv, last_reply_at: "2026-11-12T00:00:00Z" }, at(30)).waitingMinutes).toBe(30);
   });
 
-  it("night overlap over several days and fully inside the night", () => {
-    // 도쿄 11-12 00:00 ~ 11-14 00:00(48시간) — 밤: 12일 0~7, 12일 23~13일 7, 13일 23~24 = 7+8+1 = 16시간
-    const start = Date.parse("2026-11-12T00:00:00+09:00");
-    const end = Date.parse("2026-11-14T00:00:00+09:00");
-    expect(tokyoNightOverlapMs(start, end)).toBe(16 * 3_600_000);
-    const inside = computeWaiting(
-      { ...conv, last_guest_at: "2026-11-12T15:00:00Z" }, // 도쿄 00:00
-      { ...settings, nightPause: true },
-      new Date("2026-11-12T17:00:00Z"), // 도쿄 02:00
-    );
-    expect(inside.waitingMinutes).toBe(0);
+  it("처리 끝이면 0 · 손님 말이 없으면 0", () => {
+    expect(computeWaiting({ ...conv, status: "done" }, at(500)).waitingMinutes).toBe(0);
+    expect(computeWaiting({ ...conv, last_guest_at: null }, at(500)).waitingMinutes).toBe(0);
+  });
+
+  it("나중에가 안 끝났으면 0 · 끝났으면 손님 말부터 센다", () => {
+    const now = at(120);
+    expect(computeWaiting({ ...conv, status: "snoozed", snooze_until: "2026-11-12T04:00:00Z" }, now).waitingMinutes).toBe(0);
+    expect(computeWaiting({ ...conv, status: "snoozed", snooze_until: "2026-11-12T02:30:00Z" }, now).waitingMinutes).toBe(120);
+  });
+
+  it("예약 분류는 UTC 날짜가 아니라 도쿄 날짜", () => {
+    const booking = { booking_status: "confirmed", check_in_date: "2026-11-20", check_out_date: "2026-11-23" };
+    // 2026-11-19T15:30Z = 도쿄 11-20 00:30 → 숙박 중(UTC 날짜로는 아직 19일)
+    expect(bookingStateCategory(booking, new Date("2026-11-19T15:30:00Z"))).toBe("staying");
+    expect(bookingStateCategory(booking, new Date("2026-11-19T14:30:00Z"))).toBe("other");
+    expect(bookingStateCategory(booking, new Date("2026-11-23T00:30:00Z"))).toBe("other");
+    expect(bookingStateCategory({ ...booking, booking_status: "inquiry" }, new Date())).toBe("inquiry");
+  });
+});
+
+describe("waitingText · waitBadge — 문구와 색", () => {
+  it("한국어 단계", () => {
+    const copy = getDictionary("ko").guestMessages;
+    expect(waitingText(10, copy)).toBe("10분째 대기");
+    expect(waitingText(80, copy)).toBe("1시간 20분째 대기");
+    expect(waitingText(120, copy)).toBe("2시간째 대기");
+    expect(waitingText(24 * 60, copy)).toBe("1일 넘게 대기");
+    expect(waitingText(3 * 24 * 60 + 30, copy)).toBe("3일 넘게 대기");
+  });
+
+  it("일본어 · 영어에도 같은 단계가 있다", () => {
+    const ja = getDictionary("ja").guestMessages;
+    const en = getDictionary("en").guestMessages;
+    expect(waitingText(80, ja)).toBe("1時間20分待機中");
+    expect(waitingText(24 * 60, ja)).toBe("1日以上待機中");
+    expect(waitingText(80, en)).toBe("Waiting 1h 20m");
+    expect(waitingText(2 * 24 * 60, en)).toBe("Waiting 2+ days");
+  });
+
+  const GUEST_AT = "2026-11-12T01:00:00Z";
+  const live = (patch: Record<string, unknown> = {}) =>
+    ({ status: "awaiting", state: "awaiting", snoozeUntil: null, lastGuestAt: GUEST_AT, lastReplyAt: null, ...patch }) as never;
+  const after = (minutes: number) => new Date(Date.parse(GUEST_AT) + minutes * 60_000);
+
+  it("59분은 muted · 60분은 urgent 하나뿐(굵게 단계 없음)", () => {
+    const copy = getDictionary("ko").guestMessages;
+    expect(waitBadge(live(), copy, "ko", after(59)).tone).toBe("muted");
+    expect(waitBadge(live(), copy, "ko", after(60))).toEqual({ text: "1시간째 대기", tone: "urgent" });
+  });
+
+  it("같은 줄이어도 시간이 흐르면 숫자 · 색이 바뀐다(50분 → 70분)", () => {
+    const copy = getDictionary("ko").guestMessages;
+    const row = live();
+    expect(waitBadge(row, copy, "ko", after(50))).toEqual({ text: "50분째 대기", tone: "muted" });
+    expect(waitBadge(row, copy, "ko", after(70))).toEqual({ text: "1시간 10분째 대기", tone: "urgent" });
+  });
+
+  it("나중에 시각이 지나면 지금 시각 기준으로 대기로 바뀐다", () => {
+    const copy = getDictionary("ko").guestMessages;
+    const row = live({ status: "snoozed", state: "snoozed", snoozeUntil: after(30).toISOString() });
+    expect(liveRowState(row, after(10))).toBe("snoozed");
+    expect(liveRowState(row, after(31))).toBe("awaiting");
+    expect(waitBadge(row, copy, "ko", after(90))).toEqual({ text: "1시간 30분째 대기", tone: "urgent" });
+  });
+
+  it("기다린 시간이 0이면 글자를 그리지 않는다(우리가 답한 뒤 · 1분 안)", () => {
+    const copy = getDictionary("ko").guestMessages;
+    expect(waitBadge(live({ lastReplyAt: after(5).toISOString() }), copy, "ko", after(20)).text).toBe("");
+    expect(waitBadge(live(), copy, "ko", after(0)).text).toBe("");
+  });
+
+  it("처리 끝은 기존 표시 그대로 — 대기 시간 없음", () => {
+    const copy = getDictionary("ko").guestMessages;
+    const badge = waitBadge(live({ status: "done", state: "done" }), copy, "ko", after(300));
+    expect(badge).toEqual({ text: copy.stateDone, tone: "muted" });
   });
 });
 
 describe("settings + capture flag", () => {
   it("reads settings with defaults for missing or bad values", () => {
     expect(readGuestMessageSettings(null)).toEqual(DEFAULT_GUEST_MESSAGE_SETTINGS);
-    const settings = readGuestMessageSettings({
-      settings: { responseTargetMinutes: { inquiry: 15, staying: -1, other: "x" } },
-      night_pause: true,
-      credit_reserve: 30,
-      stall_hours: 6,
-    });
-    expect(settings.responseTargetMinutes).toEqual({ inquiry: 15, request: 30, staying: 60, other: 120 });
-    expect(settings).toMatchObject({ nightPause: true, creditReserve: 30, stallHours: 6 });
+    const settings = readGuestMessageSettings({ credit_reserve: 30, stall_hours: 6 });
+    expect(settings).toEqual({ creditReserve: 30, stallHours: 6 });
   });
 
   it("captured payloads keep only attachment lengths and are size-capped", () => {

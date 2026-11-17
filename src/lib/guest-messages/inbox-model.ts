@@ -1,7 +1,7 @@
 /**
  * 손님 메시지함(2단계) — 화면 · 서버 액션이 같이 쓰는 **순수** 규칙. docs/product/47-guest-messaging.md §5 · §6-1 · §9
  *
- * - 목록 정렬은 응답 목표에 가까운 순(`computeWaiting`): 목표 넘음 → 목표에 가까운 순 → 나중에(돌아올 시각 순) → 처리 끝(최근 순).
+ * - 목록 정렬은 마지막 메시지가 최신인 순(`compareInboxRows`). 기다린 시간(`computeWaiting`)은 줄 글자 · 색에만 쓴다.
  * - 「나중에」가 끝난 대화는 DB 상태가 아직 `snoozed` 여도 「답장 기다림」으로 본다(다음 메시지가 올 때 DB 함수가 바꾼다 — §4-0).
  * - 보내기 막힘(직접 예약 · 채널 모름)은 어댑터의 허용 목록과 같은 규칙(`OTA_SENDABLE_CHANNELS`).
  * - 「나중에」 시각은 도쿄 기준(CLAUDE.md 7). UTC 자르기 금지 — `tokyo-date.ts`.
@@ -10,13 +10,12 @@
  */
 
 import type { ResolvedDraft, ThreadLinkView } from "@/lib/guest-messages/task-link-model";
-import { computeWaiting, type WaitingResult } from "@/lib/guest-messages/response-target";
+import { computeWaiting } from "@/lib/guest-messages/waiting";
 import {
   OTA_SENDABLE_CHANNELS,
   type GuestChannelKey,
   type GuestConversationStatus,
   type GuestMessageDirection,
-  type GuestMessageSettings,
 } from "@/lib/guest-messages/types";
 import { tokyoDateOf, tokyoDayStart, ymdShift } from "@/lib/tokyo-date";
 import type { AutoRunView } from "@/lib/guest-messages/auto-model";
@@ -55,7 +54,9 @@ export type InboxConversationRow = {
   lastMessageAt: string | null;
   lastGuestAt: string | null;
   lastLine: { direction: GuestMessageDirection; body: string } | null;
-  waiting: WaitingResult;
+  /** DB 상태 그대로(나중에 만료는 `liveRowState` 로). */
+  status: GuestConversationStatus;
+  lastReplyAt: string | null;
   outboxAlert: OutboxAlert;
   replyBlock: ReplyBlock;
 };
@@ -120,21 +121,20 @@ export function sortInboxRows(rows: readonly InboxConversationRow[]): InboxConve
   return [...rows].sort(compareInboxRows);
 }
 
-/** DB 줄 → 기다림 계산(그대로 `computeWaiting`). */
-export function waitingOf(
-  row: {
-    status: GuestConversationStatus;
-    snooze_until: string | null;
-    last_guest_at: string | null;
-    last_reply_at: string | null;
-    booking_status: string | null;
-    check_in_date: string | null;
-    check_out_date: string | null;
-  },
-  settings: Pick<GuestMessageSettings, "responseTargetMinutes" | "nightPause">,
+/** 화면이 지금 시각으로 다시 판정한다 — 서버 값은 줄을 읽은 순간의 것이라 시간이 흐르면 낡는다(나중에 만료 · 1시간 빨강). */
+export function liveRowState(row: Pick<InboxConversationRow, "status" | "snoozeUntil">, now: Date): InboxRowState {
+  return effectiveRowState({ status: row.status, snooze_until: row.snoozeUntil }, now);
+}
+
+/** 기다린 분 — 서버 · 화면 · 실시간 줄이 같은 `computeWaiting` 을 쓴다. */
+export function liveWaitingMinutes(
+  row: Pick<InboxConversationRow, "status" | "snoozeUntil" | "lastGuestAt" | "lastReplyAt">,
   now: Date,
-): WaitingResult {
-  return computeWaiting(row, settings, now);
+): number {
+  return computeWaiting(
+    { status: row.status, snooze_until: row.snoozeUntil, last_guest_at: row.lastGuestAt, last_reply_at: row.lastReplyAt },
+    now,
+  ).waitingMinutes;
 }
 
 /** 발송 큐 줄들 → 목록에 띄울 하나. 보내지 못함 > 나갔는지 모름 > 보낼 차례 기다림. */
@@ -391,7 +391,6 @@ export type InboxThread = {
 export type InboxListData = {
   rows: InboxConversationRow[];
   awaitingCount: number;
-  overdueCount: number;
   /** 정본 건물 이름(그릴 때 localize). */
   buildings: string[];
 };

@@ -23,6 +23,7 @@
 }
 
 .gm-urgent { color: var(--gm-urgent); font-weight: 600; }
+.gm-wait-long { color: var(--gm-urgent); }
 .gm-hint { font-size: 12px; color: var(--gm-muted); line-height: 1.5; }
 .gm-link { border: 0; background: none; padding: 0; font: inherit; color: var(--gm-primary); cursor: pointer; text-decoration: none; }
 .gm-link:hover { color: var(--gm-primary-press); }
@@ -101,8 +102,7 @@
 .gm-row__name { font-size: 14px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .gm-row__name[data-unread] { font-weight: 600; }
 .gm-row__wait { margin-left: auto; flex: none; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--gm-muted); }
-.gm-row__wait[data-tone="strong"] { color: var(--gm-ink); font-weight: 600; }
-.gm-row__wait[data-tone="urgent"] { color: var(--gm-urgent); font-weight: 600; }
+.gm-row__wait[data-tone="urgent"] { color: var(--gm-urgent); }
 .gm-row__line { font-size: 13px; color: var(--gm-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gm-row__line[data-unread] { color: var(--gm-ink); }
 .gm-row__meta { display: flex; gap: 6px; min-width: 0; font-size: 12px; color: var(--gm-muted); }
@@ -328,7 +328,6 @@
 }
 @media (max-width: 1360px) { .gm-console__list { width: 340px; } }
 .gm-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 0 0 10px 12px; }
-.gm-filters__overdue { flex: 1 1 100%; font-size: 12px; color: var(--gm-urgent); font-weight: 600; white-space: nowrap; }
 .gm-filters .gm-select { white-space: nowrap; }
 .gm-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-bottom: 16px; }
 /* 목록 줄을 감싼 접힘 칸(.row-collapse grid)이 긴 미리보기 글에 밀려 넓어지지 않게. */

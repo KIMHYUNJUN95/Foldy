@@ -53,14 +53,6 @@ const BUILDING = PROPERTY_MAP_META[0].canonicalName;
 type Tables = Record<string, Array<Record<string, unknown>>>;
 /** DB 함수 거울(SQL 은 로컬 Postgres 에서 따로 확인 — 47 §11). 앱이 함수를 부르고 결과를 읽는 길을 본다. */
 const RPC = {
-  guest_message_save_settings: (args: Record<string, unknown>, tables: Tables) => {
-    const rows = (tables.guest_message_channel_state ??= []);
-    let row = rows.find((r) => r.organization_id === args.p_organization_id);
-    if (!row) rows.push((row = { organization_id: args.p_organization_id, settings: {} }));
-    row.settings = { ...((row.settings as object) ?? {}), responseTargetMinutes: args.p_response_targets };
-    Object.assign(row, { night_pause: args.p_night_pause, credit_reserve: args.p_credit_reserve, stall_hours: args.p_stall_hours });
-    return { data: null, error: null };
-  },
   guest_message_claim_manual_check: (args: Record<string, unknown>, tables: Tables) => {
     const rows = (tables.guest_message_channel_state ??= []);
     let row = rows.find((r) => r.organization_id === args.p_organization_id);
@@ -91,8 +83,6 @@ const as = (capabilities: string[]): Session => ({ organization: { id: ORG }, us
 const MANAGER = ["admin_web.access", "guest_messages.view", "guest_messages.reply", "guest_messages.manage", "property_info.edit"];
 
 const validSettings = {
-  responseTargetMinutes: { inquiry: 30, request: 60, staying: 15, other: 180 },
-  nightPause: false,
   creditReserve: 20,
   stallHours: 3,
 };
@@ -140,11 +130,16 @@ describe("설정 저장", () => {
     expect(await saveGuestMessageSettings({ ...validSettings, stallHours: 0 })).toEqual({ ok: false, errorKey: "invalid", field: "stallHours" });
   });
 
-  it("다른 settings 키(lastManualCheckAt 등)는 남기고 내 조직 줄만 고친다", async () => {
+  it("두 칸만 고치고 settings · night_pause(옛 응답 목표 값)는 그대로 남기며 내 조직 줄만 고친다", async () => {
     state.session = as(MANAGER);
     const fake = fakeDb({
       guest_message_channel_state: [
-        { organization_id: ORG, settings: { lastManualCheckAt: "2026-11-12T00:00:00Z", translateTarget: "ja" }, stall_hours: 3 },
+        {
+          organization_id: ORG,
+          settings: { lastManualCheckAt: "2026-11-12T00:00:00Z", translateTarget: "ja", responseTargetMinutes: { inquiry: 30 } },
+          night_pause: true,
+          stall_hours: 3,
+        },
         { organization_id: OTHER_ORG, settings: { keep: true }, stall_hours: 9 },
       ],
     });
@@ -154,8 +149,8 @@ describe("설정 저장", () => {
     expect(mine).toMatchObject({
       stall_hours: 6,
       credit_reserve: 40,
-      night_pause: false,
-      settings: { lastManualCheckAt: "2026-11-12T00:00:00Z", translateTarget: "ja", responseTargetMinutes: validSettings.responseTargetMinutes },
+      night_pause: true,
+      settings: { lastManualCheckAt: "2026-11-12T00:00:00Z", translateTarget: "ja", responseTargetMinutes: { inquiry: 30 } },
     });
     const other = fake.tables.guest_message_channel_state.find((row) => row.organization_id === OTHER_ORG);
     expect(other).toMatchObject({ settings: { keep: true }, stall_hours: 9 });

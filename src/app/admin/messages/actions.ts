@@ -2,7 +2,7 @@
 
 /**
  * PC `/admin/messages` 「설정」 · 「정해 둔 문구」 탭만 부르는 액션(모바일은 이 탭이 없다 — 그래서 `src/actions` 가 아니라 여기).
- * docs/product/47-guest-messaging.md §6-1 · §6-2 · §6-3
+ * docs/product/47-guest-messaging.md §6-2 · §6-3
  *
  * - 권한: 관리자 웹(`getAdminSessionForApi`) + `guest_messages.manage`. 아니면 redirect 없이 `forbidden`.
  * - 쓰기는 service_role, 조직은 세션에서(클라이언트 값 안 씀). 값 검사는 순수 모듈(`settings-model` · `saved-reply-model`).
@@ -23,7 +23,6 @@ import {
 import { UUID_RE } from "@/lib/guest-messages/inbox-model";
 import { hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
-import type { Json } from "@/types/database";
 
 type Gate = { ok: true; organizationId: string; userId: string } | { ok: false; errorKey: "forbidden" };
 
@@ -39,7 +38,7 @@ function revalidate() {
   revalidatePath("/mobile/messages");
 }
 
-// ── 응답 목표 · 크레딧 선 · 멈춤 기준 ────────────────────────────────────────
+// ── 크레딧 선 · 멈춤 기준 ────────────────────────────────────────
 
 export type SaveSettingsResult = { ok: true } | { ok: false; errorKey: "forbidden" | "invalid" | "failed"; field?: SettingsField | null };
 
@@ -50,14 +49,13 @@ export async function saveGuestMessageSettings(input: unknown): Promise<SaveSett
   if (!checked.ok) return { ok: false, errorKey: "invalid", field: checked.field };
   const db = getSupabaseServiceClient();
   try {
-    // DB 함수 한 번 — settings 는 응답 목표 키만 바꾼다(그 사이 「지금 확인하기」 · 번역 언어가 쓴 키를 덮지 않게).
-    const saved = await db.rpc("guest_message_save_settings", {
-      p_organization_id: access.organizationId,
-      p_response_targets: checked.value.responseTargetMinutes as unknown as Json,
-      p_night_pause: checked.value.nightPause,
-      p_credit_reserve: checked.value.creditReserve,
-      p_stall_hours: checked.value.stallHours,
-    });
+    // 두 칸만 쓴다 — settings · night_pause(예전 응답 목표 값)는 건드리지 않는다.
+    const saved = await db
+      .from("guest_message_channel_state")
+      .upsert(
+        { organization_id: access.organizationId, credit_reserve: checked.value.creditReserve, stall_hours: checked.value.stallHours },
+        { onConflict: "organization_id" },
+      );
     if (saved.error) throw new Error(saved.error.message);
     revalidate();
     return { ok: true };

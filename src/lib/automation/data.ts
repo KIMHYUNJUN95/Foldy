@@ -21,6 +21,7 @@ import {
   toAutomationReservation,
   type AutomationReservation,
 } from "@/lib/automation/reservation-fields";
+import { resolveReservationNumber } from "@/lib/reservation-display-id";
 import { getCleaningTargets } from "@/lib/cleaning-targets";
 import { getDictionary } from "@/lib/i18n";
 import {
@@ -335,7 +336,7 @@ export async function loadCleaningRoomOptions(
 export async function findCleaningDataIssues(supabase: Client, organizationId: string, date: string): Promise<CleaningDataIssue[]> {
   const result = await supabase
     .from("reservations")
-    .select("id, source_reservation_id, property_name, room_label, check_in_date, check_out_date, rp_id:raw_payload->id, rp_bookId:raw_payload->bookId")
+    .select("id, source_reservation_id, original_reservation_id, property_name, room_label, check_in_date, check_out_date, rp_id:raw_payload->id, rp_bookId:raw_payload->bookId")
     .eq("organization_id", organizationId)
     .eq("status", "confirmed")
     .or(`check_in_date.eq.${date},check_out_date.eq.${date}`);
@@ -348,7 +349,12 @@ export async function findCleaningDataIssues(supabase: Client, organizationId: s
     const canonical = propertyName ? getCanonicalPropertyName(propertyName) : "";
     if (canonical && isExcludedOperationalProperty(canonical)) continue;
     if (canonical && roomLabel && isExcludedOperationalRoom(propertyName, roomLabel)) continue;
-    const bookingId = String(row.rp_id ?? row.rp_bookId ?? row.source_reservation_id ?? "").trim();
+    const bookingId =
+      resolveReservationNumber({
+        channelReservationId: row.original_reservation_id as string | null,
+        rawPayload: { bookId: row.rp_bookId, id: row.rp_id },
+        sourceReservationId: row.source_reservation_id as string | null,
+      }) ?? "";
     const checkIn = String(row.check_in_date ?? "");
     const checkOut = String(row.check_out_date ?? "");
     const broken = !canonical || !known.has(canonical) || !roomLabel || !checkIn || !checkOut || checkIn >= checkOut || !bookingId;

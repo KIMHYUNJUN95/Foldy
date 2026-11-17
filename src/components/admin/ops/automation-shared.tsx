@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { effectiveDestinations, effectiveMessageCount } from "@/lib/automation/enable-guard";
 import { previewAutomationMessage } from "@/actions/ops-automation";
 import type { AutomationJobView, AutomationPageData, AutomationRunView } from "@/lib/automation/console-data";
 import type { AutomationJobKey, AutomationLocale } from "@/lib/automation/jobs";
@@ -143,17 +144,18 @@ export function lastLineOf(item: AutomationJobView, copy: AutomationCopy, today:
   return { status: last.status, text: relWhen(last.createdAt, today, w) };
 }
 
-export const messageCountOf = (job: AutomationJobView) => job.destinations.reduce((sum, item) => sum + item.locales.length, 0);
+export const messageCountOf = (job: AutomationJobView, channelKeys: readonly string[]) => effectiveMessageCount(job.destinations, channelKeys);
 
-/** 상세 머리 둘째 줄의 받는 곳 — 받는 곳 DAILY_REPORT (한국어) / 받는 곳 2곳 · 메시지 3통. */
-export function destLineOf(job: AutomationJobView, w: AutomationWhiteCopy) {
-  return job.destinations.length === 0
+/** 상세 머리 둘째 줄의 받는 곳 — 받는 곳 DAILY_REPORT (한국어) / 받는 곳 2곳 · 메시지 3통. 연결된 채널만 센다(확인 창 숫자와 같은 기준). */
+export function destLineOf(job: AutomationJobView, w: AutomationWhiteCopy, channelKeys: readonly string[]) {
+  const sent = effectiveDestinations(job.destinations, channelKeys);
+  return sent.length === 0
     ? w.destNone
-    : job.destinations.length === 1
+    : sent.length === 1
       ? fill(w.destOne, {
-          name: `${job.destinations[0].channelKey} (${job.destinations[0].locales.map((item) => LANG_LABEL[item]).join(" · ")})`,
+          name: `${sent[0].channelKey} (${sent[0].locales.map((item) => LANG_LABEL[item]).join(" · ")})`,
         })
-      : fill(w.destMany, { m: messageCountOf(job), n: job.destinations.length });
+      : fill(w.destMany, { m: messageCountOf(job, channelKeys), n: sent.length });
 }
 
 // ── 오늘 발송 타임라인 ─────────────────────────────────────────────────────

@@ -80,13 +80,13 @@
 .maf-step { display: flex; align-items: center; gap: 10px; min-height: 44px; }
 .maf-step__ctl { display: flex; align-items: center; gap: 4px; flex: none; }
 .maf-step__b {
-  position: relative; width: 36px; height: 36px; border: 0; border-radius: 10px; background: var(--maf-fill2);
+  position: relative; width: 40px; height: 40px; border: 0; border-radius: 10px; background: var(--maf-fill2);
   font-size: 18px; line-height: 1; color: var(--maf-body); transition: transform 140ms ease, background 150ms ease;
 }
-.maf-step__b::after { content: ""; position: absolute; inset: -4px; }
+.maf-step__b::after { content: ""; position: absolute; inset: -2px; }
 .maf-step__b:active:not(:disabled) { transform: scale(.92); background: #ecebf0; }
 .maf-step__b:disabled { color: #c9c6d2; }
-.maf-step__v { display: block; min-width: 52px; overflow: hidden; text-align: center; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.maf-step__v { display: block; min-width: 52px; overflow: hidden; text-align: center; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .maf-step__v span { display: inline-block; }
 .maf-step__v span.is-up { animation: maf-roll-up 220ms var(--maf-ease); }
 .maf-step__v span.is-down { animation: maf-roll-down 220ms var(--maf-ease); }
@@ -96,18 +96,18 @@
 /* 알약(빼는 건물 · 채널 규칙) — 감싸며 줄바꿈 */
 .maf-pills { display: flex; flex-wrap: wrap; gap: 6px; }
 .maf-pill {
-  position: relative; height: 36px; padding: 0 14px; border: 0; border-radius: 18px;
+  position: relative; height: 40px; padding: 0 14px; border: 0; border-radius: 20px;
   background: var(--maf-fill); color: var(--maf-soft); font-size: 13px; white-space: nowrap;
   transition: transform 140ms ease, background 180ms ease, color 180ms ease;
 }
-.maf-pill::after { content: ""; position: absolute; inset: -4px 0; }
+.maf-pill::after { content: ""; position: absolute; inset: -2px 0; }
 .maf-pill.is-on { background: var(--maf-sel); color: var(--maf-sel-ink); font-weight: 600; }
 .maf-pill:active { transform: scale(.97); }
 
 /* 받는 곳 */
 .maf-dest { gap: 8px; }
 .maf-dest__n { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 8px; row-gap: 2px; min-width: 0; }
-.maf-dest__n b { font-size: 14px; font-weight: 700; overflow-wrap: anywhere; }
+.maf-dest__n b { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
 .maf-dest__n span { font-size: 12px; }
 .maf-dest__n .is-ok { color: var(--maf-green); }
 .maf-dest__n .is-bad { color: var(--maf-red); }
@@ -164,6 +164,7 @@
 }
 .maf-save__t { flex: 1; min-width: 0; font-size: 12px; color: var(--maf-soft); }
 .maf-save__t b { color: var(--maf-ink); }
+.maf-save__t.is-bad { color: var(--maf-red); }
 @keyframes maf-rise { from { opacity: 0; transform: translateY(24px); } }
 
 /* ── 담당자 ── */
@@ -193,7 +194,7 @@
 }
 @keyframes maf-up { from { opacity: 0; transform: translateY(6px); } }
 .maf-ar__top { display: flex; align-items: center; gap: 10px; min-height: 24px; min-width: 0; }
-.maf-ar__code { min-width: 40px; flex: none; font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.maf-ar__code { min-width: 40px; flex: none; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .maf-ar__label { flex: 1; min-width: 0; font-size: 13px; color: #4c4958; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .maf-ar__chg { flex: none; font-size: 12px; font-weight: 600; color: var(--maf-amber); white-space: nowrap; }
 .maf-ar__rm {
@@ -239,7 +240,7 @@
 /* ── 청소 객실 추가 시트(body 포털) ── */
 .maf-sheet { display: flex; flex-direction: column; min-height: 0; flex: 1; padding: 0 20px 8px; color: #16141f; }
 .maf-sheet__h { display: flex; flex-direction: column; gap: 4px; padding: 2px 0 12px; }
-.maf-sheet__h h3 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+.maf-sheet__h h3 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
 .maf-sheet__h span { font-size: 12px; line-height: 1.5; color: var(--text-3); }
 .maf-search { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 12px; border-radius: 12px; background: #f7f7f9; color: var(--text-3); flex: none; }
 .maf-search input { flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; font: inherit; font-size: 16px; color: #16141f; outline: none; }
@@ -270,7 +271,7 @@
   width: 100%; max-width: 340px; padding: 22px 20px 16px; border-radius: 20px; background: #fff; color: #16141f;
   box-shadow: 0 24px 48px -16px rgba(22, 20, 31, .35); animation: maf-card 280ms cubic-bezier(.23, 1, .32, 1) both;
 }
-.maf-cf__card h3 { margin: 0 0 8px; font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+.maf-cf__card h3 { margin: 0 0 8px; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
 .maf-cf__card p { margin: 0 0 18px; font-size: 14px; line-height: 1.55; color: #4c4958; }
 .maf-cf__btns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 /* 글자 1.35배 · ja · en 에서 버튼 글자가 잘리지 않게 줄바꿈을 허용한다. */

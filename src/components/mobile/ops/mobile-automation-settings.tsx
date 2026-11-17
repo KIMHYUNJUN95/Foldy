@@ -13,7 +13,9 @@ import {
   type AutomationLocale,
   type AutomationSettings,
 } from "@/lib/automation/jobs";
+import { canEnableAutomation, orphanDestinations } from "@/lib/automation/enable-guard";
 import { isScheduledSendDue, tokyoClock } from "@/lib/automation/schedule";
+import { haptic } from "@/lib/haptics";
 import type { Dictionary } from "@/lib/i18n";
 import "./mobile-automation-form.css";
 
@@ -236,6 +238,7 @@ export function MobileAutomationSettings({
   const [saving, startSave] = useTransition();
   const [confirming, setConfirming] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // 서버에서 새 값이 오면(저장 뒤 refresh · 다른 자동화로 바꿈) 따라간다 — 손대던 중(같은 자동화 · 바뀐 곳 있음)이면 그대로 둔다.
   const signature = JSON.stringify(original);
@@ -296,16 +299,35 @@ export function MobileAutomationSettings({
     startSave(async () => {
       const result = await saveAutomationJob({ jobKey: job.jobKey, ...draft });
       setConfirming(false);
-      if (!result.ok) return flash(errorTextOf(copy, result.error));
+      if (!result.ok) {
+        haptic("error");
+        setSaveError(errorTextOf(copy, result.error));
+        return flash(errorTextOf(copy, result.error));
+      }
       flash(s.saved);
       setJustSaved(true);
       router.refresh();
     });
   };
+  const channelKeys = useMemo(() => data.channels.map((channel) => channel.key), [data.channels]);
+  const draftGuard = canEnableAutomation(draft.destinations, channelKeys);
   const save = () => {
+    setSaveError(null);
+    // 연결 안 된 채널 줄이 남아 있으면 서버가 invalid 로 돌려보낸다 — 이유가 보이게 먼저 알린다.
+    if (orphanDestinations(draft.destinations, channelKeys).length > 0) {
+      haptic("error");
+      setSaveError(s.orphanSaveBlocked);
+      return;
+    }
+    // 켜져 있는데 실제로 나갈 곳이 0곳이면 저장하지 않는다(서버도 같은 판정으로 막는다) — 저장 줄에 이유를 적는다.
+    if (job.enabled && !draftGuard.ok) {
+      haptic("error");
+      setSaveError(copy.errors.no_destination);
+      return;
+    }
     // 켜져 있고 바꾼 시각 · 받는 곳으로 지금이 발송 시간대면, 저장 직후 틱이 바로 보낸다 — 한 번 묻는다(PC 와 같은 조건).
     const sendsNow =
-      timed && job.enabled && draft.destinations.length > 0 && isScheduledSendDue({ ...draft, enabled: true, lastDoneOn: job.lastDoneOn }, new Date());
+      timed && job.enabled && draftGuard.ok && isScheduledSendDue({ ...draft, enabled: true, lastDoneOn: job.lastDoneOn }, new Date());
     if (sendsNow) return setConfirming(true);
     doSave();
   };
@@ -534,6 +556,25 @@ export function MobileAutomationSettings({
           );
         })
       )}
+      {orphanDestinations(draft.destinations, channelKeys).map((orphan) => (
+        <div className="maf-row maf-dest" key={orphan.channelKey}>
+          <span className="maf-dest__n">
+            <b>{orphan.channelKey}</b>
+            <span className="is-bad">
+              {s.orphanChannel} · {s.orphanHint}
+            </span>
+          </span>
+          <button
+            aria-label={`${orphan.channelKey} ${s.orphanRemove}`}
+            className="maf-btn is-gray"
+            disabled={view}
+            onClick={() => setDraft((current) => ({ ...current, destinations: current.destinations.filter((item) => item.channelKey !== orphan.channelKey) }))}
+            type="button"
+          >
+            {s.orphanRemove}
+          </button>
+        </div>
+      ))}
       <span className="maf-note maf-hint">{s.channelHint}</span>
 
       <span className="maf-h">{s.history}</span>
@@ -552,8 +593,18 @@ export function MobileAutomationSettings({
 
       {showSave ? (
         <div className="maf-save" ref={barRef}>
-          <span className="maf-save__t">{dirty ? <Rich text={fill(m.changedShort, { n: changeCount })} /> : null}</span>
-          <button className="maf-btn is-gray" disabled={!dirty || saving} onClick={() => setDraft(original)} type="button">
+          <span className={`maf-save__t${saveError ? " is-bad" : ""}`} role={saveError ? "alert" : undefined}>
+            {saveError ?? (dirty ? <Rich text={fill(m.changedShort, { n: changeCount })} /> : null)}
+          </span>
+          <button
+            className="maf-btn is-gray"
+            disabled={!dirty || saving}
+            onClick={() => {
+              setSaveError(null);
+              setDraft(original);
+            }}
+            type="button"
+          >
             {s.revert}
           </button>
           <button className={`maf-btn is-primary${justSaved && !dirty ? " is-done" : ""}`} disabled={!dirty || saving} onClick={save} type="button">

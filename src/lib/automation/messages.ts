@@ -22,13 +22,13 @@ import { tokyoDateOf, ymdShift } from "@/lib/tokyo-date";
 import type { AutomationLocale, DailyReportChannel } from "@/lib/automation/jobs";
 import {
   bookDateOf,
-  bookingIdOf,
+  channelNameOf,
+  reservationNumberOf,
   bookingInstantOf,
   cancelInstantOf,
   exactReferer,
   guestCountsOf,
   originalAmountOf,
-  platformLabel,
   type AutomationReservation,
 } from "@/lib/automation/reservation-fields";
 
@@ -576,7 +576,9 @@ export function buildReservationAlertCard(input: AlertInput): AlertCard {
   const stay = `${reservation.checkIn && reservation.checkIn === today ? `${a.today} ` : ""}${stayRange(copy, reservation.checkIn, reservation.checkOut, today)}`;
   const header = fill(cancel ? a.cancelHeader : a.sameDayHeader, { property: input.propertyLabel }).trim();
   const room = input.roomLabel.trim();
-  const contextParts = [reservation.guestName || "-", fill(a.bookingId, { id: bookingIdOf(reservation.raw, reservation.id) })];
+  const reservationNumber = reservationNumberOf(reservation.raw, reservation.channelReservationId);
+  const contextParts = [reservation.guestName || "-"];
+  if (reservationNumber) contextParts.push(fill(a.bookingId, { id: reservationNumber }));
   if (cancel) {
     const instant = cancelInstantOf(reservation.raw, true);
     if (instant) {
@@ -584,7 +586,7 @@ export function buildReservationAlertCard(input: AlertInput): AlertCard {
       contextParts.push(fill(a.cancelledAt, { time: `${dayLabel(copy, date, today)} ${time}` }));
     }
   }
-  const channel = { label: a.fieldChannel, value: alertPlatformLabel(platformLabel(reservation.raw)) };
+  const channel = { label: a.fieldChannel, value: alertPlatformLabel(channelNameOf(reservation.raw, reservationNumber)) };
   const amountCell = { label: cancel ? a.fieldCancelAmount : a.fieldAmount, value: amountText };
   return {
     context: contextParts.join(" · "),

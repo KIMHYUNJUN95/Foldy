@@ -12,6 +12,7 @@
  * | 금액 | `legacyReservationAmount`(ops-sales-summary — 같은 `normalize` 규칙) |
  */
 
+import { resolveReservationNumber } from "@/lib/reservation-display-id";
 import { getReservationGuests } from "@/lib/reservation-guests";
 import { tokyoDateOf } from "@/lib/tokyo-date";
 
@@ -71,13 +72,22 @@ export function exactReferer(raw: RawPayload): string {
   return text(raw, "referer") ?? "";
 }
 
-/** 알림의 「플랫폼」 — 저쪽은 `platform || referer`. */
-export function platformLabel(raw: RawPayload): string {
-  return text(raw, "referer") ?? text(raw, "channel") ?? text(raw, "source") ?? "-";
+/**
+ * 알림에 적는 예약 번호 — **채널 예약번호**(Airbnb `HM…` · Booking 번호) → Beds24 번호 순. 어느 것도 없으면 `null`(2026-11-17).
+ *
+ * 내부 UUID(`reservations.id`)는 사람이 못 찾는 번호라 **절대 돌려주지 않는다** — 전에는 원본에 번호가 없으면 UUID 를 그대로 적었다.
+ */
+export function reservationNumberOf(raw: RawPayload, channelReservationId?: string | null): string | null {
+  return resolveReservationNumber({ channelReservationId, rawPayload: raw });
 }
 
-export function bookingIdOf(raw: RawPayload, fallback: string): string {
-  return text(raw, "bookId") ?? text(raw, "id") ?? fallback;
+/** 채널 이름 — 원본의 referer · channel · source 순, 없으면 번호 모양으로(`HM…` = Airbnb · 숫자 10자리 = Booking.com), 그래도 없으면 `-`. */
+export function channelNameOf(raw: RawPayload, reservationNumber: string | null): string {
+  const named = text(raw, "referer") ?? text(raw, "channel") ?? text(raw, "source") ?? text(raw, "apiSource");
+  if (named) return named;
+  if (reservationNumber && /^HM[A-Z0-9]{6,}$/.test(reservationNumber)) return "Airbnb";
+  if (reservationNumber && /^\d{10}$/.test(reservationNumber)) return "Booking.com";
+  return "-";
 }
 
 /** 성인 · 어린이 — 저쪽 알림 형식(`성인 2명, 아동 1명 (총 3명)`). */
@@ -111,11 +121,12 @@ export const AUTOMATION_PAYLOAD_KEYS = [
   "numInfant",
   "bookId",
   "id",
+  "apiReference",
   "rateDescription",
 ] as const;
 
 export const AUTOMATION_RESERVATION_SELECT = [
-  "id, property_name, room_label, guest_name, status, check_in_date, check_out_date, updated_at, last_known_amount",
+  "id, property_name, room_label, guest_name, status, check_in_date, check_out_date, updated_at, last_known_amount, original_reservation_id",
   ...AUTOMATION_PAYLOAD_KEYS.map((key) => `rp_${key}:raw_payload->${key}`),
 ].join(", ");
 
@@ -130,6 +141,8 @@ export type AutomationReservation = {
   updatedAt: string;
   /** DB 가 기억한 마지막 금액(`reservations.last_known_amount` — 취소로 price 가 0 이 돼도 남는다). */
   lastKnownAmount: number | null;
+  /** `reservations.original_reservation_id` — 채널 예약번호(Airbnb HM… · Booking 번호). 옛 줄 · 시험 값은 없을 수 있다. */
+  channelReservationId?: string | null;
   raw: RawPayload;
 };
 
@@ -149,6 +162,7 @@ export function toAutomationReservation(row: Record<string, unknown>): Automatio
     roomLabel: String(row.room_label ?? ""),
     status: String(row.status ?? ""),
     updatedAt: String(row.updated_at ?? ""),
+    channelReservationId: typeof row.original_reservation_id === "string" ? row.original_reservation_id : null,
     lastKnownAmount: Number(row.last_known_amount) > 0 ? Number(row.last_known_amount) : null,
   };
 }

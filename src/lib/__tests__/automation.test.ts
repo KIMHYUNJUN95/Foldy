@@ -204,7 +204,7 @@ describe("청소 · 셋팅 명단", () => {
       propertyLabel: (n) => n,
     });
     expect(text).toContain("*AA201* | Tanaka (2) | 김민지");
-    expect(text).toContain("*AA302* | 체크인 X (3)\n");
+    expect(text).toContain("*AA302* | 체크인 없음 (3)\n");
     expect(text).not.toContain("미배정");
     expect(text).toContain("*셋팅해야 하는 객실*");
     // 건물 이름은 굵게(2026-10-08).

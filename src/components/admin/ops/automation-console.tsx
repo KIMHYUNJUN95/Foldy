@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
+import { type CSSProperties, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Check, Plus, X } from "lucide-react";
 import {
   addCleaningExtraRoom,
@@ -56,6 +56,7 @@ import {
   type AutomationLocale,
   type AutomationSettings,
 } from "@/lib/automation/jobs";
+import { canEnableAutomation, orphanDestinations } from "@/lib/automation/enable-guard";
 import { isScheduledSendDue } from "@/lib/automation/schedule";
 import type { Dictionary } from "@/lib/i18n";
 import "./automation-white.css";
@@ -102,6 +103,95 @@ function DrawCheck() {
   );
 }
 
+/**
+ * 앱 확인 창 — 네이티브 `confirm()` 대신(2026-11-17). 켜기 확인과 같은 `atw-scrim` / `atw-modal` 모양.
+ * Esc · 바깥 클릭으로 닫고, 열리면 확인 버튼에 포커스(Enter 로 바로 확정), 닫히면 열기 전 자리로 돌아간다.
+ */
+function AtwConfirm({
+  title,
+  body,
+  confirmLabel,
+  cancelLabel,
+  pending = false,
+  disabled = false,
+  warn,
+  onConfirm,
+  onClose,
+}: {
+  title: string;
+  body?: string | null;
+  confirmLabel: string;
+  cancelLabel: string;
+  pending?: boolean;
+  disabled?: boolean;
+  warn?: string | null;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const confirmRef = useRef<HTMLButtonElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  const disabledRef = useRef(pending || disabled);
+  useEffect(() => {
+    disabledRef.current = pending || disabled;
+  });
+  // 부모가 렌더마다 새 `onClose` 를 넘겨도 효과가 다시 돌지 않게 최신 함수만 ref 에 둔다 — 전에는 렌더마다 포커스가 「확인」으로 끌려왔다.
+  const closeRef = useRef(onClose);
+  useEffect(() => {
+    closeRef.current = onClose;
+  });
+  useEffect(() => {
+    const before = document.activeElement as HTMLElement | null;
+    // 확인이 꺼져 있으면(받는 곳 없음) 「취소」에 초점 — 꺼진 버튼엔 초점이 안 가 창 밖에 남는다.
+    (disabledRef.current ? cancelRef : confirmRef).current?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") return closeRef.current();
+      // 초점 가둠 — 열려 있는 동안 Tab 은 창 안 버튼 사이만 돈다.
+      if (event.key !== "Tab") return;
+      const buttons = Array.from(dialogRef.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? []);
+      if (buttons.length === 0) return;
+      const first = buttons[0];
+      const last = buttons[buttons.length - 1];
+      const active = document.activeElement;
+      if (!dialogRef.current?.contains(active)) {
+        event.preventDefault();
+        first.focus();
+      } else if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      before?.focus?.();
+    };
+  }, []);
+  return (
+    <div className="atw-scrim" onClick={onClose} role="presentation">
+      <div aria-labelledby={titleId} aria-modal="true" className="atw-modal" onClick={(event) => event.stopPropagation()} ref={dialogRef} role="dialog">
+        <div className="atw-modal__t" id={titleId}>
+          {title}
+        </div>
+        {body ? <div className="atw-modal__b">{body}</div> : null}
+        {warn ? <div className="atw-warn">{warn}</div> : null}
+        <div className="atw-modal__f">
+          <button className="atw-btn" onClick={onClose} ref={cancelRef} type="button">
+            {cancelLabel}
+          </button>
+          <button className="atw-btn is-primary" disabled={pending || disabled} onClick={onConfirm} ref={confirmRef} type="button">
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AutomationConsole({
   data,
   copy,
@@ -140,8 +230,11 @@ export function AutomationConsole({
   const jobName = (key: AutomationJobKey) => copy.jobs[key].name;
   const tabs: Tab[] = selected === "cleaning_list" ? ["preview", "history", "settings", "assign"] : ["preview", "history", "settings"];
   const activeTab: Tab = tabs.includes(tab) ? tab : "preview";
-  const messageCount = messageCountOf(job);
+  const channelKeys = useMemo(() => data.channels.map((channel) => channel.key), [data.channels]);
+  const messageCount = messageCountOf(job, channelKeys);
 
+  const enableGuard = canEnableAutomation(job.destinations, channelKeys);
+  const closeConfirmOn = useCallback(() => setConfirmOn(false), []);
   const toggle = () => {
     if (view) return;
     if (!job.enabled) {
@@ -155,6 +248,7 @@ export function AutomationConsole({
     });
   };
   const confirmEnable = () => {
+    if (!enableGuard.ok) return;
     startTransition(async () => {
       const result = await setAutomationEnabled(job.jobKey, true);
       setConfirmOn(false);
@@ -171,7 +265,7 @@ export function AutomationConsole({
   const now = nowMinute === null ? null : new Date(nowMinute * 60_000);
   const scheduleLine = (item: AutomationJobView) => scheduleLineOf(item, copy, data.today, now);
   const lastLine = (item: AutomationJobView) => lastLineOf(item, copy, data.today);
-  const destLine = destLineOf(job, w);
+  const destLine = destLineOf(job, w, channelKeys);
 
   // ── 탭 밑줄(미끄러짐) ──
   const navRef = useRef<HTMLDivElement | null>(null);
@@ -246,8 +340,6 @@ export function AutomationConsole({
             );
           })}
           <div className="atw-later">
-            <span className="atw-later__h">{copy.sectionLater}</span>
-            <span>{copy.laterBody}</span>
             <span className="atw-later__tz">{copy.footTz}</span>
           </div>
         </aside>
@@ -332,32 +424,28 @@ export function AutomationConsole({
       </div>
 
       {confirmOn ? (
-        <div className="atw-scrim" onClick={() => setConfirmOn(false)} role="presentation">
-          <div aria-modal="true" className="atw-modal" onClick={(event) => event.stopPropagation()} role="dialog">
-            <div className="atw-modal__t">{copy.confirmTitle}</div>
-            <div className="atw-modal__b">
-              {fill(copy.confirmBody, {
-                m: messageCount,
-                n: job.destinations.length,
-                name: jobName(job.jobKey),
-                when: job.kind === "scheduled" ? fill(copy.confirmWhenDaily, { time: job.sendTime }) : copy.confirmWhenEvent,
-              })}
-            </div>
-            {job.destinations.length === 0 ? <div className="atw-warn">{copy.errors.no_destination}</div> : null}
-            {/* 발송 시간대 안에서 켜면 다음 틱(1분 안)에 바로 나간다 — 미리 알린다. */}
-            {job.kind === "scheduled" && job.destinations.length > 0 && isScheduledSendDue({ ...job, enabled: true }, new Date()) ? (
-              <div className="atw-warn">{fill(copy.sendsNowWarning, { until: job.retryUntil })}</div>
-            ) : null}
-            <div className="atw-modal__f">
-              <button className="atw-btn" onClick={() => setConfirmOn(false)} type="button">
-                {copy.cancel}
-              </button>
-              <button className="atw-btn is-primary" disabled={pending} onClick={confirmEnable} type="button">
-                {copy.confirmOk}
-              </button>
-            </div>
-          </div>
-        </div>
+        <AtwConfirm
+          body={fill(copy.confirmBody, {
+            m: messageCount,
+            n: enableGuard.count,
+            name: jobName(job.jobKey),
+            when: job.kind === "scheduled" ? fill(copy.confirmWhenDaily, { time: job.sendTime }) : copy.confirmWhenEvent,
+          })}
+          cancelLabel={copy.cancel}
+          confirmLabel={copy.confirmOk}
+          disabled={!enableGuard.ok}
+          onClose={closeConfirmOn}
+          onConfirm={confirmEnable}
+          pending={pending}
+          title={copy.confirmTitle}
+          warn={
+            !enableGuard.ok
+              ? copy.errors.no_destination
+              : job.kind === "scheduled" && isScheduledSendDue({ ...job, enabled: true }, new Date())
+                ? fill(copy.sendsNowWarning, { until: job.retryUntil })
+                : null
+          }
+        />
       ) : null}
       {toast ? (
         <div className="atw-toast" role="status">
@@ -477,8 +565,9 @@ function PreviewPane({
   const { loading, text, card } = useAutomationPreview(job.jobKey, date, lang, onPreviewError);
   const { timed, asCorrection } = previewSendState(job, date);
 
+  const [confirmSend, setConfirmSend] = useState(false);
   const sendNow = () => {
-    if (!window.confirm(copy.preview.sendConfirm)) return;
+    setConfirmSend(false);
     startSend(async () => {
       const result = await sendAutomationNow(asCorrection ? { correction: true, date, jobKey: job.jobKey } : { date, jobKey: job.jobKey });
       if (!result.ok) return flash(errorText(result.error));
@@ -584,14 +673,24 @@ function PreviewPane({
         </span>
         <button
           className={`atw-btn is-tint${done ? " is-done" : ""}`}
-          disabled={view || sending || job.destinations.length === 0}
-          onClick={sendNow}
+          disabled={view || sending || !canEnableAutomation(job.destinations, data.channels.map((channel) => channel.key)).ok}
+          onClick={() => setConfirmSend(true)}
           type="button"
         >
           {done ? <DrawCheck /> : null}
           {asCorrection ? w.sendCorrection : copy.preview.sendNow}
         </button>
       </div>
+      {confirmSend ? (
+        <AtwConfirm
+          cancelLabel={copy.cancel}
+          confirmLabel={copy.settings.confirmSend}
+          onClose={() => setConfirmSend(false)}
+          onConfirm={sendNow}
+          pending={sending}
+          title={copy.preview.sendConfirm}
+        />
+      ) : null}
     </div>
   );
 }
@@ -868,6 +967,7 @@ function HistoryPane({
 }) {
   const w = copy.white;
   const [message, setMessage] = useState<string | null>(null);
+  const rawTitleId = useId();
   const open = (id: string) => {
     loadAutomationRunMessage(id).then((result) => {
       if (!result.ok) return flash(errorText(result.error));
@@ -926,8 +1026,10 @@ function HistoryPane({
       </table>
       {message !== null ? (
         <div className="atw-scrim" onClick={() => setMessage(null)} role="presentation">
-          <div aria-modal="true" className="atw-modal is-wide" onClick={(event) => event.stopPropagation()} role="dialog">
-            <div className="atw-modal__t">{w.raw}</div>
+          <div aria-labelledby={rawTitleId} aria-modal="true" className="atw-modal is-wide" onClick={(event) => event.stopPropagation()} role="dialog">
+            <div className="atw-modal__t" id={rawTitleId}>
+              {w.raw}
+            </div>
             <div className="atw-modal__pre">{message}</div>
             <div className="atw-modal__f">
               <button className="atw-btn" onClick={() => setMessage(null)} type="button">
@@ -966,10 +1068,15 @@ function SettingsPane({
   const original = useMemo(() => draftOf(job), [job]);
   const [draft, setDraft] = useState<Draft>(original);
   const [saving, startSave] = useTransition();
+  const [confirmSave, setConfirmSave] = useState(false);
   const dirty = JSON.stringify(draft) !== JSON.stringify(original);
   const weekdayLabels = copy.settings.weekdayShort.split(",");
   const timed = job.kind === "scheduled";
 
+  const channelKeys = useMemo(() => data.channels.map((channel) => channel.key), [data.channels]);
+  const orphans = orphanDestinations(draft.destinations, channelKeys);
+  const draftGuard = canEnableAutomation(draft.destinations, channelKeys);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const destinationFor = (channelKey: string) => draft.destinations.find((item) => item.channelKey === channelKey);
   const toggleLocale = (channelKey: string, itemLocale: AutomationLocale) => {
     setDraft((current) => {
@@ -1007,16 +1114,37 @@ function SettingsPane({
     setDraft((current) => ({ ...current, settings: { ...current.settings, resend: { ...current.settings.resend, ...patch } } }));
 
   const save = () => {
+    setSaveError(null);
+    // 연결 안 된 채널 줄이 남아 있으면 서버가 invalid 로 돌려보낸다 — 이유가 보이게 먼저 알린다.
+    if (orphans.length > 0) {
+      setSaveError(copy.settings.orphanSaveBlocked);
+      return;
+    }
+    // 켜져 있는데 실제로 나갈 곳이 0곳이면 저장하지 않는다(서버도 같은 판정으로 막는다) — 저장 줄 옆에 이유를 적는다.
+    if (job.enabled && !draftGuard.ok) {
+      setSaveError(copy.errors.no_destination);
+      return;
+    }
     // 켜져 있고 바꾼 시각 · 받는 곳으로 지금이 발송 시간대면, 저장 직후 틱이 바로 보낸다 — 한 번 묻는다.
     const sendsNow =
       timed &&
       job.enabled &&
-      draft.destinations.length > 0 &&
+      draftGuard.ok &&
       isScheduledSendDue({ ...draft, enabled: true, lastDoneOn: job.lastDoneOn }, new Date());
-    if (sendsNow && !window.confirm(fill(copy.sendsNowWarning, { until: draft.retryUntil }))) return;
+    if (sendsNow) {
+      setConfirmSave(true);
+      return;
+    }
+    doSave();
+  };
+  const doSave = () => {
+    setConfirmSave(false);
     startSave(async () => {
       const result = await saveAutomationJob({ jobKey: job.jobKey, ...draft });
-      if (!result.ok) return flash(errorText(result.error));
+      if (!result.ok) {
+        setSaveError(errorText(result.error));
+        return flash(errorText(result.error));
+      }
       flash(copy.settings.saved);
       onSaved(job.jobKey);
     });
@@ -1261,6 +1389,27 @@ function SettingsPane({
             );
           })
         )}
+        {orphans.map((orphan) => (
+          <div className="atw-dest" key={orphan.channelKey}>
+            <span className="atw-dest__n">
+              <b>{orphan.channelKey}</b>
+              <span className="is-bad">
+                {copy.settings.orphanChannel} · {copy.settings.orphanHint}
+              </span>
+            </span>
+            <span className="atw-dest__langs">
+              <button
+                aria-label={`${orphan.channelKey} ${copy.settings.orphanRemove}`}
+                className="atw-btn"
+                disabled={view}
+                onClick={() => setDraft((current) => ({ ...current, destinations: current.destinations.filter((item) => item.channelKey !== orphan.channelKey) }))}
+                type="button"
+              >
+                {copy.settings.orphanRemove}
+              </button>
+            </span>
+          </div>
+        ))}
         <span className="atw-note">{copy.settings.channelHint}</span>
       </div>
 
@@ -1282,8 +1431,22 @@ function SettingsPane({
 
       {!view ? (
         <div className="atw-save">
-          {dirty ? <span className="atw-save__t">{fill(copy.settings.unsaved, { n: changeCount })}</span> : null}
-          <button className="atw-btn is-big" disabled={!dirty || saving} onClick={() => setDraft(original)} type="button">
+          {saveError ? (
+            <span className="atw-save__t is-bad" role="alert">
+              {saveError}
+            </span>
+          ) : dirty ? (
+            <span className="atw-save__t">{fill(copy.settings.unsaved, { n: changeCount })}</span>
+          ) : null}
+          <button
+            className="atw-btn is-big"
+            disabled={!dirty || saving}
+            onClick={() => {
+              setSaveError(null);
+              setDraft(original);
+            }}
+            type="button"
+          >
             {copy.settings.revert}
           </button>
           <button className={`atw-btn is-primary is-big${justSaved ? " is-done" : ""}`} disabled={!dirty || saving} onClick={save} type="button">
@@ -1291,6 +1454,16 @@ function SettingsPane({
             {w.saveSettings}
           </button>
         </div>
+      ) : null}
+      {confirmSave ? (
+        <AtwConfirm
+          cancelLabel={copy.cancel}
+          confirmLabel={copy.settings.confirmSave}
+          onClose={() => setConfirmSave(false)}
+          onConfirm={doSave}
+          pending={saving}
+          title={fill(copy.sendsNowWarning, { until: draft.retryUntil })}
+        />
       ) : null}
     </div>
   );

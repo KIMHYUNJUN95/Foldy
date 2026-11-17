@@ -43,6 +43,7 @@ import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { useIsTablet } from "@/components/shell/split-list";
 import type { AutomationJobView, AutomationPageData } from "@/lib/automation/console-data";
 import { AUTOMATION_LOCALES, isAutomationJobKey, type AutomationJobKey, type AutomationLocale } from "@/lib/automation/jobs";
+import { canEnableAutomation } from "@/lib/automation/enable-guard";
 import { isScheduledSendDue } from "@/lib/automation/schedule";
 import { DatePickerSheet } from "@/components/shell/date-picker-sheet";
 import { haptic } from "@/lib/haptics";
@@ -88,7 +89,7 @@ function DrawCheck() {
   );
 }
 
-type Confirm = { title: string; body: string; warnings: string[]; ok: string; run: () => Promise<void> };
+type Confirm = { title: string; body: string; warnings: string[]; ok: string; run: () => Promise<void>; blocked?: boolean };
 
 export function MobileAutomation({
   data,
@@ -251,9 +252,6 @@ function ListView({
       </div>
 
       <div className="mat-foot">
-        <span>
-          {copy.sectionLater} — {copy.laterBody}
-        </span>
         <span>{copy.footTz}</span>
       </div>
     </>
@@ -350,7 +348,8 @@ function DetailView({
   const view = !data.canManage;
   const [pending, startTransition] = useTransition();
   const name = copy.jobs[job.jobKey].name;
-  const messageCount = messageCountOf(job);
+  const channelKeys = data.channels.map((channel) => channel.key);
+  const messageCount = messageCountOf(job, channelKeys);
 
   const toggle = () => {
     if (view || pending) return;
@@ -365,18 +364,20 @@ function DetailView({
       return;
     }
     const warnings: string[] = [];
-    if (job.destinations.length === 0) warnings.push(copy.errors.no_destination);
+    const guard = canEnableAutomation(job.destinations, channelKeys);
+    if (!guard.ok) warnings.push(copy.errors.no_destination);
     // 발송 시간대 안에서 켜면 다음 틱(1분 안)에 바로 나간다 — 미리 알린다.
-    if (job.kind === "scheduled" && job.destinations.length > 0 && isScheduledSendDue({ ...job, enabled: true }, new Date())) {
+    if (job.kind === "scheduled" && guard.ok && isScheduledSendDue({ ...job, enabled: true }, new Date())) {
       warnings.push(fill(copy.sendsNowWarning, { until: job.retryUntil }));
     }
     onConfirm({
       body: fill(copy.confirmBody, {
         m: messageCount,
-        n: job.destinations.length,
+        n: guard.count,
         name,
         when: job.kind === "scheduled" ? fill(copy.confirmWhenDaily, { time: job.sendTime }) : copy.confirmWhenEvent,
       }),
+      blocked: !guard.ok,
       ok: copy.confirmOk,
       run: async () => {
         const result = await setAutomationEnabled(job.jobKey, true);
@@ -423,7 +424,7 @@ function DetailView({
           <p>
             {job.kind === "scheduled" ? fill(copy.whenDaily, { time: job.sendTime }) : eventLineOf(job.jobKey, w)}
             {" · "}
-            {destLineOf(job, w)}
+            {destLineOf(job, w, channelKeys)}
           </p>
         </div>
         <div className="mat-sw">
@@ -538,12 +539,14 @@ function PreviewPane({
     return () => window.clearTimeout(timer);
   }, [done]);
 
+  const channelKeys = data.channels.map((channel) => channel.key);
+  const recipients = canEnableAutomation(job.destinations, channelKeys);
   const send = () => {
     haptic("light");
     onConfirm({
       body: asCorrection
-        ? fill(m.correctionBody, { date: mdOf(date), n: job.destinations.length })
-        : fill(m.sendBody, { date: mdOf(date), m: messageCountOf(job), n: job.destinations.length, name: copy.jobs[job.jobKey].name }),
+        ? fill(m.correctionBody, { date: mdOf(date), n: recipients.count })
+        : fill(m.sendBody, { date: mdOf(date), m: messageCountOf(job, channelKeys), n: recipients.count, name: copy.jobs[job.jobKey].name }),
       ok: asCorrection ? w.sendCorrection : m.sendOk,
       run: async () => {
         const result = await sendAutomationNow(asCorrection ? { correction: true, date, jobKey: job.jobKey } : { date, jobKey: job.jobKey });
@@ -665,7 +668,7 @@ function PreviewPane({
         </button>
         <button
           className={`mat-btn is-tint${done ? " is-done" : ""}`}
-          disabled={view || job.destinations.length === 0}
+          disabled={view || !recipients.ok}
           onClick={send}
           type="button"
         >
@@ -800,7 +803,7 @@ function ConfirmModal({ confirm, keep, onClose }: { confirm: Confirm; keep: stri
           </button>
           <button
             className="mat-btn is-primary"
-            disabled={busy}
+            disabled={busy || confirm.blocked === true}
             onClick={() =>
               startBusy(async () => {
                 await confirm.run();

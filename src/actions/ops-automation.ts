@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getAdminSessionForApi } from "@/lib/admin-session";
 import { getDictionary } from "@/lib/i18n";
+import { canEnableAutomation } from "@/lib/automation/enable-guard";
 import { listAutomationChannels } from "@/lib/automation/channels";
 import {
   AUTOMATION_BUILDING_ORDER,
@@ -255,6 +256,9 @@ export async function saveAutomationJob(input: SaveJobInput): Promise<{ ok: true
   const organizationId = session.organization.id;
   const [jobs, currentDestinations] = await Promise.all([loadJobs(supabase, organizationId), loadDestinations(supabase, organizationId)]);
   const current = jobs[jobKey];
+  // 켜져 있는 자동화를 받는 곳 0곳으로 저장하면 다음 발송이 조용히 건너뛴다 — 막고 이유를 알려 준다(끄지는 않는다).
+  // 꺼진 것을 저장하거나 끄려고 저장하는 것은 그대로 된다.
+  if (current.enabled && !canEnableAutomation(destinations, [...known]).ok) return { error: "no_destination", ok: false };
   const now = new Date();
   const nextWake = computeNextWake(
     {
@@ -380,7 +384,13 @@ export async function setAutomationEnabled(jobKey: string, enabled: boolean): Pr
   if (!isAutomationJobKey(jobKey)) return { error: "invalid", ok: false };
   const supabase = getSupabaseServiceClient();
   const organizationId = session.organization.id;
-  const jobs = await loadJobs(supabase, organizationId);
+  // 끌 때는 받는 곳을 읽지 않는다. 켤 때만 — 실제로 나갈 곳(연결된 채널 + 언어 체크)이 없으면 켤 수 없다.
+  // 화면(확인 창)과 같은 판정(`canEnableAutomation`)을 서버가 다시 한다.
+  const [jobs, destinations] = await Promise.all([loadJobs(supabase, organizationId), enabled ? loadDestinations(supabase, organizationId) : null]);
+  if (destinations) {
+    const guard = canEnableAutomation(destinations[jobKey], listAutomationChannels().map((channel) => channel.key));
+    if (!guard.ok) return { error: guard.error, ok: false };
+  }
   const current = jobs[jobKey];
   const now = new Date();
   const nextWake =

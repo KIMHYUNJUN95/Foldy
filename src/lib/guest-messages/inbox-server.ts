@@ -346,6 +346,8 @@ export type InboxSearchResult = {
   results: Array<{ row: InboxConversationRow; match: InboxSearchMatch }>;
   /** DB 후보가 받은 만큼 꽉 찼다 — 더 있을 수 있다(말을 더 넣어 좁히기). */
   truncated: boolean;
+  /** 2글자 검색어라 메시지 내용은 최근 90일만 봤다(`bodySinceFor`). */
+  bodyRecentOnly: boolean;
 };
 
 const BUILDING_LABEL_SETS = Object.values(dictionaries).map((dictionary) => dictionary.cleaning.buildingLabels as Record<string, string>);
@@ -371,13 +373,15 @@ export async function searchInbox(
       codes = null;
     }
   }
-  const args = buildSearchArgs(query, { labelSets: BUILDING_LABEL_SETS, canSeeCodes: visibility.canSeeCodes, codes });
+  const args = buildSearchArgs(query, { labelSets: BUILDING_LABEL_SETS, canSeeCodes: visibility.canSeeCodes, codes, now });
+  const bodyRecentOnly = args.p_body_since !== null;
   const { data, error } = await db.rpc("guest_conversation_search", {
     p_organization_id: organizationId,
     ...args,
     p_reference: args.p_reference ?? undefined,
     p_phone_pattern: args.p_phone_pattern ?? undefined,
     p_email: args.p_email ?? undefined,
+    p_body_since: args.p_body_since ?? undefined,
     p_code_mask: args.p_code_mask ?? undefined,
     p_status: filter.status,
     p_building: filter.building ?? undefined,
@@ -389,7 +393,7 @@ export async function searchInbox(
   const candidates = (data ?? []) as SearchRpcRow[];
   const picked = pickSearchMatches(candidates, query, { canSeeCodes: visibility.canSeeCodes, codes });
   const truncated = candidates.length >= SEARCH_FETCH_LIMIT || picked.length >= SEARCH_RESULT_LIMIT;
-  if (picked.length === 0) return { results: [], truncated };
+  if (picked.length === 0) return { results: [], truncated, bodyRecentOnly };
 
   const ids = picked.map((item) => item.id);
   const found = await db.from("guest_conversations").select(CONVERSATION_COLUMNS).eq("organization_id", organizationId).in("id", ids);
@@ -407,7 +411,7 @@ export async function searchInbox(
       match: item.match,
     });
   }
-  return { results, truncated };
+  return { results, truncated, bodyRecentOnly };
 }
 
 /** 메뉴 · 탭 숫자 — 답장 기다림(끝난 「나중에」 포함). 실패하면 0. */

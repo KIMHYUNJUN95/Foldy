@@ -5,6 +5,7 @@ vi.mock("server-only", () => ({}));
 import {
   SEARCH_FETCH_LIMIT,
   answerOnRunStart,
+  bodySinceFor,
   buildSearchArgs,
   codeMaskPattern,
   maskCodeText,
@@ -23,7 +24,8 @@ import { dictionaries } from "@/lib/i18n";
 /** 손님 메시지 검색(47 §5-10) — 검색어 다듬기 · 찾는 곳별 판정 · 코드 가리기 · 조직 범위 · 순서 · 50개. */
 
 const LABELS = Object.values(dictionaries).map((d) => d.cleaning.buildingLabels as Record<string, string>);
-const base = { labelSets: LABELS, canSeeCodes: true, codes: [] as string[] };
+const NOW = new Date("2026-11-18T03:00:00.000Z");
+const base = { labelSets: LABELS, canSeeCodes: true, codes: [] as string[], now: NOW };
 
 function rpcRow(id: string, patch: Partial<SearchRpcRow> = {}): SearchRpcRow {
   return {
@@ -229,10 +231,20 @@ describe("searchInbox — 조직 범위", () => {
     await searchInbox(seen.db as never, "org-1", "482913", { status: "all", building: null, channel: "all" });
     expect(seen.calls.rpc.find((c) => c.name === "guest_conversation_search")!.args.p_code_mask).toBeUndefined();
   });
+  it("2글자면 메시지 내용은 최근 90일(searchInbox 의 now 기준)만 · 결과에 표시", async () => {
+    const short = fakeDb([]);
+    const result = await searchInbox(short.db as never, "org-1", "鍵穴", { status: "all", building: null, channel: "all" }, NOW);
+    expect(short.calls.rpc.find((c) => c.name === "guest_conversation_search")!.args.p_body_since).toBe("2026-08-20T03:00:00.000Z");
+    expect(result.bodyRecentOnly).toBe(true);
+    const long = fakeDb([]);
+    const full = await searchInbox(long.db as never, "org-1", "umbrella", { status: "all", building: null, channel: "all" }, NOW);
+    expect(long.calls.rpc.find((c) => c.name === "guest_conversation_search")!.args.p_body_since).toBeUndefined();
+    expect(full.bodyRecentOnly).toBe(false);
+  });
 });
 
 describe("검색 칸 상태", () => {
-  const ready = { query: "umbrella", status: "ready" as const, results: [1], truncated: false };
+  const ready = { query: "umbrella", status: "ready" as const, results: [1], truncated: false, bodyRecentOnly: false };
   const failed = { query: "umbrella", status: "error" as const };
   it("다시 시도 — 실패 답을 지워 바로 찾는 중, 결과 답은 새 답까지 둔다", () => {
     expect(answerOnRunStart(failed)).toBeNull();
@@ -252,5 +264,22 @@ describe("검색 칸 상태", () => {
   it("입력 칸 최대 길이 = 검색 길이 60", () => {
     expect(SEARCH_MAX_CHARS).toBe(60);
     expect(normalizeSearchQuery("a".repeat(70))).toHaveLength(SEARCH_MAX_CHARS);
+  });
+});
+
+describe("2글자 검색 — 메시지 내용 기간", () => {
+  it("공백 뺀 2글자는 now − 90일, 3글자부터는 전체 기간(null)", () => {
+    expect(bodySinceFor("ab", NOW)).toBe("2026-08-20T03:00:00.000Z");
+    expect(bodySinceFor("a b", NOW)).toBe("2026-08-20T03:00:00.000Z");
+    expect(bodySinceFor("鍵", NOW)).toBe("2026-08-20T03:00:00.000Z");
+    expect(bodySinceFor("abc", NOW)).toBeNull();
+    expect(bodySinceFor("우산이", NOW)).toBeNull();
+  });
+  it("인자에도 실린다 — 이름 · 예약번호 같은 다른 곳은 그대로", () => {
+    const short = buildSearchArgs("ab", base);
+    expect(short.p_body_since).toBe("2026-08-20T03:00:00.000Z");
+    expect(short.p_body).toBe(true);
+    expect(short.p_name_fragments.length).toBeGreaterThan(0);
+    expect(buildSearchArgs("abc", base).p_body_since).toBeNull();
   });
 });

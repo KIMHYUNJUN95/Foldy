@@ -1190,6 +1190,9 @@ button.gm-photo:focus-visible { outline: 2px solid var(--gm-primary); outline-of
 .gm-search__hint { font-size: 12px; color: var(--gm-muted); padding-left: 2px; }
 .gm-search__status { margin: 0; padding: 4px 0 8px 12px; font-size: 12px; color: var(--gm-muted); display: flex; flex-wrap: wrap; gap: 4px 10px; }
 .gm-mlist-head + .gm-search__status { padding-left: 0; }
+/* 2글자 검색 안내 — 늘 자기 줄, 좁은 폰에서는 줄바꿈. */
+.gm-search__note { min-width: 0; max-width: 100%; overflow-wrap: anywhere; font-size: 12px; color: var(--gm-muted); }
+.gm-search__status .gm-search__note { flex-basis: 100%; }
 .gm-row__hit { font-size: 12px; color: var(--gm-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gm-root [data-stale] { opacity: 0.55; transition: opacity 160ms var(--gm-ease); }
 /* 폰 · 터치 — 44px 칸, 글자 16px(iOS 가 초점 때 화면을 키우지 않게). */

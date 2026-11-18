@@ -55,7 +55,7 @@ export function useInboxSearch(
     if (mine !== seq.current) return;
     setAnswer(
       result?.ok
-        ? { query: q, status: "ready", results: result.results, truncated: result.truncated }
+        ? { query: q, status: "ready", results: result.results, truncated: result.truncated, bodyRecentOnly: result.bodyRecentOnly }
         : { query: q, status: "error" },
     );
   }, []);

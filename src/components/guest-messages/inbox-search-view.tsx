@@ -89,6 +89,7 @@ export function InboxSearchState({ search, copy }: { search: Search; copy: GmCop
       <div className="gm-empty" role="status">
         <b>{copy.searchEmptyTitle}</b>
         <span>{copy.searchEmptyBody}</span>
+        {answer.status === "ready" && answer.bodyRecentOnly ? <span className="gm-search__note">{copy.searchRecentOnly}</span> : null}
       </div>
     );
   }
@@ -96,6 +97,7 @@ export function InboxSearchState({ search, copy }: { search: Search; copy: GmCop
     <p className="gm-search__status" role="status">
       {search.loading ? copy.searchLoading : fill(copy.searchCount, { n: rows.length })}
       {!search.loading && answer?.status === "ready" && answer.truncated ? <span>{copy.searchMore}</span> : null}
+      {!search.loading && answer?.status === "ready" && answer.bodyRecentOnly ? <span className="gm-search__note">{copy.searchRecentOnly}</span> : null}
     </p>
   );
 }

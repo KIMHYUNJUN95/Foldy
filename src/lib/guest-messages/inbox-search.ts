@@ -23,6 +23,20 @@ export const SEARCH_MAX_CHARS = 60;
 export const SEARCH_RESULT_LIMIT = 50;
 /** DB 에서 조금 더 받는다 — 이름 · 전화번호 후보는 여기서 다시 보고 떨어질 수 있다. */
 export const SEARCH_FETCH_LIMIT = 80;
+/**
+ * 공백 뺀 글자가 이보다 짧으면(= 2글자) 메시지 내용은 최근 `SHORT_QUERY_BODY_DAYS` 일만 본다 — trigram 색인은 3글자부터라
+ * 2글자는 메시지 전체를 읽는다(운영 12만 줄 약 2초 · 처음 12초 → 90일이면 0.8초). 이름 · 예약번호 · 건물 · 전화 · 이메일은 전체 기간.
+ */
+export const BODY_FULL_RANGE_MIN_CHARS = 3;
+export const SHORT_QUERY_BODY_DAYS = 90;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** 메시지 내용을 볼 시작 시각 — 2글자 검색어면 `now` 90일 전, 아니면 null(전체 기간). */
+export function bodySinceFor(query: string, now: Date): string | null {
+  if (Array.from(query.replace(/\s/g, "")).length >= BODY_FULL_RANGE_MIN_CHARS) return null;
+  return new Date(now.getTime() - SHORT_QUERY_BODY_DAYS * DAY_MS).toISOString();
+}
+
 /** 코드 값을 못 읽었을 때 가리는 모양 — 목록 미리보기(`maskAllCodeLike`)와 같다. */
 export const CODE_LIKE_SOURCE = "[0-9#*]{3,}";
 
@@ -81,7 +95,7 @@ export function maskCodeText(text: string, canSeeCodes: boolean, codes: readonly
 
 /** 검색 칸이 들고 있는 마지막 답(결과 또는 실패). */
 export type SearchAnswer<R> =
-  | { query: string; status: "ready"; results: R[]; truncated: boolean }
+  | { query: string; status: "ready"; results: R[]; truncated: boolean; bodyRecentOnly: boolean }
   | { query: string; status: "error" };
 
 /**
@@ -109,13 +123,14 @@ export type InboxSearchArgs = {
   p_email: "full" | "local" | null;
   p_place_names: string[];
   p_body: boolean;
+  p_body_since: string | null;
   p_code_mask: string | null;
 };
 
-/** 다듬은 검색어 → DB 함수 인자(조직 · 필터 · 시각 · 개수는 부르는 쪽이 붙인다). */
+/** 다듬은 검색어 → DB 함수 인자(조직 · 필터 · 개수는 부르는 쪽이 붙인다). `now` = 2글자 내용 검색 기간의 기준 시각. */
 export function buildSearchArgs(
   query: string,
-  options: { labelSets: readonly Record<string, string>[]; canSeeCodes: boolean; codes: readonly string[] | null },
+  options: { labelSets: readonly Record<string, string>[]; canSeeCodes: boolean; codes: readonly string[] | null; now: Date },
 ): InboxSearchArgs {
   const plan = buildGuestSearchPlan(query);
   const spaced = /\s/.test(query);
@@ -128,6 +143,7 @@ export function buildSearchArgs(
     p_email: query.includes("@") ? "full" : !spaced && Array.from(query).length >= 3 ? "local" : null,
     p_place_names: placeNamesFor(query, options.labelSets),
     p_body: true,
+    p_body_since: bodySinceFor(query, options.now),
     p_code_mask: codeMaskPattern(options.canSeeCodes, options.codes),
   };
 }

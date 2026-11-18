@@ -1,3 +1,4 @@
+import { beds24Fetch } from "@/lib/beds24/credit-ledger";
 import { getOptionalBeds24ApiEnv } from "@/lib/env";
 
 /**
@@ -22,11 +23,15 @@ export async function resolveBeds24AccessToken(prefix = "beds24"): Promise<Beds2
     return { ok: true, token: cachedToken.token };
   }
   try {
-    const response = await fetch(`${env.baseUrl.replace(/\/$/, "")}/authentication/token`, {
-      method: "GET",
-      headers: { accept: "application/json", refreshToken: env.refreshToken },
-      cache: "no-store",
-    });
+    const response = await beds24Fetch(
+      `${env.baseUrl.replace(/\/$/, "")}/authentication/token`,
+      {
+        method: "GET",
+        headers: { accept: "application/json", refreshToken: env.refreshToken },
+        cache: "no-store",
+      },
+      { feature: "auth", action: "token.refresh", job: prefix },
+    );
     if (!response.ok) {
       return {
         ok: false,

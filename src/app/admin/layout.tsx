@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { AdminEntry } from "@/components/admin/admin-entry";
 import { AdminNavBadgesProvider } from "@/components/admin/admin-nav-badges";
+import { Beds24CreditProvider } from "@/components/admin/beds24-credit-gauge";
+import { canViewBeds24Credit } from "@/lib/beds24/credit-access";
+import { getBeds24CreditSnapshot } from "@/lib/beds24/credit-usage-read";
 import { StaffCallHost } from "@/components/checkin-call/staff-call-host";
 import { BuildingNamesProvider } from "@/components/shared/building-names";
 import { getDictionary } from "@/lib/i18n";
@@ -25,13 +28,19 @@ export const metadata: Metadata = {
   },
 };
 
+/** 렌더 밖에서 읽는 지금 시각 — 크레딧 게이지 카운트다운의 첫 그림용. */
+function nowMs() {
+  return Date.now();
+}
+
 // 진입 모션은 레이아웃에, 내용보다 앞(스크립트가 콘솔 HTML 보다 먼저 돈다) — 어느 관리자 화면에서 새로고침 · 다시 접속해도 나오고, 콘솔 안 이동 땐 레이아웃이 그대로라 다시 안 나온다.
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await getCurrentAppSession();
   const dictionary = getDictionary(session?.user.preferredLanguage ?? "ko");
   const inOrg = Boolean(session && session.organization.id !== "platform");
-  // 두 숫자는 서로 기다리지 않게 같이 센다.
-  const [pendingIdDocs, awaitingMessages] = await Promise.all([
+  const creditEnabled = canViewBeds24Credit(session);
+  // 숫자들은 서로 기다리지 않게 같이 센다.
+  const [pendingIdDocs, awaitingMessages, creditSnapshot] = await Promise.all([
     // 사용자 메뉴 숫자 = 신분 서류 확인 대기 — 서류를 볼 권한이 있는 사람에게만 계산한다.
     session && inOrg && session.capabilities.includes("staff_documents.view")
       ? countPendingIdDocumentPeople(session.organization.id)
@@ -40,6 +49,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     session && inOrg && session.capabilities.includes("guest_messages.view")
       ? getSupabaseServerClient().then((client) => countAwaitingConversations(client, session.organization.id))
       : Promise.resolve(0),
+    // 상단 줄 Beds24 크레딧 게이지 첫 값 — 판매 캘린더 권한이 있는 사람만. 우리 DB 한 줄 조회(Beds24 를 부르지 않는다).
+    // 읽기가 실패해도 콘솔 전체가 죽지 않게 「모름」으로.
+    session && creditEnabled ? getBeds24CreditSnapshot(session.organization.id).catch(() => null) : Promise.resolve(null),
   ]);
   const navBadges: Record<string, number> = {};
   if (pendingIdDocs > 0) navBadges.users = pendingIdDocs;
@@ -49,13 +61,15 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <AdminEntry />
       {/* 건물 이름을 보는 사람 언어로(2026-10-23) — 모바일과 같은 공급자. 데이터는 한국어 정규 명칭이라 그릴 때 `useBuildingName()` 으로 바꾼다. */}
       <AdminNavBadgesProvider badges={navBadges}>
-        <BuildingNamesProvider labels={dictionary.cleaning.buildingLabels}>
-          {children}
-          {/* 직원 통화 받기(docs/product/46 §6) — 레이아웃에 붙여 화면을 옮겨도 통화가 이어진다. */}
-          {session && hasOrganizationContext(session) && session.capabilities.includes("checkin.call") ? (
-            <StaffCallHost userId={session.user.id} surface="admin" copy={dictionary.checkinCall} />
-          ) : null}
-        </BuildingNamesProvider>
+        <Beds24CreditProvider enabled={creditEnabled} initial={creditSnapshot} serverNow={nowMs()}>
+          <BuildingNamesProvider labels={dictionary.cleaning.buildingLabels}>
+            {children}
+            {/* 직원 통화 받기(docs/product/46 §6) — 레이아웃에 붙여 화면을 옮겨도 통화가 이어진다. */}
+            {session && hasOrganizationContext(session) && session.capabilities.includes("checkin.call") ? (
+              <StaffCallHost userId={session.user.id} surface="admin" copy={dictionary.checkinCall} />
+            ) : null}
+          </BuildingNamesProvider>
+        </Beds24CreditProvider>
       </AdminNavBadgesProvider>
     </>
   );

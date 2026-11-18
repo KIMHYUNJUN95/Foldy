@@ -37,6 +37,7 @@ import {
   useNowMinute,
   type AutomationCopy,
 } from "@/components/admin/ops/automation-shared";
+import { MobileCreditSection } from "@/components/mobile/ops/beds24-credit-mobile";
 import { MobileAutomationAssign } from "@/components/mobile/ops/mobile-automation-assign";
 import { MobileAutomationSettings } from "@/components/mobile/ops/mobile-automation-settings";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
@@ -47,6 +48,7 @@ import { canEnableAutomation } from "@/lib/automation/enable-guard";
 import { isScheduledSendDue } from "@/lib/automation/schedule";
 import { DatePickerSheet } from "@/components/shell/date-picker-sheet";
 import { haptic } from "@/lib/haptics";
+import type { Beds24CreditCopy } from "@/lib/beds24-credit-view";
 import "./mobile-automation.css";
 import { useToastMotion } from "@/components/shell/use-toast-motion";
 
@@ -94,11 +96,13 @@ type Confirm = { title: string; body: string; warnings: string[]; ok: string; ru
 export function MobileAutomation({
   data,
   copy,
+  creditCopy,
   locale,
   localeTag,
 }: {
   data: AutomationPageData;
   copy: AutomationCopy;
+  creditCopy: Beds24CreditCopy;
   locale: AutomationLocale;
   localeTag: string;
 }) {
@@ -149,7 +153,7 @@ export function MobileAutomation({
     <div className="mat" data-mode={mode}>
       <div className="mat-body">
         <div className="mat-side">
-          <ListView copy={copy} data={data} localeTag={localeTag} now={now} onOpen={open} selected={isTablet ? detailKey : null} />
+          <ListView copy={copy} creditCopy={creditCopy} data={data} localeTag={localeTag} now={now} onOpen={open} selected={isTablet ? detailKey : null} />
         </div>
         {job ? (
           <section className="mat-detail" key={job.jobKey}>
@@ -181,6 +185,7 @@ export function MobileAutomation({
 function ListView({
   data,
   copy,
+  creditCopy,
   localeTag,
   now,
   selected,
@@ -188,6 +193,7 @@ function ListView({
 }: {
   data: AutomationPageData;
   copy: AutomationCopy;
+  creditCopy: Beds24CreditCopy;
   localeTag: string;
   now: Date | null;
   selected: AutomationJobKey | null;
@@ -250,6 +256,8 @@ function ListView({
           );
         })}
       </div>
+
+      <MobileCreditSection copy={creditCopy} detail={data.credit} serverNow={data.renderedAt} />
 
       <div className="mat-foot">
         <span>{copy.footTz}</span>

@@ -2624,3 +2624,18 @@ INSERT · UPDATE 신호만, DELETE 는 오지 않는다. 대신 `task_occurrence
 - 함수(security invoker · `search_path = ''` · 실행 service_role 만): `guest_reply_similar(org, embedding, property_name, since, before, limit)` → `(pair_id, conversation_id, property_name, asked_at, question_text, reply_text, distance)` — 같은 조직 · 답 있음 · 기간 안, 같은 건물 거리 −0.03, 1~10줄. `guest_reply_assist_cost_since(since)` → bigint(모든 조직 합 — 키 하나 공용 한도). `guest_reply_assist_reserve(org, conversation, user, draft_id, message_id, since, cap, reserve)` → boolean(잠금 `pg_advisory_xact_lock` 안에서 합 + 이번 몫 > 한도면 false, 아니면 `pending` 줄 넣고 true). `guest_reply_similar` 는 그 조직 줄이 5,000개 이하면 정확 계산, 넘으면 HNSW 60개(`ef_search = 100` · `iterative_scan = relaxed_order`) 뒤 순위.
 - 보존: 따로 지우는 작업 없음(대화 · 메시지 · 문구를 지우면 cascade 로 같이).
 - 타입: `src/types/database.ts` 손으로 맞춤(`embedding` 은 글 `"[…]"`).
+
+## 2026-11-18 `beds24_credit_usage` — Beds24 호출 한 번 = 한 줄 (크레딧 사용 기록)
+
+마이그레이션 `202611180003_beds24_credit_usage.sql` (**운영 적용 2026-11-18**). 설계: 01 → 「2026-11-18 크레딧 사용 기록」.
+
+- 열: `id` bigint identity · `called_at` · `organization_id`(null = 계정 전체 작업, 조직 지우면 같이 지움) · `credential_key` text not null default `'main'`(어느 Beds24 토큰) ·
+  `feature`(check: `rates_write` · `rates_read` · `block_write` · `booking_write` · `bookings_sync` · `guest_messages` · `reviews_sync` · `rooms_sync` · `auth` · `other`) ·
+  `action`(예: `calendar.post`) · `item_count` · `actor_kind`(`user` | `auto`, auto 면 `actor_job` 필수) · `actor_user_id`(profiles, 지워지면 null) · `actor_name`(사본) · `actor_job` ·
+  `cost` · `remaining` · `resets_at`(헤더 없으면 null) · `http_status`(네트워크 오류면 null).
+- 색인: `(called_at desc)` · `(actor_user_id) where not null`. 조직 색인은 두지 않는다(줄 대부분이 한 조직 + 조직 없음이라 거르지 못함).
+- 함수 `beds24_credit_usage_windows(p_organization_id, p_from, p_to, p_credential_key default 'main')` — 5분 창 × 누가 × 어디에 묶음(이 조직 줄 + 조직 없는 줄).
+- 함수 `beds24_record_account_credit(p_expires_at, p_source, p_metadata)` — `beds24_sync_locks` 의 `account_credit` 줄 쓰기. plpgsql(줄 잠금 뒤 판정). 옛 창 · 이미 지난 값 · 같은 창에서 되올라가는 값 · 같은 창의 빈 남은 값은 덮지 않고, `metadata.expiresEstimated = true`(리셋 헤더 없어 만료를 추정한 값)는 살아 있는 창의 만료를 바꾸지 않는다(판정표 12줄: 01 「크레딧 사용 기록」).
+  `language sql` · `stable` · security invoker · `search_path = ''`. 계산은 `src/lib/beds24/credit-usage-model.ts`.
+- 보관 30일: pg_cron `beds24-credit-usage-purge`(`35 15 * * *` UTC = 도쿄 0:35), 하드 삭제.
+- 쓰는 곳: `src/lib/beds24/credit-ledger.ts`(service role). 읽는 곳: `src/lib/beds24/credit-usage-read.ts`. 타입은 `src/types/database.ts` 손으로 맞춤.

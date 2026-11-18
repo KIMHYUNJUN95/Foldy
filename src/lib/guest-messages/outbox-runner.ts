@@ -13,6 +13,8 @@
  */
 
 import "server-only";
+import { userCreditActor, withBeds24CreditScope } from "@/lib/beds24/credit-ledger";
+import type { Beds24CreditActor } from "@/lib/beds24/credit-usage-types";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
@@ -47,7 +49,29 @@ type DueRow = {
   created_at: string;
   body: string;
   conversation_id: string;
+  created_by: string | null;
 };
+
+/**
+ * 크레딧 기록의 「누가」 — 한 번의 보내기(묶음)가 **한 직원의 답장만**이면 그 직원, 자동 안내가 섞였거나
+ * 여러 직원이면 자동. 이름은 지금 프로필 이름(못 읽으면 빈 이름 — 화면이 「이름 없음」으로 보인다).
+ */
+/** 잡은 뒤에 부른다 — 기록용이라 실패해도 던지지 않고 자동으로 남긴다(던지면 잡은 줄이 sending 에 멈춘다). */
+export async function resolveOutboxCreditActor(
+  supabase: Client,
+  rows: Pick<DueRow, "kind" | "created_by">[],
+): Promise<Beds24CreditActor> {
+  const auto: Beds24CreditActor = { kind: "auto", job: "guest_messages_outbox" };
+  const senders = new Set(rows.map((row) => (row.kind === "reply" ? row.created_by : null)));
+  const [only] = [...senders];
+  if (senders.size !== 1 || !only) return auto;
+  try {
+    const profile = await supabase.from("profiles").select("name").eq("id", only).maybeSingle();
+    return userCreditActor({ id: only, name: (profile.data as { name: string | null } | null)?.name ?? null });
+  } catch {
+    return auto;
+  }
+}
 
 export async function runGuestOutbox(
   supabase: Client,
@@ -95,7 +119,7 @@ export async function runGuestOutbox(
     .eq("organization_id", organizationId)
     .in("id", dueIds)
     .eq("status", "queued")
-    .select("id, kind, attempts, next_try_at, created_at, body, conversation_id");
+    .select("id, kind, attempts, next_try_at, created_at, body, conversation_id, created_by");
   if (claimed.error) throw new Error(`outbox claim failed: ${claimed.error.message}`);
   const claimedRows = ((claimed.data ?? []) as DueRow[]).sort((x, y) => (x.created_at < y.created_at ? -1 : x.created_at > y.created_at ? 1 : 0));
   if (claimedRows.length === 0) return { ran: false, reason: "not_claimed" };
@@ -156,9 +180,10 @@ export async function runGuestOutbox(
   });
 
   const adapter = deps.adapter ?? createServerBeds24GuestMessageAdapter(supabase, organizationId);
+  const creditActor = await resolveOutboxCreditActor(supabase, rows);
   let result;
   try {
-    result = await processOutboxBatch({
+    result = await withBeds24CreditScope({ actor: creditActor, organizationId }, () => processOutboxBatch({
       rows: outboxRows,
       adapter,
       creditReserve: stateRow?.credit_reserve ?? 20,
@@ -168,7 +193,7 @@ export async function runGuestOutbox(
         requestCost: stateRow?.last_request_cost ?? null,
       },
       now,
-    });
+    }));
   } catch (error) {
     // 어댑터는 던지지 않게 만들었지만, 던지면 잡은 줄을 「모름」으로 둔다 — 나갔을 수도 있으니 다시 보내지 않는다.
     await markUncertain(supabase, organizationId, [...claimedIds], "runner_error");

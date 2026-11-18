@@ -7,6 +7,7 @@ import "@/components/admin/admin-console.css";
 import "@/components/admin/shared/adm-dropdown.css";
 import "@/components/admin/ops/ops-console.css";
 import { hasAdminWebAccess } from "@/config/capabilities";
+import { getBeds24CreditSnapshot } from "@/lib/beds24/credit-usage-read";
 import { countOpsHistoryAlerts } from "@/lib/beds24/ops-history-alerts";
 import { getDictionary } from "@/lib/i18n";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
@@ -49,6 +50,11 @@ function addDays(date: string, days: number): string {
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 }
 
+/** 렌더 밖에서 읽는 지금 시각 — 크레딧 카운트다운의 첫 그림용. */
+function nowMs() {
+  return Date.now();
+}
+
 export default async function MobileOpsCalendarPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const navBadgesPromise = getMobileNavBadges();
   const [state, session, params] = await Promise.all([getOnboardingState(), getCurrentAppSession(), searchParams]);
@@ -65,7 +71,7 @@ export default async function MobileOpsCalendarPage({ searchParams }: { searchPa
 
   // 주소에 30일/월간이 없으면 이 사용자가 마지막으로 본 보기로 연다(있으면 그게 새 기억) — 대시보드 · 모바일 공용.
   const mode = await resolveOpsCalendarMode(session.user.id, params.mode);
-  const [data, badges, historyAlerts] = await Promise.all([
+  const [data, badges, historyAlerts, credit] = await Promise.all([
     getOpsCalendarData(session, {
       mode,
       month: params.ym,
@@ -78,8 +84,12 @@ export default async function MobileOpsCalendarPage({ searchParams }: { searchPa
     navBadgesPromise,
     // 「이력」 칩의 빨간 숫자(최근 7일 전송 실패 + 멈춘 작업) — 데스크톱과 같은 셈.
     countOpsHistoryAlerts(getSupabaseServiceClient(), session.organization.id),
+    // Beds24 크레딧 한 줄의 첫 값 — 우리 DB 기록만 읽는다. 실패하면 줄을 안 그린다(캘린더는 그대로 연다).
+    getBeds24CreditSnapshot(session.organization.id).catch(() => null),
   ]);
-  scheduleOpsCalendarOpenRefresh(session.organization.id, data);
+  // 서버 그림과 브라우저 첫 그림이 같은 카운트다운을 쓰게 — 그린 시각을 함께 넘긴다.
+  const renderedAt = nowMs();
+  scheduleOpsCalendarOpenRefresh(session.organization.id, data, session.user);
 
   const isRolling = data.mode === "rolling";
   const hrefWith = (next: Partial<SearchParams>) =>
@@ -114,6 +124,7 @@ export default async function MobileOpsCalendarPage({ searchParams }: { searchPa
       <MobileOpsCalendar
         canWrite={canWriteOpsCalendar(session)}
         copy={copy}
+        credit={{ copy: dictionary.beds24Credit, initial: credit, serverNow: renderedAt }}
         days={data.days}
         historyAlerts={historyAlerts}
         jump={{

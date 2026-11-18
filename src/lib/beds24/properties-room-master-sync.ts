@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { beds24Fetch } from "@/lib/beds24/credit-ledger";
 import { getOptionalBeds24ApiEnv } from "@/lib/env";
 import {
   type Beds24PropertyRoomSnapshot,
@@ -77,14 +78,14 @@ async function resolveBeds24AccessToken(): Promise<Beds24AccessTokenState> {
   }
 
   try {
-    const response = await fetch(`${env.baseUrl.replace(/\/$/, "")}/authentication/token`, {
+    const response = await beds24Fetch(`${env.baseUrl.replace(/\/$/, "")}/authentication/token`, {
       method: "GET",
       headers: {
         accept: "application/json",
         refreshToken: env.refreshToken,
       },
       cache: "no-store",
-    });
+    }, { feature: "auth", action: "token.refresh", job: "room_master_sync" });
 
     if (!response.ok) {
       return {
@@ -171,13 +172,13 @@ async function fetchBeds24PropertySnapshot(): Promise<
   const propertiesUrl =
     `${env.baseUrl.replace(/\/$/, "")}/properties?includeAllRooms=true&includePriceRules=true`;
   try {
-    const response = await fetch(propertiesUrl, {
+    const response = await beds24Fetch(propertiesUrl, {
       headers: {
         accept: "application/json",
         token: tokenState.token,
       },
       cache: "no-store",
-    });
+    }, { feature: "rooms_sync", action: "properties.get", job: "room_master_sync" });
 
     if (!response.ok) {
       return { skipped: [`master-sync:properties-http-${response.status}`], snapshot: null };

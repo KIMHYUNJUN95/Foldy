@@ -11,6 +11,7 @@ const state = vi.hoisted(() => ({
   db: null as unknown,
   session: null as unknown,
   syncCalls: [] as Array<{ offset: number; limit: number }>,
+  scopes: [] as unknown[],
   total: 30,
   lockOk: true,
 }));
@@ -36,13 +37,17 @@ vi.mock("@/lib/beds24/sync-locks", () => ({
   },
   releaseBeds24Lock: async () => undefined,
 }));
-vi.mock("@/lib/beds24/reviews-sync", () => ({
+vi.mock("@/lib/beds24/reviews-sync", async () => {
+  const ledger = await import("@/lib/beds24/credit-ledger");
+  return {
   syncOrganizationReviews: async ({ offset, limit }: { offset: number; limit: number }) => {
     state.syncCalls.push({ offset, limit });
+    state.scopes.push(ledger.currentBeds24CreditScope());
     const next = offset + limit;
     return { nextOffset: next < state.total ? next : null, stoppedEarly: false, totalTargets: state.total, upserted: 1 };
   },
-}));
+  };
+});
 
 import { syncReviewsNowStep } from "@/app/mobile/complaints/review-sync-actions";
 import { extendReviewSyncRun, reviewSyncRunLockName, scheduleRunLockPlan } from "@/lib/beds24/reviews-sync-manual";
@@ -53,12 +58,20 @@ beforeEach(() => {
   state.db = createComplaintsFakeDb({ tables: { beds24_sync_locks: [] } }).client;
   state.session = {
     organization: { id: ORG },
-    user: { id: "u1" },
+    user: { id: "u1", name: "김" },
     capabilities: ["complaint.write"],
   };
   state.syncCalls = [];
+  state.scopes = [];
   state.total = 30;
   state.lockOk = true;
+});
+
+describe("syncReviewsNowStep — 크레딧 기록의 「누가」", () => {
+  it("누른 사람으로 남는다(자동 아님)", async () => {
+    await syncReviewsNowStep({ runId: null });
+    expect(state.scopes[0]).toMatchObject({ organizationId: ORG, actor: { kind: "user", userId: "u1", name: "김" } });
+  });
 });
 
 describe("syncReviewsNowStep — 서버가 이어 부를 위치를 갖는다", () => {

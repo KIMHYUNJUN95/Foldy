@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { beds24Fetch } from "@/lib/beds24/credit-ledger";
 import { getOptionalBeds24ApiEnv } from "@/lib/env";
 import { classifyBeds24Room } from "@/lib/beds24/room-sync";
 import { acquireBeds24Lock } from "@/lib/beds24/sync-locks";
@@ -216,14 +217,14 @@ async function resolveBeds24AccessToken(): Promise<Beds24AccessTokenState> {
   }
 
   try {
-    const response = await fetch(`${env.baseUrl.replace(/\/$/, "")}/authentication/token`, {
+    const response = await beds24Fetch(`${env.baseUrl.replace(/\/$/, "")}/authentication/token`, {
       method: "GET",
       headers: {
         accept: "application/json",
         refreshToken: env.refreshToken,
       },
       cache: "no-store",
-    });
+    }, { feature: "auth", action: "token.refresh", job: "inventory_sync" });
 
     if (!response.ok) {
       console.warn("[beds24/inventory] access token refresh failed", { status: response.status });
@@ -256,7 +257,10 @@ async function resolveBeds24AccessToken(): Promise<Beds24AccessTokenState> {
   }
 }
 
-async function fetchInventoryMinimumStays(propId: string): Promise<InventoryFetchResult> {
+async function fetchInventoryMinimumStays(
+  propId: string,
+  organizationId: string,
+): Promise<InventoryFetchResult> {
   const env = getOptionalBeds24ApiEnv();
   if (!env) {
     return { endpointTried: null, rows: [], skippedReason: "inventory:missing-env" };
@@ -283,13 +287,13 @@ async function fetchInventoryMinimumStays(propId: string): Promise<InventoryFetc
   for (const url of urls) {
     lastEndpoint = url;
     try {
-      const response = await fetch(url, {
+      const response = await beds24Fetch(url, {
         headers: {
           accept: "application/json",
           token: accessTokenState.token,
         },
         cache: "no-store",
-      });
+      }, { feature: "rates_read", action: "calendar.get", job: "inventory_sync", organizationId });
 
       if (!response.ok) {
         console.warn("[beds24/inventory] calendar request failed", { url, status: response.status });
@@ -313,13 +317,13 @@ async function fetchInventoryMinimumStays(propId: string): Promise<InventoryFetc
   // 캘린더가 실패하거나 값을 주지 않으면 종전과 동일하게 `/properties` 를 읽는다. 이 경로를
   // 남겨두는 이유는 회귀 방지다 — 캘린더 호출이 막혀도 동기화가 종전 수준으로는 계속 돈다.
   try {
-    const response = await fetch(propertiesUrl, {
+    const response = await beds24Fetch(propertiesUrl, {
       headers: {
         accept: "application/json",
         token: accessTokenState.token,
       },
       cache: "no-store",
-    });
+    }, { feature: "rates_read", action: "properties.get", job: "inventory_sync", organizationId });
 
     if (response.ok) {
       const json = (await response.json()) as unknown;
@@ -441,7 +445,7 @@ export async function syncBeds24InventoryMinimumStay(
     };
   }
 
-  const { endpointTried, rows, skippedReason } = await fetchInventoryMinimumStays(externalPropertyId);
+  const { endpointTried, rows, skippedReason } = await fetchInventoryMinimumStays(externalPropertyId, organizationId);
   if (rows.length === 0) {
     return {
       attempted: skippedReason !== "inventory:missing-env",

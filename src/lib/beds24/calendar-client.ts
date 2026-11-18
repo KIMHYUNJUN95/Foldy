@@ -1,4 +1,5 @@
 import { resolveBeds24AccessToken } from "@/lib/beds24/access-token";
+import { beds24Fetch } from "@/lib/beds24/credit-ledger";
 import { getOptionalBeds24ApiEnv } from "@/lib/env";
 
 /**
@@ -130,11 +131,11 @@ export async function fetchBeds24Calendar(
   let pages = 0;
 
   while (url && pages < CALENDAR_MAX_PAGES) {
-    const response: Response = await fetch(url, {
+    const response: Response = await beds24Fetch(url, {
       cache: "no-store",
       headers,
       signal: options?.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined,
-    });
+    }, { action: "calendar.get", itemCount: query.externalRoomIds?.length ?? null, job: "calendar" });
     credit = readCreditSignal(response.headers);
     if (!response.ok) {
       throw new Beds24HttpError(response.status, credit.resetInSec, response.status === 429);
@@ -195,7 +196,7 @@ export async function postBeds24Calendar(
   const resolved = await resolveBase();
   if ("skipped" in resolved) return resolved;
 
-  const response = await fetch(`${resolved.base}/inventory/rooms/calendar`, {
+  const response = await beds24Fetch(`${resolved.base}/inventory/rooms/calendar`, {
     body: JSON.stringify(payload),
     cache: "no-store",
     headers: {
@@ -204,7 +205,7 @@ export async function postBeds24Calendar(
       token: resolved.token,
     },
     method: "POST",
-  });
+  }, { action: "calendar.post", itemCount: payload.length, job: "calendar" });
   const credit = readCreditSignal(response.headers);
   if (!response.ok) {
     throw new Beds24HttpError(response.status, credit.resetInSec, response.status === 429);
@@ -299,7 +300,7 @@ export async function postBeds24Booking(
   const resolved = await resolveBase();
   if ("skipped" in resolved) return resolved;
 
-  const response = await fetch(`${resolved.base}/bookings`, {
+  const response = await beds24Fetch(`${resolved.base}/bookings`, {
     body: JSON.stringify([payload]),
     cache: "no-store",
     signal: options?.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined,
@@ -309,7 +310,7 @@ export async function postBeds24Booking(
       token: resolved.token,
     },
     method: "POST",
-  });
+  }, { action: "bookings.create", job: "booking" });
   const credit = readCreditSignal(response.headers);
   if (!response.ok) {
     throw new Beds24HttpError(response.status, credit.resetInSec, response.status === 429);
@@ -357,7 +358,7 @@ export async function postBeds24BookingCancel(args: {
   if ("skipped" in resolved) return resolved;
 
   const reason = args.reason?.trim();
-  const response = await fetch(`${resolved.base}/bookings`, {
+  const response = await beds24Fetch(`${resolved.base}/bookings`, {
     body: JSON.stringify([
       {
         comments: reason ? `Cancelled: ${reason}` : "Cancelled by User",
@@ -372,7 +373,7 @@ export async function postBeds24BookingCancel(args: {
       token: resolved.token,
     },
     method: "POST",
-  });
+  }, { action: "bookings.cancel", job: "booking" });
   const credit = readCreditSignal(response.headers);
   if (!response.ok) {
     throw new Beds24HttpError(response.status, credit.resetInSec, response.status === 429);
@@ -409,7 +410,7 @@ export async function postBeds24BookingUpdate(
   const resolved = await resolveBase();
   if ("skipped" in resolved) return resolved;
 
-  const response = await fetch(`${resolved.base}/bookings`, {
+  const response = await beds24Fetch(`${resolved.base}/bookings`, {
     body: JSON.stringify([payload]),
     cache: "no-store",
     headers: {
@@ -419,7 +420,7 @@ export async function postBeds24BookingUpdate(
     },
     method: "POST",
     signal: options?.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined,
-  });
+  }, { action: "bookings.update", job: "booking" });
   const credit = readCreditSignal(response.headers);
   if (!response.ok) {
     throw new Beds24HttpError(response.status, credit.resetInSec, response.status === 429);
@@ -453,11 +454,11 @@ export async function fetchBeds24BookingById(
   const resolved = await resolveBase();
   if ("skipped" in resolved) return resolved;
 
-  const response = await fetch(`${resolved.base}/bookings?id=${encodeURIComponent(bookingId)}`, {
+  const response = await beds24Fetch(`${resolved.base}/bookings?id=${encodeURIComponent(bookingId)}`, {
     cache: "no-store",
     signal: options?.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined,
     headers: { accept: "application/json", token: resolved.token },
-  });
+  }, { action: "bookings.read", job: "booking" });
   const credit = readCreditSignal(response.headers);
   if (!response.ok) {
     throw new Beds24HttpError(response.status, credit.resetInSec, response.status === 429);

@@ -13,6 +13,8 @@
 import { revalidatePath } from "next/cache";
 import { reconcileGuestMessages, type ReconcileSkip, type ReconcileStop } from "@/lib/guest-messages/reconcile";
 import { RECONCILE_NOW_INTERVAL_MS } from "@/lib/guest-messages/settings-model";
+import { userCreditActor, withBeds24CreditScope } from "@/lib/beds24/credit-ledger";
+import type { Beds24CreditActor } from "@/lib/beds24/credit-usage-types";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -22,11 +24,13 @@ export type CheckNowResult =
   | { ok: true; pages: number; fetched: number; added: number; skipped: ReconcileSkip | null; stoppedEarly: ReconcileStop | null }
   | { ok: false; errorKey: CheckNowErrorKey };
 
-async function manageGate(): Promise<{ ok: true; organizationId: string } | { ok: false; errorKey: "forbidden" }> {
+async function manageGate(): Promise<
+  { ok: true; organizationId: string; actor: Beds24CreditActor } | { ok: false; errorKey: "forbidden" }
+> {
   const session = await getCurrentAppSession().catch(() => null);
   if (!session || !hasOrganizationContext(session)) return { ok: false, errorKey: "forbidden" };
   if (!session.capabilities.includes("guest_messages.manage")) return { ok: false, errorKey: "forbidden" };
-  return { ok: true, organizationId: session.organization.id };
+  return { ok: true, organizationId: session.organization.id, actor: userCreditActor(session.user) };
 }
 
 export async function checkGuestMessagesNow(): Promise<CheckNowResult> {
@@ -44,7 +48,9 @@ export async function checkGuestMessagesNow(): Promise<CheckNowResult> {
     if (claimed.error) throw new Error(claimed.error.message);
     if (claimed.data !== true) return { ok: false, errorKey: "too_soon" };
 
-    const result = await reconcileGuestMessages([access.organizationId], { supabase: db });
+    const result = await withBeds24CreditScope({ actor: access.actor, organizationId: access.organizationId }, () =>
+      reconcileGuestMessages([access.organizationId], { supabase: db }),
+    );
     const counts = result.organizations[access.organizationId] ?? { inserted: 0, merged: 0 };
     revalidatePath("/admin/messages");
     revalidatePath("/mobile/messages");

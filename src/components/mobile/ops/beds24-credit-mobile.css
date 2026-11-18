@@ -1,0 +1,298 @@
+/*
+ * 모바일 Beds24 크레딧(2026-11-18, 시안 Mobile) — 판매 캘린더 한 줄 · 시트 · 모바일 자동화 칸.
+ * 상태는 색만으로 말하지 않는다 — 줄 앞 글자(「크레딧 적음」 · 「Beds24 쉬는 중」)가 같이 간다.
+ * 움직임은 transform · opacity(한 줄이 생길 때만 높이 0fr→1fr), `prefers-reduced-motion` 이면 끈다.
+ */
+
+.mcr-note,
+.mcr-sheet,
+.mcr-sec {
+  --mcr-ink: #16141f;
+  --mcr-body: #4c4958;
+  --mcr-muted: #6b6878;
+  --mcr-pri: #7a52e6;
+  --mcr-warn: #a3520b;
+  --mcr-warn-bg: #fdf3e6;
+  --mcr-warn-fill: #e08a1e;
+  --mcr-stop: #c5282e;
+  --mcr-stop-bg: #fdecec;
+  --mcr-track: #efedf3;
+}
+
+/* ── 판매 캘린더 맨 위 한 줄 ─────────────────────────────────────────────── */
+/*
+ * 줄이 생기고 사라질 때 아래 캘린더가 뚝 밀리지 않게 높이도 부드럽게(0fr → 1fr). 닫혀 있을 때는 `.mops` 의 줄 간격(10px · 태블릿 격자도 같음)까지
+ * 접어 빈자리가 남지 않게 한다.
+ */
+.mcr-fold {
+  display: grid;
+  grid-template-rows: 0fr;
+  margin-bottom: -10px;
+  opacity: 0;
+  transition: grid-template-rows 0.2s ease-out, margin-bottom 0.2s ease-out, opacity 0.16s ease-out;
+}
+.mcr-fold.is-open {
+  grid-template-rows: 1fr;
+  margin-bottom: 0;
+  opacity: 1;
+}
+.mcr-fold__in {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.mcr-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: calc(100% - 32px);
+  min-height: 44px;
+  margin: 0 16px;
+  padding: 8px 10px 8px 12px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--mcr-warn-bg);
+  color: var(--mcr-warn);
+  font: inherit;
+  font-size: 13px;
+  text-align: start;
+}
+.mcr-note--stop {
+  background: var(--mcr-stop-bg);
+  color: var(--mcr-stop);
+}
+/* 앞 글자는 en · ja 에서 길어 줄바꿈을 허용하고, 숫자 · 카운트다운은 한 덩어리로 오른쪽에 둔다. */
+.mcr-note__t {
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
+  line-height: 1.35;
+}
+.mcr-note__v {
+  flex: none;
+  color: var(--mcr-ink);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.mcr-note__chev {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  opacity: 0.8;
+}
+/* 접는 칸이 overflow 를 숨겨 밖으로 나간 초점 테두리가 잘린다 — 안쪽으로 그린다. */
+.mcr-note:focus-visible {
+  outline: 2px solid var(--mcr-pri);
+  outline-offset: -2px;
+}
+.mcr-msg button:focus-visible {
+  outline: 2px solid var(--mcr-pri);
+  outline-offset: 2px;
+}
+
+/* ── 시트 · 자동화 칸 공통 ─────────────────────────────────────────────── */
+/* 좌우 20px · 아래 max(20px, 안전 영역)은 공용 BottomSheet 가 이미 준다 — 여기서 더하지 않는다. */
+.mcr-sheet {
+  padding: 4px 0 0;
+  color: var(--mcr-ink);
+}
+.mcr-n {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+.mcr-n b {
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.mcr-n span {
+  color: var(--mcr-muted);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.mcr-bar {
+  height: 6px;
+  margin-top: 10px;
+  border-radius: 999px;
+  background: var(--mcr-track);
+  overflow: hidden;
+}
+.mcr-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--mcr-pri);
+  transform: scaleX(var(--cg-fill, 0));
+  transform-origin: left center;
+  transition: transform 0.24s ease-out;
+}
+.mcr--warn .mcr-bar i { background: var(--mcr-warn-fill); }
+.mcr--stop .mcr-bar i { background: var(--mcr-stop); }
+.mcr--unknown .mcr-bar i { background: transparent; }
+/* 문장 끝 한 글자(ko 「다」 등)만 다음 줄로 떨어지지 않게 — pretty 를 모르는 브라우저는 balance 로. */
+.mcr-sub,
+.mcr-empty,
+.mcr-note__t {
+  text-wrap: balance;
+  text-wrap: pretty;
+  overflow-wrap: anywhere;
+}
+/* 한글 · 일본어는 글자마다 끊겨 pretty 만으로는 「니다」 · 「ます」가 떨어진다 — ko 는 어절, ja 는 구 단위로(모르는 브라우저는 지금 그대로). 언어 판정은 globals.css 와 같은 `:lang()`. */
+.mcr-sub:lang(ko),
+.mcr-empty:lang(ko),
+.mcr-note__t:lang(ko) {
+  word-break: keep-all;
+}
+.mcr-sub:lang(ja),
+.mcr-empty:lang(ja),
+.mcr-note__t:lang(ja) {
+  word-break: auto-phrase;
+}
+.mcr-sub {
+  margin: 8px 0 0;
+  color: var(--mcr-body);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.mcr--stop .mcr-sub { color: var(--mcr-stop); font-weight: 600; }
+
+.mcr-lh {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 18px 0 4px;
+  color: var(--mcr-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.mcr-lh span {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.mcr-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.mcr-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 8px 0;
+  font-size: 14px;
+}
+.mcr-row + .mcr-row {
+  box-shadow: inset 0 0.5px 0 var(--separator, #e4e3e9);
+}
+.mcr-row__t {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.mcr-row__t small {
+  color: var(--mcr-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+.mcr-row b {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.mcr-row em {
+  width: 40px;
+  color: var(--mcr-muted);
+  font-size: 12px;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+.mcr-empty {
+  padding: 12px 0;
+  color: var(--mcr-muted);
+  font-size: 13px;
+}
+.mcr-msg {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+  color: var(--mcr-stop);
+  font-size: 13px;
+  font-weight: 600;
+}
+.mcr-msg button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--mcr-track);
+  color: var(--mcr-ink);
+  font: inherit;
+  font-size: 13px;
+}
+.mcr-msg svg { width: 14px; height: 14px; }
+.mcr-loading {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+.mcr-loading i {
+  display: block;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--mcr-track);
+  animation: mcr-pulse 1.2s ease-in-out infinite;
+}
+
+/* ── 모바일 자동화 칸 ─────────────────────────────────────────────── */
+.mcr-sec {
+  margin-top: 20px;
+  padding: 18px 16px;
+  border-radius: 18px;
+  background: var(--surface, #fff);
+  color: var(--mcr-ink);
+}
+.mcr-sec__h {
+  margin-bottom: 12px;
+}
+.mcr-sec__h h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+.mcr-sec__h span {
+  display: block;
+  margin-top: 2px;
+  color: var(--mcr-muted);
+  font-size: 12px;
+}
+
+/* 폴드 · 태블릿 — 자동화 칸은 두 칸(누가 · 어디에)으로 나란히 놓지 않고 폭만 키운다. 숫자 줄은 그대로. */
+@media (min-width: 600px) {
+  .mcr-sec { padding: 20px 22px; }
+  .mcr-note { width: calc(100% - 40px); margin: 0 20px; }
+}
+
+@keyframes mcr-pulse {
+  50% { opacity: 0.55; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mcr-fold { transition: none; }
+  .mcr-loading i { animation: none; }
+  .mcr-bar i { transition: none; }
+}

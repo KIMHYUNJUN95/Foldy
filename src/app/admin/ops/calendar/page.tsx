@@ -111,7 +111,7 @@ export default async function OpsCalendarPage({
   const firstVisibleDate = data.days.at(0)?.date;
   const lastVisibleDate = data.days.at(-1)?.date;
   // 대기 작업 깨우기 + 낡은 창 당기기 — 모바일과 같은 규칙(`ops-calendar-open-refresh.ts`).
-  scheduleOpsCalendarOpenRefresh(session.organization.id, data);
+  scheduleOpsCalendarOpenRefresh(session.organization.id, data, session.user);
 
   // 건물이 여럿이면 `property` 를 **반복**해 싣는다(탭 순서). 빈 목록은 키 자체를 뺀다 = 전체.
   const hrefWith = (next: Partial<SearchParams>) =>

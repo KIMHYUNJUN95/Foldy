@@ -1937,3 +1937,16 @@ Supabase advisor `anon_security_definer_function_executable` 정리. 운영 `pg_
 - 서버 액션 `src/actions/guest-messages-assist.ts`: `guest_messages.view` **와** `guest_messages.reply`(답장 쓸 수 있는 사람만). 거부는 redirect 없이 `forbidden`(개요는 `unavailable`). 초안에 출입 코드를 채우는 것은 `guest_messages.manage` 또는 `property_info.edit`(답장 칸 넣기 목록과 같은 기준) — 그 밖에는 자리 표시만. 답장을 받지 않는 채널(`replyBlockReason`)의 대화는 Voyage · Claude 를 부르기 전에 초안 `forbidden` · 개요 `unavailable`. 「틀렸어요」 · 「버림」은 이 조직의 초안 기록이 있어야(다른 조직 `draft_id` 는 `not_found`).
 - `sendGuestReply`: 채우지 않은 자리 표시(세 언어 + 날것 토큰)가 원문 · 보낼 글에 남아 있으면 `assistDraftId` 유무와 관계없이 `assist_placeholder`. `assistDraftId` 가 있으면 그 초안 기록은 세션 조직으로만 찾는다.
 - 확인(로컬 Postgres 17, 2026-11-18 — 로컬에 pgvector 가 없어 `vector` 를 `float8[]` + `<=>` 대역으로 바꿔 한 트랜잭션 안에서 적용 뒤 되돌림): 두 번 적용(멱등) · RLS 3표 · service_role 쓰기 · 같은 건물 보정 · 다른 조직 id 0줄 · 처음/끝 기록 중복 23505 · 잘못된 이유 23514 · 비용 합, authenticated · anon 의 세 표 읽기 · 두 함수 실행 모두 42501. 다시 확인(같은 날, 로컬에 pgvector 0.8.1 설치 뒤 **진짜 `vector` · HNSW** 로, 한 트랜잭션 안 적용 뒤 되돌림): 위 항목 전부 + `guest_reply_assist_reserve` 한도 안 `true`(pending 줄) · 넘으면 `false` · pending → failed 정산 · authenticated · anon 실행 42501, `guest_reply_similar` 정확 계산 길 · 색인 길(`iterative_scan = relaxed_order`) 둘 다 실행.
+
+## 2026-11-18 `beds24_credit_usage` · `beds24_credit_usage_windows`
+
+마이그레이션 `202611180003_beds24_credit_usage.sql` (**운영 적용 2026-11-18**).
+
+- RLS 켬. 읽기 정책 하나(`to authenticated`): `organization_id = any((select capability_organization_ids('ops_admin.access'))::uuid[])` — 202609300007 과 같은 InitPlan 방식.
+  `organization_id` 가 null 인 줄(계정 전체 작업)은 이 정책으로 안 보인다.
+- 쓰기 정책 없음 — 쓰기는 service role(기록 함수 `credit-ledger.ts`)만. GRANT: public · anon · authenticated 모두 회수 → authenticated 에 select 만, service_role all.
+- 함수 `beds24_credit_usage_windows`: security invoker, 실행 권한 **service_role 만**(public · anon · authenticated 회수). 조직 id 는 항상 인자로 받아 조건에 건다.
+- 함수 `beds24_record_account_credit`: security invoker, 실행 권한 **service_role 만**. 계정 전체 줄 하나(`account_credit`)만 쓴다 — 조직 데이터 없음. 덮을지 말지는 함수 안 판정표(01 「크레딧 사용 기록」)가 정한다.
+- 읽기 액션 · PC 상단 게이지는 같은 판정 `canViewBeds24Credit`(조직 있음 · `ops_admin.access` · `admin_web.access`). 플랫폼 계정은 `forbidden`.
+- 화면은 서버 액션 `loadBeds24CreditSummary` · `loadBeds24CreditDetail`(`src/actions/beds24-credit.ts`, `ops_admin.access`, 못 하면 `forbidden` 결과)이
+  service_role + **세션 조직**으로 읽는다 — 「이 조직 줄 + 조직 없는 줄」만. 다른 조직 사용량은 줄로는 안 보이고 「Foldy 밖」 합으로만 보인다.

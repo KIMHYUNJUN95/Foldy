@@ -9,6 +9,7 @@ import { MobilePreview } from "@/components/shell/mobile-preview";
 import "@/components/admin/admin-console.css";
 import "@/components/admin/shared/adm-dropdown.css";
 import { useAdminNavBadges } from "@/components/admin/admin-nav-badges";
+import { Beds24CreditGauge } from "@/components/admin/beds24-credit-gauge";
 import { NotificationBell } from "@/components/admin/notification-bell";
 import { useSession } from "@/components/providers/session-provider";
 import {
@@ -152,6 +153,8 @@ export function AdminShell({ activeItem, children, mobileHref = "/mobile", title
                 <input placeholder={c.searchPlaceholder} type="search" />
               </div>
             )}
+            {/* Beds24 크레딧 — 레이아웃이 `ops_admin.access` 가진 사람에게만 첫 값을 준다(없으면 그리지 않는다). */}
+            <Beds24CreditGauge copy={dictionary.beds24Credit} />
             <div className="top__actions">
               {/* 전체 화면으로 넘어가는 대신 아이폰 모양 프레임으로 띄운다 — 어드민에서 일하는
                   중에 보는 것이라 화면을 떠나지 않는 편이 낫다. 전체 화면으로 가는 길은

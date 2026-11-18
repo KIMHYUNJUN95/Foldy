@@ -14,6 +14,7 @@ import {
   type AssigneeRoomView,
   type CleaningRoomOptionGroup,
 } from "@/actions/ops-automation";
+import { Beds24CreditPanel } from "@/components/admin/ops/beds24-credit-panel";
 import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
 import { AdminDatePicker } from "@/components/admin/shared/admin-date-picker";
 import { AdminTimePicker } from "@/components/admin/shared/admin-time-picker";
@@ -195,12 +196,14 @@ function AtwConfirm({
 export function AutomationConsole({
   data,
   copy,
+  creditCopy,
   shared,
   locale,
   localeTag,
 }: {
   data: AutomationPageData;
   copy: Copy;
+  creditCopy: Dictionary["beds24Credit"];
   shared: SharedCopy;
   locale: AutomationLocale;
   localeTag: string;
@@ -422,6 +425,8 @@ export function AutomationConsole({
           </div>
         </section>
       </div>
+
+      <Beds24CreditPanel copy={creditCopy} initial={data.credit} localeTag={localeTag} serverNow={data.renderedAt} />
 
       {confirmOn ? (
         <AtwConfirm

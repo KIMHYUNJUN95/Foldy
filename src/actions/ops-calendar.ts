@@ -88,6 +88,7 @@ import {
   type ChangeLogRow,
 } from "@/lib/ops-history";
 import { runNextPriceJob } from "@/lib/beds24/price-job-worker";
+import { updateBeds24CreditScope, userCreditActor, withBeds24CreditScope } from "@/lib/beds24/credit-ledger";
 import { readRoomNames } from "@/app/api/ops/calendar/reads";
 
 /**
@@ -456,11 +457,18 @@ const BLOCK_PURPOSES: readonly BlockPurpose[] = ["repair", "cleaning", "owner", 
 const BLOCK_MEMO_MAX = 200;
 
 async function runBlockChange(
+  ...args: Parameters<typeof runBlockChangeInScope>
+): ReturnType<typeof runBlockChangeInScope> {
+  return withBeds24CreditScope({ feature: "block_write" }, () => runBlockChangeInScope(...args));
+}
+
+async function runBlockChangeInScope(
   args: { cells: BlockChangeCell[]; purpose?: string | null; memo?: string | null },
   mode: "block" | "unblock",
 ): Promise<BlockChangeResult> {
   const session = await requireOpsWriter();
   if (!session) return { error: "forbidden", ok: false };
+  updateBeds24CreditScope({ actor: userCreditActor(session.user), organizationId: session.organization.id });
   if (args.cells.length === 0) return { error: "no_cells", ok: false };
   // 사유는 **걸 때만** 남긴다. 모르는 코드는 버리고(없는 것과 같다), 메모는 잘라서 받는다.
   const purpose =
@@ -774,7 +782,13 @@ const MANUAL_BOOKING_READ_TIMEOUT_MS = 10_000;
 /** 방 잠금 수명 — 위 두 호출의 최악(읽기 10 + 생성 20 + 다시 읽기 10초)과 DB 쓰기를 넉넉히 덮는다. 함수가 죽어도 이만큼 뒤에 풀린다. */
 const MANUAL_BOOKING_LOCK_TTL_MS = 90_000;
 
-export async function submitManualBooking(args: {
+export async function submitManualBooking(
+  ...args: Parameters<typeof submitManualBookingInScope>
+): ReturnType<typeof submitManualBookingInScope> {
+  return withBeds24CreditScope({ feature: "booking_write" }, () => submitManualBookingInScope(...args));
+}
+
+async function submitManualBookingInScope(args: {
   input: ManualBookingInput;
   /** 그 캘린더 행 뒤의 우리 `rooms.id` 전부. Beds24 roomId 는 서버가 찾는다. */
   roomIds: string[];
@@ -789,6 +803,7 @@ export async function submitManualBooking(args: {
 }): Promise<ManualBookingResult> {
   const session = await requireOpsWriter();
   if (!session) return { error: "forbidden", ok: false };
+  updateBeds24CreditScope({ actor: userCreditActor(session.user), organizationId: session.organization.id });
   const requestKey = String(args.requestKey ?? "").trim();
   if (!/^[A-Za-z0-9-]{8,64}$/.test(requestKey)) return { error: "beds24_failed", detail: "bad_request_key", ok: false };
 
@@ -1170,7 +1185,13 @@ export type ReservationEditResult =
  * 원래 값은 **화면이 아니라 DB 에서** 읽는다 — 화면이 보낸 「원래 값」을 믿으면 채널 예약의
  * 잠금을 우회할 수 있다.
  */
-export async function submitReservationEdit(args: {
+export async function submitReservationEdit(
+  ...args: Parameters<typeof submitReservationEditInScope>
+): ReturnType<typeof submitReservationEditInScope> {
+  return withBeds24CreditScope({ feature: "booking_write" }, () => submitReservationEditInScope(...args));
+}
+
+async function submitReservationEditInScope(args: {
   reservationId: string;
   /** 격자의 행 키와 그 행의 우리 `rooms.id` — 겹침 검사가 쓴다. */
   roomKey: string;
@@ -1179,6 +1200,7 @@ export async function submitReservationEdit(args: {
 }): Promise<ReservationEditResult> {
   const session = await requireOpsWriter();
   if (!session) return { error: "forbidden", ok: false };
+  updateBeds24CreditScope({ actor: userCreditActor(session.user), organizationId: session.organization.id });
 
   const supabase = getSupabaseServiceClient();
   const found = await supabase
@@ -1581,7 +1603,13 @@ const MOVE_LOCK_TTL_MS = 90_000;
  *    우리 표 겹침(`readOpsRoomUnavailableNights`, 이 예약 자신은 뺀다) → 그 밤에 팔고 있는 유닛 고르기 → Beds24 가용 재확인.
  * 3. `POST /bookings` 로 **같은 예약**의 `roomId`(·날짜)만 바꾸고, 다시 읽어 옮겨졌는지 확인한 뒤 우리 표를 웹훅 처리기로 맞춘다.
  */
-export async function submitReservationMove(args: {
+export async function submitReservationMove(
+  ...args: Parameters<typeof submitReservationMoveInScope>
+): ReturnType<typeof submitReservationMoveInScope> {
+  return withBeds24CreditScope({ feature: "booking_write" }, () => submitReservationMoveInScope(...args));
+}
+
+async function submitReservationMoveInScope(args: {
   reservationId: string;
   /** 옮길 줄의 행 키와 그 줄의 우리 `rooms.id` 전부. Beds24 roomId 는 서버가 고른다. */
   targetRoomKey: string;
@@ -1592,6 +1620,7 @@ export async function submitReservationMove(args: {
 }): Promise<ReservationMoveResult> {
   const session = await requireOpsWriter();
   if (!session) return { error: "forbidden", ok: false };
+  updateBeds24CreditScope({ actor: userCreditActor(session.user), organizationId: session.organization.id });
 
   const supabase = getSupabaseServiceClient();
   const found = await supabase
@@ -1826,13 +1855,20 @@ export type CancelReservationResult =
       detail?: string;
     };
 
-export async function submitReservationCancel(args: {
+export async function submitReservationCancel(
+  ...args: Parameters<typeof submitReservationCancelInScope>
+): ReturnType<typeof submitReservationCancelInScope> {
+  return withBeds24CreditScope({ feature: "booking_write" }, () => submitReservationCancelInScope(...args));
+}
+
+async function submitReservationCancelInScope(args: {
   /** 우리 `reservations.id`. Beds24 예약번호는 **서버가 찾는다.** */
   reservationId: string;
   reason?: string | null;
 }): Promise<CancelReservationResult> {
   const session = await requireOpsWriter();
   if (!session) return { error: "forbidden", ok: false };
+  updateBeds24CreditScope({ actor: userCreditActor(session.user), organizationId: session.organization.id });
 
   const supabase = getSupabaseServiceClient();
   const found = await supabase

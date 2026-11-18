@@ -110,7 +110,7 @@ Beds24 예약 웹훅 ──▶ /api/beds24/webhook (기존) ──▶ 메시지 
 | `src/lib/guest-messages/beds24-adapter.ts` | Beds24 어댑터. `send` 는 한 POST(배열). **OTA 허용 목록**(airbnb · booking · expedia · agoda · vrbo)만 보낸다 — 직접 예약은 `direct_booking`, 채널 모름 · 그 밖은 `unknown_channel`(호출 안 함). 부르기 전 `gate`(동기화 멈춤 · 계정 쿨다운)면 `rate_limited`. 429 는 `resets-in` + 2초(15~300초). 요청이 나간 뒤의 실패(네트워크 · 5xx · 응답 줄 빠짐)는 `uncertain`, 4xx 는 `rejected`, 설정 · 토큰 없음은 `pre_send` |
 | `src/lib/guest-messages/adapter-server.ts` | 서버용 — 게이트(멈춤 · 쿨다운), 크레딧 기록(계정 전체 + 조직 사본), 남은 크레딧 < `LOW_CREDIT_THRESHOLD`(10) 면 계정 쿨다운 low_credit, 429 면 rate_limit |
 | `src/lib/guest-messages/credit.ts` | 크레딧 판단 한 곳: `knownRemainingCredit`(리셋 시각을 모르거나 지났으면 null) · `effectiveCreditReserve`(설정값과 10 중 큰 쪽) · `estimateBatchCost`(건수 비례 — V3 실측 전) |
-| `src/lib/beds24/account-credit.ts` | 계정 전체 마지막 크레딧 기록 — `beds24_sync_locks` 의 `account_credit` 줄(`expires_at` = 리셋 시각) |
+| `src/lib/beds24/account-credit.ts` | 계정 전체 마지막 크레딧 기록 — `beds24_sync_locks` 의 `account_credit` 줄(`expires_at` = 리셋 시각). 쓰기는 공용 `beds24Fetch` 가(2026-11-18) |
 | `src/lib/guest-messages/ingest-plan.ts` | 중복 막기 · 되돌아옴 합치기 · DB 함수 인자 만들기(`summarizeAddedMessages`) · 상태 규칙 거울(`nextConversationState`, 순수) |
 | `src/lib/guest-messages/store.ts` | DB 쓰기(service_role). 웹훅 · 보정 조회가 같은 함수로 넣는다. 모든 쓰기의 오류를 확인한다(되돌아옴 합치기 실패는 건수에 안 넣음, 23505 는 이미 있는 줄에 잇기, 대화 다시 읽기 실패는 던져 실패 건수에 든다) |
 | `src/lib/guest-messages/org-resolve.ts` | 조직 정하기(매핑 → 기본값, 기본값으로만 정해지면 경고) · 보정 조회의 조직 섞임 판정 |
@@ -192,7 +192,10 @@ Beds24 예약 웹훅 ──▶ /api/beds24/webhook (기존) ──▶ 메시지 
 
 - 429 를 받으면 발송 큐는 `resets-in` 초 뒤에 다시 시도한다. 직원 화면에는 「보낼 차례 기다리는 중」(시안 States).
 - 기존 쿨다운 `src/lib/beds24/sync-locks.ts` · 헤더 읽기 `src/lib/beds24/credits.ts` 를 그대로 쓴다. 저크레딧 선은 가격 작업과 같은 `LOW_CREDIT_THRESHOLD`(10) — 그 아래면 계정 쿨다운(low_credit).
-- **크레딧 기록은 계정에 한 곳**: `beds24_sync_locks` 의 `account_credit` 줄(남은 양 · 리셋 시각 · 비용, `expires_at` = 리셋 시각). `guest_message_channel_state.last_credit_*` 는 이 기능 화면용 **사본**이다. 지금은 손님 메시지 경로만 이 줄을 쓴다.
+- **크레딧 기록은 계정에 한 곳**: `beds24_sync_locks` 의 `account_credit` 줄(남은 양 · 리셋 시각 · 비용, `expires_at` = 리셋 시각). `guest_message_channel_state.last_credit_*` 는 이 기능 화면용 **사본**이다. 2026-11-18 부터 이 줄은 **모든 Beds24 호출**이
+  공용 기록(`beds24Fetch`, `src/lib/beds24/credit-ledger.ts`)에서 갱신한다 — 손님 메시지 어댑터의 기본 `fetchImpl` 은
+  `createBeds24LedgerFetch(hint)` 이고, `recordGuestMessageCredit` 은 조직 사본 · 저잔량 쿨다운만 맡는다(`account_credit` 쓰기는 뺐다).
+  계정 값은 호출 직후 바로 쓰고 최대 1초 기다리며(순서는 DB 함수), 사용 줄은 기다리지 않고 호출마다 한 줄씩 쓴다(둘 다 4초 시한 · 요청의 `after()`). 한 실행 안의 크레딧 판단은 그래도 응답 헤더를 직접 읽는다. 상세: `docs/engineering/01-beds24-integration.md` → 「크레딧 사용 기록」.
 - 남겨 둘 선 숫자는 V3 실측 뒤 정한다. 지금 기본값 20(`guest_message_channel_state.credit_reserve`), 실제로 쓰는 선은 설정값과 10 중 큰 쪽.
 - 구현(`processOutboxBatch`): 직원 답장 묶음 → 자동 안내 묶음 순서로 한 POST 씩.
   - 자동 안내는 「남은 크레딧 − 예상 비용 < 선」이면 보내지 않고 큐에 둔다. 예상 비용은 **건수 비례**(마지막 `x-request-cost` × 건수, 모르면 건수 — V3 실측 전이라 넉넉히). 리셋 시각을 모르거나 지난 기록은 믿지 않는다. 직원 답장은 선과 무관.

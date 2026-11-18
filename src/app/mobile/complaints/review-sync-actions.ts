@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { userCreditActor, withBeds24CreditScope } from "@/lib/beds24/credit-ledger";
 import { syncOrganizationReviews } from "@/lib/beds24/reviews-sync";
 import {
   claimReviewSyncSlice,
@@ -84,12 +85,15 @@ export async function syncReviewsNowStep(input: { runId: string | null }): Promi
 
   let result: Awaited<ReturnType<typeof syncOrganizationReviews>>;
   try {
-    result = await syncOrganizationReviews({
-      limit: REVIEW_SYNC_SLICE,
-      offset,
-      organizationId,
-      sinceDays: REVIEW_SYNC_ROUTINE_SINCE_DAYS,
-    });
+    // 크레딧 기록의 「누가」 = 누른 사람(docs/engineering/01-beds24-integration.md → 「크레딧 사용 기록」).
+    result = await withBeds24CreditScope({ actor: userCreditActor(session.user), organizationId }, () =>
+      syncOrganizationReviews({
+        limit: REVIEW_SYNC_SLICE,
+        offset,
+        organizationId,
+        sinceDays: REVIEW_SYNC_ROUTINE_SINCE_DAYS,
+      }),
+    );
   } catch (error) {
     console.error("[complaints/review-sync] step failed", { error, offset, organizationId });
     await release();

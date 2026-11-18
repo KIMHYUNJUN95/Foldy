@@ -25,6 +25,7 @@ import type { Database, Json } from "@/types/database";
 import { readBeds24AccountCredit } from "@/lib/beds24/account-credit";
 import { resolveBeds24AccessToken, type Beds24TokenState } from "@/lib/beds24/access-token";
 import { LOW_CREDIT_THRESHOLD } from "@/lib/beds24/calendar-client";
+import { createBeds24LedgerFetch } from "@/lib/beds24/credit-ledger";
 import { readBeds24Credits } from "@/lib/beds24/credits";
 import { isBeds24SyncPaused } from "@/lib/beds24/sync-control";
 import { activateBeds24Cooldown, getBeds24Cooldown } from "@/lib/beds24/sync-locks";
@@ -399,7 +400,9 @@ export async function backfillGuestMessageHistory(
 ): Promise<BackfillResult> {
   const mode = options.mode ?? "run";
   const supabase = deps.supabase ?? getSupabaseServiceClient();
-  const fetchImpl = deps.fetchImpl ?? fetch;
+  const fetchImpl =
+    deps.fetchImpl ??
+    createBeds24LedgerFetch({ feature: "guest_messages", action: "messages.backfill", job: "guest_messages_backfill", organizationId });
   const now = deps.now ?? (() => new Date());
   const startedMs = now().getTime();
   const result = emptyResult(mode, organizationId);

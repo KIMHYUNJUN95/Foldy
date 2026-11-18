@@ -91,7 +91,7 @@ Historical: Retained for decision history but superseded by a newer document or 
 
 | Document | Status | Purpose |
 |---|---:|---|
-| [Beds24 Integration](./engineering/01-beds24-integration.md) | Living | Implemented webhook and reconciliation integration |
+| [Beds24 Integration](./engineering/01-beds24-integration.md) | Living | Implemented webhook and reconciliation integration; every Beds24 call goes through `beds24Fetch` and is logged for credit usage (who · where · cost, 30 days) |
 | [Platform Architecture](./engineering/02-platform-architecture.md) | Confirmed | PWA/admin/backend architecture |
 | [Deployment Strategy](./engineering/03-deployment-strategy.md) | Confirmed | Vercel/PWA/internal deployment |
 | [Data Model](./engineering/04-data-model.md) | Living | Implemented Supabase/PostgreSQL schema contract |

@@ -54,6 +54,7 @@ import { isInactiveBeds24Room } from "@/lib/rooms";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 
 import { resolveBeds24AccessToken } from "./access-token";
+import { beds24Fetch } from "./credit-ledger";
 import { readBeds24Credits, type Beds24CreditInfo } from "./credits";
 import { relinkReviewRooms, type ReviewRelinkResult } from "./review-room-relink";
 
@@ -77,12 +78,16 @@ const AIRBNB_REVIEW_CAP = 50;
 
 type PageResult = { rows: unknown[]; credits: CreditInfo; nextPage: string | null };
 
-async function fetchPage(url: string, token: string): Promise<PageResult | { error: string }> {
+async function fetchPage(
+  url: string,
+  token: string,
+  organizationId: string,
+): Promise<PageResult | { error: string }> {
   try {
-    const response = await fetch(url, {
+    const response = await beds24Fetch(url, {
       headers: { accept: "application/json", token },
       cache: "no-store",
-    });
+    }, { feature: "reviews_sync", action: "reviews.get", job: "reviews_sync", organizationId });
     const credits = readCredits(response.headers);
     if (!response.ok) return { error: `http-${response.status}` };
     const json = (await response.json()) as {
@@ -597,7 +602,7 @@ export async function syncOrganizationReviews(input: {
     let guard = 0;
     while (url && guard < 20) {
       guard += 1;
-      const page = await fetchPage(url, token);
+      const page = await fetchPage(url, token, organizationId);
       result.requests += 1;
       if ("error" in page) {
         skipped.push(`reviews-sync:${target.provider}-${target.externalId}-${page.error}`);

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { updateBeds24CreditScope, userCreditActor, withBeds24CreditScope } from "@/lib/beds24/credit-ledger";
 import {
   Beds24HttpError,
   fetchBeds24Calendar,
@@ -560,6 +561,16 @@ export async function runNextPriceJob(
   /** `organizationId` — 「지금 보내기」처럼 사람이 누른 경로는 그 조직 작업만 집는다. 크론·킥은 생략(전역). */
   options: { organizationId?: string } = {},
 ): Promise<PriceJobOutcome> {
+  // 크레딧 기록의 「누가」는 **작업을 요청한 사람**이다(누가 「지금 보내기」를 눌렀든 · 크론이 돌렸든). 집은 뒤에 채운다.
+  return withBeds24CreditScope({ actor: { kind: "auto", job: "price_job" }, feature: "rates_write" }, () =>
+    runNextPriceJobInScope(supabase, options),
+  );
+}
+
+async function runNextPriceJobInScope(
+  supabase: Client,
+  options: { organizationId?: string },
+): Promise<PriceJobOutcome> {
   const cooldown = await getBeds24Cooldown(supabase);
   if (cooldown.active) {
     console.log(`[beds24/price-job] 쿨다운 ${cooldown.remainingSec}초 남음 — 쉰다`);
@@ -587,6 +598,12 @@ export async function runNextPriceJob(
     await recoverStuckJobs(supabase);
     const job = await claimNextJob(supabase, options.organizationId);
     if (!job) return { ran: false, reason: "empty" };
+    updateBeds24CreditScope({
+      organizationId: job.organization_id,
+      actor: job.requested_by
+        ? userCreditActor({ id: job.requested_by, name: job.requested_by_name })
+        : { kind: "auto", job: "price_job" },
+    });
 
     // 우리 방 마스터에 있는 것만 로컬 반영 대상이다. **못 읽었으면 보내지 않는다** — 로컬 반영·
     // 이력이 조용히 빠진 채 「완료」가 된다. 흡수 전이라 이 작업 하나만 되돌리면 된다.

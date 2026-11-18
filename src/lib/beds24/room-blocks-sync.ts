@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { beds24Fetch } from "@/lib/beds24/credit-ledger";
 import { getOptionalBeds24ApiEnv } from "@/lib/env";
 import type { Database } from "@/types/database";
 import { signalBeds24Change } from "@/lib/beds24/live-signal";
@@ -82,10 +83,10 @@ async function resolveBeds24AccessToken(): Promise<Beds24AccessTokenState> {
   }
 
   try {
-    const response = await fetch(`${env.baseUrl.replace(/\/$/, "")}/authentication/token`, {
+    const response = await beds24Fetch(`${env.baseUrl.replace(/\/$/, "")}/authentication/token`, {
       headers: { accept: "application/json", refreshToken: env.refreshToken },
       cache: "no-store",
-    });
+    }, { feature: "auth", action: "token.refresh", job: "room_blocks_sync" });
     if (!response.ok) {
       return {
         ok: false,
@@ -209,10 +210,10 @@ async function fetchBlackoutSegments(
   if (onlyPropertyIds && onlyPropertyIds.size > 0) {
     propertyRows = [...onlyPropertyIds].map((id) => ({ id }));
   } else {
-    const propertiesResponse = await fetch(`${base}/properties?includeAllRooms=false`, {
+    const propertiesResponse = await beds24Fetch(`${base}/properties?includeAllRooms=false`, {
       headers,
       cache: "no-store",
-    });
+    }, { feature: "rooms_sync", action: "properties.get", job: "room_blocks_sync" });
     if (!propertiesResponse.ok) {
       return {
         blocks: [],
@@ -256,7 +257,7 @@ async function fetchBlackoutSegments(
           failure = "paging-capped";
           break;
         }
-        const response: Response = await fetch(nextUrl, { headers, cache: "no-store" });
+        const response: Response = await beds24Fetch(nextUrl, { headers, cache: "no-store" }, { feature: "rates_read", action: "calendar.get", job: "room_blocks_sync" });
         if (!response.ok) {
           failure = `http-${response.status}`;
           break;

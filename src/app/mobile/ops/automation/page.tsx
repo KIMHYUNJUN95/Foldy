@@ -42,7 +42,7 @@ export default async function MobileAutomationPage() {
     // `split` — 폴드는 가운데 760px(화면이 다시 540px 로 모은다), 태블릿 가로는 폭 전부를 화면 CSS 가 목록 330px | 상세로 나눈다.
     // 고른 자동화 · 탭은 화면이 주소(`useSearchParams`)에서 읽는다 — 목록 → 상세 이동에 서버를 다시 부르지 않는다.
     <MobileShell activeItem="ops-automation" badges={badges} split title={dictionary.automation.title}>
-      <MobileAutomation copy={dictionary.automation} data={data} locale={locale} localeTag={adminLocaleTag(locale)} />
+      <MobileAutomation copy={dictionary.automation} creditCopy={dictionary.beds24Credit} data={data} locale={locale} localeTag={adminLocaleTag(locale)} />
     </MobileShell>
   );
 }

@@ -2170,6 +2170,75 @@ export type Database = {
           },
         ]
       }
+      beds24_credit_usage: {
+        Row: {
+          action: string
+          actor_job: string | null
+          actor_kind: "user" | "auto"
+          actor_name: string | null
+          actor_user_id: string | null
+          called_at: string
+          cost: number | null
+          credential_key: string
+          feature: string
+          http_status: number | null
+          id: number
+          item_count: number | null
+          organization_id: string | null
+          remaining: number | null
+          resets_at: string | null
+        }
+        Insert: {
+          action: string
+          actor_job?: string | null
+          actor_kind: "user" | "auto"
+          actor_name?: string | null
+          actor_user_id?: string | null
+          called_at?: string
+          cost?: number | null
+          credential_key?: string
+          feature: string
+          http_status?: number | null
+          id?: never
+          item_count?: number | null
+          organization_id?: string | null
+          remaining?: number | null
+          resets_at?: string | null
+        }
+        Update: {
+          action?: string
+          actor_job?: string | null
+          actor_kind?: "user" | "auto"
+          actor_name?: string | null
+          actor_user_id?: string | null
+          called_at?: string
+          cost?: number | null
+          credential_key?: string
+          feature?: string
+          http_status?: number | null
+          id?: never
+          item_count?: number | null
+          organization_id?: string | null
+          remaining?: number | null
+          resets_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "beds24_credit_usage_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beds24_credit_usage_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       beds24_sync_locks: {
         Row: {
           expires_at: string
@@ -8478,6 +8547,38 @@ export type Database = {
       }
       task_report_tick_if_needed: { Args: never; Returns: string }
       task_report_tick_token_ok: { Args: { p_token: string }; Returns: boolean }
+      beds24_record_account_credit: {
+        Args: {
+          p_expires_at: string
+          p_metadata: Json
+          p_source: string
+        }
+        Returns: undefined
+      }
+      beds24_credit_usage_windows: {
+        Args: {
+          p_credential_key?: string
+          p_from: string
+          p_organization_id: string
+          p_to: string
+        }
+        Returns: {
+          actor_job: string | null
+          actor_kind: string
+          actor_name: string | null
+          actor_user_id: string | null
+          calls: number
+          cost: number
+          credential_key: string
+          feature: string
+          first_at: string
+          last_at: string
+          rate_limited: number
+          window_min_remaining: number | null
+          window_paused_at: string | null
+          window_resets_at: string | null
+        }[]
+      }
       beds24_try_lock: {
         Args: {
           p_lock_id: string

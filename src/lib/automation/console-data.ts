@@ -10,6 +10,8 @@ import {
   type AutomationJobKind,
   type AutomationSettings,
 } from "@/lib/automation/jobs";
+import { getBeds24CreditDetail } from "@/lib/beds24/credit-usage-read";
+import type { Beds24CreditDetail } from "@/lib/beds24/credit-usage-types";
 import type { Locale } from "@/lib/i18n";
 import type { AppSession } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
@@ -66,13 +68,17 @@ export type AutomationPageData = {
   gate: { ok: boolean; ageMinutes: number | null };
   opsAlertConfigured: boolean;
   buildings: Array<{ name: string; label: string }>;
+  /** Beds24 크레딧 칸 첫 값(「오늘」). 읽기 실패면 null — 화면이 오류 칸을 보인다. */
+  credit: Beds24CreditDetail | null;
+  /** 서버가 이 화면을 그린 시각(ms) — 크레딧 카운트다운의 첫 그림을 서버 · 브라우저가 같게. */
+  renderedAt: number;
 };
 
 export async function getAutomationPageData(session: AppSession, locale: Locale): Promise<AutomationPageData> {
   const supabase = getSupabaseServiceClient();
   const organizationId = session.organization.id;
   const now = new Date();
-  const [jobs, destinations, runs, logs, gate, labeler] = await Promise.all([
+  const [jobs, destinations, runs, logs, gate, labeler, credit] = await Promise.all([
     loadJobs(supabase, organizationId),
     loadDestinations(supabase, organizationId),
     supabase
@@ -89,6 +95,8 @@ export async function getAutomationPageData(session: AppSession, locale: Locale)
       .limit(100),
     checkReservationGate(supabase, now),
     loadPropertyLabeler(supabase, organizationId),
+    // 우리 DB 의 호출 기록만 읽는다(Beds24 를 부르지 않는다). 실패해도 관제실은 연다.
+    getBeds24CreditDetail(organizationId, "today").catch(() => null),
   ]);
 
   const actorIds = [...new Set((logs.data ?? []).map((row) => row.actor_id).filter((id): id is string => !!id))];
@@ -130,6 +138,8 @@ export async function getAutomationPageData(session: AppSession, locale: Locale)
   return {
     buildings: AUTOMATION_BUILDING_ORDER.map((name) => ({ label: labeler(name, locale), name })),
     canManage: session.capabilities.includes("automation.manage"),
+    credit,
+    renderedAt: now.getTime(),
     channels: listAutomationChannels(),
     gate: { ageMinutes: gate.ageMinutes, ok: gate.ok },
     jobs: AUTOMATION_JOB_KEYS.map((jobKey) => {

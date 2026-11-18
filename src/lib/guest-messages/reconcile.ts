@@ -22,6 +22,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { readBeds24AccountCredit } from "@/lib/beds24/account-credit";
 import { resolveBeds24AccessToken, type Beds24TokenState } from "@/lib/beds24/access-token";
+import { createBeds24LedgerFetch } from "@/lib/beds24/credit-ledger";
 import { readBeds24Credits } from "@/lib/beds24/credits";
 import { isBeds24SyncPaused } from "@/lib/beds24/sync-control";
 import { activateBeds24Cooldown, getBeds24Cooldown } from "@/lib/beds24/sync-locks";
@@ -86,7 +87,14 @@ export async function reconcileGuestMessages(
   } = {},
 ): Promise<ReconcileResult> {
   const supabase = deps.supabase ?? getSupabaseServiceClient();
-  const fetchImpl = deps.fetchImpl ?? fetch;
+  const fetchImpl =
+    deps.fetchImpl ??
+    createBeds24LedgerFetch({
+      feature: "guest_messages",
+      action: "messages.reconcile",
+      job: "guest_messages_reconcile",
+      organizationId: organizationIds.length === 1 ? organizationIds[0] : null,
+    });
   const now = deps.now ?? (() => new Date());
   const maxPages = deps.maxPages ?? RECONCILE_MAX_PAGES;
   const result: ReconcileResult = {

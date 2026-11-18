@@ -26,6 +26,7 @@ export default async function AutomationPage() {
     <AdminShell activeItem={opsNavId("automation")} title={dictionary.automation.title}>
       <AutomationConsole
         copy={dictionary.automation}
+        creditCopy={dictionary.beds24Credit}
         data={data}
         locale={locale}
         localeTag={LOCALE_TAG[locale]}

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { resolveBeds24AccessToken } from "@/lib/beds24/access-token";
+import { beds24Fetch, type Beds24CreditHint } from "@/lib/beds24/credit-ledger";
 import { getOptionalBeds24ApiEnv } from "@/lib/env";
 import { detectExternalRateChanges, type RateSnapshot } from "@/lib/beds24/external-price-changes";
 import type { Database, Json } from "@/types/database";
@@ -110,11 +111,12 @@ class CalendarHttpError extends Error {
 async function fetchCalendarPages(
   firstUrl: string,
   headers: Record<string, string>,
+  creditHint: Beds24CreditHint,
 ): Promise<JsonRecord[]> {
   const pages: JsonRecord[] = [];
   let url: string | null = firstUrl;
   while (url && pages.length < CALENDAR_MAX_PAGES) {
-    const response: Response = await fetch(url, { headers, cache: "no-store" });
+    const response: Response = await beds24Fetch(url, { headers, cache: "no-store" }, creditHint);
     if (!response.ok) throw new CalendarHttpError(response.status);
     const root = asRecord(await response.json());
     if (!root) break;
@@ -283,15 +285,17 @@ export async function syncBeds24RoomRates(
   // **Beds24 를 읽기 전에** 잡는다. 그 뒤에 가격 작업이 쓴 칸은 이보다 늦은 `synced_at` 을 갖고,
   // `upsert_room_daily_rates_if_newer` 가 그 칸을 이번 (더 옛) 값으로 덮지 않는다.
   const syncedAt = new Date().toISOString();
+  const ratesCreditHint: Beds24CreditHint = { feature: "rates_read", job: "rates_sync", organizationId };
 
   // 네트워크 예외를 **던지지 않는다.** 이 함수는 크론이 돌리는 안전망이라, 한 번의 순간적인
   // 실패로 500 을 내면 그 주기의 갱신이 통째로 사라진다(2026-09-17 실제로 한 번 겪었다).
   let propertiesRoot: JsonRecord | null = null;
   try {
-    const propertiesResponse = await fetch(`${base}/properties?includeAllRooms=true`, {
-      headers,
-      cache: "no-store",
-    });
+    const propertiesResponse = await beds24Fetch(
+      `${base}/properties?includeAllRooms=true`,
+      { headers, cache: "no-store" },
+      { ...ratesCreditHint, feature: "rooms_sync", action: "properties.get" },
+    );
     if (!propertiesResponse.ok) {
       return { ...empty, skipped: [`room-rates:properties-http-${propertiesResponse.status}`] };
     }
@@ -330,7 +334,7 @@ export async function syncBeds24RoomRates(
     // 다음 주기에 다시 시도된다 — 전부 upsert 라 재시도가 안전하다.
     let pages: JsonRecord[];
     try {
-      pages = await fetchCalendarPages(url, headers);
+      pages = await fetchCalendarPages(url, headers, ratesCreditHint);
     } catch (error) {
       if (error instanceof CalendarHttpError) {
         skipped.push(`room-rates:calendar-${externalPropertyId}-http-${error.status}`);
@@ -462,7 +466,7 @@ export async function syncBeds24RoomRates(
           `&includePrices=true&includeLinkedPrices=true&includeNumAvail=true&includeMinStay=true` +
           `&includeMaxStay=true&includeOverride=true&_ts=${Date.now()}`;
         try {
-          const recheckPages = await fetchCalendarPages(url, headers);
+          const recheckPages = await fetchCalendarPages(url, headers, ratesCreditHint);
           for (const page of recheckPages) {
             for (const roomValue of Array.isArray(page.data) ? page.data : []) {
               const room = asRecord(roomValue);

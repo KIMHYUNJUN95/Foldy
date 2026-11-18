@@ -290,6 +290,7 @@ Usage:
   select cron.unschedule('guest-messages-media-once');
   ```
   `failed`(5번 실패)는 화면에서 Airbnb 주소로 계속 보인다 — 다시 해 보려면 `update public.guest_messages set media_state = 'pending', media_attempts = 0, media_next_try_at = null where media_state = 'failed';`(운영 데이터 변경 — 사용자 허락 뒤).
+- **Beds24 크레딧 사용 기록 (2026-11-18, `docs/engineering/01-beds24-integration.md` → 「크레딧 사용 기록」 — 운영 적용 2026-11-18)**: 새 환경변수 없음. 마이그레이션 `202611180003_beds24_credit_usage.sql` 이 표 `beds24_credit_usage`(RLS — `ops_admin.access` 조직 읽기만, 쓰기는 service role) · 창 집계 함수 `beds24_credit_usage_windows` · 계정 값 쓰기 함수 `beds24_record_account_credit`(둘 다 service role 전용) · pg_cron 잡 `beds24-credit-usage-purge`(매일 도쿄 0:35, 30일 지난 줄 하드 삭제)를 만든다. 코드보다 먼저든 나중이든 괜찮다 — 적용 전 코드는 기록 줄 쓰기만 로그 오류로 남기고(Beds24 호출 · 응답은 그대로), `account_credit` 은 예전 upsert 로 쓴다. 적용은 사용자 허락 뒤 SQL Editor.
 - `CRON_SECRET`: shared secret authorizing production scheduled/maintenance endpoints: Beds24 reconcile,
   external-review sync/health/relink, Todo reminders, attendance reminders, and guest messages
   (`/api/guest-messages/outbox`, `/api/guest-messages/auto`, `/api/beds24/messages-reconcile`, `/api/beds24/messages-backfill`, `/api/guest-messages/media-backfill` —

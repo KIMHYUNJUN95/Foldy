@@ -13,6 +13,7 @@
  */
 
 import { resolveBeds24AccessToken, type Beds24TokenState } from "@/lib/beds24/access-token";
+import { createBeds24LedgerFetch } from "@/lib/beds24/credit-ledger";
 import { readBeds24Credits } from "@/lib/beds24/credits";
 import { isBeds24SyncPaused } from "@/lib/beds24/sync-control";
 import { resolveCooldownSeconds } from "@/lib/beds24/sync-locks";
@@ -116,7 +117,8 @@ type PostResult =
   | { kind: "network_error" };
 
 export function createBeds24GuestMessageAdapter(deps: Beds24AdapterDeps = {}): GuestMessageChannelAdapter {
-  const fetchImpl = deps.fetchImpl ?? fetch;
+  const fetchImpl =
+    deps.fetchImpl ?? createBeds24LedgerFetch({ feature: "guest_messages", action: "messages.send", job: "guest_messages_send" });
   const resolveToken = deps.resolveToken ?? (() => resolveBeds24AccessToken("guest-messages"));
   const now = deps.now ?? Date.now;
   const gate = deps.gate ?? defaultBeds24Gate;

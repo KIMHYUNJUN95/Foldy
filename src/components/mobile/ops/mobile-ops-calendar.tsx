@@ -81,6 +81,9 @@ import { opsVacantRoomKeys } from "@/lib/ops-vacant-today";
 import { opsVacantGapCells, opsVacantGaps, type OpsVacantGap, type OpsVacantGapLength, type OpsVacantGapSort } from "@/lib/ops-vacant-gaps";
 import { OpsVacantGapsPanel } from "@/components/admin/ops/ops-vacant-gaps-panel";
 import { useBuildingName } from "@/components/shared/building-names";
+import { MobileCreditNote } from "@/components/mobile/ops/beds24-credit-mobile";
+import type { Beds24CreditSnapshot } from "@/lib/beds24/credit-usage-types";
+import type { Beds24CreditCopy } from "@/lib/beds24-credit-view";
 import "./mobile-ops-calendar.css";
 import "./mobile-ops-calendar-white.css";
 
@@ -192,6 +195,7 @@ function tokyoStamp(iso: string): string {
 export function MobileOpsCalendar({
   canWrite,
   copy: copyProp,
+  credit,
   days: daysProp,
   historyAlerts,
   jump,
@@ -209,6 +213,11 @@ export function MobileOpsCalendar({
    */
   canWrite: boolean;
   copy: Copy;
+  /**
+   * Beds24 크레딧 한 줄(주의 · 쉬는 중만). 서버에서 만든 JSX 를 넘기면 RSC 로 건너온 요소가 형제들 사이에서
+   * key 경고를 낸다 — 값만 받아 여기서 그린다.
+   */
+  credit?: { initial: Beds24CreditSnapshot | null; copy: Beds24CreditCopy; serverNow: number | null };
   days: OpsCalendarDay[];
   historyAlerts: number;
   jump: Jump;
@@ -1456,6 +1465,7 @@ export function MobileOpsCalendar({
 
   return (
     <div aria-busy={navPending ? true : undefined} className={`mops${navPending ? " is-nav" : ""}`} ref={rootRef}>
+      {credit ? <MobileCreditNote copy={credit.copy} initial={credit.initial} serverNow={credit.serverNow} /> : null}
       {/* 건물 — 옅은 보라 선택 글자 탭(화이트 리디자인 2026-10-16). 모바일은 한 건물씩 — 누르면 그 건물**만** 본다
           (2026-10-05: 예전 「함께 보기」 동그라미가 칩 옆에 붙어 있어 잘못 누르면 이전 건물이 남았다). */}
       <div className="mops-pills" role="group" aria-label={copy.propertyGroupLabel}>

@@ -1,7 +1,7 @@
 /**
  * 서버에서 쓰는 Beds24 어댑터. docs/product/47-guest-messaging.md §4-1
  * - 부르기 전: Beds24 동기화 멈춤 · 계정 쿨다운이면 부르지 않는다(`rate_limited` 로 돌려 큐가 그 뒤로 미룸).
- * - 응답마다: 계정 전체 크레딧 기록(`beds24_sync_locks` 'account_credit') + 이 조직 화면용 사본, 남은 크레딧이
+ * - 응답마다: 이 조직 화면용 사본(계정 전체 기록 · 'account_credit' 갱신은 `beds24Fetch` 가 한다), 남은 크레딧이
  *   `LOW_CREDIT_THRESHOLD` 아래면 계정 쿨다운(low_credit — 가격 작업과 같은 선).
  * - 429: 계정 쿨다운(rate_limit).
  * 2단계 발송 작업(`processOutboxBatch` 를 부르는 쪽)이 이걸 쓴다.
@@ -11,7 +11,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
-import { recordBeds24AccountCredit } from "@/lib/beds24/account-credit";
+import { createBeds24LedgerFetch } from "@/lib/beds24/credit-ledger";
 import { isBeds24SyncPaused } from "@/lib/beds24/sync-control";
 import { activateBeds24Cooldown, getBeds24Cooldown } from "@/lib/beds24/sync-locks";
 import { createBeds24GuestMessageAdapter, type Beds24CallGate } from "@/lib/guest-messages/beds24-adapter";
@@ -38,7 +38,7 @@ export async function recordGuestMessageCredit(
   source: string,
   nowMs: number = Date.now(),
 ): Promise<void> {
-  await recordBeds24AccountCredit(supabase, credit, source, nowMs);
+  // 계정 마지막 값('account_credit')은 기록 함수(`beds24Fetch` → credit-ledger)가 이미 갱신했다.
   for (const organizationId of organizationIds) await recordChannelCredit(supabase, organizationId, credit);
   if (isBelowLowCreditThreshold(credit.remaining)) {
     const resetInSec = credit.resetsAt !== null ? Math.max(0, Math.round((credit.resetsAt - nowMs) / 1000)) : null;
@@ -48,6 +48,12 @@ export async function recordGuestMessageCredit(
 
 export function createServerBeds24GuestMessageAdapter(supabase: Client, organizationId: string): GuestMessageChannelAdapter {
   return createBeds24GuestMessageAdapter({
+    fetchImpl: createBeds24LedgerFetch({
+      feature: "guest_messages",
+      action: "messages.send",
+      job: "guest_messages_send",
+      organizationId,
+    }),
     gate: beds24ServerGate(supabase),
     onCredit: (credit) => recordGuestMessageCredit(supabase, [organizationId], credit, "guest-messages-send"),
     onRateLimited: async (resetsInSec) => {

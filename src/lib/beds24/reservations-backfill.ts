@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { beds24Fetch } from "@/lib/beds24/credit-ledger";
 import { getOptionalBeds24ApiEnv } from "@/lib/env";
 import {
   chooseStoredReservationId,
@@ -209,11 +210,11 @@ async function resolveBeds24AccessToken(): Promise<Beds24AccessTokenState> {
   }
 
   try {
-    const response = await fetch(`${env.baseUrl.replace(/\/$/, "")}/authentication/token`, {
+    const response = await beds24Fetch(`${env.baseUrl.replace(/\/$/, "")}/authentication/token`, {
       method: "GET",
       headers: { accept: "application/json", refreshToken: env.refreshToken },
       cache: "no-store",
-    });
+    }, { feature: "auth", action: "token.refresh", job: "reservations_sync" });
     if (!response.ok) {
       return {
         ok: false,
@@ -286,10 +287,10 @@ async function fetchBookingsFromUrl(
     seenPageUrls.add(nextUrl);
     pageCount += 1;
 
-    const response = await fetch(nextUrl, {
+    const response = await beds24Fetch(nextUrl, {
       headers: { accept: "application/json", token },
       cache: "no-store",
-    });
+    }, { feature: "bookings_sync", action: "bookings.get", job: "reservations_sync" });
     if (!response.ok) {
       skippedReason = `reservations:http-${response.status}`;
       failedPageUrl = nextUrl;

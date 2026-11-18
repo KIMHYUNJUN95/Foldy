@@ -4,6 +4,7 @@ import { getOptionalBeds24ApiEnv } from "@/lib/env";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 
 import { resolveBeds24AccessToken } from "./access-token";
+import { beds24Fetch } from "./credit-ledger";
 import { readBeds24Credits } from "./credits";
 
 /**
@@ -280,10 +281,10 @@ export async function relinkReviewRooms(input: {
           ].join("&");
           let json: { data?: unknown } | null = null;
           try {
-            const response = await fetch(`${base}/bookings?${qs}`, {
+            const response = await beds24Fetch(`${base}/bookings?${qs}`, {
               headers: { accept: "application/json", token: tokenState.token },
               cache: "no-store",
-            });
+            }, { feature: "reviews_sync", action: "bookings.lookup", itemCount: chunk.length, job: "review_relink", organizationId });
             result.lookupRequests += 1;
             const credits = readBeds24Credits(response.headers);
             if (credits.remaining !== null) result.creditsRemaining = credits.remaining;

@@ -14,6 +14,8 @@
 
 import { after } from "next/server";
 import { backfillGuestMessageHistory, readGuestMessageBackfillState, type BackfillMeasure } from "@/lib/guest-messages/backfill";
+import { userCreditActor, withBeds24CreditScope } from "@/lib/beds24/credit-ledger";
+import type { Beds24CreditActor } from "@/lib/beds24/credit-usage-types";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -38,11 +40,11 @@ export type GuestMessageBackfillStatus = {
 
 type Failure = { ok: false; errorKey: GuestMessageBackfillErrorKey };
 
-async function gate(): Promise<{ ok: true; organizationId: string } | Failure> {
+async function gate(): Promise<{ ok: true; organizationId: string; actor: Beds24CreditActor } | Failure> {
   const session = await getCurrentAppSession().catch(() => null);
   if (!session || !hasOrganizationContext(session)) return { ok: false, errorKey: "forbidden" };
   if (!session.capabilities.includes("guest_messages.manage")) return { ok: false, errorKey: "forbidden" };
-  return { ok: true, organizationId: session.organization.id };
+  return { ok: true, organizationId: session.organization.id, actor: userCreditActor(session.user) };
 }
 
 const IDLE: GuestMessageBackfillStatus = {
@@ -108,7 +110,9 @@ export async function startGuestMessageBackfill(
   const restart = input?.restart === true;
   try {
     if (mode === "measure") {
-      const measured = await backfillGuestMessageHistory(organizationId, { mode: "measure" });
+      const measured = await withBeds24CreditScope({ actor: access.actor, organizationId }, () =>
+        backfillGuestMessageHistory(organizationId, { mode: "measure" }),
+      );
       if (measured.skipped === "too_soon") return { ok: false, errorKey: "too_soon" };
       return { ok: true, status: await readStatus(organizationId) };
     }
@@ -117,7 +121,9 @@ export async function startGuestMessageBackfill(
     if (current.status === "done" && !restart) return { ok: false, errorKey: "done" };
     after(async () => {
       try {
-        await backfillGuestMessageHistory(organizationId, { mode: "run", restart });
+        await withBeds24CreditScope({ actor: access.actor, organizationId }, () =>
+          backfillGuestMessageHistory(organizationId, { mode: "run", restart }),
+        );
       } catch (error) {
         console.error("[guest-messages/backfill] run failed", error instanceof Error ? error.message : "unknown");
       }

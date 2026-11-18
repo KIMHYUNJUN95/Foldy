@@ -23,11 +23,14 @@ export type Beds24CreditInfo = {
   limit?: number;
 };
 
-/** 헤더가 없으면 null 이다. `Number(null) === 0` 이라 이 구분을 빼먹으면 «잔여 0» 으로 읽힌다. */
+/**
+ * 헤더가 없거나 비었으면(빈 문자열 · 공백만) null 이다. `Number(null)` · `Number("")` 이 모두 0 이라
+ * 이 구분을 빼먹으면 «잔여 0» 으로 읽힌다. 빈 이름은 건너뛰고 다음(옛) 이름을 본다.
+ */
 function readNumericHeader(headers: Headers, names: string[]): number | null {
   for (const name of names) {
     const raw = headers.get(name);
-    if (raw === null) continue;
+    if (raw === null || raw.trim() === "") continue;
     const parsed = Number(raw);
     if (Number.isFinite(parsed)) return parsed;
   }

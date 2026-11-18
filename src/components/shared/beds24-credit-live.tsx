@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { loadBeds24CreditDetail, loadBeds24CreditSummary } from "@/actions/beds24-credit";
-import { creditDisplay, creditView, shouldRefreshCredit } from "@/lib/beds24-credit-view";
+import { creditDisplay, creditRefreshResult, creditView, isNewerResponse, shouldRefreshCredit, type CreditRefreshResult } from "@/lib/beds24-credit-view";
 import type {
   Beds24CreditDetail,
   Beds24CreditRange,
@@ -82,30 +82,46 @@ export function useNowSecond(ticking: boolean): number | null {
 export function useBeds24CreditLive(initial: Beds24CreditSnapshot | null, enabled = true, serverNow: number | null = null) {
   const [snapshot, setSnapshot] = useState<Beds24CreditSnapshot | null>(initial);
   const [summary, setSummary] = useState<Beds24CreditSummary | null>(null);
-  const [failed, setFailed] = useState(false);
+  // 이어서 실패한 횟수 — 낡은 값 판정(`creditView`)에 그대로 넘긴다.
+  const [failures, setFailures] = useState(0);
   const [loading, setLoading] = useState(false);
   const lastFetchedAt = useRef(0);
-  const inFlight = useRef<Promise<void> | null>(null);
+  const inFlight = useRef<Promise<CreditRefreshResult> | null>(null);
 
-  const refresh = useCallback(() => {
-    if (!enabled) return Promise.resolve();
+  // 요청 순번 — 요약 · 상세가 하나를 같이 쓴다. 나중에 보낸 요청의 응답만 값을 바꾼다(기록 시각은 보지 않는다).
+  const issued = useRef(0);
+  const applied = useRef(0);
+  const begin = useCallback(() => ++issued.current, []);
+  const commit = useCallback((token: number, next: Beds24CreditSnapshot, nextSummary?: Beds24CreditSummary) => {
+    if (!isNewerResponse(token, applied.current)) return false;
+    applied.current = token;
+    setFailures(0);
+    setSnapshot(next);
+    if (nextSummary) setSummary(nextSummary);
+    return true;
+  }, []);
+  // 이미 더 새 응답을 받은 뒤 늦게 온 실패는 세지 않는다.
+  const fail = useCallback((token: number) => {
+    const counted = isNewerResponse(token, applied.current);
+    if (counted) setFailures((n) => n + 1);
+    return counted;
+  }, []);
+
+  const refresh = useCallback((): Promise<CreditRefreshResult> => {
+    if (!enabled) return Promise.resolve("dropped");
     if (inFlight.current) return inFlight.current;
     lastFetchedAt.current = Date.now();
     setLoading(true);
+    const token = begin();
     const run = fetchCreditSummary().then((result) => {
       inFlight.current = null;
       setLoading(false);
-      if (!result.ok) {
-        setFailed(true);
-        return;
-      }
-      setFailed(false);
-      setSummary(result.data);
-      setSnapshot(result.data.snapshot);
+      if (!result.ok) return creditRefreshResult(false, fail(token));
+      return creditRefreshResult(true, commit(token, result.data.snapshot, result.data));
     });
     inFlight.current = run;
     return run;
-  }, [enabled]);
+  }, [enabled, begin, commit, fail]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -143,8 +159,8 @@ export function useBeds24CreditLive(initial: Beds24CreditSnapshot | null, enable
   // 붙기 전(서버 그림 · 첫 그림)은 서버가 그린 시각(`serverNow`)으로 읽어 두 그림이 같다. 그것도 없으면 기록 시각으로
   // 상태만 정하고 카운트다운 자리는 비운다(now null) — 「곧」 → 「2:40」 으로 글자가 바뀌어 흔들리지 않게.
   const now = tick ?? serverNow;
-  const view = creditView(snapshot, now ?? snapshot?.recordedAt ?? 0);
+  const view = creditView(snapshot, now ?? snapshot?.recordedAt ?? 0, failures);
 
   const display = creditDisplay(view, now);
-  return { snapshot, summary, view, display, now, failed, loading, refresh };
+  return { snapshot, summary, view, display, now, failed: failures > 0, failures, loading, refresh, begin, commit, fail };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { ExternalLink, RefreshCw } from "lucide-react";
 import { useBeds24Credit } from "@/components/admin/beds24-credit-gauge";
 import { fetchCreditDetail, useBeds24CreditLive } from "@/components/shared/beds24-credit-live";
@@ -9,10 +9,12 @@ import {
   barCaption,
   pauseSummaryLine,
   chartLines,
+  creditPollMs,
   creditTexts,
   featureLabel,
   fillCopy,
   sharePercent,
+  showCreditLoadError,
   type Beds24CreditCopy,
 } from "@/lib/beds24-credit-view";
 import type { Beds24CreditCall, Beds24CreditDetail, Beds24CreditRange } from "@/lib/beds24/credit-usage-types";
@@ -23,7 +25,8 @@ import "@/components/admin/beds24-credit.css";
  *
  * 도메인 계약: docs/product/36-automation-control.md 「Beds24 크레딧」.
  * 첫 값은 서버(`getAutomationPageData` → `credit`)가 「오늘」로 준다. 기간을 바꾸면 상세 액션을 다시 부른다.
- * 큰 숫자 · 남은 시간은 상단 줄 게이지와 같은 값(레이아웃 공급자)을 쓴다 — 같은 화면에서 두 숫자가 어긋나지 않게.
+ * 큰 숫자 · 남은 시간은 상단 줄 게이지와 같은 값(레이아웃 공급자)을 쓴다 — 이 칸이 받은 스냅샷은 공급자에도 밀어 넣는다(더 늦은 기록이 이김).
+ * 탭이 보일 때 10초마다(탭 · 창 복귀 즉시) 우리 DB 만 다시 읽는다 — 로딩 표시 없이 조용히.
  */
 
 const RANGES: Beds24CreditRange[] = ["5m", "1h", "today", "7d"];
@@ -43,7 +46,7 @@ export function Beds24CreditPanel({
   const [range, setRange] = useState<Beds24CreditRange>(initial?.range ?? "today");
   const [detail, setDetail] = useState<Beds24CreditDetail | null>(initial);
   const [failed, setFailed] = useState(initial === null);
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
   const live = useBeds24Credit();
   // 공급자(관리자 레이아웃) 값이 있으면 상단 줄 게이지와 같은 숫자를 쓴다. 없을 때만 이 칸 첫 값으로.
   const local = useBeds24CreditLive(detail?.snapshot ?? null, !live, serverNow);
@@ -52,18 +55,63 @@ export function Beds24CreditPanel({
   const texts = creditTexts(display, copy);
   const limit = display.limit;
 
+  // 마지막 요청만 반영한다(요청 번호). 기간 버튼 · 자동 갱신이 같은 번호를 써서 서로 덮지 않는다.
+  const seq = useRef(0);
+  const inFlight = useRef(0);
+  const wantedRange = useRef<Beds24CreditRange>(range);
+  const shownRange = useRef<Beds24CreditRange | null>(initial?.range ?? null);
+  const shared = useRef(source);
+  useEffect(() => {
+    shared.current = source;
+  });
+
+  const run = useCallback(async (target: Beds24CreditRange, silent: boolean) => {
+    const id = ++seq.current;
+    wantedRange.current = target;
+    inFlight.current += 1;
+    const token = shared.current.begin();
+    // 로딩 표시는 처음 읽을 때와 기간을 바꿀 때만 — 자동 갱신은 조용히(깜빡임 · 높이 튐 없음).
+    if (!silent) setPending(true);
+    const result = await fetchCreditDetail(target);
+    inFlight.current -= 1;
+    if (id !== seq.current) return;
+    setPending(false);
+    if (!result.ok) {
+      shared.current.fail(token);
+      // 버튼이 표가 보여 주는 기간과 어긋나지 않게 되돌린다.
+      if (shownRange.current) {
+        wantedRange.current = shownRange.current;
+        setRange(shownRange.current);
+      }
+      // 조용한 갱신 실패는 낡은 값 기준(실패 횟수)으로만 드러난다 — 누른 요청의 실패만 바로 띠를 띄운다.
+      if (!silent) setFailed(true);
+      return;
+    }
+    shownRange.current = result.data.range;
+    setRange(result.data.range);
+    setFailed(false);
+    setDetail(result.data);
+    shared.current.commit(token, result.data.snapshot);
+  }, []);
+
   const load = (next: Beds24CreditRange) => {
     setRange(next);
-    startTransition(async () => {
-      const result = await fetchCreditDetail(next);
-      if (!result.ok) {
-        setFailed(true);
-        return;
-      }
-      setFailed(false);
-      setDetail(result.data);
-    });
+    void run(next, false);
   };
+
+  useEffect(() => {
+    const tick = () => {
+      if (document.visibilityState === "visible" && inFlight.current === 0) void run(wantedRange.current, true);
+    };
+    const timer = window.setInterval(tick, creditPollMs(range)); // 7일은 무거워 60초
+    document.addEventListener("visibilitychange", tick);
+    window.addEventListener("focus", tick);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", tick);
+      window.removeEventListener("focus", tick);
+    };
+  }, [run, range]);
 
   const timeFmt = useMemo(
     () => new Intl.DateTimeFormat(localeTag, { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }),
@@ -116,11 +164,11 @@ export function Beds24CreditPanel({
           </p>
         </div>
         <div className="bcd-live">
-          {detail ? <WindowChart copy={copy} detail={detail} limit={limit} /> : failed ? null : <div className="bcd-skel" />}
+          {detail ? <WindowChart copy={copy} detail={detail} limit={limit} /> : showCreditLoadError(failed, source.failures) ? null : <div className="bcd-skel" />}
         </div>
       </div>
 
-      {failed ? (
+      {showCreditLoadError(failed, source.failures) ? (
         <div className="bcd-msg" role="alert">
           <span>{copy.loadError}</span>
           <button disabled={pending} onClick={() => load(range)} type="button">

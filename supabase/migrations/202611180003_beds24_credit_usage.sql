@@ -9,6 +9,7 @@
 --
 -- - 쓰기: service role 만(서버의 기록 함수). 사람 세션 쓰기 정책 없음.
 -- - 읽기: `ops_admin.access` 를 가진 조직의 줄만(202609300007 과 같은 `capability_organization_ids` 방식).
+--   (202611180004 에서 `admin_web.access` 도 함께 요구하도록 맞췄다 — 화면 권한 `canViewBeds24Credit` 과 같게.)
 --   `organization_id` 가 없는 줄(계정 전체 작업 — 조직을 정할 수 없는 크론 · 토큰 갱신)은 이 정책으로 안 보인다.
 --   화면은 서버 함수(service role, `beds24_credit_usage_windows`)로 읽고, 거기서 「이 조직 줄 + 조직 없는 줄」만 고른다.
 -- - 보관: 30일. 매일 pg_cron 이 지운다(하드 삭제).
@@ -17,7 +18,7 @@
 --
 -- 토큰 · 요청 본문 · 헤더 원문은 남기지 않는다 — 숫자 헤더 3개와 상태 코드만.
 --
--- 적용 필요: 운영 Supabase 에 아직 적용 전.
+-- 운영 적용 2026-11-18.
 -- 되돌리기:
 --   select cron.unschedule('beds24-credit-usage-purge');
 --   drop function if exists public.beds24_record_account_credit(timestamptz, text, jsonb);

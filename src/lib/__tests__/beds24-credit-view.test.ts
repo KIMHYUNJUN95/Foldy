@@ -6,6 +6,10 @@ import {
   windowHeadLine,
   chartLines,
   creditDisplay,
+  creditPollMs,
+  creditRefreshResult,
+  isNewerResponse,
+  showCreditLoadError,
   creditTexts,
   creditView,
   fillCopy,
@@ -49,11 +53,11 @@ describe("stateOfRemaining — 50 아래 주의, 10 아래 멈춤", () => {
 
 describe("creditView", () => {
   it("기록이 없으면 모름 — 숫자 · 막대 · 카운트다운 없음", () => {
-    expect(creditView(null, NOW)).toEqual({ state: "unknown", remaining: null, limit: 200, percent: 0, countdownTo: null });
+    expect(creditView(null, NOW)).toEqual({ state: "unknown", remaining: null, limit: 200, percent: 0, countdownTo: null, stale: false });
   });
 
   it("넉넉 — 남은 양 · 비율 · 다시 가득 차는 시각", () => {
-    expect(creditView(snap(), NOW)).toEqual({ state: "ok", remaining: 120, limit: 200, percent: 60, countdownTo: NOW + 90_000 });
+    expect(creditView(snap(), NOW)).toEqual({ state: "ok", remaining: 120, limit: 200, percent: 60, countdownTo: NOW + 90_000, stale: false });
   });
 
   it("주의 — 남은 양 30", () => {
@@ -77,6 +81,35 @@ describe("creditView", () => {
 
   it("서버가 모름이라고 하면 숫자를 지운다", () => {
     expect(creditView(snap({ state: "unknown" }), NOW)).toMatchObject({ state: "unknown", remaining: null, percent: 0 });
+  });
+});
+
+describe("creditView — 갱신이 실패하는 동안(낡은 값)", () => {
+  it("갱신이 잘 되면 옛 값 그대로 — 실패 0번", () => {
+    expect(creditView(snap({ resetsAt: NOW - 1 }), NOW, 0)).toMatchObject({ state: "ok", remaining: 200, stale: false });
+  });
+
+  it("실패 중 + 리셋 시각이 지났으면 가득 참으로 보이지 않고 모름", () => {
+    const view = creditView(snap({ remaining: 5, resetsAt: NOW - 1 }), NOW, 1);
+    expect(view).toMatchObject({ state: "unknown", remaining: null, percent: 0, countdownTo: null, stale: true });
+  });
+
+  it("실패 중 + 쉬는 시각이 지났어도 모름", () => {
+    expect(creditView(snap({ pausedUntil: NOW - 1 }), NOW, 1)).toMatchObject({ state: "unknown", stale: true });
+  });
+
+  it("실패 1~2번은 아직 유효한 값을 그대로, 3번 이어지면 모름", () => {
+    expect(creditView(snap(), NOW, 2)).toMatchObject({ state: "ok", remaining: 120, stale: false });
+    expect(creditView(snap(), NOW, 3)).toMatchObject({ state: "unknown", remaining: null, stale: true });
+  });
+
+  it("낡은 모름은 문구가 「기록 없음」이 아니라 「확인 못 함」", () => {
+    const copy = getDictionary("ko").beds24Credit;
+    const stale = creditTexts(creditDisplay(creditView(snap(), NOW, 3), NOW), copy);
+    expect(stale.sub).toBe(copy.staleBody);
+    expect(stale.gauge.value).toBe(copy.staleShort);
+    expect(stale.aria).toBe(copy.ariaStale);
+    expect(stale.note).toBeNull();
   });
 });
 
@@ -276,5 +309,35 @@ describe("windowHeadLine — 지금 5분 머리글", () => {
       expect(line).toBe(c.windowHeadPlain);
       expect(line).not.toMatch(/0|\{/);
     }
+  });
+});
+
+describe("자동 갱신 간격 · 응답 순번 · 오류 띠", () => {
+  it("7일만 60초, 나머지는 10초", () => {
+    expect(["5m", "1h", "today"].map((r) => creditPollMs(r as "5m"))).toEqual([10_000, 10_000, 10_000]);
+    expect(creditPollMs("7d")).toBe(60_000);
+  });
+
+  it("나중에 보낸 요청의 응답이 이긴다 — 늦게 도착한 옛 요청은 못 덮는다", () => {
+    expect(isNewerResponse(5, 4)).toBe(true);
+    expect(isNewerResponse(4, 5)).toBe(false);
+    expect(isNewerResponse(5, 5)).toBe(false);
+  });
+
+  it("오류 띠 — 누른 요청 실패는 바로, 조용한 갱신은 낡은 값 기준(3번)부터", () => {
+    expect(showCreditLoadError(true, 0)).toBe(true);
+    expect(showCreditLoadError(false, 2)).toBe(false);
+    expect(showCreditLoadError(false, 3)).toBe(true);
+  });
+});
+
+describe("creditRefreshResult — 순번에 밀린 응답은 성공 · 실패로 세지 않는다", () => {
+  it.each([
+    [true, true, "ok"],
+    [false, true, "failed"],
+    [true, false, "dropped"],
+    [false, false, "dropped"],
+  ] as const)("ok=%s newer=%s → %s", (ok, newer, expected) => {
+    expect(creditRefreshResult(ok, newer)).toBe(expected);
   });
 });

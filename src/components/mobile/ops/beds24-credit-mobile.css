@@ -226,13 +226,29 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  /* 폭이 모자라면(글자 크기 1.35배 · 긴 문구) 버튼이 문구 아래로 내려간다. */
+  flex-wrap: wrap;
+  gap: 8px 10px;
   margin-top: 14px;
   color: var(--mcr-stop);
   font-size: 13px;
   font-weight: 600;
 }
+.mcr-msg > span {
+  flex: 1 1 12em;
+  min-width: 0;
+  /* 외톨이 줄 방지 · 넘침 안전망(다른 줄바꿈 자리가 없을 때만 쓰여 ja 의 정상 줄바꿈은 그대로). */
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+/* ko 만 단어 단위 — ja 는 글자 사이에서 줄이 바뀌어야 한다. */
+.mcr-msg > span:lang(ko),
+:lang(ko) .mcr-msg > span {
+  word-break: keep-all;
+}
 .mcr-msg button {
+  flex: none;
+  white-space: nowrap;
   display: inline-flex;
   align-items: center;
   gap: 6px;

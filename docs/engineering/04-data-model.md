@@ -2627,15 +2627,15 @@ INSERT · UPDATE 신호만, DELETE 는 오지 않는다. 대신 `task_occurrence
 
 ## 2026-11-18 `beds24_credit_usage` — Beds24 호출 한 번 = 한 줄 (크레딧 사용 기록)
 
-마이그레이션 `202611180003_beds24_credit_usage.sql` (**운영 적용 2026-11-18**). 설계: 01 → 「2026-11-18 크레딧 사용 기록」.
+마이그레이션 `202611180003_beds24_credit_usage.sql` (**운영 적용 2026-11-18**) · 고침 `202611180004_beds24_credit_usage_fixes.sql`(**운영 적용 2026-11-18**: 읽기 정책에 `admin_web.access` 추가 · 판정표 3번 줄 · 창 집계 전체 순서). 설계: 01 → 「2026-11-18 크레딧 사용 기록」.
 
 - 열: `id` bigint identity · `called_at` · `organization_id`(null = 계정 전체 작업, 조직 지우면 같이 지움) · `credential_key` text not null default `'main'`(어느 Beds24 토큰) ·
   `feature`(check: `rates_write` · `rates_read` · `block_write` · `booking_write` · `bookings_sync` · `guest_messages` · `reviews_sync` · `rooms_sync` · `auth` · `other`) ·
   `action`(예: `calendar.post`) · `item_count` · `actor_kind`(`user` | `auto`, auto 면 `actor_job` 필수) · `actor_user_id`(profiles, 지워지면 null) · `actor_name`(사본) · `actor_job` ·
   `cost` · `remaining` · `resets_at`(헤더 없으면 null) · `http_status`(네트워크 오류면 null).
 - 색인: `(called_at desc)` · `(actor_user_id) where not null`. 조직 색인은 두지 않는다(줄 대부분이 한 조직 + 조직 없음이라 거르지 못함).
-- 함수 `beds24_credit_usage_windows(p_organization_id, p_from, p_to, p_credential_key default 'main')` — 5분 창 × 누가 × 어디에 묶음(이 조직 줄 + 조직 없는 줄).
-- 함수 `beds24_record_account_credit(p_expires_at, p_source, p_metadata)` — `beds24_sync_locks` 의 `account_credit` 줄 쓰기. plpgsql(줄 잠금 뒤 판정). 옛 창 · 이미 지난 값 · 같은 창에서 되올라가는 값 · 같은 창의 빈 남은 값은 덮지 않고, `metadata.expiresEstimated = true`(리셋 헤더 없어 만료를 추정한 값)는 살아 있는 창의 만료를 바꾸지 않는다(판정표 12줄: 01 「크레딧 사용 기록」).
+- 함수 `beds24_credit_usage_windows(p_organization_id, p_from, p_to, p_credential_key default 'main')` — 5분 창 × 누가 × 어디에 묶음(이 조직 줄 + 조직 없는 줄). 결과 순서 = 묶음 키 전부(`window_resets_at nulls last` · `actor_kind` · `actor_user_id` · `actor_job` · `feature`, 0004) — 나눠 읽기용 전체 순서. 칸은 0003 그대로.
+- 함수 `beds24_record_account_credit(p_expires_at, p_source, p_metadata)` — `beds24_sync_locks` 의 `account_credit` 줄 쓰기. plpgsql(줄 잠금 뒤 판정). 모든 조합이 한 판정 관계(I, E) = 옛 창 · 같은 창 · 새 창을 쓴다(`metadata.expiresEstimated = true` 인 추정 값의 호출 시각 = 만료 − 300초, 시계 여유 30초, 0004). 옛 창 · 이미 지난 값은 안 쓰고, 같은 창은 작은 남은 값(빈 값은 지우지 않음) · 진짜 쪽 만료(추정끼리면 남긴 값을 찍은 호출의 추정 만료) · I 에 없는 칸(limit 등)은 E 것 유지, 새 창은 통째로(판정표 · 남는 한계: 01 「크레딧 사용 기록」).
   `language sql` · `stable` · security invoker · `search_path = ''`. 계산은 `src/lib/beds24/credit-usage-model.ts`.
 - 보관 30일: pg_cron `beds24-credit-usage-purge`(`35 15 * * *` UTC = 도쿄 0:35), 하드 삭제.
 - 쓰는 곳: `src/lib/beds24/credit-ledger.ts`(service role). 읽는 곳: `src/lib/beds24/credit-usage-read.ts`. 타입은 `src/types/database.ts` 손으로 맞춤.

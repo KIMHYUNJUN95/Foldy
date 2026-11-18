@@ -290,7 +290,11 @@ export async function beds24Fetch(
   return response;
 }
 
-/** 주입형 fetch 를 쓰는 곳(손님 메시지)에 넘기는 기록용 fetch. */
+/**
+ * 주입형 fetch 를 쓰는 곳(손님 메시지)에 넘기는 기록용 fetch.
+ * **문자열 · URL 입력만** 쓴다 — 주입 자리 모양 때문에 `typeof fetch` 지만, `Request` 를 넘기면 url 만 쓰고
+ * 그 안의 method · headers · body 는 버린다(지금 호출부는 모두 문자열 URL + init).
+ */
 export function createBeds24LedgerFetch(hint: Beds24CreditHint = {}): typeof fetch {
   return (input, init) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;

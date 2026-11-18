@@ -1940,12 +1940,15 @@ Supabase advisor `anon_security_definer_function_executable` 정리. 운영 `pg_
 
 ## 2026-11-18 `beds24_credit_usage` · `beds24_credit_usage_windows`
 
-마이그레이션 `202611180003_beds24_credit_usage.sql` (**운영 적용 2026-11-18**).
+마이그레이션 `202611180003_beds24_credit_usage.sql` (**운영 적용 2026-11-18**) · `202611180004_beds24_credit_usage_fixes.sql`(**운영 적용 2026-11-18**).
 
-- RLS 켬. 읽기 정책 하나(`to authenticated`): `organization_id = any((select capability_organization_ids('ops_admin.access'))::uuid[])` — 202609300007 과 같은 InitPlan 방식.
+- RLS 켬. 읽기 정책 하나(`to authenticated`): `organization_id = any((select capability_organization_ids('ops_admin.access'))::uuid[])`
+  **and** `organization_id = any((select capability_organization_ids('admin_web.access'))::uuid[])` — 202609300007 과 같은 InitPlan 방식.
+  서버 판정 `canViewBeds24Credit`(`ops_admin.access` + `admin_web.access`)과 같다. 0003 은 `ops_admin.access` 만 봐서 서버보다 넓었다 → 0004 에서 drop + create 로 맞춤
+  (0004 적용 전 운영은 아직 0003 조건).
   `organization_id` 가 null 인 줄(계정 전체 작업)은 이 정책으로 안 보인다.
 - 쓰기 정책 없음 — 쓰기는 service role(기록 함수 `credit-ledger.ts`)만. GRANT: public · anon · authenticated 모두 회수 → authenticated 에 select 만, service_role all.
-- 함수 `beds24_credit_usage_windows`: security invoker, 실행 권한 **service_role 만**(public · anon · authenticated 회수). 조직 id 는 항상 인자로 받아 조건에 건다.
+- 함수 `beds24_credit_usage_windows`: security invoker, 실행 권한 **service_role 만**(public · anon · authenticated 회수). 조직 id 는 항상 인자로 받아 조건에 건다. 결과 순서는 묶음 키 전부(전체 순서, 0004) — 앱이 `.range()` 로 나눠 읽어도 겹치거나 빠지지 않는다.
 - 함수 `beds24_record_account_credit`: security invoker, 실행 권한 **service_role 만**. 계정 전체 줄 하나(`account_credit`)만 쓴다 — 조직 데이터 없음. 덮을지 말지는 함수 안 판정표(01 「크레딧 사용 기록」)가 정한다.
 - 읽기 액션 · PC 상단 게이지는 같은 판정 `canViewBeds24Credit`(조직 있음 · `ops_admin.access` · `admin_web.access`). 플랫폼 계정은 `forbidden`.
 - 화면은 서버 액션 `loadBeds24CreditSummary` · `loadBeds24CreditDetail`(`src/actions/beds24-credit.ts`, `ops_admin.access`, 못 하면 `forbidden` 결과)이

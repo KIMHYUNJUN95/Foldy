@@ -1495,8 +1495,8 @@ Management Console" → Current Implementation Note.
 ## 상단 줄 — Beds24 크레딧 게이지 (2026-11-18)
 
 상단 줄 검색 오른쪽 · 알림 종 왼쪽에 **Beds24 크레딧 게이지**(`src/components/admin/beds24-credit-gauge.tsx`)가 있다.
-`ops_admin.access` 가진 사람에게만 보인다(레이아웃이 첫 값을 줌 — `Beds24CreditProvider`). 넉넉 · 주의(50 미만, 주황) ·
-쉬는 중(10 미만이나 쉼, 빨강 + 카운트다운) · 모름(「기록 없음」) — 색과 글자를 같이 쓴다. 누르면 328px 요약 창이 알림 종 창과
+`ops_admin.access` + `admin_web.access` 를 둘 다 가진 사람에게만 보인다(`canViewBeds24Credit` · 레이아웃이 첫 값을 줌 — `Beds24CreditProvider`). 넉넉 · 주의(50 미만, 주황) ·
+쉬는 중(10 미만이나 쉼, 빨강 + 카운트다운) · 모름(「기록 없음」 · 갱신이 계속 실패하면 「확인 못 함」 — 응답은 나중에 보낸 요청이 이김) — 색과 글자를 같이 쓴다. 요약 창은 Tab 으로 포커스가 벗어나도 닫힌다. 누르면 328px 요약 창이 알림 종 창과
 같은 움직임(오른쪽 위에서 자라남 · 바깥 누르기 / Esc)으로 열리고, 「자세히 보기」가 관제실 크레딧 칸으로 간다.
 값을 같이 쓰는 다른 화면은 `useBeds24Credit()` 으로 같은 공급자 값을 읽는다(새로 부르지 않는다). 기획: 36번 「Beds24 크레딧」.
 

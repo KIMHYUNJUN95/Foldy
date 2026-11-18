@@ -8,6 +8,7 @@ import {
   actorLines,
   creditTexts,
   fillCopy,
+  showCreditLoadError,
   windowHeadLine,
   type Beds24CreditCopy,
   type Beds24CreditDisplay,
@@ -55,6 +56,7 @@ export function Beds24CreditGauge({ copy }: { copy: Beds24CreditCopy }) {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
   const popId = useId();
+  const [userFailed, setUserFailed] = useState(false);
   const refresh = live?.refresh;
 
   useEffect(() => {
@@ -84,7 +86,15 @@ export function Beds24CreditGauge({ copy }: { copy: Beds24CreditCopy }) {
   const bar = { "--cg-fill": texts.fill } as CSSProperties;
 
   return (
-    <div className="cgwrap" ref={wrapRef}>
+    <div
+      className="cgwrap"
+      onBlur={(event) => {
+        // Tab 으로 창 · 버튼 밖으로 나가면 닫는다. relatedTarget 이 없으면(창 바깥 클릭 · 창 전환) 바깥 누름 처리가 맡는다.
+        const next = event.relatedTarget as Node | null;
+        if (open && next && !event.currentTarget.contains(next)) setOpen(false);
+      }}
+      ref={wrapRef}
+    >
       <button
         aria-controls={open ? popId : undefined}
         aria-expanded={open}
@@ -110,9 +120,15 @@ export function Beds24CreditGauge({ copy }: { copy: Beds24CreditCopy }) {
         <div aria-label={copy.popTitle} className="cgpop" id={popId} ref={popRef} role="dialog" tabIndex={-1}>
           <CreditSummaryBody
             copy={copy}
-            failed={live.failed && !live.summary}
+            failed={(live.failed && !live.summary) || showCreditLoadError(userFailed, live.failures)}
             loading={!live.summary}
-            onRetry={() => void live.refresh()}
+            onRetry={() =>
+              void live.refresh().then((result) => {
+                // 직접 누른 다시 받기 — 실패는 바로, 성공은 풀림. 순번에 밀려 버려진 응답은 건드리지 않는다.
+                if (result === "failed") setUserFailed(true);
+                else if (result === "ok") setUserFailed(false);
+              })
+            }
             state={display.state}
             summary={live.summary}
             texts={texts}
@@ -171,14 +187,16 @@ function CreditSummaryBody({
             {copy.retry}
           </button>
         </div>
-      ) : loading ? (
+      ) : null}
+      {!summary && !failed && loading ? (
         <div aria-busy="true" className="cgpop__loading">
           <span className="sr-only">{copy.loading}</span>
           <i />
           <i />
           <i />
         </div>
-      ) : summary ? (
+      ) : null}
+      {summary ? (
         <>
           <div className="cgpop__lh">{windowHeadLine(summary.windowUsed, copy)}</div>
           {actors.length === 0 ? (

@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useTransition, type CSSProperties } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { ChevronRight, RefreshCw } from "lucide-react";
-import { useBeds24CreditLive } from "@/components/shared/beds24-credit-live";
+import { fetchCreditDetail, useBeds24CreditLive } from "@/components/shared/beds24-credit-live";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { haptic } from "@/lib/haptics";
 import {
   actorLines,
+  creditPollMs,
   creditTexts,
+  showCreditLoadError,
   featureLabel,
   fillCopy,
   sharePercent,
@@ -41,6 +42,15 @@ export function MobileCreditNote({
 }) {
   const live = useBeds24CreditLive(initial, true, serverNow);
   const [open, setOpen] = useState(false);
+  const [userFailed, setUserFailed] = useState(false);
+  // 직접 누른 다시 받기 — 실패는 바로 줄 + 햅틱 error, 성공은 풀림. 밀려 버려진 응답은 아무것도 바꾸지 않는다.
+  const retry = async () => {
+    const result = await live.refresh();
+    if (result === "failed") {
+      setUserFailed(true);
+      haptic("error");
+    } else if (result === "ok") setUserFailed(false);
+  };
   const texts = creditTexts(live.display, copy);
   // 줄이 사라질 때 접히는 동안 마지막 글자를 들고 있는다(바로 비우면 접힘 없이 뚝 사라진다).
   const [lastNote, setLastNote] = useState(texts.note);
@@ -76,11 +86,12 @@ export function MobileCreditNote({
           <div className={`mcr-sheet mcr--${live.display.state}`}>
             <CreditHead copy={copy} texts={texts} />
             {live.failed && !live.summary ? (
-              <ErrorLine copy={copy} onRetry={() => void live.refresh()} />
+              <ErrorLine copy={copy} onRetry={() => void retry()} />
             ) : !live.summary ? (
               <Loading copy={copy} />
             ) : (
               <>
+                {showCreditLoadError(userFailed, live.failures) ? <ErrorLine copy={copy} onRetry={() => void retry()} /> : null}
                 <div className="mcr-lh">{windowHeadLine(live.summary.windowUsed, copy)}</div>
                 <ActorRows actors={live.summary.actors} copy={copy} empty={copy.windowEmpty} />
               </>
@@ -163,9 +174,9 @@ function ErrorLine({ copy, onRetry }: { copy: Beds24CreditCopy; onRetry: () => v
   );
 }
 
-/** 모바일 자동화 — 크레딧 칸. 첫 값은 서버(`getAutomationPageData().credit`, 「오늘」), 큰 숫자는 30초마다 새로. */
+/** 모바일 자동화 — 크레딧 칸. 첫 값은 서버(`getAutomationPageData().credit`, 「오늘」), 큰 숫자는 30초 · 누가/어디에는 10초마다 새로. */
 export function MobileCreditSection({
-  detail,
+  detail: initialDetail,
   copy,
   serverNow,
 }: {
@@ -173,12 +184,50 @@ export function MobileCreditSection({
   copy: Beds24CreditCopy;
   serverNow: number | null;
 }) {
+  const [detail, setDetail] = useState(initialDetail);
+  const [userFailed, setUserFailed] = useState(false);
   const live = useBeds24CreditLive(detail?.snapshot ?? null, true, serverNow);
   const texts = creditTexts(live.display, copy);
   const state = live.display.state;
+
+  // 탭이 보일 때 10초마다 · 복귀 즉시 우리 DB 만 조용히 다시 읽는다(관제실 칸과 같은 원칙). 겹치면 건너뛰고, 실패하면 옛 값 유지.
+  const inFlight = useRef(false);
+  const shared = useRef(live);
+  useEffect(() => {
+    shared.current = live;
+  });
+  // force — 「다시 받기」 버튼은 탭 상태 · 겹침과 상관없이 바로 읽는다(같은 읽기 경로 · 같은 순번 규칙).
+  const poll = useCallback(async (force = false) => {
+    if (!force && (inFlight.current || document.visibilityState !== "visible")) return;
+    inFlight.current = true;
+    const token = shared.current.begin();
+    const result = await fetchCreditDetail("today");
+    inFlight.current = false;
+    if (!result.ok) {
+      shared.current.fail(token);
+      // 직접 누른 다시 받기의 실패는 바로 보인다 — 조용한 갱신 실패는 실패 횟수로만(PC 와 같은 판정).
+      if (force) {
+        setUserFailed(true);
+        haptic("error");
+      }
+      return;
+    }
+    setUserFailed(false);
+    setDetail(result.data);
+    shared.current.commit(token, result.data.snapshot);
+  }, []);
+  useEffect(() => {
+    const timer = window.setInterval(() => void poll(), creditPollMs("today"));
+    const onBack = () => void poll();
+    document.addEventListener("visibilitychange", onBack);
+    window.addEventListener("focus", onBack);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onBack);
+      window.removeEventListener("focus", onBack);
+    };
+  }, [poll]);
   const limit = live.display.limit;
-  const router = useRouter();
-  const [, startRefresh] = useTransition();
 
   return (
     <section aria-labelledby="mcr-title" className={`mcr-sec mcr--${state}`} id="beds24-credit">
@@ -187,10 +236,10 @@ export function MobileCreditSection({
         <span>{fillCopy(copy.sub, { limit })}</span>
       </div>
       <CreditHead copy={copy} texts={texts} />
-      {!detail ? (
-        // 오늘 몫(누가 · 어디에)은 화면 첫 값에만 있다 — 다시 받기는 화면을 새로.
-        <ErrorLine copy={copy} onRetry={() => startRefresh(() => router.refresh())} />
-      ) : (
+      {!detail || showCreditLoadError(userFailed, live.failures) ? (
+        <ErrorLine copy={copy} onRetry={() => void poll(true)} />
+      ) : null}
+      {detail ? (
         <>
           <div className="mcr-lh">
             {copy.mobileWho}
@@ -212,7 +261,7 @@ export function MobileCreditSection({
             </ul>
           )}
         </>
-      )}
+      ) : null}
     </section>
   );
 }

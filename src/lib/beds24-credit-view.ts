@@ -5,6 +5,7 @@ import {
   type Beds24CreditActorUsage,
   type Beds24CreditDetail,
   type Beds24CreditFeature,
+  type Beds24CreditRange,
   type Beds24CreditSnapshot,
   type Beds24CreditState,
   type Beds24CreditWindowBar,
@@ -26,7 +27,34 @@ export type Beds24CreditView = {
   percent: number;
   /** 카운트다운이 가리키는 시각 — 쉬는 중이면 풀리는 때, 아니면 다시 가득 차는 때. 없으면 null. */
   countdownTo: number | null;
+  /** 갱신이 실패하는 중이라 값이 낡았다 — 모름으로 내려 보낸 경우. */
+  stale: boolean;
 };
+
+/** 갱신이 이만큼 이어서 실패하면(30초 주기 기준 약 1분 반) 값이 낡았다고 본다. */
+export const CREDIT_STALE_AFTER_FAILURES = 3;
+
+/** 자동 갱신 간격 — 7일은 장마다 전체 계산이라 무거워 60초, 나머지는 10초. */
+export function creditPollMs(range: Beds24CreditRange): number {
+  return range === "7d" ? 60_000 : 10_000;
+}
+
+/** 응답 판정 — **나중에 보낸 요청의 응답이 이긴다**(요약 · 상세가 같은 순번을 쓴다). 기록 시각은 보지 않는다. */
+export function isNewerResponse(token: number, appliedToken: number): boolean {
+  return token > appliedToken;
+}
+
+/** 값 받기 한 번의 결과 — 순번에 밀려 버려진 응답(`dropped`)은 성공 · 실패 어느 쪽으로도 세지 않는다. */
+export type CreditRefreshResult = "ok" | "failed" | "dropped";
+
+export function creditRefreshResult(ok: boolean, newer: boolean): CreditRefreshResult {
+  return !newer ? "dropped" : ok ? "ok" : "failed";
+}
+
+/** 오류 띠 — 사용자가 누른 요청이 실패했거나, 조용한 갱신이 낡은 값 기준만큼 이어서 실패했을 때. */
+export function showCreditLoadError(userFailed: boolean, failures: number): boolean {
+  return userFailed || failures >= CREDIT_STALE_AFTER_FAILURES;
+}
 
 export function stateOfRemaining(remaining: number): Exclude<Beds24CreditState, "unknown"> {
   if (remaining < BEDS24_CREDIT_STOP_BELOW) return "stop";
@@ -34,9 +62,17 @@ export function stateOfRemaining(remaining: number): Exclude<Beds24CreditState, 
   return "ok";
 }
 
-export function creditView(snapshot: Beds24CreditSnapshot | null, now: number): Beds24CreditView {
+/** `failures` — 값 받기가 이어서 실패한 횟수. 낡은 값 판정은 여기 한 곳(모든 화면이 이 결과를 쓴다). */
+export function creditView(snapshot: Beds24CreditSnapshot | null, now: number, failures = 0): Beds24CreditView {
   const limit = snapshot?.limit ?? 200;
-  if (!snapshot) return { state: "unknown", remaining: null, limit, percent: 0, countdownTo: null };
+  if (!snapshot) return { state: "unknown", remaining: null, limit, percent: 0, countdownTo: null, stale: false };
+
+  // 갱신이 실패하는데 리셋 · 쉬는 시각이 지났으면 다음 값을 모른다 — 「가득 참」 · 「풀림」으로 짐작하지 않는다.
+  const timePassed =
+    (snapshot.resetsAt !== null && snapshot.resetsAt <= now) || (snapshot.pausedUntil !== null && snapshot.pausedUntil <= now);
+  if (failures >= CREDIT_STALE_AFTER_FAILURES || (failures > 0 && timePassed)) {
+    return { state: "unknown", remaining: null, limit, percent: 0, countdownTo: null, stale: true };
+  }
 
   const paused = snapshot.pausedUntil !== null && snapshot.pausedUntil > now;
   const resetPending = snapshot.resetsAt !== null && snapshot.resetsAt > now;
@@ -54,7 +90,7 @@ export function creditView(snapshot: Beds24CreditSnapshot | null, now: number): 
 
   const countdownTo = paused ? snapshot.pausedUntil : resetPending ? snapshot.resetsAt : null;
   const percent = remaining === null ? 0 : clampPercent((remaining / Math.max(1, limit)) * 100);
-  return { state, remaining, limit, percent, countdownTo };
+  return { state, remaining, limit, percent, countdownTo, stale: false };
 }
 
 export function clampPercent(value: number): number {
@@ -137,6 +173,8 @@ export type CreditHeadline =
 export type Beds24CreditDisplay = {
   state: Beds24CreditState;
   limit: number;
+  /** 모름인데 갱신 실패로 낡아서인 경우 — 문구가 「기록 없음」과 다르다. */
+  stale: boolean;
   headline: CreditHeadline;
   /** 0~1 막대. 쉬는 중 · 모름은 0. */
   fill: number;
@@ -146,7 +184,7 @@ export type Beds24CreditDisplay = {
 
 export function creditDisplay(view: Beds24CreditView, now: number | null): Beds24CreditDisplay {
   const leftMs = view.countdownTo !== null && now !== null ? Math.max(0, view.countdownTo - now) : null;
-  const base = { state: view.state, limit: view.limit };
+  const base = { state: view.state, limit: view.limit, stale: view.stale };
   if (view.state === "unknown") return { ...base, headline: { kind: "none" }, fill: 0, refillMs: null };
   if (view.state === "stop") {
     const headline: CreditHeadline =
@@ -178,10 +216,10 @@ export function creditTexts(d: Beds24CreditDisplay, copy: Beds24CreditCopy): Bed
   if (h.kind === "none") {
     return {
       fill: 0,
-      gauge: { label: copy.name, value: copy.unknownShort, suffix: "" },
-      aria: copy.ariaUnknown,
+      gauge: { label: copy.name, value: d.stale ? copy.staleShort : copy.unknownShort, suffix: "" },
+      aria: d.stale ? copy.ariaStale : copy.ariaUnknown,
       big: { value: "—", suffix: leftOf },
-      sub: copy.unknownBody,
+      sub: d.stale ? copy.staleBody : copy.unknownBody,
       note: null,
     };
   }

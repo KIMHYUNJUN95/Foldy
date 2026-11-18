@@ -66,6 +66,8 @@ import {
 import { tokyoDateOf } from "@/lib/tokyo-date";
 import type { LinkTargetType } from "@/lib/guest-messages/task-link-model";
 import { TaskCreateForm, TaskPanelSection, type TaskCategoryCopy } from "@/components/guest-messages/task-create";
+import { AssistSimilarSection } from "@/components/guest-messages/ai-assist";
+import type { AssistSimilar } from "@/lib/guest-messages/ai-assist-types";
 
 type Shared = Dictionary["admin"]["shared"];
 
@@ -126,6 +128,8 @@ export function MessagesConsole({
   const [editBuilding, setEditBuilding] = useState<string | null>(null);
   // 건물 손님용 정보를 저장하면 올린다 — 답장 칸 넣기 목록이 새 값으로 다시 읽힌다.
   const [insertsRefreshKey, setInsertsRefreshKey] = useState(0);
+  // AI 도우미의 비슷한 과거 대화(49 §8-5) — 답장 칸이 읽어 오고, 오른쪽 패널이 그린다. 대화 id 로 묶어 옛 대화 것이 남지 않게.
+  const [assistSimilar, setAssistSimilar] = useState<{ id: string; list: AssistSimilar[] } | null>(null);
   // 먼저 접어 둔 줄은 서버 답이 올 때까지 접힌 채 — 다른 줄의 실시간 합치기로 펴지 않는다(16 「줄 접힘」: 실패할 때만 다시 편다).
   // 그 줄이 목록에서 빠지면 표시를 지운다(나중에 같은 대화가 다시 들어오면 펴진 채로 나타나게).
   const rowIds = list?.rows.map((row) => row.id).join("|") ?? "";
@@ -479,6 +483,7 @@ export function MessagesConsole({
                 canManageReplies={canManage}
                 onEditBuilding={setEditBuilding}
                 insertsRefreshKey={insertsRefreshKey}
+                onAssistSimilar={(list) => setAssistSimilar({ id: thread.conversation.id, list })}
               />
             </div>
           </>
@@ -520,6 +525,7 @@ export function MessagesConsole({
           notify={(message) => showToast(message)}
           taskKinds={taskKinds}
           onPickTask={openTask}
+          similar={assistSimilar?.id === thread.conversation.id ? assistSimilar.list : []}
         />
       ) : (
         <aside className="gm-console__panel" aria-label={copy.panelLabel} />
@@ -576,6 +582,7 @@ function ReservationPanel({
   notify,
   taskKinds,
   onPickTask,
+  similar,
 }: {
   thread: InboxThread;
   copy: GmCopy;
@@ -586,6 +593,7 @@ function ReservationPanel({
   notify: (message: string) => void;
   taskKinds: LinkTargetType[];
   onPickTask: (kind: LinkTargetType) => void;
+  similar: AssistSimilar[];
 }) {
   const placeLabel = usePlaceLabel();
   const row = thread.conversation;
@@ -620,6 +628,7 @@ function ReservationPanel({
         <h2 className="gm-panel__title">{placeLabel(row.propertyName, row.roomLabel) || copy.unknownValue}</h2>
       </div>
       <ReservationRows reservation={thread.reservation} copy={copy} locale={locale} surface="admin" />
+      <AssistSimilarSection similar={similar} copy={copy} locale={locale} />
       <TaskPanelSection kinds={taskKinds} links={thread.links} copy={copy} locale={locale} onPick={onPickTask} />
       <AutoRunsList
         runs={runs}

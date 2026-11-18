@@ -1,6 +1,6 @@
 # 49. 손님 메시지 AI 답장 도우미 — 기획 초안 (아이디어 1 · 2)
 
-> 상태: **기획 · 결정 끝, 화면 시안 전** (2026-11-17). 코드 · DB 변경 없음.
+> 상태: **구현 중** (2026-11-18). 화면 시안 승인 · 초안 언어 결정 · 기술 설계 §8. 시안 캔버스: https://claude.ai/artifact/XTqsdM8saLVxU8AV76DXvq
 > 근거 데이터: `48-guest-message-analysis.md`. 메시지함 본체: `47-guest-messaging.md`.
 
 ## 1. 하려는 것
@@ -82,8 +82,9 @@
 0-1. ~~미리 시험~~ — 끝(2026-11-17, 아래 §7)
 0-2. ~~건물별 정책표~~ — 48 §8-9, 엇갈림 7개 결정 끝(2026-11-17). 신오쿠보는 따로 있는 건물이 아님(동네 이름). 구현 때 건물 안내 노트로 옮긴다
 1. ~~D1~D6 결정~~ — 끝(2026-11-17)
-2. 화면 시안(PC 메시지함 + 모바일 3폭, 지금 화면 옆에 비교)
-3. 기술 설계(테이블 · 가리기 규칙 · 비용 상한) → 구현 시작 확인
+2. ~~화면 시안~~ — 끝(2026-11-18, 사용자 승인)
+3. ~~기술 설계~~ — 아래 §8(2026-11-18). 구현 시작(사용자 2026-11-18)
+4. 운영: 마이그레이션 적용 · 과거 묶음 숫자로 바꾸기(백필) · `ANTHROPIC_API_KEY` 넣기 — 각각 사용자 허락 뒤
 
 ## 7. 미리 시험 결과 (2026-11-17)
 
@@ -141,3 +142,93 @@
 4. 「이 예약에만 해당」(26%)은 초안에 「확인 필요」 칸을 남기고 「사람 판단 필요」 표시를 단다.
 5. 화면은 1순위 하나가 아니라 **비슷한 과거 대화 3개를 보여 주고 사람이 고르게** 한다.
 6. 검색 품질 자체는 충분하다. 여러 언어(한 · 중 · 일 → 영어 답)도 같은 뜻으로 잘 찾았다. 그러니 임베딩 방식은 그대로 간다.
+
+## 8. 기술 설계 (2026-11-18)
+
+**초안 언어 결정(2026-11-18 사용자 — 추천안)**: 초안은 **보는 직원 언어**로 쓴다. 손님에게는 지금 있는 「손님 언어로 번역해서 보내기」로 나간다
+(직원이 읽고 고치기 쉬움). §1 · §3 의 「손님 언어로」는 이 결정으로 바뀐다.
+
+### 8-1. 테이블 (마이그레이션 `202611180002_guest_reply_assist.sql`)
+
+| 테이블 | 줄 하나 | 핵심 칸 |
+| --- | --- | --- |
+| `guest_reply_pairs` | 손님 질문 메시지 하나(+ 12시간 안 우리 첫 답) | `organization_id` · `question_message_id`(유일) · `conversation_id` · `property_name`(정본 건물 이름 — 검색에 넘기는 이름과 같은 글) · `asked_at` · `question_text`(코드 가림) · `reply_text`(가리기 규칙 §8-3 뒤, 없으면 null) · `embedding vector(1024)` · `embed_model` |
+| `guest_saved_reply_embeddings` | 정해 둔 문구 하나 | `saved_reply_id`(PK, 지우면 같이 지움) · `organization_id` · `body_hash` · `embedding vector(1024)` |
+| `guest_reply_assist_events` | 도우미 기록 하나 | `organization_id` · `conversation_id` · `user_id` · `kind`(`pending` · `draft` · `direct` · `failed` · `wrong` · `sent_as_is` · `sent_edited` · `discarded`) · `draft_id`(같은 초안 묶음) · `message_id`(가리킨 손님 메시지) · `model` · `input_tokens` · `output_tokens` · `cost_micro_usd` · `wrong_reason` · `draft_hash`(채운 초안 sha256 — 글은 안 남김) · `placeholders`(남은 자리 표시 글) · `created_at` |
+
+- 세 테이블 모두 RLS 켬 · 정책 없음 · `service_role` 만 GRANT(손님 메시지 표와 같은 방식 — 서버 액션이 세션 조직 · 권한을 본 뒤 읽음).
+- `vector` 확장(`extensions` 스키마) · `guest_reply_pairs.embedding` HNSW(코사인) 색인.
+- 검색 함수 `guest_reply_similar(p_organization_id, p_embedding, p_property_name, p_since, p_before, p_limit)` — security invoker · `service_role` 만 실행.
+  같은 건물이면 거리에서 조금 뺀다(0.03). 기본 최근 12개월(D4, 도쿄 날짜 기준 N달 전 자정).
+  그 조직 · 기간 · 답 있는 줄이 5,000개 이하면 **색인 없이 전부 정확히** 계산한다(조건으로 걸러 후보가 모자라는 일이 없게).
+  그보다 많으면 색인으로 가까운 60개를 뽑고 그 안에서 순위를 다시 매긴다 — `hnsw.ef_search = 100` · `hnsw.iterative_scan = relaxed_order`
+  (pgvector 0.8+, 걸러져 모자라면 색인을 더 읽는다). 로컬 pgvector 0.8.1 에서 두 길 모두 실행 확인.
+- 한 초안에 처음 기록(`pending` → `draft` · `direct` · `failed`) 하나 · 끝 기록(`sent_as_is` · `sent_edited` · `discarded`) 하나(부분 고유 색인). `wrong` 은 여러 번.
+- 비용 합 함수 `guest_reply_assist_cost_since(p_since)` — **모든 조직 합**(Anthropic 키 하나를 같이 쓴다, DeepL 한도와 같은 방식). `service_role` 만.
+- 한도 잡기 함수 `guest_reply_assist_reserve(…, p_cap_micro_usd, p_reserve_micro_usd)` — 잠금(`pg_advisory_xact_lock`) 하나 안에서 이번 달 합 +
+  이번 몫(0.04달러)이 한도를 넘으면 `false`, 아니면 `pending` 줄을 넣고 `true`. 부른 뒤 서버가 같은 줄을 실제 결과 · 비용
+  (`draft` · `direct` · `failed`)으로 바꾼다 — 동시에 여러 번 눌러도 한도를 넘지 않는다. `service_role` 만.
+
+### 8-2. 흐름
+
+1. **대화를 열면**(답장 권한 있는 사람만) `getReplyAssist(conversationId)`:
+   마지막 손님 메시지가 「답 필요 없음」(15자 미만 · 사진만 · 시스템)이거나 **그 뒤에 우리 답이 이미 있으면** `{ kind: "none" }`.
+   아니면 그 글을 숫자로 바꿔(이미 바꿔 둔 게 있으면 재사용 — `guest_reply_pairs` 에 질문 줄로 저장) 정해 둔 문구 1~3개(유사도 0.55 이상) + 비슷한 과거 대화 3개를 돌려준다.
+   Voyage 키가 없거나 실패하면 `{ kind: "unavailable" }` — 화면은 도우미 줄만 숨긴다(메시지함은 그대로).
+2. **「초안 만들기」** → `draftGuestReply(conversationId)`:
+   답장을 받지 않는 채널(직접 예약 · 모르는 채널, `replyBlockReason`)이면 외부 호출 전에 `forbidden`(개요는 `unavailable`).
+   한도 잡기(`pending`) → Claude 로 초안 → 같은 줄을 `draft` 로 정산 → `{ draftId, text, lang, checks[], needsHuman, reason, placeholders[] }`.
+   그 예약에만 해당하는 질문이면 초안 없이 `direct`. 답할 질문이 없으면 `invalid`. `needsHuman` 은 모델 값 **또는** 서버 주제 검사(취소 · 환불 ·
+   늦은 체크아웃 등 ko/ja/en/zh 낱말) — 모델이 놓쳐도 켜진다. 모델 `reason` 글에도 이 건물 코드가 나오면 가린다.
+   모델이 거절 · 잘림 · 모양 틀림으로 실패해도 쓴 토큰 · 비용은 `failed` 로 남는다(요금은 나가므로 한도에 센다).
+3. **보낼 때** `sendGuestReply({ …, assistDraftId })` — 서버가 **`assistDraftId` 가 없어도 늘** 먼저 **직원 원문(`original`)과 보낼 글(`body`) 둘 다**에서
+   채우지 않은 자리 표시(세 언어 자리 표시 전부 + 날것 `{entry_code_room}` · `{wifi}` + 있으면 그 초안의 것)를 찾아 있으면 `assist_placeholder` 로
+   거절한다(큐에 안 넣음) — 다시 만들기가 실패해 옛 초안이 칸에 남은 채 보내는 경우도 막는다.
+   보낸 뒤(`after()`, 실패는 삼킴) 초안 해시와 비교해 `sent_as_is` / `sent_edited` 를 기록(공백 차이는 같은 글).
+   도우미가 켜진 환경(Voyage 키 있음)이면 보낸 답(가리기 뒤)을 **보내기 직전 대화의 마지막 질문 하나**(답 없음 · 12시간 안)에만 붙인다 —
+   다음 검색 재료. 규칙은 개요의 질문 고르기 · 백필 짝 맞추기와 같다: 질문과 답 사이에 다른 손님 질문이 오면 앞 질문은 답 없음.
+   다시 만들기 · 답장 칸 비우기 = `discarded`. 「틀렸어요」 = `wrong`(+ 이유 하나).
+
+### 8-3. 초안에 넘기는 것 · 넘기지 않는 것
+
+- 넘김: 최근 대화 12줄(코드 가림) · 예약 기본(건물 · 방 · 날짜 · 인원 · 채널) · 건물 안내 노트(손님용 칸, 코드 · 와이파이 비밀번호 칸 제외) ·
+  맞는 정해 둔 문구 · 비슷한 과거 답 3개(**가리기 뒤**).
+- 과거 답 가리기: 출입 코드 · **와이파이 이름 · 비밀번호**(건물 손님용 칸 값) · 3자리 이상 숫자 묶음 · 방 번호 · URL · 메일 · 전화번호 · 금액(¥ · 엔 · 円) → `[…]`. 말투 · 구성 참고용(§7 설계 1).
+- **비밀번호 · 와이파이 값은 모델에 주지 않는다.** 모델은 `{entry_code_room}` · `{wifi}` 자리 표시만 쓴다. 서버가 돌려주기 전에
+  출입 코드를 볼 수 있는 사람(`canSeeStaffCodes` 와 같은 규칙)이면 **지금 예약의 방 손님용 코드**로 채우고, 아니면 자리 표시
+  (「[출입 비밀번호]」, 보는 사람 언어)를 남긴다 — 자리 표시가 남아 있으면 보내기를 막는다.
+  - 코드 고르기(`guestEntryCodeFor`): 그 방의 `room_access` 번호 → 없으면(건물에 방 번호가 하나도 없을 때만) 손님용 공용 번호
+    (`roomPassword` · `doorPassword`)가 **딱 하나**일 때 그것 → 아니면 자리 표시. 창고 · 키 박스 · 리넨실 번호는 절대 넣지 않는다.
+  - 와이파이는 건물 손님용 칸 값으로 채운다(답장 칸 넣기 목록과 같은 꼴, 보는 직원 언어).
+  - 지킴 한 번 더: 모델 글에 이 건물 코드 값이 나오면 채우기 전에 `{entry_code_room}` 로, 와이파이 값이 나오면 `{wifi}` 로 되돌린다.
+  - `{wifi}` 는 **이름표까지 붙은 한 줄**(「와이파이: … / 비밀번호: …」)로 채워진다. 지시문에 「앞에 이름표를 붙이지 말 것」을 적고, 그래도
+    줄 맨 앞에 「Wi-Fi:」 · 「와이파이 정보:」 · 「Wi-Fi情報：」 같은 이름표를 붙였으면 서버가 떼고 채운다(`stripWifiLabelBeforeToken`).
+  - 가릴 값 목록(`secretsOf` = 출입 코드 + 와이파이 이름 · 비밀번호)은 질문 줄 저장 · 보낸 답 붙이기 · 백필 · 모델 입력(대화 · 질문 · 건물 노트) ·
+    모델 출력(`checks` · `reason`) · 비슷한 대화 내보내기(읽을 때 그 줄 건물 값으로 한 번 더) 모두 같은 목록을 쓴다.
+- 출력은 **structured output**(`output_config.format` JSON 스키마 — 강제 도구 호출은 생각(thinking)과 같이 못 써서): `kind`(`draft` · `direct`) ·
+  `text` · `checks`(확인 필요 문구, 최대 4 — 서버가 초안 안 정확한 부분 문자열만 남김) · `needsHuman`(§4 주제) · `reason`.
+- 질문 줄은 같은 메시지 · 같은 모델 숫자가 이미 있으면 다시 바꾸지도 쓰지도 않는다. 가짜 모드 숫자는 `embed_model = "fake"` 로 적어, 진짜 키로 돌리면 다시 바꾼다.
+- 질문 줄을 저장할 때도 출입 코드 · 그 손님 이름 · 연락처(URL · 메일 · 전화)를 가린다. 초안 글 자체는 DB 에 남기지 않는다.
+
+### 8-4. 설정 · 비용
+
+- 모델 · 상한은 `src/lib/guest-messages/ai-config.ts` 한 곳(D2): 초안 `claude-sonnet-5-5`, 임베딩 `voyage-4`(1024), 생각 깊이 낮게.
+  요금은 모델 id 바로 옆에 같이 둔다(USD / 100만 토큰 — 입력 2 · 출력 10 · 캐시 쓰기 2.5 · 캐시 읽기 0.1, 공용 모델 요금표 2026-10 기준,
+  시험이 고정). 모델을 바꾸면 요금도 같이 바꾼다. 지시문 캐시는 걸지 않는다 — 지시문이 캐시 최소 길이(약 1,000 토큰)보다 짧아 효과가 없다.
+- 한 달 상한: `GUEST_AI_MONTHLY_CAP_USD`(기본 30, 비어 있으면 기본값 · `0` 이면 초안 끔). 이번 달(도쿄) `cost_micro_usd` 합(모든 조직, 잡아 둔 `pending` 포함) +
+  이번 몫이 넘으면 초안만 `cap`(문구 추천은 계속 — 개요의 `capReached`). 한도 잡기가 실패하면 초안은 `unavailable`(막는 쪽).
+- 환경 변수: `VOYAGE_API_KEY` · `ANTHROPIC_API_KEY`(서버 전용). 로컬 시험용 `GUEST_AI_FAKE=1` — 외부 호출 없이 고정 숫자 · 고정 초안
+  (`NODE_ENV=production` 이면 켜도 무시).
+- 과거 묶음 백필: `scripts/dev/guest-reply-pairs-backfill.ts`(최근 12개월 — 도쿄 날짜 기준, 건물 이름은 정본으로 저장, 이미 있는 줄도 지금 가리기 규칙으로 다시 가려 고쳐 씀 — 가리기 규칙이 늘면 다시 돌린다, 배치 128, 다시 돌려도 이어서 — 같은 모델 숫자 + 같은 질문 글이면 다시 부르지 않음,
+  `--dry-run` 은 세기만). `.env` 를 읽지 않고, 로컬 주소가 아니면 `--allow-remote` 없이 멈춘다. 운영 실행은 사용자 허락 뒤.
+- 액션(`src/actions/guest-messages-assist.ts`, 권한 `guest_messages.view` + `reply`, 거부는 `forbidden` · 개요는 `unavailable`):
+  `getReplyAssist(conversationId)` · `draftGuestReply(conversationId)` · `markAssistWrong({ draftId, reason })` · `markAssistDiscarded(draftId)`.
+  서버 모듈 `src/lib/guest-messages/ai-assist-server.ts`(server-only) · 순수 함수 `ai-assist-model.ts` · 공용 모양 `ai-assist-types.ts`.
+
+### 8-5. 화면
+
+- 답장 칸 바로 위 도우미 한 줄(PC `/admin/messages` · 모바일 `/mobile/messages` 폰 · 폴드 · 태블릿 칸) — 시안 그대로.
+  상태: 처음(문구 칩 + 초안 만들기) · 만드는 중(답장 칸 반짝임) · 초안(상태 줄: 확인 필요 · 사람 판단 필요 · 비슷한 대화 · 틀렸어요) ·
+  직접 확인 필요 · 한도 · 실패. 폰은 「비슷한 대화」를 `BottomSheet` 로.
+- 직원이 쓰던 글이 있으면 덮기 전에 묻는다. 초안 등장 420ms 흐림 → 선명(줄이기 설정이면 없음). 햅틱: 칩 고르기 `light`, 성공은 보낸 뒤만.
+- 보라색(`--gm-ai`)은 AI 가 만든 것에만.

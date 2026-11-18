@@ -4116,6 +4116,135 @@ export type Database = {
           },
         ]
       }
+      guest_reply_pairs: {
+        Row: {
+          asked_at: string
+          conversation_id: string
+          created_at: string
+          embed_model: string | null
+          embedding: string | null
+          id: string
+          organization_id: string
+          property_name: string | null
+          question_message_id: string
+          question_text: string
+          reply_message_id: string | null
+          reply_text: string | null
+          updated_at: string
+        }
+        Insert: {
+          asked_at: string
+          conversation_id: string
+          created_at?: string
+          embed_model?: string | null
+          embedding?: string | null
+          id?: string
+          organization_id: string
+          property_name?: string | null
+          question_message_id: string
+          question_text: string
+          reply_message_id?: string | null
+          reply_text?: string | null
+          updated_at?: string
+        }
+        Update: {
+          asked_at?: string
+          conversation_id?: string
+          created_at?: string
+          embed_model?: string | null
+          embedding?: string | null
+          id?: string
+          organization_id?: string
+          property_name?: string | null
+          question_message_id?: string
+          question_text?: string
+          reply_message_id?: string | null
+          reply_text?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      guest_saved_reply_embeddings: {
+        Row: {
+          body_hash: string
+          embed_model: string
+          embedding: string
+          organization_id: string
+          saved_reply_id: string
+          updated_at: string
+        }
+        Insert: {
+          body_hash: string
+          embed_model: string
+          embedding: string
+          organization_id: string
+          saved_reply_id: string
+          updated_at?: string
+        }
+        Update: {
+          body_hash?: string
+          embed_model?: string
+          embedding?: string
+          organization_id?: string
+          saved_reply_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      guest_reply_assist_events: {
+        Row: {
+          conversation_id: string
+          cost_micro_usd: number
+          created_at: string
+          draft_hash: string | null
+          draft_id: string
+          id: string
+          input_tokens: number
+          kind: string
+          message_id: string | null
+          model: string | null
+          organization_id: string
+          output_tokens: number
+          placeholders: string[]
+          user_id: string | null
+          wrong_reason: string | null
+        }
+        Insert: {
+          conversation_id: string
+          cost_micro_usd?: number
+          created_at?: string
+          draft_hash?: string | null
+          draft_id: string
+          id?: string
+          input_tokens?: number
+          kind: string
+          message_id?: string | null
+          model?: string | null
+          organization_id: string
+          output_tokens?: number
+          placeholders?: string[]
+          user_id?: string | null
+          wrong_reason?: string | null
+        }
+        Update: {
+          conversation_id?: string
+          cost_micro_usd?: number
+          created_at?: string
+          draft_hash?: string | null
+          draft_id?: string
+          id?: string
+          input_tokens?: number
+          kind?: string
+          message_id?: string | null
+          model?: string | null
+          organization_id?: string
+          output_tokens?: number
+          placeholders?: string[]
+          user_id?: string | null
+          wrong_reason?: string | null
+        }
+        Relationships: []
+      }
       guest_message_channel_state: {
         Row: {
           created_at: string
@@ -8205,6 +8334,42 @@ export type Database = {
           p_user_id: string
         }
         Returns: { duplicate: boolean; outbox_id: string; same_body: boolean }[]
+      }
+      guest_reply_similar: {
+        Args: {
+          p_before?: string
+          p_embedding: string
+          p_limit?: number
+          p_organization_id: string
+          p_property_name?: string
+          p_since?: string
+        }
+        Returns: {
+          asked_at: string
+          conversation_id: string
+          distance: number
+          pair_id: string
+          property_name: string | null
+          question_text: string
+          reply_text: string | null
+        }[]
+      }
+      guest_reply_assist_cost_since: {
+        Args: { p_since: string }
+        Returns: number
+      }
+      guest_reply_assist_reserve: {
+        Args: {
+          p_organization_id: string
+          p_conversation_id: string
+          p_user_id: string
+          p_draft_id: string
+          p_message_id: string
+          p_since: string
+          p_cap_micro_usd: number
+          p_reserve_micro_usd: number
+        }
+        Returns: boolean
       }
       translation_usage_since: {
         Args: { p_since: string }

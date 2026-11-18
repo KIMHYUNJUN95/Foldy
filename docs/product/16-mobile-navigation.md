@@ -1379,5 +1379,6 @@ Future navigation additions must also update the side-menu badge table and `getM
 - 뒤로가기: `/mobile/messages` · `/mobile/messages/[id]` 를 `src/lib/swipe-back/mobile-screens.ts` 에 등록 — 대화 화면은 화면 스와이프로 목록으로. 고르기 모드의 말풍선 누르기는 가로 제스처가 아니라 따로 끄지 않는다.
 - 넓은 화면: 목록 → 대화는 `SplitList` + `split`(태블릿 가로는 칸 안 대화, 폰 · 폴드는 화면 이동) — 「화면별 넓은 화면 대응 현황」 표의 손님 메시지 줄.
 - 로딩: `messages/loading.tsx` · `messages/[id]/loading.tsx` 한 줄 재내보내기.
+- AI 답장 도우미(2026-11-18, 47 §5-11 · 49): 답장 칸 바로 위 한 줄 · 「비슷한 대화」는 폰 · 폴드 · 태블릿 칸 모두 공용 `BottomSheet`(태블릿은 가운데 카드). 칩 줄은 가로로 넘겨 `data-swipe-back="off"`.
 
 - **청소 현황판 unslop (2026-11-16)**: 「손이 필요한 방」 주황 카드 → 투명 + 6px 점, 「담당 없음」 회색 글자 + 점, 「넣기」 옅은 보라 알약, 필터 44px. 상세는 `37-cleaning-shift-assignment.md` 「2026-11-16 unslop 다듬기」.

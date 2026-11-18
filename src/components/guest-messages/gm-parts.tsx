@@ -11,6 +11,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -69,6 +70,9 @@ import {
 } from "@/components/guest-messages/gm-format";
 import type { InboxSearchMatch } from "@/lib/guest-messages/inbox-search";
 import { InsertTools } from "@/components/guest-messages/composer-inserts";
+import { AssistFieldLayer, AssistLine, useReplyAssist } from "@/components/guest-messages/ai-assist";
+import { blockingSlots, fitFieldHeight, sendFailureView } from "@/components/guest-messages/ai-assist-model";
+import type { AssistSimilar } from "@/lib/guest-messages/ai-assist-types";
 import { MessageBodyView } from "@/components/guest-messages/message-body-view";
 import { messagePlainText, messageTextForTranslation } from "@/lib/guest-messages/message-body";
 import { TaskLinkLine } from "@/components/guest-messages/task-create";
@@ -92,6 +96,8 @@ export function errorText(key: GuestMessageErrorKey, copy: GmCopy): string {
       return copy.errDirectBooking;
     case "unknown_channel":
       return copy.errUnknownChannel;
+    case "assist_placeholder":
+      return copy.errAssistPlaceholder;
     case "not_found":
       return copy.notFound;
     case "translation_budget":
@@ -852,6 +858,7 @@ export function Composer({
   canManageReplies = false,
   onEditBuilding,
   insertsRefreshKey = 0,
+  onAssistSimilar,
 }: {
   thread: InboxThread;
   copy: GmCopy;
@@ -866,6 +873,8 @@ export function Composer({
   onEditBuilding?: (canonicalName: string) => void;
   /** 바뀌면 넣기 목록을 다시 읽는다(건물 정보 저장 뒤). */
   insertsRefreshKey?: number;
+  /** PC 만 — AI 도우미가 찾은 비슷한 과거 대화(오른쪽 패널에 그린다, 49 §8-5). */
+  onAssistSimilar?: (similar: AssistSimilar[]) => void;
 }) {
   const row = thread.conversation;
   // 답장이 막힌 대화(직접 예약 등)도 처음엔 「답장」 자리 — 막힘 안내(이메일 복사 · 내부 메모 쓰기)가 먼저 보인다(시안 States).
@@ -903,6 +912,68 @@ export function Composer({
   }
   const draftActive = Boolean(draft && draftText !== null && text.trim() && mode === "reply");
 
+  // AI 답장 도우미(49 §8-5) — 마지막 손님 메시지 기준. 초안은 칸에 넣기만 하고, 보내기는 언제나 직원이 누른다.
+  let latestGuestMessageId: string | null = null;
+  for (let i = thread.messages.length - 1; i >= 0; i -= 1) {
+    if (thread.messages[i].direction === "guest") {
+      latestGuestMessageId = thread.messages[i].id;
+      break;
+    }
+  }
+  /** AI 가 마지막으로 칸에 넣은 글 — 이것과 다르면 직원이 쓴 글이 있는 것(덮기 전에 묻는다). */
+  const aiTextRef = useRef<string | null>(null);
+  const assist = useReplyAssist({
+    conversationId: row.id,
+    latestGuestMessageId,
+    enabled: canReply && !row.replyBlock,
+    onDraftText: (next) => {
+      aiTextRef.current = next;
+      setText(next);
+      setDraftText(null);
+      setPreview({ kind: "none" });
+    },
+    onSimilar: onAssistSimilar,
+  });
+  const [askOverwrite, setAskOverwrite] = useState(false);
+  const [fieldScroll, setFieldScroll] = useState(0);
+  const [seenFade, setSeenFade] = useState(0);
+  const [fading, setFading] = useState(false);
+  /** 서버가 보내기를 막은 이유(칸 아래 빨간 줄) — 그 뒤 글을 고치면 사라진다. */
+  const [sendError, setSendError] = useState<{ text: string; message: string } | null>(null);
+  const sendErrorText = sendError && sendError.text === text ? sendError.message : null;
+  if (seenFade !== assist.fadeKey) {
+    setSeenFade(assist.fadeKey);
+    setFading(true);
+    setFieldScroll(0);
+  }
+  const aiDraft = mode === "reply" && assist.state.kind === "draft" ? assist.state : null;
+  const aiLoading = mode === "reply" && assist.state.kind === "loading";
+  // AI 초안이 든 칸은 글에 맞춰 늘린다 — 최대 줄 수까지, 언제나 줄 단위로 끝나게(폰에서 마지막 줄이 반쯤 잘리던 것).
+  const aiSized = Boolean(aiDraft) || aiLoading;
+  useLayoutEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    if (!aiSized) {
+      el.style.height = "";
+      return;
+    }
+    if (aiLoading) return;
+    const css = getComputedStyle(el);
+    const lineHeight = parseFloat(css.lineHeight);
+    const padding = parseFloat(css.paddingTop) + parseFloat(css.paddingBottom);
+    const chrome = padding + parseFloat(css.borderTopWidth) + parseFloat(css.borderBottomWidth);
+    el.style.height = "auto";
+    el.style.height = `${fitFieldHeight({
+      contentHeight: el.scrollHeight - padding,
+      lineHeight,
+      chrome,
+      minLines: variant === "pc" ? 4 : 5,
+      maxLines: variant === "pc" ? 10 : 8,
+    })}px`;
+  }, [aiSized, aiLoading, text, variant]);
+  // 초안 상태와 상관없이 글 기준 — 다시 만들기 실패 · 상태가 바뀌어도 남은 자리 표시는 손님에게 못 나간다.
+  const slotsLeft = mode === "reply" ? blockingSlots(text, aiDraft?.placeholders) : [];
+
   // 대화가 바뀌면 칸을 비운다 — 부르는 쪽이 `key={대화 id}` 로 새로 그린다(효과 안 setState 대신).
 
   if (!canReply) {
@@ -936,6 +1007,8 @@ export function Composer({
         idempotencyKey: keyRef.current,
         original,
         bodyLang: original ? bodyLang : null,
+        // 초안에서 온 글이면 서버가 그대로 보냄 / 고쳐 보냄을 기록한다(D6).
+        assistDraftId: assist.draftId ?? undefined,
       });
       if (result.ok) {
         // 성공 햅틱은 서버가 큐에 넣었다고 확인한 뒤에만(16 「햅틱 — 공용 규칙」).
@@ -946,19 +1019,26 @@ export function Composer({
         setText("");
         setDraftText(null);
         setPreview({ kind: "none" });
+        assist.sent();
+        aiTextRef.current = null;
         keyRef.current = newIdempotencyKey();
         keyBodyRef.current = null;
         onSent();
       } else {
         haptic("error");
-        notify(errorText(result.errorKey, copy), "error");
+        const view = sendFailureView(result.errorKey);
+        // 자리 표시로 막힘 — 번역 확인 창을 닫고 칸 아래에 바로 보인다(창 뒤에 숨은 토스트 대신).
+        if (view.closePreview) setPreview({ kind: "none" });
+        if (view.inline) setSendError({ text, message: errorText(result.errorKey, copy) });
+        else notify(errorText(result.errorKey, copy), "error");
       }
     });
   };
 
   const submit = () => {
     const body = text.trim();
-    if (!body || tooLong || pending) return;
+    if (!body || tooLong || pending || aiLoading) return;
+    if (mode === "reply" && slotsLeft.length > 0) return;
     if (mode === "note") {
       startTransition(async () => {
         const result = await addGuestInternalNote({
@@ -1042,6 +1122,39 @@ export function Composer({
       />
     ) : null;
 
+  // 「초안 만들기」 · 「다시 만들기」 — 직원이 쓴 글(AI 글과 다른 글)이 있으면 덮기 전에 묻는다.
+  const requestDraft = () => {
+    const typed = text.trim() && text !== aiTextRef.current;
+    if (typed) {
+      setAskOverwrite(true);
+      return;
+    }
+    assist.makeDraft();
+  };
+  const clearAiDraft = () => {
+    haptic("light");
+    setText("");
+    aiTextRef.current = null;
+    assist.discard();
+  };
+  const assistLine =
+    mode === "reply" && !row.replyBlock ? (
+      <AssistLine
+        assist={assist}
+        copy={copy}
+        locale={locale}
+        variant={variant}
+        text={text}
+        guestLanguage={row.guestLanguage}
+        translateTarget={target}
+        onInsert={insertAtCursor}
+        onDraftRequest={requestDraft}
+        onClear={clearAiDraft}
+        notify={(message) => notify(message)}
+      />
+    ) : null;
+  const sendBlocked = mode === "reply" && (slotsLeft.length > 0 || aiLoading);
+
   const blocked = mode === "reply" ? row.replyBlock : null;
   const label =
     mode === "note"
@@ -1054,6 +1167,8 @@ export function Composer({
   const hint =
     mode === "note"
       ? copy.noteHint
+      : slotsLeft.length > 0
+        ? fill(copy.assist.slotHint, { text: slotsLeft[0] })
       : draftActive
         ? `${copy.resolvedNote} · ${targetName ? fill(copy.channelHintTranslated, { lang: targetName, channel }) : fill(copy.channelHint, { channel })}`
         : targetName
@@ -1212,6 +1327,7 @@ export function Composer({
       ) : blocked ? null : (
         // 막힌 대화는 위 안내(이메일 복사 · 내부 메모 쓰기)만 — 쓸 수 없는 답장 칸을 같이 그리지 않는다.
         <>
+          {assistLine}
           {variant === "phone" ? (
             <div className="gm-tools" data-swipe-back="off">
               {insertTools}
@@ -1232,8 +1348,16 @@ export function Composer({
             </div>
           ) : null}
           <div className="gm-composer__row">
-            <label className="gm-field" htmlFor={inputId} data-mode={mode} data-draft={draftActive ? "" : undefined}>
+            <label
+              className={fading && aiDraft ? "gm-field ax-fade" : "gm-field"}
+              htmlFor={inputId}
+              data-mode={mode}
+              data-draft={draftActive || aiDraft ? "" : undefined}
+              data-ai={aiDraft || aiLoading ? "" : undefined}
+              onAnimationEnd={() => setFading(false)}
+            >
               <span className="gm-field__label">{label}</span>
+              {mode === "reply" ? <AssistFieldLayer state={assist.state} text={text} scrollTop={fieldScroll} /> : null}
               <textarea
                 ref={inputRef}
                 id={inputId}
@@ -1242,7 +1366,18 @@ export function Composer({
                 placeholder={
                   mode === "note" ? copy.notePlaceholder : copy.replyPlaceholder
                 }
-                onChange={(event) => setText(event.target.value)}
+                onChange={(event) => {
+                  const next = event.target.value;
+                  setText(next);
+                  // 초안을 다 지우면 버림으로 기록하고 처음 상태(추천 칩)로.
+                  if (aiDraft && !next.trim()) {
+                    aiTextRef.current = null;
+                    assist.discard();
+                  }
+                }}
+                onScroll={(event) => setFieldScroll(event.currentTarget.scrollTop)}
+                readOnly={aiLoading}
+                aria-busy={aiLoading || undefined}
                 onKeyDown={(event) => {
                   if (
                     event.key === "Enter" &&
@@ -1269,6 +1404,7 @@ export function Composer({
                   pending ||
                   !text.trim() ||
                   tooLong ||
+                  sendBlocked ||
                   (mode === "reply" && Boolean(row.replyBlock))
                 }
                 onClick={submit}
@@ -1292,6 +1428,11 @@ export function Composer({
           {tooLong ? (
             <span className="gm-hint gm-urgent">
               {fill(copy.tooLong, { n: limit })}
+            </span>
+          ) : null}
+          {sendErrorText && !tooLong ? (
+            <span className="gm-hint gm-urgent" role="alert">
+              {sendErrorText}
             </span>
           ) : null}
           {variant === "pc" ? (
@@ -1318,6 +1459,7 @@ export function Composer({
                   pending ||
                   !text.trim() ||
                   tooLong ||
+                  sendBlocked ||
                   (mode === "reply" && Boolean(row.replyBlock))
                 }
                 onClick={submit}
@@ -1340,6 +1482,19 @@ export function Composer({
           )}
         </>
       )}
+      {askOverwrite ? (
+        <GmConfirm
+          title={copy.assist.overwriteTitle}
+          body={copy.assist.overwriteBody}
+          confirmLabel={copy.assist.overwriteYes}
+          cancelLabel={copy.assist.overwriteNo}
+          onCancel={() => setAskOverwrite(false)}
+          onConfirm={() => {
+            setAskOverwrite(false);
+            assist.makeDraft();
+          }}
+        />
+      ) : null}
     </div>
   );
 }

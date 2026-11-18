@@ -19,6 +19,8 @@
   --gm-ease: cubic-bezier(0.23, 1, 0.32, 1);
   /* 칸 바탕(목록 · 예약 패널) — 세로 구분선 대신. */
   --gm-pane: #fafafb;
+  /* AI 가 만든 것에만(답장 도우미 초안 · 초안 버튼, 49 §8-5) — 다른 곳에 쓰지 않는다. */
+  --gm-ai: #7a52e6;
   color: var(--gm-ink);
 }
 
@@ -1202,3 +1204,146 @@ button.gm-photo:focus-visible { outline: 2px solid var(--gm-primary); outline-of
   .gm-search__clear { width: 40px; height: 40px; }
 }
 .gm-mlist-head .gm-search input { font-size: 16px; }
+
+/* ── AI 답장 도우미(49 §8-5, 승인 시안) — 답장 칸 바로 위 한 줄. 테두리 · 색 알약 · 세로선 없음, 보라는 AI 것에만. ── */
+.ax-assist { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.ax-sugs { display: flex; align-items: center; gap: 8px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.ax-sugs::-webkit-scrollbar { display: none; }
+.ax-sugs__lead { flex: none; margin-right: 2px; font-size: 12px; color: var(--gm-muted); }
+.ax-sugrow { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.ax-sugrow .ax-sugs { flex: 1 1 auto; }
+.ax-sugs__end { flex: none; margin-left: auto; }
+.ax-sug,
+.ax-chip-draft {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ax-sug { background: var(--gm-fill); color: var(--gm-ink); }
+.ax-chip-draft,
+.gm-composer--pc .ax-draftbtn { background: var(--gm-select); color: var(--gm-ai); font-weight: 600; }
+.ax-draftbtn { display: inline-flex; align-items: center; gap: 6px; }
+.ax-chip-draft svg,
+.ax-draftbtn svg { flex: none; }
+.ax-chip-draft:disabled,
+.ax-draftbtn:disabled { opacity: 0.45; cursor: default; }
+@media (hover: hover) and (pointer: fine) {
+  .ax-sug:hover { background: #efeef3; }
+  .gm-composer--pc .ax-draftbtn:hover:not(:disabled) { background: #ebe4fc; }
+}
+.ax-line { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; line-height: 1.5; color: var(--gm-muted); }
+.ax-line--wrap { flex-wrap: wrap; }
+.ax-line b { font-weight: 600; color: var(--gm-ink); }
+.ax-sep { color: var(--gm-muted); }
+.ax-spark { flex: none; display: inline-flex; color: var(--gm-ai); }
+.ax-line__end { flex: none; margin-left: auto; display: inline-flex; align-items: center; gap: 14px; }
+.ax-line__end--reasons { flex: 0 1 auto; flex-wrap: wrap; gap: 4px 12px; }
+.ax-ell { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ax-ell b { white-space: nowrap; }
+.gm-composer--phone .ax-line__end { gap: 12px; }
+.ax-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--gm-muted);
+  white-space: nowrap;
+  text-decoration: underline;
+  text-decoration-color: #d5d3dc;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.ax-link--ink { color: var(--gm-primary); text-decoration: none; }
+.ax-quiet { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: 12px; background: var(--gm-fill); font-size: 13px; line-height: 1.5; color: var(--gm-ink); }
+.ax-quiet svg { flex: none; margin-top: 2px; color: var(--gm-muted); }
+.ax-quiet__text { min-width: 0; }
+.ax-quiet__text span { display: block; font-size: 12px; color: var(--gm-muted); }
+.ax-quiet__act { flex: none; margin-left: auto; align-self: center; }
+
+/* 입력 칸 — 초안이면 보라 테두리 · 조금 높게, 「확인 필요」 · 자리 표시는 칸 뒤 겹 그림(글자 굵기 · 여백을 바꾸지 않아 줄이 맞는다). */
+.gm-field[data-ai] .gm-field__label { z-index: 2; }
+/* 높이는 Composer 가 줄 단위로 맞춘다(fitFieldHeight) — 여기서 min-height 를 주면 반 줄이 생긴다. 만드는 중(반짝임)만 자리를 잡는다. */
+.gm-field[data-ai] .gm-field__input { position: relative; z-index: 1; background: transparent; scrollbar-width: none; }
+.gm-field[data-ai] .gm-field__input[aria-busy="true"] { min-height: 112px; }
+.gm-field[data-ai] .gm-field__input::-webkit-scrollbar { display: none; }
+.gm-composer--phone .gm-field[data-ai] .gm-field__input[aria-busy="true"] { min-height: 132px; }
+.gm-field[data-ai][data-draft] .gm-field__input { border-color: var(--gm-ai); }
+.ax-backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+  border: 1.5px solid transparent;
+  border-radius: 12px;
+  background: #fff;
+  padding: 14px 16px 12px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: transparent;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: normal;
+  pointer-events: none;
+}
+.gm-composer--phone .ax-backdrop { border-radius: 18px; padding: 12px 16px; font-size: 15px; line-height: 1.4; }
+.ax-tok {
+  color: transparent;
+  background: var(--gm-select);
+  border-radius: 4px;
+  box-shadow: 0 0 0 2px var(--gm-select);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+.ax-tok--check { background: #f3f2f6; box-shadow: 0 0 0 2px #f3f2f6; border-bottom: 1.5px dashed #a8a5b3; border-radius: 4px 4px 0 0; }
+.ax-shimmer {
+  position: absolute;
+  inset: 1.5px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 16px;
+  border-radius: 11px;
+  background: #fff;
+  pointer-events: none;
+}
+.gm-composer--phone .ax-shimmer { border-radius: 17px; }
+.ax-shimmer i {
+  display: block;
+  height: 10px;
+  border-radius: 5px;
+  background: linear-gradient(90deg, #efeef3 0%, #f8f7fa 40%, #efeef3 80%);
+  background-size: 200% 100%;
+  animation: axShimmer 1.3s linear infinite;
+}
+@keyframes axShimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+.ax-fade { animation: axIn 420ms ease-out both; }
+@keyframes axIn { from { opacity: 0; filter: blur(3px); } to { opacity: 1; filter: none; } }
+
+/* 비슷한 과거 대화 — PC 오른쪽 패널 · 폰 시트 공용 목록. */
+.ax-similar { display: flex; flex-direction: column; gap: 2px; padding-top: 20px; border-top: 0.5px solid var(--gm-sep); }
+.ax-similar h3 { margin: 0; font-size: 15px; font-weight: 700; }
+.ax-similar > .gm-hint { margin: 2px 0 8px; }
+.ax-simlist { display: flex; flex-direction: column; }
+.ax-sim { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; margin: 0 -12px; border-radius: 12px; }
+.ax-sim:first-child { background: var(--gm-fill); }
+.ax-sim__q { font-size: 13px; color: var(--gm-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ax-sim__a { font-size: 13px; color: var(--gm-muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ax-sim__m { font-size: 12px; color: var(--gm-muted); }
+.ax-simsheet__hint { margin: 0 0 10px; }
+.ax-simsheet .ax-sim { margin: 0 -8px; padding: 10px 8px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ax-fade { animation: none; }
+  .ax-shimmer i { animation: none; }
+}

@@ -694,6 +694,16 @@ it builds the report deterministically from the day's completed tasks with a loc
 - 키 만료일을 정했다면 그 전에 새 키로 바꿔야 한다(만료되면 읽기만 멈춤).
 - 크레딧: 사용자 계정은 Max 플랜 포함 API 크레딧(월 US$100)을 연결해 쓴다(2026-10-23). 한 장 몇 엔 수준.
 
+### 손님 메시지 AI 답장 도우미 (2026-11-18, `docs/product/49-guest-message-ai-reply-assist.md` §8)
+
+모두 **서버 전용**(`NEXT_PUBLIC_` 금지). 값은 채팅 · 문서에 적지 않는다. 설정 한 곳: `src/lib/guest-messages/ai-config.ts`.
+
+- `VOYAGE_API_KEY` — 뜻 숫자(임베딩, `voyage-4` 1024). 없으면 도우미 줄 자체가 안 뜬다(`unavailable`), 메시지함은 그대로.
+- `ANTHROPIC_API_KEY` — 초안(`claude-sonnet-5-5`). 위 재류카드 읽기와 같은 키를 쓴다. 없으면 초안만 `unavailable`(문구 추천은 계속).
+- `GUEST_AI_MONTHLY_CAP_USD` — 한 달(도쿄) 초안 비용 상한, 기본 30(비어 있으면 기본값, `0` 이면 초안 끔). 모든 조직 합.
+- `GUEST_AI_FAKE=1` — 로컬 시험용. 외부 호출 없이 가짜 숫자 · 고정 초안. `VERCEL_ENV=production` · `NODE_ENV=production` 에서는 무시.
+- 백필 `scripts/dev/guest-reply-pairs-backfill.ts` 는 `.env` 를 읽지 않는다 — 환경 변수를 직접 넘기고, 로컬 주소가 아니면 `--allow-remote` 없이 멈춘다.
+
 ### Slack single-channel delivery
 
 Set this server-only variable in local development and the deployed environment:
@@ -803,6 +813,9 @@ CRON_SECRET=
 
 DEEPL_API_KEY=
 DEEPL_API_URL=
+VOYAGE_API_KEY=
+GUEST_AI_MONTHLY_CAP_USD=
+GUEST_AI_FAKE=
 
 SLACK_DAILY_REPORT_WEBHOOK_URL=
 SLACK_OPS_ALERT_WEBHOOK_URL=

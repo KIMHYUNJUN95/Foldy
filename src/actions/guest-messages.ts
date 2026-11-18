@@ -51,6 +51,11 @@ import { createTranslationBudget, deeplTranslate } from "@/lib/review-translate"
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { messageTextForTranslation } from "@/lib/guest-messages/message-body";
+import { ASSIST_PLACEHOLDER_LABELS, hasUnfilledPlaceholder } from "@/lib/guest-messages/ai-assist-model";
+import { attachReplyToPairs, draftPlaceholdersFor, recordAssistSent } from "@/lib/guest-messages/ai-assist-server";
+import { hasVoyageKey } from "@/lib/guest-messages/ai-config";
+
+const ALL_ASSIST_PLACEHOLDERS = Object.values(ASSIST_PLACEHOLDER_LABELS).flatMap((labels) => Object.values(labels));
 
 export type GuestMessageErrorKey =
   | "forbidden"
@@ -62,7 +67,9 @@ export type GuestMessageErrorKey =
   | "stale"
   | "failed"
   | "translation_unavailable"
-  | "translation_budget";
+  | "translation_budget"
+  /** AI 초안의 채우지 않은 자리 표시(「[출입 비밀번호]」 등)가 남은 채 보내려 함 — 49 §4. */
+  | "assist_placeholder";
 
 type Failure = { ok: false; errorKey: GuestMessageErrorKey };
 type Ok = { ok: true };
@@ -276,6 +283,8 @@ export async function sendGuestReply(input: {
   original?: string | null;
   /** 번역해서 보낼 때 고른 언어(미리 보기와 같은 것). 원문 그대로면 비운다. */
   bodyLang?: string | null;
+  /** AI 초안(`draftGuestReply` 의 `draftId`)에서 시작한 답장 — 자리 표시 검사 · 「그대로 / 고쳐 보냄」 기록(49 §8). */
+  assistDraftId?: string | null;
 }): Promise<SendGuestReplyResult> {
   const auth = await gate(true);
   if (!auth.ok) return auth;
@@ -285,6 +294,7 @@ export async function sendGuestReply(input: {
   if (!body) return { ok: false, errorKey: "invalid" };
   if (Array.from(body).length > MAX_REPLY_CHARS) return { ok: false, errorKey: "too_long" };
   const original = typeof input.original === "string" && input.original.trim() ? input.original.trim().slice(0, MAX_REPLY_CHARS) : null;
+  const assistDraftId = typeof input.assistDraftId === "string" && UUID_RE.test(input.assistDraftId) ? input.assistDraftId : null;
 
   const supabase = db();
   try {
@@ -292,6 +302,12 @@ export async function sendGuestReply(input: {
     if (!conversation) return { ok: false, errorKey: "not_found" };
     const block = replyBlockReason(conversation.channel);
     if (block) return { ok: false, errorKey: block };
+    // 초안 id 가 없어도 늘 본다 — 다시 만들기가 실패해 옛 초안이 답장 칸에 남은 채 보내는 경우도 막는다.
+    // 직원 원문(original)과 손님에게 갈 글(body) 둘 다. 세 언어 자리 표시 전부 + 날것 토큰 + (있으면) 그 초안의 자리 표시.
+    const draftPlaceholders = assistDraftId ? ((await draftPlaceholdersFor(supabase, auth.organizationId, assistDraftId)) ?? []) : [];
+    const placeholders = [...draftPlaceholders, ...ALL_ASSIST_PLACEHOLDERS];
+    if (hasUnfilledPlaceholder(body, placeholders) || (original !== null && hasUnfilledPlaceholder(original, placeholders)))
+      return { ok: false, errorKey: "assist_placeholder" };
     // 고를 수 있는 언어만 남긴다(모르는 값은 버림 — 표시용 칸이라 거절하지 않는다).
     const bodyLang =
       original && isAllowedReplyTarget(auth.locale, normalizeGuestLanguage(conversation.guest_language), input.bodyLang)
@@ -299,6 +315,7 @@ export async function sendGuestReply(input: {
         : null;
 
     const sendEnabled = isGuestMessageSendEnabled();
+    const sentAt = new Date();
     // 큐 줄 + 대기 메시지 줄을 DB 함수 하나로(그 사이에 발송 작업이 큐 줄만 보내는 틈이 없게). 같은 키면 첫 줄을 돌려준다.
     const enqueued = await supabase.rpc("guest_message_enqueue_reply", {
       p_organization_id: auth.organizationId,
@@ -309,7 +326,7 @@ export async function sendGuestReply(input: {
       p_original_lang: original ? auth.locale : null,
       p_idempotency_key: input.idempotencyKey,
       p_user_id: auth.userId,
-      p_now: new Date().toISOString(),
+      p_now: sentAt.toISOString(),
       p_body_lang: bodyLang,
     });
     if (enqueued.error) throw new Error(`enqueue failed: ${enqueued.error.message}`);
@@ -327,6 +344,20 @@ export async function sendGuestReply(input: {
       };
     const outboxId = row.outbox_id;
 
+    // 도우미를 쓰는 조직에서만(키 있음) — 초안 결과 기록 · 질문 줄에 이번 답 붙이기. 실패는 삼킨다.
+    if (assistDraftId || hasVoyageKey()) {
+      after(async () => {
+        if (assistDraftId)
+          await recordAssistSent(supabase, {
+            organizationId: auth.organizationId,
+            userId: auth.userId,
+            conversationId: conversation.id,
+            draftId: assistDraftId,
+            sentText: original ?? body,
+          });
+        await attachReplyToPairs(supabase, auth.organizationId, conversation, body, sentAt);
+      });
+    }
     kickOutbox(auth.organizationId);
     revalidateInbox();
     return { ok: true, outboxId, duplicate: false, sendEnabled };

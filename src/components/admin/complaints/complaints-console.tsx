@@ -24,6 +24,7 @@ import type {
 } from "@/lib/external-reviews";
 import { reviewRoomFallbackLabel } from "@/lib/external-review-rules";
 import { REVIEW_SCALE } from "@/lib/external-reviews";
+import { reviewReservationNo } from "@/lib/review-reservation-no";
 import { REVIEW_LIST_STEP } from "@/lib/external-review-pages";
 import type { TranslationPart } from "@/lib/review-translate";
 import type { Dictionary, Locale } from "@/lib/i18n";
@@ -574,6 +575,7 @@ function ReviewsView({
                     <b>{PROVIDER_LABEL[review.provider]}</b>
                     <span>{`${buildingLabelOf(review.propertyName)} · ${bRoom(room)}`}</span>
                     {review.guestDisplayName ? <span>{review.guestDisplayName}</span> : null}
+                    {reviewReservationNo(review) ? <span className="cxw-rv__no num">{reviewReservationNo(review)}</span> : null}
                     {review.linkedComplaintId ? <em className="is-linked">{copy.wLinked}</em> : null}
                     <time className="num">{md(review.reviewedAt)}</time>
                   </span>

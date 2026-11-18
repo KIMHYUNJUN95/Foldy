@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { reviewReservationNo } from "@/lib/review-reservation-no";
 import { X } from "lucide-react";
 import { ReviewConvertButton, ReviewTranslateButton } from "@/components/admin/complaints/review-panel-actions";
 import { REVIEW_SCALE, type ExternalReviewDetail, type ReviewProvider } from "@/lib/external-reviews";
@@ -107,10 +108,10 @@ export function ReviewDetailPanel({
             {headlineText ? <h2 className="cxw-ph__title">{headlineText}</h2> : null}
             <span className="cxw-ph__ctx">
               {`${building} · ${room}${review.guestDisplayName ? ` · ${review.guestDisplayName}` : ""}`}
-              {review.sourceReservationId ? (
+              {reviewReservationNo(review) ? (
                 <>
                   <br />
-                  <span className="num">{copy.wReservationNo.replace("{id}", review.sourceReservationId)}</span>
+                  <span className="num">{copy.wReservationNo.replace("{id}", reviewReservationNo(review) ?? "")}</span>
                 </>
               ) : null}
             </span>

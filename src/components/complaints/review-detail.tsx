@@ -1,5 +1,6 @@
 "use client";
 
+import { reviewReservationNo } from "@/lib/review-reservation-no";
 import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -190,10 +191,10 @@ export function ReviewDetail({
           {headlineText ? <h1 className="fbw-dh__title is-md">{headlineText}</h1> : null}
           <span className="fbw-ctx">
             {[building, room, review.guestDisplayName].filter(Boolean).join(" · ")}
-            {review.sourceReservationId ? (
+            {reviewReservationNo(review) ? (
               <>
                 <br />
-                <span className="num">{t.wReservationNo.replace("{id}", review.sourceReservationId)}</span>
+                <span className="num">{t.wReservationNo.replace("{id}", reviewReservationNo(review) ?? "")}</span>
               </>
             ) : null}
           </span>

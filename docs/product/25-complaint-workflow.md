@@ -1081,3 +1081,19 @@ FBManual-Phone · FBCx-Phone · FBNew-Phone · FBNewConfirm-Phone · FBRooms-Pho
 - **PC 검색 안내**: PC 패널 검색칸은 예약을 찾으므로 `pickerSearchPhPc` = 「예약 · 객실 · 이름」(모바일 `pickerSearchPh` 는 건물 · 객실 · 이름).
 - **PC 사진 ×**: 썸네일 간격 12px, 누름 영역 `::after` inset -13px(약 45px) — 옆 사진과 겹치지 않는다. 5장 한 줄은 64×5+12×4=368px, 좁으면 줄바꿈.
 - 테스트: `src/lib/__tests__/complaint-create-copy.test.ts`.
+
+## 목록 · 상세 · 외부 리뷰 unslop 다듬기 (2026-11-18, PC + 모바일)
+
+기존 토큰만 쓰고 화면 구조는 그대로. 시안 캔버스 `KYMVMYtGsqAqPcCmiwUnKK`.
+
+- **굵기**: 점수 · 평균 · 이름 · 퍼센트 · 모달/시트 제목 · 모바일 제목 · 숫자 700~900 → 600 이하. 숫자는 tabular-nums.
+- **상태 표시**: 점 7 → 6px, 글자는 먹색(또는 회색) 500, 색은 점에만(미처리 빨강 · 처리 완료 초록). 「낮은 평점」 = 회색 글자 + 6px 빨간 점, 「컴플레인 등록됨」 = 회색 글자. 상세의 큰 빨간 별점 숫자는 의미 색이라 그대로.
+- **목록 줄 예약번호**: 외부 리뷰 줄에 채널 예약번호(Airbnb `HM…` · Booking 번호)를 회색으로. PC · 폴드 · 태블릿(≥600)만, 폰은 숨기고 상세에서만 본다. `reviewReservationNo()`(`src/lib/review-reservation-no.ts`) → `resolveReservationNumber` — 내부 UUID 는 절대 표시하지 않는다. 목록 쿼리에 Beds24 예약 조인이 없어 채널 번호가 없으면 번호 칸을 비운다.
+- **누름 영역**: PC 패널 닫기 · 삭제 아이콘 44px(`aria-label` 은 i18n), 모바일 「연결」 · 「지금 가져오기」 단추 44px.
+- **움직임**: 모바일 줄 차례 등장 지연 제거(200ms 한 번), 막대 차오름 700 → 400ms, `prefers-reduced-motion` 이면 없음. 가져오기 스피너는 실제 작업 중에만.
+- **빈 상태(PC)**: 보라 타일 없이 회색 아이콘. **삭제 확인창**: 경고 문구는 회색 500, 삭제 단추만 빨강.
+- **폰 필터 첫 칸**: 「전체 플랫폼」 잘림 → 칸 폭 `1.35fr` + 짧은 라벨 `wDdAllPlatformsShort`(플랫폼 / 全サイト / Platform).
+- **카피**: 짧은 한 문장 끝 마침표 제거(ko · ja · en), 여러 문장 안내는 유지.
+- **CSS 정리**: `complaints-console.css` 1116 → 544줄, `complaints.css` 3111 → 682줄(안 쓰이는 규칙 삭제, 쓰이는 규칙 굵기 600 이하). 보라 직접 값은 `--primary-ink` · `--primary-tint` · `--primary-ring` · `--primary-hover`(`globals.css`)로.
+- **Excel · PDF**: `complaint.manage` 권한자에게만 보이는 건 의도다(위 「Excel · PDF 내보내기」 권한 줄 — 파일에 게스트 이름 · 예약 번호가 담김). 바꾸지 않았다.
+- 테스트: `src/lib/__tests__/complaints-unslop.test.ts`.

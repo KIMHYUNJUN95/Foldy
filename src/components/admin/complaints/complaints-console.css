@@ -9,7 +9,7 @@
    (정확한 토큰 .card__s 는 이 콘솔만 사용). 톤은 공용 .ahint / opscell__sub 와 맞춘다. */
 .adm .card__s {
   font-size: 11.5px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--adm-muted);
   letter-spacing: -0.005em;
 }
@@ -24,346 +24,14 @@
   padding: 11px 16px 13px;
   border-top: 0.5px solid var(--separator);
   font-size: 11.5px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--adm-muted);
-}
-
-/* ── 문제 객실: 플랫폼 열 묶음 ── */
-.adm .cxtbl th.cxgrp {
-  text-align: center;
-  letter-spacing: 0.08em;
-  padding-bottom: 4px;
-  border-bottom: none;
-}
-.adm .cxtbl td.cxnum,
-.adm .cxtbl th.cxnum {
-  text-align: right;
-  white-space: nowrap;
-}
-.adm .cxtbl .cxsep {
-  border-left: 1px solid var(--line-soft);
-}
-.adm .cxtbl tbody tr.cxroom {
-  background: color-mix(in oklab, var(--adm-surface) 32%, var(--card));
-}
-.adm .cxtbl tbody tr.cxroom.is-hot {
-  background: color-mix(in oklab, var(--danger-bg) 62%, var(--card));
-}
-.adm .cxbuilding {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 850;
-}
-.adm .cxroomname {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding-left: 26px;
-  font-family: var(--mono);
-  font-size: 12.5px;
-  font-weight: 800;
-}
-.adm .cxnote {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding-left: 26px;
-  font-size: 11.5px;
-  font-weight: 750;
-  color: var(--adm-muted);
-}
-.adm .cxavg {
-  font-family: var(--mono);
-  font-size: 14px;
-  font-weight: 850;
-}
-.adm .cxavg.is-bad {
-  color: var(--danger);
-}
-.adm .cxcount {
-  font-family: var(--mono);
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--adm-muted);
-}
-.adm .cxrisk {
-  font-family: var(--mono);
-  font-size: 13px;
-  font-weight: 900;
-  color: var(--danger);
-}
-.adm .cxrisk.is-zero {
-  color: var(--faint);
-  font-weight: 700;
-}
-.adm .cxdash {
-  color: var(--faint);
-  font-weight: 700;
-  font-size: 11.5px;
-}
-
-/* ── 문제 비율 바 ── */
-.adm .cxratio {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  min-width: 118px;
-}
-.adm .cxratio__bar {
-  flex: 1;
-  height: 6px;
-  border-radius: 999px;
-  background: var(--adm-surface);
-  overflow: hidden;
-}
-.adm .cxratio__fill {
-  display: block;
-  height: 100%;
-  border-radius: 999px;
-  background: var(--danger);
-}
-.adm .cxratio__fill.is-mid {
-  background: var(--warn);
-}
-.adm .cxratio__fill.is-low {
-  background: var(--done);
-}
-.adm .cxratio__v {
-  font-family: var(--mono);
-  font-size: 12px;
-  font-weight: 850;
-  width: 46px;
-  text-align: right;
-}
-.adm .cxratio__v.is-zero {
-  color: var(--faint);
-}
-
-/* ── 외부 리뷰 행 ── */
-.adm .cxrow {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 12px 16px;
-  border-bottom: 0.5px solid var(--separator);
-  text-decoration: none;
-  color: inherit;
-}
-.adm .cxrow:last-child {
-  border-bottom: none;
-}
-.adm .cxrow:hover {
-  background: var(--card2);
-}
-.adm .cxscore {
-  width: 54px;
-  flex: 0 0 auto;
-  text-align: center;
-}
-.adm .cxscore__v {
-  font-family: var(--mono);
-  font-size: 19px;
-  font-weight: 900;
-  line-height: 1.1;
-}
-.adm .cxscore__v.is-bad {
-  color: var(--danger);
-}
-.adm .cxscore__s {
-  font-size: 9.5px;
-  font-weight: 750;
-  color: var(--faint);
-}
-.adm .cxmain {
-  flex: 1;
-  min-width: 0;
 }
 /* 행 본문이 상세 패널로 가는 링크가 됐다(2026-09-08). 링크 기본 스타일을 지우고 행 전체가
    눌리는 것처럼 보이게 한다 — 삭제 버튼은 링크 밖에 있어 중첩되지 않는다. */
-.adm .cxmain--link {
-  display: block;
-  color: inherit;
-  text-decoration: none;
-  border-radius: 10px;
-  transition: background-color var(--dur-fast, 0.12s) ease;
-}
-.adm .cxmain--link:hover {
-  background: var(--surface2);
-}
-.adm .cxmain--link:focus-visible {
-  outline: 2px solid var(--adm-primary);
-  outline-offset: 2px;
-}
-
-/* 컴플레인 첨부 사진 — 정사각 썸네일 그리드. 원본은 새 탭에서 연다(콘솔에 라이트박스 없음). */
-.adm .cxshots {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
-}
-.adm .cxshot {
-  display: block;
-  width: 96px;
-  height: 96px;
-  border-radius: 10px;
-  overflow: hidden;
-  border: 1px solid var(--line);
-}
-.adm .cxshot__img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.adm .cxtop {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin-bottom: 4px;
-  flex-wrap: wrap;
-}
-.adm .cxttl {
-  font-size: 13px;
-  font-weight: 850;
-  letter-spacing: -0.01em;
-}
-.adm .cxexcerpt {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--adm-muted);
-  line-height: 1.55;
-  margin: 0;
-}
-.adm .cxexcerpt.is-dim {
-  color: var(--faint);
-}
 
 /* ── 목록 행의 긍정/부정 본문 (클릭 없이 전량 표시) ──
    Booking.com은 2단(긍정 왼쪽·부정 오른쪽), 좁으면 1단으로 접힌다. */
-.adm .cxpn {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px 20px;
-}
-@media (max-width: 900px) {
-  .adm .cxpn { grid-template-columns: 1fr; }
-}
-.adm .cxpn__col { min-width: 0; }
-.adm .cxpn__k {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 10.5px;
-  font-weight: 800;
-  margin-bottom: 3px;
-}
-.adm .cxpn__k svg { width: 12px; height: 12px; }
-.adm .cxpn__k.is-pos { color: var(--done); }
-.adm .cxpn__k.is-neg { color: var(--warn); }
-.adm .cxpn__b {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--adm-muted);
-  line-height: 1.55;
-  white-space: pre-wrap;
-  margin: 0;
-}
-.adm .cxmeta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 6px;
-  font-size: 11px;
-  font-weight: 750;
-  color: var(--faint);
-  flex-wrap: wrap;
-}
-.adm .cxmeta .cxdot {
-  width: 3px;
-  height: 3px;
-  border-radius: 999px;
-  background: var(--line);
-}
-.adm .cxmeta .is-linked {
-  color: var(--done);
-}
-.adm .cxmeta .is-unlinked {
-  color: var(--warn);
-}
-
-/* ── 수동 컴플레인 행 삭제 버튼 ── */
-.adm .cxrowdel {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
-  border: 1px solid var(--line);
-  background: var(--card);
-  color: var(--adm-muted);
-  cursor: pointer;
-}
-.adm .cxrowdel:hover {
-  background: var(--danger-bg);
-  border-color: color-mix(in oklab, var(--danger) 30%, var(--line));
-  color: var(--danger);
-}
-.adm .cxrowdel svg { width: 15px; height: 15px; }
-
-/* ── 삭제 확인 모달 본문 (공용 .modal 셸 안, 화면 전용 조각만) ── */
-.adm .cxdelhead {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-.adm .cxdelhead__ic {
-  flex: 0 0 auto;
-  width: 40px;
-  height: 40px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 11px;
-  background: var(--danger-bg);
-  color: var(--danger);
-}
-.adm .cxdelhead__ic svg { width: 20px; height: 20px; }
-.adm .cxdelhead__t {
-  font-size: 14px;
-  font-weight: 850;
-  letter-spacing: -0.01em;
-}
-.adm .cxdelhead__s {
-  font-size: 12px;
-  font-weight: 650;
-  color: var(--adm-muted);
-  margin-top: 2px;
-  word-break: break-word;
-}
-.adm .cxdelwarn {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 11px 13px;
-  border-radius: 11px;
-  background: color-mix(in oklab, var(--danger) 6%, var(--card));
-  border: 1px solid color-mix(in oklab, var(--danger) 22%, var(--line));
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--ink-soft);
-  line-height: 1.55;
-}
-.adm .cxdelwarn__ic {
-  flex: 0 0 auto;
-  display: inline-flex;
-  color: var(--danger);
-}
-.adm .cxdelwarn__ic svg { width: 15px; height: 15px; }
 
 /* ── 상세 패널 즉시 닫기 ──
    ReviewDetailOverlay가 닫기 클릭 즉시 .is-closing을 걸어, 서버 왕복을 기다리지 않고 스크림은 페이드,
@@ -384,261 +52,10 @@
   pointer-events: none;
   transition: transform 0.22s cubic-bezier(0.4, 0, 0.1, 1);
 }
-
-/* ── 필터 바 ── */
-.adm .cxfilters {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.adm .cxseg {
-  display: inline-flex;
-  background: var(--adm-surface);
-  border-radius: 10px;
-  padding: 3px;
-  gap: 2px;
-}
 /* 필터는 <a>(쿼리스트링), 등록 패널의 연결 방식은 <button>(폼 상태) — 요소는 달라도 같은
    세그먼트로 보여야 한다. `.lviews`가 둘을 함께 겨냥하는 것과 같은 규약이다. */
-.adm .cxseg a,
-.adm .cxseg button {
-  display: inline-flex;
-  align-items: center;
-  height: 30px;
-  padding: 0 12px;
-  border-radius: 7px;
-  font-size: 12.5px;
-  font-weight: 700;
-  color: var(--adm-muted);
-  text-decoration: none;
-  border: 0;
-  background: transparent;
-  font-family: inherit;
-  cursor: pointer;
-}
-.adm .cxseg a.on,
-.adm .cxseg button.on {
-  background: var(--card);
-  color: var(--ink);
-  box-shadow: 0 2px 5px rgba(20, 32, 43, 0.1);
-}
-
-/* ── 외부 리뷰 상세 패널 (.panel 공용 셸 안, 화면 전용 조각만) ── */
-.adm .cxhero {
-  display: flex;
-  align-items: flex-end;
-  gap: 10px;
-  margin-top: 13px;
-}
-.adm .cxhero__score {
-  display: flex;
-  align-items: baseline;
-  gap: 3px;
-  flex: 0 0 auto;
-}
-.adm .cxhero__v {
-  font-family: var(--mono);
-  font-size: 30px;
-  font-weight: 900;
-  line-height: 1;
-  letter-spacing: -0.02em;
-}
-.adm .cxhero__v.is-bad {
-  color: var(--danger);
-}
-.adm .cxhero__scale {
-  font-size: 12px;
-  font-weight: 750;
-  color: var(--faint);
-}
-.adm .cxhero__title {
-  font-size: 13.5px;
-  font-weight: 800;
-  line-height: 1.4;
-  padding-bottom: 3px;
-}
-.adm .cxhero__title.is-dim {
-  color: var(--faint);
-  font-weight: 650;
-}
-
-.adm .cxbodyhead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-.adm .cxsrc {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--faint);
-  text-transform: none;
-  letter-spacing: 0;
-}
-.adm .cxtrbtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 10px;
-  border: 1px solid var(--line);
-  background: var(--card);
-  color: var(--adm-muted);
-  cursor: pointer;
-}
-.adm .cxtrbtn:hover {
-  background: var(--adm-surface);
-  color: var(--ink);
-}
-.adm .cxtrbtn svg {
-  width: 14px;
-  height: 14px;
-}
-
-.adm .cxscoreonly {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 7px;
-}
-.adm .cxscoreonly p {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--adm-muted);
-  line-height: 1.6;
-  margin: 0;
-}
-
-.adm .cxbodypart {
-  margin-bottom: 12px;
-}
-.adm .cxbodypart:last-child {
-  margin-bottom: 0;
-}
-.adm .cxbodypart__t {
-  font-size: 11px;
-  font-weight: 800;
-  color: var(--adm-muted);
-  margin-bottom: 4px;
-}
-.adm .cxbodypart__b {
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.65;
-  color: var(--ink-soft);
-  white-space: pre-wrap;
-  margin: 0;
-}
-
-/* 비공개 피드백 — 공개 리뷰와 절대 헷갈리면 안 된다: 점선 테두리 + warn 톤. */
-.adm .cxprivate {
-  margin-bottom: 18px;
-  padding: 12px 14px;
-  border-radius: 13px;
-  background: color-mix(in oklab, var(--warn) 7%, var(--card));
-  border: 1.5px dashed color-mix(in oklab, var(--warn) 45%, var(--line));
-}
-.adm .cxprivate__top {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.adm .cxprivate__from {
-  font-size: 11px;
-  font-weight: 750;
-  color: color-mix(in oklab, var(--warn) 65%, var(--ink));
-}
-.adm .cxprivate__body {
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.65;
-  color: var(--ink-soft);
-  white-space: pre-wrap;
-  margin: 9px 0 6px;
-}
-.adm .cxprivate__note {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--adm-muted);
-  line-height: 1.5;
-  margin: 0;
-}
-
-/* OTA 답글 — 읽기 전용. 대시보드에서 답글을 쓰지 않는다는 것을 note로 명시한다. */
-.adm .cxreply {
-  margin-bottom: 18px;
-  padding: 12px 14px;
-  border-radius: 13px;
-  background: var(--card2);
-  border: 1px solid var(--line-soft);
-}
-.adm .cxreply__top {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.adm .cxreply__t {
-  font-size: 11px;
-  font-weight: 800;
-  color: var(--adm-muted);
-}
-.adm .cxreply__body {
-  font-size: 12.5px;
-  font-weight: 600;
-  line-height: 1.6;
-  color: var(--ink-soft);
-  white-space: pre-wrap;
-  margin: 8px 0 6px;
-}
-.adm .cxreply__note {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--faint);
-  margin: 0;
-}
-
-.adm .cxconvertnote {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--adm-muted);
-  line-height: 1.6;
-  margin: 0 0 11px;
-}
-.adm .cxconvertbtn {
-  width: 100%;
-  justify-content: center;
-}
-.adm .cxlinked {
-  display: inline-flex;
-  text-decoration: none;
-}
-
-/* ── 수동 컴플레인 직접 등록 패널 (.panel 공용 셸 안, 화면 전용 조각만) ── */
-
-/* 카드 헤더 오른쪽 끝의 등록 버튼. 버튼 자체는 공용 .chipbtn 이다. */
-.adm .cxcardact {
-  margin-left: auto;
-  flex: 0 0 auto;
-}
-
-.adm .cxfld {
-  margin-bottom: 16px;
-}
 /* 드롭다운은 공용 `.dd`(AdmDropdown)를 그대로 쓴다 — 네이티브 <select>는 쓰지 않는다.
    패널 안에서는 폭만 필드에 맞춰 늘린다. 색·radius·메뉴 스타일은 admin-console.css의 공용 정의. */
-.adm .cxfld > .dd {
-  width: 100%;
-}
-.adm .cxfld > .dd .dd__btn {
-  width: 100%;
-}
-.adm .cxopt {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--faint);
-}
 .adm .cxhint {
   margin: 0;
   font-size: 11.5px;
@@ -649,22 +66,13 @@
   animation: cxerr-in 160ms ease-out both;
   margin: 0 0 4px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--danger);
 }
 
 @keyframes cxerr-in { from { opacity: 0; transform: translateY(-2px); } }
 @media (prefers-reduced-motion: reduce) { .adm .cxerr { animation: none; } }
 .adm .cxerr--field { margin: -10px 0 0; }
-
-.adm .cxseg--full {
-  display: flex;
-  width: 100%;
-}
-.adm .cxseg--full button {
-  flex: 1 1 0;
-  justify-content: center;
-}
 
 /* 평점 — 척도가 있는 플랫폼에서만 뜬다. 같은 별을 다시 누르면 0점으로 되돌아간다. */
 .adm .cxstars {
@@ -692,7 +100,7 @@
 .adm .cxstars__v {
   margin-left: 8px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--adm-muted);
 }
 
@@ -745,7 +153,7 @@
   align-items: center;
   gap: 6px;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--ink);
 }
 .adm .cxpickrow__s {
@@ -759,7 +167,7 @@
   background: var(--primary-soft);
   color: var(--adm-primary);
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 /* 사진 첨부 — 모바일과 같은 5장 제한. */
@@ -815,7 +223,7 @@
   background: var(--adm-surface);
   color: var(--adm-muted);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   font-family: inherit;
   cursor: pointer;
 }
@@ -831,10 +239,6 @@
 /* CJK 자간 보정 (2차) — uppercase 없이 자간만 걸려 있던 라벨·표 머리글.
    숫자 표시(`__v` `__amt` `score` 등)와 라틴 전용(초대코드 입력·워드마크·일본어 서식
    `.jp__*`)은 제외했다 — 그쪽 자간은 의도된 것이다. */
-:lang(ko) .adm .cxtbl th.cxgrp,
-:lang(ja) .adm .cxtbl th.cxgrp {
-  letter-spacing: 0;
-}
 
 /* ── 외부 리뷰 「지금 가져오기」 (2026-10-02) — 공용 chipbtn + 상태 한 줄. 뷰 바 오른쪽 끝에 붙는다. ── */
 .adm .cxsync {
@@ -857,7 +261,7 @@
 /* ═══ 화이트 리디자인 (2026-10-14, 시안 FB-PC · FBManual-PC · FBNewCx-PC · FBDelete-PC · FBRooms-PC) ═══
    흰 바탕 · 상자 · 세로 구분선 없음 · 선택은 옅은 보라 바탕만. 움직임: 줄 차례 등장 · 막대 채움 · 누름 반응 ·
    처리 완료 체크 그리기. prefers-reduced-motion 이면 모두 끈다. */
-.adm .cxw { --cx-ink: #16141f; --cx-sub: #6b6878; --cx-mute: var(--text-3); --cx-line: var(--separator); --cx-pri: #7a52e6; --cx-pri-ink: #5a30cf; --cx-bad: #c5282e; --cx-ok: #1f7a4d; }
+.adm .cxw { --cx-ink: #16141f; --cx-sub: #6b6878; --cx-mute: var(--text-3); --cx-line: var(--separator); --cx-pri: var(--primary); --cx-pri-ink: var(--primary-ink); --cx-bad: #c5282e; --cx-ok: #1f7a4d; }
 .adm .cxw .num, .adm .cxw-panel .num { font-variant-numeric: tabular-nums; }
 .adm .cxw-viewbar { flex-wrap: wrap; row-gap: 8px; margin-bottom: 6px; }
 .adm .cxw-viewbar__sp { flex: 1; }
@@ -878,9 +282,9 @@
 .adm .cxw-viewbar button.axb.is-idle { background: transparent; color: #3a3746; }
 .adm .cxw-viewbar button.axb.is-busy { background: transparent; }
 .adm .cxw-viewbar button.axb.is-idle:hover:not(:disabled) { background: #f4f4f7; }
-.adm .cxw-create { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 10px; border: 0; border-radius: 10px; background: transparent; font: inherit; font-size: 14px; font-weight: 600; color: #5a30cf; cursor: pointer; transition: background 150ms ease, transform 140ms ease; }
+.adm .cxw-create { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 10px; border: 0; border-radius: 10px; background: transparent; font: inherit; font-size: 14px; font-weight: 600; color: var(--primary-ink); cursor: pointer; transition: background 150ms ease, transform 140ms ease; }
 .adm .cxw-create svg { width: 16px; height: 16px; }
-.adm .cxw-create:hover { background: #f4f1fd; }
+.adm .cxw-create:hover { background: var(--primary-tint); }
 .adm .cxw-create:active { transform: scale(.97); }
 
 .adm .cxw-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 14px 0 18px; }
@@ -900,18 +304,19 @@
 .adm .cxw-rv:hover { background: #faf9fc; border-radius: 12px; border-top-color: transparent; }
 .adm .cxw-rv:hover + .cxw-rv, .adm .cxw-rv.on + .cxw-rv { border-top-color: transparent; }
 .adm .cxw-rv:active { transform: scale(.997); }
-.adm .cxw-rv.on { background: #f4f1fd; border-radius: 12px; border-top-color: transparent; }
+.adm .cxw-rv.on { background: var(--primary-tint); border-radius: 12px; border-top-color: transparent; }
 .adm .cxw-rv__score { display: flex; flex-direction: column; gap: 2px; }
-.adm .cxw-rv__score b { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; color: #16141f; }
+.adm .cxw-rv__score b { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; color: #16141f; }
 .adm .cxw-rv__score b.is-bad { color: #c5282e; }
 .adm .cxw-rv__score span { font-size: 12px; color: #6b6878; }
 .adm .cxw-rv__main { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .adm .cxw-rv__meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 13px; color: #6b6878; }
 .adm .cxw-rv__meta > * + *:not(time)::before { content: "·"; margin-right: 6px; color: #c9c6d3; font-weight: 400; }
 .adm .cxw-rv__meta b { font-weight: 600; color: #16141f; }
-.adm .cxw-rv__meta em { font-style: normal; font-weight: 600; color: #6b6878; }
-.adm .cxw-rv__meta em.is-bad { color: #c5282e; }
-.adm .cxw-rv__meta em.is-linked { color: #5a30cf; }
+.adm .cxw-rv__meta em { font-style: normal; font-weight: 500; color: #6b6878; }
+.adm .cxw-rv__meta em.is-bad { display: inline-flex; align-items: center; gap: 6px; }
+.adm .cxw-rv__meta em.is-bad::before, .adm .cxw-ph__kick em.is-bad::before { content: ""; width: 6px; height: 6px; flex: none; border-radius: 50%; background: #c5282e; }
+.adm .cxw-rv__no { color: #6b6878; }
 .adm .cxw-rv__meta time { margin-left: auto; color: #6b6878; }
 .adm .cxw-rv__hl { font-size: 15px; font-weight: 600; color: #16141f; }
 .adm .cxw-rv__txt, .adm .cxw-rv__pn > span { font-size: 14px; line-height: 1.6; color: #3a3746; overflow-wrap: anywhere; }
@@ -919,12 +324,7 @@
 .adm .cxw-rv__pn.is-two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .adm .cxw-rv__pn small { display: block; margin-bottom: 3px; font-size: 12px; font-weight: 600; color: #6b6878; }
 .adm .cxw-rv__dim { font-size: 13px; color: #6b6878; }
-.adm .cxw-rows > * { animation: cxw-in 320ms cubic-bezier(.23, 1, .32, 1) both; }
-.adm .cxw-rows > :nth-child(2) { animation-delay: 30ms; }
-.adm .cxw-rows > :nth-child(3) { animation-delay: 60ms; }
-.adm .cxw-rows > :nth-child(4) { animation-delay: 90ms; }
-.adm .cxw-rows > :nth-child(5) { animation-delay: 120ms; }
-.adm .cxw-rows > :nth-child(n + 6) { animation-delay: 150ms; }
+.adm .cxw-rows > * { animation: cxw-in 200ms cubic-bezier(.23, 1, .32, 1) both; }
 @keyframes cxw-in { from { opacity: 0; transform: translateY(4px); } }
 
 /* 수동 컴플레인 표 */
@@ -935,16 +335,16 @@
 .adm .cxw-mr:hover { background: #faf9fc; border-radius: 12px; border-top-color: transparent; }
 .adm .cxw-mr:hover + .cxw-mr, .adm .cxw-mr.on + .cxw-mr { border-top-color: transparent; }
 .adm .cxw-mr:active { transform: scale(.997); }
-.adm .cxw-mr.on { background: #f4f1fd; border-radius: 12px; border-top-color: transparent; }
+.adm .cxw-mr.on { background: var(--primary-tint); border-radius: 12px; border-top-color: transparent; }
 .adm .cxw-mr__t { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .adm .cxw-mr__t b { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .adm .cxw-mr__t span { font-size: 13px; color: #6b6878; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .adm .cxw-mr__c { font-size: 13px; color: #4c4958; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .adm .cxw-mr__c.r { color: #6b6878; }
-.adm .cxw-st { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; white-space: nowrap; }
-.adm .cxw-st i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-.adm .cxw-st.is-open { color: #c5282e; }
-.adm .cxw-st.is-done { color: #1f7a4d; }
+.adm .cxw-st { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: #16141f; white-space: nowrap; }
+.adm .cxw-st i { width: 6px; height: 6px; border-radius: 50%; background: #6b6878; }
+.adm .cxw-st.is-open i { background: #c5282e; }
+.adm .cxw-st.is-done i { background: #1f7a4d; }
 
 /* 건물 · 객실별 */
 .adm .cxw-rh, .adm .cxw-rr { display: grid; grid-template-columns: minmax(0, 1fr) 200px 200px minmax(180px, 300px) 56px; column-gap: 24px; align-items: center; padding: 0 12px; }
@@ -959,30 +359,30 @@
 .adm .cxw-bd + .cxw-bd .cxw-rr.is-building { border-top-color: #f1f1f4; }
 .adm .cxw-rows > .cxw-bd:first-child > .cxw-rr { border-top: 0; }
 .adm .cxw-rr__name { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.adm .cxw-rr__name b { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adm .cxw-rr__name b { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .adm .cxw-rr.is-building .cxw-rr__name b { font-size: 15px; }
 .adm .cxw-rr__name small { font-size: 12px; color: #6b6878; white-space: nowrap; }
 .adm .cxw-chev { width: 14px; height: 14px; flex: none; color: var(--text-3); transition: transform 200ms cubic-bezier(.23, 1, .32, 1); }
 .adm .cxw-chev-sp { width: 14px; flex: none; }
 .adm .cxw-bd[open] .cxw-chev { transform: rotate(90deg); }
 .adm .cxw-rc { font-size: 13px; color: #6b6878; white-space: nowrap; }
-.adm .cxw-rc b { font-weight: 700; color: #16141f; }
+.adm .cxw-rc b { font-weight: 600; color: #16141f; }
 .adm .cxw-rc b.is-bad { color: #c5282e; }
 .adm .cxw-rc b.is-zero { font-weight: 500; color: #6b6878; }
 .adm .cxw-rc.is-none { color: var(--text-3); }
 .adm .cxw-bar { display: block; height: 6px; border-radius: 3px; background: #efeff3; overflow: hidden; }
-.adm .cxw-bar i { display: block; height: 100%; border-radius: 3px; background: #16141f; transform-origin: left center; animation: cxw-fill 700ms cubic-bezier(.23, 1, .32, 1) both; }
+.adm .cxw-bar i { display: block; height: 100%; border-radius: 3px; background: #16141f; transform-origin: left center; animation: cxw-fill 400ms cubic-bezier(.23, 1, .32, 1) both; }
 .adm .cxw-bar i.is-hot { background: #c5282e; }
 @keyframes cxw-fill { from { transform: scaleX(0); } }
-.adm .cxw-pct { text-align: right; font-size: 14px; font-weight: 700; color: #16141f; text-decoration: none; }
+.adm .cxw-pct { text-align: right; font-size: 14px; font-weight: 600; color: #16141f; text-decoration: none; }
 .adm a.cxw-pct { border-radius: 6px; }
 .adm a.cxw-pct:hover { text-decoration: underline; text-underline-offset: 3px; }
 .adm .cxw-pct.is-hot { color: #c5282e; }
-.adm .cxw-pct.is-zero { font-weight: 600; color: #3a3746; }
+.adm .cxw-pct.is-zero { font-weight: 500; color: #3a3746; }
 .adm .cxw-note { margin: 18px 12px 0; font-size: 12px; line-height: 1.6; color: #6b6878; }
 
 .adm .cxw-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 72px 20px; text-align: center; }
-.adm .cxw-empty__ic { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 6px; border-radius: 14px; background: #f4f1fd; color: #7a52e6; }
+.adm .cxw-empty__ic { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 6px; background: transparent; color: #a9a6b8; }
 .adm .cxw-empty__ic svg { width: 22px; height: 22px; }
 .adm .cxw-empty b { font-size: 15px; color: #16141f; }
 .adm .cxw-empty span { max-width: 420px; font-size: 13px; line-height: 1.6; color: #6b6878; }
@@ -993,17 +393,17 @@
 .adm .cxw-ph__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .adm .cxw-ph__kick { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 13px; color: #6b6878; }
 .adm .cxw-ph__kick > * + *::before { content: "·"; margin-right: 6px; color: #c9c6d3; }
-.adm .cxw-ph__kick em { font-style: normal; font-weight: 600; }
-.adm .cxw-ph__kick em.is-bad { color: #c5282e; }
+.adm .cxw-ph__kick em { font-style: normal; font-weight: 500; }
+.adm .cxw-ph__kick em.is-bad { display: inline-flex; align-items: center; gap: 6px; }
 .adm .cxw-ph__score { display: flex; align-items: baseline; gap: 8px; }
-.adm .cxw-ph__score b { font-size: 36px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.05; color: #16141f; }
+.adm .cxw-ph__score b { font-size: 36px; font-weight: 600; letter-spacing: -0.03em; line-height: 1.05; color: #16141f; }
 .adm .cxw-ph__score b.is-bad { color: #c5282e; }
 .adm .cxw-ph__score span { font-size: 14px; color: #6b6878; }
 .adm .cxw-ph__title { margin: 0; font-size: 16px; font-weight: 600; line-height: 1.4; color: #16141f; overflow-wrap: anywhere; }
 .adm .cxw-ph__title.is-lg { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.35; }
 .adm .cxw-ph__ctx { font-size: 13px; line-height: 1.6; color: #6b6878; }
-.adm .cxw-ph__x, .adm .cxw-ph__del { display: grid; place-items: center; width: 40px; height: 40px; flex: none; border: 0; border-radius: 10px; background: transparent; color: #6b6878; cursor: pointer; transition: background 150ms ease, transform 140ms ease; }
-.adm .cxw-ph__x { margin-right: -10px; }
+.adm .cxw-ph__x, .adm .cxw-ph__del { display: grid; place-items: center; width: 44px; height: 44px; flex: none; border: 0; border-radius: 10px; background: transparent; color: #6b6878; cursor: pointer; transition: background 150ms ease, transform 140ms ease; }
+.adm .cxw-ph__x { margin-right: -12px; }
 .adm .cxw-ph__del { color: #c5282e; }
 .adm .cxw-ph__x svg, .adm .cxw-ph__del svg { width: 20px; height: 20px; }
 .adm .cxw-ph__x:hover { background: #f4f4f7; }
@@ -1018,17 +418,14 @@
 .adm .cxw-text { display: flex; flex-direction: column; gap: 12px; animation: cxw-swap 220ms ease both; }
 @keyframes cxw-swap { from { opacity: 0; filter: blur(2px); } }
 .adm .cxw-dim { margin: 0; font-size: 13px; line-height: 1.6; color: #6b6878; }
-.adm .cxw-link { align-self: flex-start; height: 32px; padding: 0; border: 0; background: none; font: inherit; font-size: 13px; font-weight: 600; color: #5a30cf; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
+.adm .cxw-link { align-self: flex-start; height: 32px; padding: 0; border: 0; background: none; font: inherit; font-size: 13px; font-weight: 600; color: var(--primary-ink); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
 .adm .cxw-link:hover { text-decoration: underline; text-underline-offset: 3px; }
 .adm .cxw-bk { display: flex; flex-direction: column; gap: 9px; }
 .adm .cxw-bk__row { display: grid; grid-template-columns: 108px minmax(0, 1fr) 34px; align-items: center; gap: 10px; font-size: 13px; color: #6b6878; }
 .adm .cxw-bk__row b { text-align: right; font-weight: 600; color: #16141f; }
 .adm .cxw-bk__bar { display: block; height: 6px; border-radius: 3px; background: #efeff3; overflow: hidden; }
-.adm .cxw-bk__bar i { display: block; height: 100%; border-radius: 3px; background: #16141f; transform-origin: left center; animation: cxw-fill 600ms cubic-bezier(.23, 1, .32, 1) both; }
+.adm .cxw-bk__bar i { display: block; height: 100%; border-radius: 3px; background: #16141f; transform-origin: left center; animation: cxw-fill 400ms cubic-bezier(.23, 1, .32, 1) both; }
 .adm .cxw-bk__bar i.is-bad { background: #c5282e; }
-.adm .cxw-bk__row:nth-child(2) i { animation-delay: 30ms; }
-.adm .cxw-bk__row:nth-child(3) i { animation-delay: 60ms; }
-.adm .cxw-bk__row:nth-child(n + 4) i { animation-delay: 90ms; }
 .adm .cxw-dl { margin: 0; display: flex; flex-direction: column; gap: 9px; }
 .adm .cxw-dl > div { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 10px; font-size: 13px; }
 .adm .cxw-dl dt { color: #6b6878; }
@@ -1045,8 +442,8 @@
 .adm .cxw-log p { margin: 0; font-size: 14px; line-height: 1.55; color: #3a3746; white-space: pre-wrap; overflow-wrap: anywhere; }
 .adm .cxw-compose__row { display: flex; align-items: center; gap: 8px; }
 .adm .cxw-compose textarea { flex: 1; min-width: 0; box-sizing: border-box; height: 44px; padding: 11px 14px; border: 1px solid #e0e0e6; border-radius: 12px; background: #fff; font: inherit; font-size: 14px; line-height: 20px; color: #16141f; resize: none; outline: none; transition: border-color 150ms ease, box-shadow 150ms ease; }
-.adm .cxw-compose textarea:focus { border-color: #7a52e6; box-shadow: 0 0 0 4px #eee8fc; }
-.adm .cxw-send { display: grid; place-items: center; width: 44px; height: 44px; flex: none; border: 0; border-radius: 12px; background: #7a52e6; color: #fff; cursor: pointer; transition: opacity 150ms ease, transform 140ms ease; }
+.adm .cxw-compose textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 4px var(--primary-ring); }
+.adm .cxw-send { display: grid; place-items: center; width: 44px; height: 44px; flex: none; border: 0; border-radius: 12px; background: var(--primary); color: #fff; cursor: pointer; transition: opacity 150ms ease, transform 140ms ease; }
 .adm .cxw-send svg { width: 18px; height: 18px; }
 .adm .cxw-send:disabled { opacity: .4; cursor: default; }
 .adm .cxw-send:not(:disabled):active { transform: scale(.94); }
@@ -1057,9 +454,9 @@
 .adm .cxw-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 44px; padding: 0 16px; border: 0; border-radius: 14px; font: inherit; font-size: 15px; font-weight: 600; text-decoration: none; cursor: pointer; transition: background 150ms ease, transform 140ms ease, opacity 150ms ease; }
 .adm .cxw-btn:active:not(:disabled) { transform: scale(.98); }
 .adm .cxw-btn:disabled { opacity: .55; cursor: default; }
-.adm .cxw-btn.is-pri { background: #7a52e6; color: #fff; }
-.adm .cxw-btn.is-pri:hover:not(:disabled) { background: #6b43dc; }
-.adm .cxw-btn.is-soft { background: #f4f1fd; color: #5a30cf; }
+.adm .cxw-btn.is-pri { background: var(--primary); color: #fff; }
+.adm .cxw-btn.is-pri:hover:not(:disabled) { background: var(--primary-hover); }
+.adm .cxw-btn.is-soft { background: var(--primary-tint); color: var(--primary-ink); }
 .adm .cxw-btn.is-gray { background: #f4f4f7; color: #3a3746; }
 .adm .cxw-btn.is-danger { background: #c5282e; color: #fff; }
 .adm .cxw-check { width: 16px; height: 16px; }
@@ -1070,10 +467,10 @@
 /* 삭제 확인 창 */
 .adm .modal.cxw-modal { width: 440px; padding: 24px; gap: 14px; border: 0; }
 .adm .cxw-modal__h { display: flex; flex-direction: column; gap: 4px; }
-.adm .cxw-modal__h h2 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.02em; color: #16141f; }
+.adm .cxw-modal__h h2 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -0.02em; color: #16141f; }
 .adm .cxw-modal__h span { font-size: 13px; line-height: 1.5; color: #6b6878; }
 .adm .cxw-modal__b { margin: 0; font-size: 14px; line-height: 1.6; color: #3a3746; }
-.adm .cxw-modal__b.is-warn { font-weight: 600; color: #c5282e; }
+.adm .cxw-modal__b.is-warn { font-weight: 500; color: #6b6878; }
 .adm .cxw-modal__f { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; margin-top: 4px; }
 
 /* 등록 패널 */
@@ -1085,24 +482,24 @@
 .adm .cxw-nf input, .adm .cxw-nf textarea { width: 100%; box-sizing: border-box; padding: 12px 14px; border: 1px solid #e0e0e6; border-radius: 12px; background: #fff; font: inherit; font-size: 15px; line-height: 1.5; color: #16141f; outline: none; resize: none; transition: border-color 150ms ease, box-shadow 150ms ease; }
 .adm .cxw-nf input { height: 48px; }
 .adm .cxw-nf input.is-err { border-color: #c5282e; }
-.adm .cxw-nf input:focus, .adm .cxw-nf textarea:focus { border-color: #7a52e6; box-shadow: 0 0 0 4px #eee8fc; }
+.adm .cxw-nf input:focus, .adm .cxw-nf textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 4px var(--primary-ring); }
 .adm .cxw-fg { display: flex; flex-direction: column; gap: 8px; }
 .adm .cxw-fg__l { font-size: 13px; font-weight: 600; color: #3a3746; }
 .adm .cxw-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .adm .cxw-tiles.is-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .adm .cxw-tiles button { height: 40px; padding: 0 6px; border: 0; border-radius: 10px; background: #f4f4f7; font: inherit; font-size: 13px; font-weight: 500; color: #3a3746; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; transition: background 150ms ease, color 150ms ease, transform 140ms ease; }
-.adm .cxw-tiles button.on { background: #f4f1fd; color: #5a30cf; font-weight: 600; }
+.adm .cxw-tiles button.on { background: var(--primary-tint); color: var(--primary-ink); font-weight: 600; }
 .adm .cxw-tiles button:active { transform: scale(.97); }
 .adm .cxw-newp .cxstars { gap: 2px; }
 .adm .cxw-newp .cxsearch { margin-top: 0; border-color: #e0e0e6; border-radius: 12px; }
 .adm .cxw-newp .cxpicklist { border: 0; background: #f7f7f9; border-radius: 12px; }
-.adm .cxw-newp .cxpickrow.is-on { background: #f4f1fd; box-shadow: none; }
+.adm .cxw-newp .cxpickrow.is-on { background: var(--primary-tint); box-shadow: none; }
 .adm .cxw-newp .cxhint { margin: 0; font-size: 12px; line-height: 1.5; color: #6b6878; text-wrap: pretty; }
 .adm .cxw-newp .cxupadd, .adm .cxw-newp .cxupthumb { width: 64px; height: 64px; border: 0; border-radius: 10px; }
-.adm .cxw-newp .cxupadd { background: #f4f4f7; color: #7a52e6; }
+.adm .cxw-newp .cxupadd { background: #f4f4f7; color: var(--primary); }
 .adm .cxw-newp .cxw-pf .cxw-btn { width: 100%; }
 
-.adm .cxw a:focus-visible, .adm .cxw button:focus-visible, .adm .cxw-panel a:focus-visible, .adm .cxw-panel button:focus-visible, .adm .cxw-panel summary:focus-visible, .adm .cxw summary:focus-visible, .adm .cxw-modal button:focus-visible { outline: 2px solid #7a52e6; outline-offset: 2px; }
+.adm .cxw a:focus-visible, .adm .cxw button:focus-visible, .adm .cxw-panel a:focus-visible, .adm .cxw-panel button:focus-visible, .adm .cxw-panel summary:focus-visible, .adm .cxw summary:focus-visible, .adm .cxw-modal button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
 @media (prefers-reduced-motion: reduce) {
   .adm .cxw-rows > *, .adm .cxw-bar i, .adm .cxw-bk__bar i, .adm .cxw-log li, .adm .cxw-text, .adm .cxw-btn.is-done .cxw-check path { animation: none; }

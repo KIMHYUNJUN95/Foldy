@@ -250,6 +250,11 @@ summary,
   --separator: #e4e3e9;
   /* 브랜드 강조색: 부드러운 바이올렛(눌림 #5A30CF). 예전의 짙은 네이비를 대체한다. */
   --primary: #7a52e6;
+  /* 브랜드 보조 톤 — 눌림 글자 · 옅은 바탕 · 초점 고리 · 채운 버튼 위에 올렸을 때(2026-11-18, 화면마다 직접 적던 값을 한 곳으로) */
+  --primary-ink: #5a30cf;
+  --primary-tint: #f4f1fd;
+  --primary-ring: #eee8fc;
+  --primary-hover: #6b43dc;
   --primary-foreground: #ffffff;
   --ring: #7a52e6;
 

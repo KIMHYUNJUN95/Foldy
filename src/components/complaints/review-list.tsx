@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { reviewReservationNo } from "@/lib/review-reservation-no";
 import { ChevronLeft, ChevronRight, Star } from "lucide-react";
 import "./feedback-mobile.css";
 import { ReviewSyncButton } from "./review-sync-button";
@@ -130,7 +131,7 @@ export function ReviewList({
       <div className="fbw-filters">
         <FeedbackFilterDd
           ariaLabel={t.wPlatform}
-          label={provider === "all" ? t.wDdAllPlatforms : PROVIDER_FULL[provider]}
+          label={provider === "all" ? t.wDdAllPlatformsShort : PROVIDER_FULL[provider]}
           options={(["all", "airbnb", "booking"] as const).map((value) => ({
             label: value === "all" ? t.allPlatforms : PROVIDER_FULL[value],
             href: hrefWith({ provider: value === "all" ? null : value, page: null }),
@@ -214,6 +215,7 @@ export function ReviewList({
                     {bad ? <em className="is-bad">{t.riskChip}</em> : null}
                     <b>{PROVIDER_SHORT[review.provider]}</b>
                     <span className="fbw-rv__place">{place}</span>
+                    {reviewReservationNo(review) ? <span className="fbw-rv__no num">{reviewReservationNo(review)}</span> : null}
                     {review.linkedComplaintId ? <em className="is-linked">{t.wLinkedShort}</em> : null}
                     <time className="num">{md(review.reviewedAt)}</time>
                   </span>

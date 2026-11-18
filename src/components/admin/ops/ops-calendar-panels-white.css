@@ -360,6 +360,11 @@
 .adm .spw-alert.is-block b:first-child { font-size: 16px; }
 .adm .spw-alert__rows .spw-row { border-top: 0; min-height: 28px; animation: none; }
 .adm .spw-alert__sub { color: var(--spw-mute); }
+/* 차단 · 해제 상한 안내 — 제목 + 본문 두 층(2026-11-18). 확인 상자(is-block)가 아니라 spw-release 와 같은 결. */
+.adm .spw-alert.is-limit { gap: 2px; padding: 12px 14px; border-radius: 12px; animation: spw-in 200ms var(--spw-ease) both; font-variant-numeric: tabular-nums; }
+.adm .spw-alert.is-limit b:first-child { font-size: 14px; font-weight: 700; color: var(--spw-red); }
+.adm .spw-alert.is-limit span { font-size: 13px; font-weight: 400; line-height: 1.5; color: var(--spw-ink2); }
+.adm .spw-alert.is-limit small { margin-top: 2px; font-size: 12px; line-height: 1.5; color: var(--spw-mute); }
 .adm .spw-kv { margin: 0; display: flex; flex-direction: column; gap: 2px; }
 .adm .spw-kv > div { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 34px; font-size: 13px; }
 .adm .spw-kv dt { flex-shrink: 0; color: var(--spw-faint); }
@@ -388,6 +393,7 @@
 
 /* ── 아래 버튼 ── */
 .adm .spw-foot { display: grid; grid-template-columns: 1fr 1.6fr; gap: 8px; padding: 12px 4px 4px 8px; }
+.adm .spw-foot__why { grid-column: 1 / -1; margin: 0; font-size: 12px; line-height: 1.4; color: var(--spw-red); font-variant-numeric: tabular-nums; animation: spw-in 200ms var(--spw-ease) both; }
 .adm .spw-foot.is-even { grid-template-columns: 1fr 1fr; }
 .adm .spw-foot.is-panel { padding: 14px 24px 20px; }
 .adm .spw-btn {
@@ -559,7 +565,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .adm .spw-body, .adm .spw-pbody, .adm .spw-row, .adm .spw-msg, .adm .spw-compare__v.is-next, .adm .spw-step__v,
-  .adm .spw-modal__scrim, .adm .spw-modal__card { animation: none; }
+  .adm .spw-modal__scrim, .adm .spw-modal__card, .adm .spw-alert.is-limit, .adm .spw-foot__why { animation: none; }
   .adm .spw-seg button, .adm .spw-chip, .adm .spw-choice, .adm .spw-pill, .adm .spw-btn, .adm .spw-copy, .adm .spw-x,
   .adm .spw-step__btn, .adm .spw-fill__opt, .adm .spw-release__btn, .adm .spw-field__in, .adm .spw-field__area,
   .adm .spw-field__box { transition: none; }

@@ -280,6 +280,12 @@ textarea.msw-in { min-height: 64px; padding: 12px 14px; line-height: 1.45; resiz
   color: var(--msw-red);
 }
 .msw-alert.warn { background: #fdf4e3; color: #8a5a00; }
+/* 차단 · 해제 상한 안내 — 제목 + 본문 두 층(2026-11-18). */
+.msw-alert.limit { display: flex; flex-direction: column; gap: 2px; animation: msw-in 200ms var(--msw-ease) both; font-variant-numeric: tabular-nums; }
+.msw-alert.limit b { font-size: 14px; font-weight: 700; color: var(--msw-red); }
+.msw-alert.limit span { font-weight: 400; color: var(--msw-soft); }
+.msw-alert.limit small { margin-top: 2px; font-size: 12px; color: var(--msw-muted); }
+.msw-foot__why { grid-column: 1 / -1; margin: 0; font-size: 12px; line-height: 1.4; color: var(--msw-red); text-align: center; font-variant-numeric: tabular-nums; animation: msw-in 200ms var(--msw-ease) both; }
 .msw-alert.row { display: flex; align-items: center; gap: 10px; }
 .msw-alert.row > span { flex: 1; min-width: 0; }
 .msw-alert.row > button {
@@ -687,6 +693,11 @@ button.msw-mv-date:active { transform: scale(0.99); }
 .msw-pctin input { height: 44px; margin-block: -4px; font-size: 16px; } /* 16 — iOS 확대 방지 */
 .msw-note { font-size: 13px; }
 .msw-alert { font-size: 15px; }
+/* 상한 안내는 HIG 크기(15px) 위에서 굵기 · 색으로 위계를 만든다 — 위 .msw-alert 보다 뒤에 두고 크기를 모두 명시(2026-11-18). */
+.msw-alert.limit b { font-size: 15px; font-weight: 700; color: var(--msw-red); }
+.msw-alert.limit span { font-size: 15px; font-weight: 400; color: var(--msw-soft); }
+.msw-alert.limit small { font-size: 13px; color: var(--msw-muted); }
+.msw-foot__why { font-size: 13px; }
 .msw-alert.row > button { min-height: 44px; }
 .msw-okline { font-size: 15px; }
 /* 선택한 칸 목록 — 줄 44/15, 선은 줄 사이에만. 「예약된 밤 — 빼고 저장」 #b4b1bf(2.0:1) → muted(5.3:1). */

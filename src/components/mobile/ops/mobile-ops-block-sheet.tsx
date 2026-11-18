@@ -9,6 +9,7 @@ import {
 } from "@/actions/ops-calendar";
 import { BLOCK_PURPOSE_ORDER, blockErrorText, type BlockPanelCopy } from "@/components/admin/ops/ops-block-panel";
 import type { PanelScopeSummary } from "@/components/admin/ops/ops-price-panel";
+import { exceedsBlockRangeLimit, fillBlockLimitText } from "@/lib/ops-block-limits";
 import { groupSelectionIntoRanges } from "@/lib/ops-calendar-selection";
 import { MswField, MswSuccess, useSuccessThen } from "@/components/mobile/ops/mobile-ops-form";
 import { haptic } from "@/lib/haptics";
@@ -88,6 +89,13 @@ export function MobileOpsBlockSheet({
     () => cells.filter((cell) => blockedKeys.has(`${cell.roomKey}|${cell.date}`)),
     [blockedKeys, cells],
   );
+  const blockedRangeCount = useMemo(
+    () => groupSelectionIntoRanges(blockedCells.map((cell) => ({ date: cell.date, roomKey: cell.roomKey }))).length,
+    [blockedCells],
+  );
+  // 상한을 넘으면 누르기 전에 알리고 차단 버튼을 막는다. 해제는 막혀 있는 칸의 구간만 서버로 가므로 따로 센다.
+  const blockOverLimit = exceedsBlockRangeLimit(ranges.length);
+  const releaseOverLimit = exceedsBlockRangeLimit(blockedRangeCount);
   const nightsLabel = (n: number) => copy.mpNights.replace("{n}", String(n));
   // 행 키는 `건물::방` 정규 이름이다 — 내부 키를 그대로 그리지 않고, 건물은 보는 사람 언어로(2026-10-26).
   // 독채는 방 이름 = 건물 이름이라 건물 이름 하나만.
@@ -204,6 +212,15 @@ export function MobileOpsBlockSheet({
               </button>
             </div>
 
+            {/* 상한을 넘으면 맨 위에서 먼저 알린다 — 아래 구간 목록을 내리지 않아도 버튼이 막힌 이유가 보이게. */}
+            {blockOverLimit && (
+              <div className="msw-alert limit" role="status">
+                <b>{fillBlockLimitText(copy.bkLimitTitle, ranges.length)}</b>
+                <span>{fillBlockLimitText(copy.bkLimitBody, ranges.length)}</span>
+                <small>{copy.bkLimitHint}</small>
+              </div>
+            )}
+
             <div className="msw-step-sub">
               <div className="msw-sec">
                 <span>{copy.bkPurposeLabel}</span>
@@ -265,9 +282,16 @@ export function MobileOpsBlockSheet({
             {blockedCells.length > 0 && (
               <div className="msw-alert row">
                 <span>{copy.bkBlockedNote.replace("{nights}", String(blockedCells.length))}</span>
-                <button className="msw-press" disabled={pending} onClick={() => run("release")} type="button">
+                <button className="msw-press" disabled={pending || releaseOverLimit} onClick={() => run("release")} type="button">
                   {copy.bkRelease}
                 </button>
+              </div>
+            )}
+            {releaseOverLimit && (
+              <div className="msw-alert limit" role="status">
+                <b>{fillBlockLimitText(copy.bkReleaseLimitTitle, blockedRangeCount)}</b>
+                <span>{fillBlockLimitText(copy.bkReleaseLimitBody, blockedRangeCount)}</span>
+                <small>{copy.bkLimitHint}</small>
               </div>
             )}
 
@@ -283,19 +307,26 @@ export function MobileOpsBlockSheet({
       </div>
 
       <div className={`msw-foot${confirming ? " two" : ""}`}>
+        {/* 차단이 막힌 이유 한 줄 — 읽어 주는 것은 버튼의 describedby 로만(중복 낭독 방지). 확인 단계에는 오지 않는다. */}
+        {!confirming && blockOverLimit && (
+          <p className="msw-foot__why" id="msw-bk-limit-why">
+            {fillBlockLimitText(copy.bkLimitFoot, ranges.length)}
+          </p>
+        )}
         {confirming ? (
           <>
             <button className="msw-btn ghost" disabled={pending} onClick={() => setConfirming(false)} type="button">
               {copy.mwBack}
             </button>
-            <button className="msw-btn red" disabled={pending} onClick={() => run("block")} type="button">
+            <button className="msw-btn red" disabled={pending || blockOverLimit} onClick={() => run("block")} type="button">
               {copy.mbApply.replace("{n}", String(cells.length))}
             </button>
           </>
         ) : (
           <button
+            aria-describedby={blockOverLimit ? "msw-bk-limit-why" : undefined}
             className="msw-btn red"
-            disabled={cells.length === 0 || pending}
+            disabled={cells.length === 0 || pending || blockOverLimit}
             onClick={() => setConfirming(true)}
             type="button"
           >

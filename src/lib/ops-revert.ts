@@ -56,7 +56,7 @@ export function planRevertCells(args: {
 }
 
 /**
- * 차단 되돌리기 칸을 **구간 상한(`runBlockChange` 의 60)** 안으로 나눈다 — 큰 묶음(1,000칸 넘는 Beds24 변경 등)이 한 번에
+ * 차단 되돌리기 칸을 **구간 상한(`MAX_BLOCK_RANGES` — `src/lib/ops-block-limits.ts`)** 안으로 나눈다 — 큰 묶음(1,000칸 넘는 Beds24 변경 등)이 한 번에
  * 넘어가면 상한에 걸려 통째로 거절됐다(2026-10-19). 구간은 차단 쓰기와 같은 규칙으로 센다(`groupSelectionIntoRanges`).
  * 한 구간은 쪼개지 않는다.
  */

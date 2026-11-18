@@ -79,6 +79,7 @@ import {
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { signalBeds24Change } from "@/lib/beds24/live-signal";
 import { recordBlockLog } from "@/lib/beds24/block-log";
+import { exceedsBlockRangeLimit, MAX_BLOCK_RANGES } from "@/lib/ops-block-limits";
 import { chunkCellsByRanges, planRevertCells, type RevertField } from "@/lib/ops-revert";
 import { kickPriceJobWorker } from "@/lib/beds24/price-job-kick";
 import {
@@ -405,6 +406,8 @@ export type BlockChangeError =
   | BlockWriteFailure
   | "forbidden"
   | "no_cells"
+  /** 한 번에 보낸 구간이 상한(`MAX_BLOCK_RANGES`)을 넘음 — `detail` 에 보낸 구간 수. 화면이 상한을 알려 나눠 보내게 한다(2026-11-18). */
+  | "too_many_ranges"
   | "unknown_room"
   | "past_date"
   /** 같은 방에 수기 예약 · 예약 수정 · 옮기기 · 다른 차단이 진행 중(방 잠금 · 2026-10-26). 잠깐 뒤 다시. */
@@ -434,9 +437,6 @@ export type BlockChangeResult =
 export type BlockChangeCell = { roomKey: string; roomLabel: string; roomIds: string[]; date: string };
 
 export type BlockUnappliedRange = { roomKey: string; roomLabel: string; startDate: string; endDate: string };
-
-/** 한 번에 처리하는 구간 수. 실수로 격자 전체를 고르고 누르는 것을 서버에서도 막는다. */
-const MAX_BLOCK_RANGES = 60;
 
 type BlockRoomRow = {
   id: string;
@@ -471,8 +471,8 @@ async function runBlockChange(
     args.cells.map((cell) => ({ date: cell.date, roomKey: cell.roomKey })),
   );
   if (ranges.length === 0) return { error: "no_cells", ok: false };
-  if (ranges.length > MAX_BLOCK_RANGES) {
-    return { detail: `${ranges.length}`, error: "no_cells", ok: false };
+  if (exceedsBlockRangeLimit(ranges.length)) {
+    return { detail: `${ranges.length}`, error: "too_many_ranges", ok: false };
   }
   // **지난 밤은 막지 않는다**(도쿄 오늘부터). 지난 날짜 차단은 팔 수 없는 밤을 또 막는 것이라 의미가 없고,
   // 변경 이력만 어지럽힌다 — 격자도 지난 칸은 흐리게 그린다. 해제는 막지 않는다(지난 차단 정리).

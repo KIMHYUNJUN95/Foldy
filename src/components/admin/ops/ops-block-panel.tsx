@@ -8,6 +8,7 @@ import {
   type BlockChangeError,
   type BlockPurpose,
 } from "@/actions/ops-calendar";
+import { exceedsBlockRangeLimit, fillBlockLimitText, MAX_BLOCK_RANGES } from "@/lib/ops-block-limits";
 import { groupSelectionIntoRanges } from "@/lib/ops-calendar-selection";
 import {
   SpwHead,
@@ -92,6 +93,16 @@ export type BlockPanelCopy = {
   errBkSnapshotRead: string;
   errBkNotRestored: string;
   errBkRoomBusy: string;
+  /** 구간이 상한을 넘음. `{max}` = 한 번에 보낼 수 있는 구간 수. */
+  errBkTooManyRanges: string;
+  /** 누르기 전 상한 안내(제목 · 본문 · 구간 설명 · 버튼 위 한 줄). `{max}` 상한 · `{ranges}` 고른 구간 수 · `{over}` 넘은 수. */
+  bkLimitTitle: string;
+  bkLimitBody: string;
+  bkLimitHint: string;
+  bkLimitFoot: string;
+  /** 해제 쪽 안내 — `{ranges}` = 막혀 있는 구간 수. */
+  bkReleaseLimitTitle: string;
+  bkReleaseLimitBody: string;
   /** 반영 안 된 구간 목록. `{ranges}` = 「302 10/26 → 10/29, …」. */
   bkUnapplied: string;
 };
@@ -127,6 +138,8 @@ export function blockErrorText(copy: BlockPanelCopy, error: BlockChangeError): s
       return copy.errBkNotRestored;
     case "room_busy":
       return copy.errBkRoomBusy;
+    case "too_many_ranges":
+      return copy.errBkTooManyRanges.replace("{max}", String(MAX_BLOCK_RANGES));
     default:
       return copy.errBkUnknownRoom;
   }
@@ -227,6 +240,9 @@ export function OpsBlockPanel({
     () => groupSelectionIntoRanges(blockedCells.map((cell) => ({ date: cell.date, roomKey: cell.roomKey }))),
     [blockedCells],
   );
+  // 상한을 넘으면 누르기 전에 알리고 버튼을 막는다. 차단은 고른 구간 전부, 해제는 막혀 있는 칸의 구간만 서버로 가므로 따로 센다.
+  const blockOverLimit = exceedsBlockRangeLimit(ranges.length);
+  const releaseOverLimit = exceedsBlockRangeLimit(blockedRanges.length);
   const rangeList = (limit: number) => (
     <>
       {ranges.slice(0, limit).map((range, order) => (
@@ -262,10 +278,22 @@ export function OpsBlockPanel({
           <p className="spw-note">{copy.bkNote}</p>
         </div>
         <div className="spw-foot">
+          {/* 확인 단계에서도 격자 선택이 늘 수 있다(패널이 열린 채 격자를 누를 수 있음) — 같은 이유 줄. */}
+          {blockOverLimit && (
+            <p className="spw-foot__why" id="spw-bk-limit-why">
+              {fillBlockLimitText(copy.bkLimitFoot, ranges.length)}
+            </p>
+          )}
           <button className="spw-btn" onClick={() => setConfirming(false)} type="button">
             {copy.spwBack}
           </button>
-          <button className="spw-btn is-danger" disabled={pending} onClick={() => run("block")} type="button">
+          <button
+            aria-describedby={blockOverLimit ? "spw-bk-limit-why" : undefined}
+            className="spw-btn is-danger"
+            disabled={pending || blockOverLimit}
+            onClick={() => run("block")}
+            type="button"
+          >
             {copy.bkConfirmBlock.replace("{ranges}", String(ranges.length)).replace("{nights}", String(cells.length))}
           </button>
         </div>
@@ -278,6 +306,15 @@ export function OpsBlockPanel({
       <div className="spw-body">
         <SpwHead kicker={copy.spwKicker} sub={scopeSummary ? scopeSummary.rooms : copy.bkEmptyTitle} title={copy.spwBkTitle} />
         <SpwModeTabs copy={copy} mode="block" onSwitchMode={onSwitchMode} />
+
+        {/* 상한을 넘으면 맨 위에서 먼저 알린다 — 아래 목록을 내리지 않아도 버튼이 막힌 이유가 보이게. */}
+        {blockOverLimit && (
+          <div className="spw-alert is-limit" role="status">
+            <b>{fillBlockLimitText(copy.bkLimitTitle, ranges.length)}</b>
+            <span>{fillBlockLimitText(copy.bkLimitBody, ranges.length)}</span>
+            <small>{copy.bkLimitHint}</small>
+          </div>
+        )}
 
         {/* 사유(선택) — BLOCK 막대에 같이 보인다. 「이 방 왜 막혀 있지?」를 묻지 않게(2026-10-01). */}
         {hasSelection && (
@@ -341,9 +378,21 @@ export function OpsBlockPanel({
               ))}
               <span className="spw-release__t">{copy.bkBlockedNote.replace("{nights}", String(blockedCells.length))}</span>
             </span>
-            <button className="spw-release__btn" disabled={pending} onClick={() => run("release")} type="button">
+            <button
+              className="spw-release__btn"
+              disabled={pending || releaseOverLimit}
+              onClick={() => run("release")}
+              type="button"
+            >
               {copy.bkRelease}
             </button>
+          </div>
+        )}
+        {releaseOverLimit && (
+          <div className="spw-alert is-limit" role="status">
+            <b>{fillBlockLimitText(copy.bkReleaseLimitTitle, blockedRanges.length)}</b>
+            <span>{fillBlockLimitText(copy.bkReleaseLimitBody, blockedRanges.length)}</span>
+            <small>{copy.bkLimitHint}</small>
           </div>
         )}
 
@@ -358,6 +407,12 @@ export function OpsBlockPanel({
       </div>
 
       <div className="spw-foot">
+        {/* 차단이 막힌 이유 한 줄 — 버튼이 흐려지기만 하지 않게. 읽어 주는 것은 버튼의 describedby 로만(중복 낭독 방지). */}
+        {blockOverLimit && (
+          <p className="spw-foot__why" id="spw-bk-limit-why">
+            {fillBlockLimitText(copy.bkLimitFoot, ranges.length)}
+          </p>
+        )}
         {/* 화면의 선택만 비운다 — Beds24 에는 아무것도 안 보낸다. */}
         <button
           className="spw-btn"
@@ -372,8 +427,9 @@ export function OpsBlockPanel({
           {copy.scopeClear}
         </button>
         <button
+          aria-describedby={blockOverLimit ? "spw-bk-limit-why" : undefined}
           className="spw-btn is-danger"
-          disabled={!hasSelection || pending}
+          disabled={!hasSelection || pending || blockOverLimit}
           onClick={() => setConfirming(true)}
           type="button"
         >

@@ -49,7 +49,7 @@ vi.mock("@/lib/beds24/calendar-client", async (importOriginal) => {
 let fake = createFakeSupabase({});
 vi.mock("@/lib/supabase/service", () => ({ getSupabaseServiceClient: () => fake.client }));
 
-const { revertBlockChange, submitManualBooking, submitReservationEdit, submitRoomBlock } = await import("@/actions/ops-calendar");
+const { revertBlockChange, submitManualBooking, submitReservationEdit, submitRoomBlock, submitRoomUnblock } = await import("@/actions/ops-calendar");
 const calendarClient = await import("@/lib/beds24/calendar-client");
 const postCalendar = vi.mocked(calendarClient.postBeds24Calendar);
 const fetchBooking = vi.mocked(calendarClient.fetchBeds24BookingById);
@@ -304,6 +304,43 @@ describe("submitReservationEdit — 우리 표 다시 맞추기(반영 지연)",
  */
 describe("submitRoomBlock — 방 잠금 · 바뀐 밤만 이력", () => {
   const cells = ["2030-01-10", "2030-01-11"].map((date) => ({ date, roomIds: ["u1"], roomKey: ROOM_KEY, roomLabel: "101" }));
+
+  it("구간이 상한(60)을 넘으면 Beds24 · 잠금 없이 too_many_ranges, 60구간까지는 그 오류가 아니다", async () => {
+    // 하루 건너 하나씩 고르면 칸마다 따로 구간이 된다.
+    const spread = (count: number) =>
+      Array.from({ length: count }, (_, index) => {
+        const day = new Date(Date.UTC(2030, 0, 10 + index * 2, 12));
+        return { date: day.toISOString().slice(0, 10), roomIds: ["u1"], roomKey: ROOM_KEY, roomLabel: "101" };
+      });
+
+    const over = await submitRoomBlock({ cells: spread(61) });
+    expect(over).toEqual({ detail: "61", error: "too_many_ranges", ok: false });
+    expect(fetchCalendar).not.toHaveBeenCalled();
+    expect(postCalendar).not.toHaveBeenCalled();
+    expect(fake.rpcCalls.filter((call) => call.name === "beds24_try_lock")).toHaveLength(0);
+
+    // 60구간은 상한을 통과해 다음 단계(방 잠금)까지 간다 — 잠금을 남이 들고 있게 해 거기서 멈춘다.
+    let lockTries = 0;
+    fake.client.rpc = async (name: string) => {
+      if (name === "beds24_try_lock") lockTries += 1;
+      return { data: name === "beds24_try_lock" ? false : true, error: null };
+    };
+    const edge = await submitRoomBlock({ cells: spread(60) });
+    expect(edge).toEqual({ error: "room_busy", ok: false });
+    expect(lockTries).toBeGreaterThan(0);
+  });
+
+  it("해제도 61구간이면 Beds24 · 잠금 없이 too_many_ranges", async () => {
+    const spread = Array.from({ length: 61 }, (_, index) => {
+      const day = new Date(Date.UTC(2030, 0, 10 + index * 2, 12));
+      return { date: day.toISOString().slice(0, 10), roomIds: ["u1"], roomKey: ROOM_KEY, roomLabel: "101" };
+    });
+    const result = await submitRoomUnblock({ cells: spread });
+    expect(result).toEqual({ detail: "61", error: "too_many_ranges", ok: false });
+    expect(fetchCalendar).not.toHaveBeenCalled();
+    expect(postCalendar).not.toHaveBeenCalled();
+    expect(fake.rpcCalls.filter((call) => call.name === "beds24_try_lock")).toHaveLength(0);
+  });
 
   it("같은 방 잠금을 남이 들고 있으면 Beds24 를 부르지 않고 「방 사용 중」", async () => {
     fake.client.rpc = async (name: string) => ({ data: name === "beds24_try_lock" ? false : true, error: null });

@@ -3507,3 +3507,17 @@ HIG 캔버스 「A2Sales-*」 승인 후 구현. 크기 · 대비만 바꾸고 �
 회귀 테스트: `ops-manual-booking-concurrency.test.ts`(차단 방 잠금 · 바뀐 밤만 이력 · 되돌리기는 그 밤만 · 반영 지연) ·
 `ops-calendar-write-integrity.test.ts`(`changedNights` · 풀기 전 읽기 실패 · `room_blocks` 끝 날짜) · `beds24-price-job-merge.test.ts`
 (`isMergeableSibling` · `cellOwnerJobIds`).
+
+## 차단 · 해제 구간 상한 — 「고른 칸이 없습니다」 대신 상한을 알린다 (2026-11-18, 사용자 신고)
+
+한 번에 60구간(방 하나의 이어진 날짜 = 1구간)을 넘겨 차단하면 서버가 `no_cells` 를 돌려줘 화면에 「실패 — 고른 칸이 없습니다」가 떴다. 실제 뜻은 「너무 많이 골랐다」였고, 화면은 누르기 전에도 알려 주지 않았다.
+
+- **서버**: 상한 초과는 새 오류 `too_many_ranges`(`BlockChangeError`, `detail` = 보낸 구간 수). `no_cells` 는 진짜로 칸이 없을 때만 쓴다. 상한 `MAX_BLOCK_RANGES = 60`(그대로)과 판정 `exceedsBlockRangeLimit()` · 구간 수 `countBlockRanges()` 는 `src/lib/ops-block-limits.ts` 한 곳 — 서버 액션 파일은 값을 export 할 수 없어 일반 모듈로 옮겼고, 서버 · PC 패널 · 모바일 시트 · 되돌리기 쪼개기(`chunkCellsByRanges`)가 같이 쓴다.
+- **화면(PC 패널 `ops-block-panel.tsx` · 모바일 시트 `mobile-ops-block-sheet.tsx`)**: 고른 구간이 상한을 넘으면 누르기 전에 알리고 「차단」 버튼을 막는다. 해제는 막혀 있는 칸만 보내므로 그 구간 수(`blockedRanges`) 기준으로 따로 판단해 「차단 해제」 버튼을 막는다. 처음에는 안내가 61줄 구간 목록 아래에 굵은 빨강 한 덩어리로 있어 끝까지 내려야 보였고, 「구간」이 무엇인지도 몰라 다시 다듬었다(2026-11-18, 같은 날).
+  - **자리**: 차단 안내는 맨 위 — PC 는 모드 탭(`SpwModeTabs`) 바로 아래, 모바일 입력 단계는 머리(`msw-head`) 바로 아래(둘 다 사유 위). 해제 안내는 그것이 막는 「이미 막힌 칸」 줄 바로 아래. 차단 · 해제가 둘 다 넘으면 각자 자리에 따로 뜬다.
+  - **구조**: 제목(PC 빨강 14px · 모바일 15px, 굵게 — 「한 번에 {max}구간까지 막을 수 있습니다」) + 본문(PC 13px · 모바일 15px 보통 굵기 — 모바일은 HIG 크기라 시트의 다른 안내와 같다 — 「지금 {ranges}구간을 골랐습니다. {over}구간 이상 빼고 나눠서 막아 주세요.」, `{over}` = 구간 수 − 60, `overBlockRangeLimit()`) + 옅은 한 줄 설명(PC 12px · 모바일 13px — 「방 하나의 이어진 날짜가 1구간입니다.」). `role="status"`(끌어서 고를 때 숫자가 바뀌어도 매번 끼어들어 읽지 않게 — 서버 실패 안내만 `alert`), 숫자는 `tabular-nums`. 클래스 `.spw-alert.is-limit` · `.msw-alert.limit`(기존 옅은 빨강 배경 · 테두리 없음 · 아이콘 없음). 옅은 빨강 위 대비: 빨강 4.95 · 설명 줄 4.74 · 본문 10.13(모두 4.5 이상).
+  - **버튼 위 한 줄**: 차단이 상한을 넘으면 아래 버튼 영역에 「{over}구간을 빼면 막을 수 있습니다」(PC 12px 왼쪽 · 모바일 13px 가운데, 빨강)가 뜨고 차단 버튼이 `aria-describedby` 로 잇는다(role 없음 — 같은 말을 두 번 읽지 않게). 확인 단계: 최종 차단 버튼도 상한이면 막는다. PC 는 패널이 열린 채 격자를 눌러 선택이 늘 수 있어 확인 단계에도 같은 줄(같은 id · describedby)이 뜬다. 모바일 시트는 선택을 바꿀 수 없는 모달이라 버튼만 막고 줄은 없다.
+  - **움직임**: 안내와 한 줄은 기존 `spw-in` / `msw-in` 200ms 로 나타난다(`prefers-reduced-motion` 에서 끔). 버튼의 비활성 전환(opacity 160~180ms)과 비활성 중 눌림 축소 없음은 기존 규칙 그대로.
+  - 서버가 그래도 거절하면 `errBkTooManyRanges`(`{max}` 치환)를 `blockErrorText()` 가 보여 준다.
+- **문구**(`opsAdmin.calendar`, ko · ja · en): `bkLimitTitle` · `bkLimitBody` · `bkLimitHint` · `bkLimitFoot`(차단), `bkReleaseLimitTitle` · `bkReleaseLimitBody`(해제), 서버 실패용 `errBkTooManyRanges`. 자리표시는 `{max}` `{ranges}` `{over}` + `fillBlockLimitText()`(함수 값 없음). 처음 넣었던 `bkRangeLimitNote` · `bkReleaseRangeLimitNote` 는 지웠다.
+- **테스트**: `src/lib/__tests__/ops-block-limits.test.ts`(60 통과 · 61 초과 · 구간 세기 · `{over}` 계산(61→1 · 75→15) · 세 언어 새 키 · 채운 뒤 `{` 가 안 남음 · `blockErrorText` 치환), `ops-manual-booking-concurrency.test.ts`(`submitRoomBlock` 61구간 → `too_many_ranges`, Beds24 · 잠금 호출 없음).

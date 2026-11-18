@@ -18,8 +18,6 @@ import {
   Building2,
   CalendarDays,
   Check,
-  ChevronLeft,
-  ChevronRight,
   Copy,
   ExternalLink,
   LoaderCircle,
@@ -39,6 +37,7 @@ import {
   saveReservationInternalNoteAction,
 } from "@/app/admin/calendar/actions";
 import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
+import { AdminMonthPicker } from "@/components/admin/shared/admin-month-picker";
 import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
 import { formatPhoneDisplay, phoneHref } from "@/lib/phone-format";
 import {
@@ -62,6 +61,7 @@ import {
 } from "@/lib/reservation-note-sync";
 import { collectBlockedRooms } from "@/lib/room-blocks";
 import { localizePropertyName } from "@/lib/room-label-normalization";
+import { roomRowSubPrefix } from "@/lib/calendar-row-labels";
 import { splitVacantRooms } from "@/lib/vacant-rooms";
 import type { Database } from "@/types/database";
 import "./admin-reservation-console.css";
@@ -98,12 +98,12 @@ export type AdminReservationConsoleProps = {
   initialLocale: Locale;
   isOutOfWindow: boolean;
   nextMonth: string;
-  prevMonth: string;
   propertyOptions: string[];
   /** 예약 id → { 메모, updated_at } — 저장 때 `updatedAt` 을 「내가 본 버전」으로 보낸다(2026-11-12). */
   reservationNotes: Record<string, ReservationNoteSnapshot>;
   reservations: Array<{
-    beds24Id: string;
+    reservationNo: string;
+    beds24Id: string | null;
     channel: ReservationChannel;
     checkInDate: string;
     checkOutDate: string;
@@ -191,13 +191,7 @@ const STATUS_STYLE: Record<
   no_show: { badge: "pill pill--danger", dot: "var(--danger)", dimmed: true },
 };
 
-function buildMonthLabel(month: string, locale: Locale) {
-  return new Intl.DateTimeFormat(locale, {
-    year: "numeric",
-    month: "long",
-    timeZone: "Asia/Tokyo",
-  }).format(new Date(`${month}-01T00:00:00Z`));
-}
+const MONTH_PICKER_LOCALE_TAG: Record<Locale, string> = { en: "en-US", ja: "ja-JP", ko: "ko-KR" };
 
 function formatShortDate(date: string, locale: Locale) {
   return new Intl.DateTimeFormat(locale, {
@@ -374,7 +368,6 @@ export function AdminReservationConsole({
   initialLocale,
   isOutOfWindow,
   nextMonth,
-  prevMonth,
   propertyOptions,
   reservationNotes: initialReservationNotes,
   reservations,
@@ -1287,7 +1280,9 @@ export function AdminReservationConsole({
                     <span className="acw-row__t">
                       <b>{column.name(reservation)}</b>
                       <span>
-                        {selectedProperty ? "" : `${localizedPropertyName(reservation.propertyName)} · `}
+                        {roomRowSubPrefix({ selectedProperty, propertyName: reservation.propertyName, roomLabel: roomLookup[reservation.roomKey]?.displayRoomLabel ?? reservation.roomLabel })
+                          ? `${localizedPropertyName(reservation.propertyName)} · `
+                          : ""}
                         {column.sub(reservation)}
                       </span>
                     </span>
@@ -1590,13 +1585,21 @@ export function AdminReservationConsole({
 
         {activeView === "month" ? (
           <div className="acw-month">
-            <Link aria-label={copy.prevMonth} className="acw-ib" href={buildCalendarHref(prevMonth, selectedProperty)}>
-              <ChevronLeft aria-hidden="true" />
-            </Link>
-            <span className="acw-month__label num">{buildMonthLabel(selectedMonth, uiLocale)}</span>
-            <Link aria-label={copy.nextMonth} className="acw-ib" href={buildCalendarHref(nextMonth, selectedProperty)}>
-              <ChevronRight aria-hidden="true" />
-            </Link>
+            {/* 월 이름을 누르면 공용 월 고르기(CLAUDE.md §4a, 2026-11-18). 화살표는 피커가 들고, 주소는 우리 `?month=` 그대로. */}
+            <AdminMonthPicker
+              basePath="/admin/calendar"
+              labels={{
+                nextMonth: copy.nextMonth,
+                nextYear: dictionary.admin.shared.dateNextYear,
+                open: dictionary.admin.shared.dateSelect,
+                prevMonth: copy.prevMonth,
+                prevYear: dictionary.admin.shared.datePrevYear,
+                thisMonth: dictionary.admin.shared.dateThisMonth,
+              }}
+              localeTag={MONTH_PICKER_LOCALE_TAG[uiLocale]}
+              onSelect={(ym) => router.push(buildCalendarHref(ym, selectedProperty))}
+              ym={selectedMonth}
+            />
             {selectedMonth !== currentMonth ? (
               <Link className="acw-link" href={buildCalendarHref(currentMonth, selectedProperty)}>
                 {copy.thisMonth}
@@ -1690,7 +1693,6 @@ export function AdminReservationConsole({
       >
         {panelReservation ? (
           <ReservationPanel
-            beds24Id={panelReservation.beds24Id}
             channelLabel={buildChannelLabel(panelReservation.channel, dictionary)}
             channelStyle={CHANNEL_STYLE[panelReservation.channel]}
             copy={copy}
@@ -1711,9 +1713,9 @@ export function AdminReservationConsole({
             }}
             onRetryNote={() => void saveNote(panelReservation.id)}
             onClose={closePanel}
-            onCopyBeds24Id={async () => {
+            onCopyReservationNo={async () => {
               try {
-                await copyText(panelReservation.beds24Id);
+                await copyText(panelReservation.reservationNo);
                 showToast(copy.beds24CopiedToast);
               } catch {
                 showToast(copy.copyFailedToast, true);
@@ -1757,7 +1759,6 @@ export function AdminReservationConsole({
 }
 
 function ReservationPanel({
-  beds24Id,
   channelLabel,
   channelStyle,
   copy,
@@ -1765,7 +1766,7 @@ function ReservationPanel({
   noteStatus,
   onChangeNote,
   onClose,
-  onCopyBeds24Id,
+  onCopyReservationNo,
   onCopyPhone,
   onLinkedAction,
   onRestoreMine,
@@ -1776,7 +1777,6 @@ function ReservationPanel({
   roomLabel,
   uiLocale,
 }: {
-  beds24Id: string;
   channelLabel: string;
   channelStyle: { accent: string; background: string; badge: string };
   copy: ReturnType<typeof getDictionary>["admin"]["calendar"];
@@ -1784,7 +1784,7 @@ function ReservationPanel({
   noteStatus: NoteStatus | null;
   onChangeNote: (value: string) => void;
   onClose: () => void;
-  onCopyBeds24Id: () => void;
+  onCopyReservationNo: () => void;
   onCopyPhone: () => void;
   onLinkedAction: (kind: "maintenance" | "complaint" | "lost") => void;
   onRestoreMine: (mine: string) => void;
@@ -1818,10 +1818,11 @@ function ReservationPanel({
       <div className="acw-ph">
         <span className="acw-kick">
           <i style={{ background: channelStyle.accent }} />
-          {channelLabel} · {copy.wResNo} <span className="acw-mono">{beds24Id}</span>
-          <button aria-label={copy.wCopyResNo} className="acw-ib is-sm" onClick={onCopyBeds24Id} title={copy.wCopyResNo} type="button">
+          {channelLabel} · {copy.wResNo} <span className="acw-mono">{reservation.reservationNo}</span>
+          <button aria-label={copy.wCopyResNo} className="acw-ib is-sm" onClick={onCopyReservationNo} title={copy.wCopyResNo} type="button">
             <Copy aria-hidden="true" />
           </button>
+          {reservation.beds24Id ? <span className="acw-kick__sub num">{copy.wBeds24No.replace("{n}", reservation.beds24Id)}</span> : null}
         </span>
         <button aria-label={copy.wClose} className="acw-ib acw-ph__x" data-panel-autofocus onClick={onClose} type="button">
           <X aria-hidden="true" />
@@ -1957,55 +1958,39 @@ function RoomPanel({
       .filter((reservation) => reservation.roomKey === room.key && reservation.checkInDate > today)
       .sort((a, b) => a.checkInDate.localeCompare(b.checkInDate))[0] ?? null;
 
+  const linked = (reservation: AdminReservationConsoleProps["reservations"][number] | null, empty: string) =>
+    reservation ? (
+      <button className="acw-lcard" onClick={() => onOpenReservation(reservation.id)} type="button">
+        <b>{reservation.guestName}</b>
+        <span className="num">{formatDateRangeShort(reservation.checkInDate, reservation.checkOutDate, uiLocale)}</span>
+      </button>
+    ) : (
+      <p className="acw-lempty">{empty}</p>
+    );
+
+  // 예약 상세 패널과 같은 모양(2026-11-18 unslop) — 회색 kicker · 600 제목 · 테두리 없는 옅은 바탕 줄. 닫기는 X · Esc · 바깥 클릭.
   return (
-    <div className="admcal__panel-inner">
-      <div className="admcal__panel-header">
-        <div className="admcal__panel-kicker">
+    <div className="admcal__panel-inner acw-panel">
+      <div className="acw-ph">
+        <span className="acw-kick">
           {copy.roomStatusView} · {propertyLabel}
+        </span>
+        <button aria-label={copy.closePanel} className="acw-ib acw-ph__x" data-panel-autofocus onClick={onClose} type="button">
+          <X aria-hidden="true" />
+        </button>
+      </div>
+      <div className="admcal__panel-body acw-pb">
+        <div className="acw-who">
+          <h2 className="num">{bRoom(room.displayRoomLabel)}</h2>
         </div>
-        <button aria-label={copy.closePanel} className="admcal__panel-close" data-panel-autofocus onClick={onClose} type="button">
-          <X className="size-4" />
-        </button>
-        <div className="admcal__panel-title">{bRoom(room.displayRoomLabel)}</div>
-        <div className="admcal__panel-subtitle">{propertyLabel}</div>
-      </div>
-
-      <div className="admcal__panel-body">
-        <section className="admcal__panel-section">
-          <div className="admcal__section-title">{copy.currentGuest}</div>
-          {currentGuest ? (
-            <button className="admcal__linked-card" onClick={() => onOpenReservation(currentGuest.id)} type="button">
-              <div className="admcal__linked-card-title">{currentGuest.guestName}</div>
-              <div className="admcal__linked-card-body">
-                {copy.checkIn}: {formatShortDate(currentGuest.checkInDate, uiLocale)} · {copy.checkOut}:{" "}
-                {formatShortDate(currentGuest.checkOutDate, uiLocale)}
-              </div>
-            </button>
-          ) : (
-            <div className="admcal__linked-empty">{copy.statusVacant}</div>
-          )}
+        <section className="acw-lsec">
+          <span className="acw-k">{copy.currentGuest}</span>
+          {linked(currentGuest, copy.statusVacant)}
         </section>
-
-        <section className="admcal__panel-section">
-          <div className="admcal__section-title">{copy.nextReservation}</div>
-          {nextReservation ? (
-            <button className="admcal__linked-card" onClick={() => onOpenReservation(nextReservation.id)} type="button">
-              <div className="admcal__linked-card-title">{nextReservation.guestName}</div>
-              <div className="admcal__linked-card-body">
-                {copy.checkIn}: {formatShortDate(nextReservation.checkInDate, uiLocale)} · {copy.checkOut}:{" "}
-                {formatShortDate(nextReservation.checkOutDate, uiLocale)}
-              </div>
-            </button>
-          ) : (
-            <div className="admcal__linked-empty">{copy.noNextReservation}</div>
-          )}
+        <section className="acw-lsec">
+          <span className="acw-k">{copy.nextReservation}</span>
+          {linked(nextReservation, copy.noNextReservation)}
         </section>
-      </div>
-
-      <div className="admcal__panel-footer">
-        <button className="admcal__subtle-btn is-full" onClick={onClose} type="button">
-          {copy.closePanel}
-        </button>
       </div>
     </div>
   );

@@ -2,7 +2,7 @@ import { shiftMonthKey } from "@/components/admin/shared/admin-month-key";
 import { normalizeReservationSource } from "@/lib/beds24/source-normalization";
 import { isBeds24SyncPaused } from "@/lib/beds24/sync-control";
 import { loadPropertyMapMeta } from "@/lib/property-operation-info";
-import { getReservationDisplayId } from "@/lib/reservation-display-id";
+import { getCalendarReservationNumbers } from "@/lib/reservation-display-id";
 import { resolveRoomBlockRoom } from "@/lib/room-block-room";
 import { listReservationInternalNotesInWindow, pickReservationNotes } from "@/lib/reservation-internal-notes";
 import { CALENDAR_PAYLOAD_KEYS, slimPayloadOf, slimPayloadSelect } from "@/lib/reservation-payload-slim";
@@ -75,7 +75,10 @@ function toReservationRow(raw: Record<string, unknown>): ReservationRow {
 }
 
 export type AdminCalendarReservation = {
-  beds24Id: string;
+  /** 화면 · 복사에 쓰는 예약번호 — 채널 번호 먼저(`getCalendarReservationNumbers`). */
+  reservationNo: string;
+  /** 채널 번호와 다른 Beds24 번호 — 작은 보조 글자. 없으면 `null`. */
+  beds24Id: string | null;
   channel: ReservationChannel;
   checkInDate: string;
   checkOutDate: string;
@@ -307,8 +310,10 @@ export async function getAdminCalendarDashboardData(
       propertyName,
     });
 
+    const numbers = getCalendarReservationNumbers(row);
     reservations.push({
-      beds24Id: getReservationDisplayId(row),
+      beds24Id: numbers.beds24Id,
+      reservationNo: numbers.primary,
       channel: toReservationChannel(row.source),
       checkInDate: row.check_in_date,
       checkOutDate: row.check_out_date,

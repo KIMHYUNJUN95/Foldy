@@ -7,7 +7,7 @@ import { getDictionary } from "@/lib/i18n";
 import { getMobileNavBadges } from "@/lib/nav-badges";
 import { getOnboardingState } from "@/lib/onboarding";
 import { loadPropertyMapMeta } from "@/lib/property-operation-info";
-import { getReservationDisplayId } from "@/lib/reservation-display-id";
+import { getCalendarReservationNumbers } from "@/lib/reservation-display-id";
 import { resolveRoomBlockRoom } from "@/lib/room-block-room";
 import { listReservationInternalNotesInWindow, pickReservationNotes } from "@/lib/reservation-internal-notes";
 import { CALENDAR_PAYLOAD_KEYS, slimPayloadOf, slimPayloadSelect } from "@/lib/reservation-payload-slim";
@@ -336,7 +336,9 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
         item.room_label.trim();
       // 내부 키 → 표시 라벨로 바꿔서 402 와 402_2 가 한 캘린더 행을 공유한다.
       const roomLabel = getDisplayRoomLabel(canonicalProperty, internalRoomKey) || internalRoomKey;
+      const numbers = getCalendarReservationNumbers(item);
       return {
+        beds24Id: numbers.beds24Id,
         checkInDate: item.check_in_date,
         checkOutDate: item.check_out_date,
         ...guestFields(getReservationGuests(item.raw_payload)),
@@ -347,7 +349,7 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
         propertyName: canonicalProperty,
         roomLabel,
         source: item.source,
-        sourceReservationId: getReservationDisplayId(item),
+        sourceReservationId: numbers.primary,
         status: item.status,
       };
     };

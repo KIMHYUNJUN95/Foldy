@@ -31,3 +31,19 @@ export function resolveReservationNumber(input: {
   const source = typeof input.sourceReservationId === "string" ? toOriginalReservationId(input.sourceReservationId.trim()) : "";
   return source || null;
 }
+
+/**
+ * 예약 캘린더(PC 상세 패널 · 모바일 상세 시트)의 예약번호 (2026-11-18) — 채널 번호(`apiReference`: Airbnb `HM…` · Booking 숫자)를
+ * 먼저 보이고 복사한다. 사용자는 Beds24 번호로 예약을 못 찾는다. Beds24 번호는 채널 번호와 다를 때만 작은 보조로 돌려준다.
+ */
+export function getCalendarReservationNumbers(row: { raw_payload: unknown; source_reservation_id: string }): {
+  primary: string;
+  beds24Id: string | null;
+} {
+  const beds24 = getReservationDisplayId(row);
+  const payload = row.raw_payload;
+  const raw = payload && typeof payload === "object" && !Array.isArray(payload) ? (payload as Record<string, unknown>).apiReference : null;
+  const channel = typeof raw === "string" || typeof raw === "number" ? toOriginalReservationId(String(raw).trim()) : "";
+  if (!channel) return { primary: beds24, beds24Id: null };
+  return { primary: channel, beds24Id: beds24 && beds24 !== channel ? beds24 : null };
+}

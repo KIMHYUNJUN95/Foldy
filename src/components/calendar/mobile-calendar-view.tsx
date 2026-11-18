@@ -21,9 +21,12 @@ import { BuildingPicker } from "@/components/calendar/building-picker";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import { formatPhoneDisplay } from "@/lib/phone-format";
 import { haptic } from "@/lib/haptics";
+import { barLabelMaxWidth } from "@/lib/calendar-row-labels";
 import { cn } from "@/lib/utils";
 
 export type CalendarReservationItem = {
+  /** 채널 번호와 다른 Beds24 번호 — 상세 시트의 작은 보조 글자. 없으면 `null`. */
+  beds24Id: string | null;
   checkInDate: string;
   checkOutDate: string;
   guestCount: number | null;
@@ -37,6 +40,7 @@ export type CalendarReservationItem = {
   propertyName: string;
   roomLabel: string;
   source: string;
+  /** 화면 · 복사에 쓰는 예약번호 — 채널 번호(Airbnb HM… · Booking 번호) 먼저(2026-11-18). */
   sourceReservationId: string;
   status: "cancelled" | "checked_in" | "checked_out" | "confirmed" | "no_show";
 };
@@ -620,6 +624,37 @@ export function MobileCalendarView({
   // 그리드는 이제 네이티브 2축 스크롤 면이다(sticky 헤더 + sticky 방 라벨 열이
   // JS 동기화 없이 함께 움직임). 그래서 세로 스크롤도 맡으며, 페이지 스크롤러만 듣던
   // 셸의 자동 숨김 상단 크롬에 scrollTop 을 전달한다.
+  // 객실 칸 뒤로 넘어간 막대는 글자를 보이는 시작점으로 민다 — React 상태 대신 DOM 에 바로(스크롤 프레임마다 다시 그리지 않게).
+  const barFitFrame = useRef<number | null>(null);
+  const fitBarLabels = useCallback(() => {
+    barFitFrame.current = null;
+    const grid = scrollRef.current;
+    if (!grid) return;
+    const visibleLeft = grid.scrollLeft;
+    grid.querySelectorAll<HTMLElement>(".mcw-bar[data-l]").forEach((bar) => {
+      const left = Number(bar.dataset.l);
+      const width = Number(bar.dataset.w);
+      const maxWidth = barLabelMaxWidth({ barLeft: left, barRight: left + width, visibleLeft });
+      bar.style.paddingLeft = maxWidth === null ? "" : `${Math.max(8, width - 8 - maxWidth)}px`;
+      bar.toggleAttribute("data-squeezed", maxWidth !== null && maxWidth < 24);
+    });
+  }, []);
+  const scheduleBarFit = useCallback(() => {
+    if (barFitFrame.current === null) barFitFrame.current = requestAnimationFrame(fitBarLabels);
+  }, [fitBarLabels]);
+  useEffect(() => {
+    window.addEventListener("resize", scheduleBarFit);
+    return () => {
+      window.removeEventListener("resize", scheduleBarFit);
+      if (barFitFrame.current !== null) cancelAnimationFrame(barFitFrame.current);
+      barFitFrame.current = null;
+    };
+  }, [scheduleBarFit]);
+  // 막대가 바뀌거나 격자가 다시 붙을 때(월 · 건물 · 보기 전환) 한 번 다시 맞춘다.
+  useEffect(() => {
+    scheduleBarFit();
+  }, [mode, roomBarLayouts, scheduleBarFit]);
+
   const handleGridScroll = useCallback(
     (event: UIEvent<HTMLDivElement>) => {
       const { scrollLeft, scrollTop, clientWidth } = event.currentTarget;
@@ -627,8 +662,9 @@ export function MobileCalendarView({
         new CustomEvent("mobile-shell-scroll", { detail: { scrollTop } }),
       );
       updateVisibleDateRangeLabel(scrollLeft, clientWidth);
+      scheduleBarFit();
     },
-    [updateVisibleDateRangeLabel],
+    [scheduleBarFit, updateVisibleDateRangeLabel],
   );
 
   // 예약 상세 시트 — 공용 BottomSheet(2026-10-19). 고르면 띄우고, 시트가 미끄러져 나간 뒤 onClose 에서 비운다.
@@ -884,6 +920,7 @@ export function MobileCalendarView({
           >
             {copiedKey === "res" ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
           </button>
+          {item.beds24Id ? <span className="mcw-dk__sub num">{w.beds24No.replace("{n}", item.beds24Id)}</span> : null}
         </div>
         <div className="mcw-dwho">
           <h2>{item.guestName}</h2>
@@ -1214,6 +1251,8 @@ export function MobileCalendarView({
                                   !endsInView && "is-cut-r",
                                   selectedReservationId === bar.id && "is-on",
                                 )}
+                                data-l={bar.leftPx + 3}
+                                data-w={Math.max(12, bar.widthPx - 6)}
                                 key={bar.id}
                                 onClick={() => openReservationSheet(bar.id)}
                                 style={{
@@ -1488,7 +1527,7 @@ export function MobileCalendarView({
           className="max-h-[82dvh] flex flex-col"
           header={
             <div className="px-1 pb-2 pt-1">
-              <p className="text-lg font-bold">{w.pickBuilding}</p>
+              <p className="text-lg font-semibold">{w.pickBuilding}</p>
             </div>
           }
         >

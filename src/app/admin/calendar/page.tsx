@@ -49,7 +49,6 @@ export default async function AdminCalendarPage({ searchParams }: PageProps) {
         initialLocale={data.locale}
         isOutOfWindow={data.isOutOfWindow}
         nextMonth={data.nextMonth}
-        prevMonth={data.prevMonth}
         propertyOptions={data.propertyOptions}
         reservationNotes={data.reservationNotes}
         reservations={data.reservations}

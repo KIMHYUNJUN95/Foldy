@@ -84,8 +84,8 @@ export default async function AdminCalendarPrintPage({ searchParams }: PageProps
 
         body {
           margin: 0;
-          background: #f4efe7;
-          color: #1f2937;
+          background: #f6f6f9;
+          color: #16141f;
           font-family: "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif;
         }
 
@@ -102,10 +102,8 @@ export default async function AdminCalendarPrintPage({ searchParams }: PageProps
           max-width: 1200px;
           margin: 0 auto 20px;
           padding: 14px 18px;
-          border: 1px solid #ded4c7;
-          border-radius: 18px;
-          background: rgba(255, 255, 255, 0.9);
-          box-shadow: 0 18px 34px -30px rgba(31, 41, 55, 0.35);
+          border-radius: 14px;
+          background: #fff;
         }
 
         .admcal-print__ghost,
@@ -116,32 +114,31 @@ export default async function AdminCalendarPrintPage({ searchParams }: PageProps
           min-width: 132px;
           height: 40px;
           padding: 0 16px;
-          border-radius: 999px;
-          border: 1px solid #d9cfbf;
+          border: 0;
+          border-radius: 10px;
           font-size: 13px;
-          font-weight: 800;
+          font-weight: 600;
           text-decoration: none;
           white-space: nowrap;
           cursor: pointer;
         }
 
         .admcal-print__ghost {
-          background: #fff;
-          color: #475569;
+          background: #f2f2f5;
+          color: #3a3746;
         }
 
         .admcal-print__primary {
-          background: #304b8f;
-          border-color: #304b8f;
+          background: var(--primary-ink, #5a30cf);
           color: #fff;
         }
 
         .admcal-print__hint {
           flex: 1;
           margin: 0;
-          color: #6b7280;
+          color: #6b6878;
           font-size: 12px;
-          font-weight: 600;
+          font-weight: 400;
           text-align: center;
         }
 
@@ -150,10 +147,8 @@ export default async function AdminCalendarPrintPage({ searchParams }: PageProps
           min-height: 190mm;
           margin: 0 auto 18px;
           padding: 10mm 10mm 9mm;
-          border: 1px solid #dfd3c3;
           border-radius: 16px;
-          background: #fffdfa;
-          box-shadow: 0 24px 48px -40px rgba(31, 41, 55, 0.28);
+          background: #fff;
           break-after: page;
         }
 
@@ -170,32 +165,32 @@ export default async function AdminCalendarPrintPage({ searchParams }: PageProps
         }
 
         .admcal-print__eyebrow {
-          color: #7b8799;
-          font-size: 11px;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 0.08em;
+          color: #6b6878;
+          font-size: 12px;
+          font-weight: 500;
         }
 
         .admcal-print__title {
           margin: 6px 0 0;
           font-size: 24px;
-          font-weight: 900;
-          letter-spacing: -0.03em;
+          font-weight: 600;
+          letter-spacing: -0.02em;
+          font-variant-numeric: tabular-nums;
         }
 
         .admcal-print__subtitle {
           margin: 4px 0 0;
-          color: #5b6473;
+          color: #6b6878;
           font-size: 13px;
-          font-weight: 700;
+          font-weight: 500;
         }
 
         .admcal-print__meta {
-          color: #6b7280;
+          color: #6b6878;
           font-size: 12px;
-          font-weight: 700;
+          font-weight: 500;
           text-align: right;
+          font-variant-numeric: tabular-nums;
         }
 
         .admcal-print__grid {
@@ -204,7 +199,7 @@ export default async function AdminCalendarPrintPage({ searchParams }: PageProps
              (폭 약 257mm; 256mm 로 두면 그리드 테두리용 여유 ~1mm 가 남음) 그래서 30/31일
              달에서도 더 이상 넘치거나 오른쪽 날짜가 잘리지 않는다. */
           --day-width: calc((256mm - var(--label-width)) / ${data.dates.length});
-          border: 1px solid #ded7cc;
+          border: 0.5px solid #e4e3e9;
           border-radius: 12px;
           overflow: hidden;
         }
@@ -216,36 +211,34 @@ export default async function AdminCalendarPrintPage({ searchParams }: PageProps
         }
 
         .admcal-print__head {
-          background: #f4efe7;
+          background: #fafafc;
         }
 
         .admcal-print__corner,
         .admcal-print__room {
           padding: 5px 8px;
-          border-right: 1px solid #ded7cc;
-          border-bottom: 1px solid #ded7cc;
+          border-right: 0.5px solid #e4e3e9;
+          border-bottom: 0.5px solid #e4e3e9;
         }
 
         .admcal-print__corner {
-          color: #7b8799;
+          color: #6b6878;
           font-size: 10px;
-          font-weight: 800;
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
+          font-weight: 500;
         }
 
         .admcal-print__room {
           display: flex;
           align-items: center;
-          background: #fffdfa;
+          background: #fff;
           font-size: 12px;
-          font-weight: 800;
+          font-weight: 600;
         }
 
         .admcal-print__day {
           padding: 4px 0 5px;
-          border-right: 1px solid #e7e0d7;
-          border-bottom: 1px solid #ded7cc;
+          border-right: 0.5px solid #ececf1;
+          border-bottom: 0.5px solid #e4e3e9;
           text-align: center;
         }
 
@@ -257,22 +250,23 @@ export default async function AdminCalendarPrintPage({ searchParams }: PageProps
         .admcal-print__day-week {
           display: block;
           font-size: 8px;
-          font-weight: 800;
+          font-weight: 500;
         }
 
         .admcal-print__day-number {
           display: block;
           margin-top: 1px;
           font-size: 10px;
-          font-weight: 900;
+          font-weight: 600;
+          font-variant-numeric: tabular-nums;
         }
 
         .admcal-print__day.is-sun {
-          color: #dc4b4b;
+          color: #c4364b;
         }
 
         .admcal-print__day.is-sat {
-          color: #315fb5;
+          color: #2f6fde;
         }
 
         .admcal-print__track {
@@ -285,20 +279,17 @@ export default async function AdminCalendarPrintPage({ searchParams }: PageProps
         }
 
         .admcal-print__cell {
-          border-right: 1px solid #f0e8dd;
-          border-bottom: 1px solid #efe7dc;
+          border-right: 0.5px solid #f0f0f4;
+          border-bottom: 0.5px solid #ececf1;
         }
 
-        .admcal-print__cell.is-sun {
-          background: #fff7f7;
-        }
-
+        .admcal-print__cell.is-sun,
         .admcal-print__cell.is-sat {
-          background: #f8fbff;
+          background: #fafafc;
         }
 
         .admcal-print__cell.is-today {
-          background: #fff2cf;
+          background: var(--primary-tint, #f4f1fd);
         }
 
         .admcal-print__bar {
@@ -307,12 +298,10 @@ export default async function AdminCalendarPrintPage({ searchParams }: PageProps
           height: 6.2mm;
           padding: 0 1.6mm;
           border-radius: 6px;
-          border: 1px solid var(--bar-accent);
-          border-left-width: 2px;
           background: var(--bar-bg);
           color: var(--bar-accent);
           font-size: 8.5px;
-          font-weight: 800;
+          font-weight: 600;
           line-height: 6mm;
           white-space: nowrap;
           overflow: hidden;
@@ -328,7 +317,7 @@ export default async function AdminCalendarPrintPage({ searchParams }: PageProps
           background: repeating-linear-gradient(135deg, #eef0f3 0 2mm, #e3e6ea 2mm 4mm);
           color: #5b6573;
           font-size: 8.5px;
-          font-weight: 800;
+          font-weight: 600;
           line-height: 6mm;
           padding: 0 1.6mm;
           white-space: nowrap;
@@ -338,12 +327,11 @@ export default async function AdminCalendarPrintPage({ searchParams }: PageProps
 
         .admcal-print__empty {
           padding: 24px;
-          border: 1px dashed #d9cfbf;
-          border-radius: 14px;
-          background: #fff;
-          color: #6b7280;
+          border-radius: 12px;
+          background: #f6f6f9;
+          color: #6b6878;
           font-size: 13px;
-          font-weight: 700;
+          font-weight: 400;
           text-align: center;
         }
 
@@ -362,9 +350,12 @@ export default async function AdminCalendarPrintPage({ searchParams }: PageProps
 
           .admcal-print__sheet {
             margin: 0;
-            border: 0;
             border-radius: 0;
-            box-shadow: none;
+          }
+
+          /* 종이에선 옅은 바탕끼리 붙은 막대가 구분되지 않는다 — 막대 둘레 0.5px 만 남긴다 */
+          .admcal-print__bar {
+            box-shadow: inset 0 0 0 0.5px var(--bar-accent);
           }
         }
       `}</style>

@@ -38,7 +38,7 @@
   background: var(--card);
   color: var(--adm-muted);
   font-size: 12.5px;
-  font-weight: 800;
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -67,7 +67,7 @@
   background: var(--card);
   color: var(--ink-soft);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -120,7 +120,7 @@
   color: var(--ink-soft);
   text-decoration: none;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
 }
@@ -148,7 +148,7 @@
   padding: 0 4px;
   text-align: center;
   font-size: 14px;
-  font-weight: 900;
+  font-weight: 600;
   letter-spacing: -0.02em;
 }
 
@@ -176,7 +176,7 @@
   color: var(--ink-soft);
   box-shadow: 0 8px 20px -20px rgba(20, 32, 43, 0.24);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   line-height: 1;
   cursor: pointer;
 }
@@ -191,14 +191,14 @@
 .adm .admcal__menu-kicker {
   color: var(--adm-muted);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1;
 }
 
 .adm .admcal__menu-value {
   color: var(--ink);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   line-height: 1;
 }
 
@@ -235,7 +235,7 @@
   background: transparent;
   color: var(--ink-soft);
   font-size: 12.5px;
-  font-weight: 800;
+  font-weight: 600;
   text-align: left;
   cursor: pointer;
 }
@@ -279,7 +279,7 @@
   color: var(--ink-soft);
   text-decoration: none;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .adm .admcal__chip.is-active {
@@ -342,7 +342,7 @@
   border-bottom: 0.5px solid var(--separator);
   box-shadow: 0 8px 18px -18px rgba(20, 32, 43, 0.42);
   font-size: 10.5px;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--faint);
@@ -383,7 +383,7 @@
 .adm .admcal__day-week {
   display: block;
   font-size: 9.5px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .adm .admcal__day-number {
@@ -391,7 +391,7 @@
   margin-top: 2px;
   font-family: var(--mono);
   font-size: 12.5px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .adm .admcal__group-head {
@@ -423,7 +423,7 @@
 
 .adm .admcal__group-name {
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 600;
 }
 
 .adm .admcal__group-count {
@@ -439,7 +439,7 @@
   gap: 8px;
   padding: 0 14px;
   font-size: 10.5px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--adm-muted);
 }
 
@@ -479,7 +479,7 @@
   border-right: 1px solid var(--line);
   font-family: var(--mono);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .adm .admcal__room-label--blocked {
@@ -518,7 +518,7 @@
   background: var(--card);
   color: var(--adm-muted);
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .adm .admcal__cell {
@@ -553,7 +553,7 @@
   color: var(--admcal-bar-accent);
   box-shadow: 0 1px 2px rgba(20, 32, 43, 0.08);
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -621,7 +621,7 @@
 
 .adm .admcal__legend-label {
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--faint);
@@ -632,7 +632,7 @@
   align-items: center;
   gap: 6px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--adm-muted);
 }
 
@@ -656,13 +656,13 @@
   background: var(--card);
   box-shadow: var(--sh-card);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ink-soft);
 }
 
 .adm .admcal__state-title {
   font-size: 13px;
-  font-weight: 900;
+  font-weight: 600;
   color: var(--ink);
 }
 
@@ -698,7 +698,7 @@
   gap: 8px;
   min-width: 0;
   font-size: 13px;
-  font-weight: 900;
+  font-weight: 600;
 }
 
 .adm .admcal__board-icon,
@@ -723,14 +723,14 @@
   padding: 2px 9px;
   font-family: var(--mono);
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .adm .admcal__board-empty {
   padding: 30px 20px;
   color: var(--faint);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   text-align: center;
 }
 
@@ -740,7 +740,6 @@
 }
 
 .adm .admcal__board-row,
-.adm .admcal__linked-card,
 .adm .admcal__table-link,
 .adm .admcal__action-tile {
   border: 0;
@@ -769,7 +768,7 @@
   color: #fff;
   font-family: var(--mono);
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
   padding: 0 6px;
   border: 1px solid rgba(255, 255, 255, 0.28);
   box-shadow:
@@ -786,7 +785,7 @@
 .adm .admcal__board-row-title {
   display: block;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .adm .admcal__board-row-meta {
@@ -809,7 +808,7 @@
   background: var(--warn-bg);
   color: var(--warn);
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .adm .admcal__board-row-tail {
@@ -830,7 +829,7 @@
   border-bottom: 0.5px solid var(--separator);
   text-align: left;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .adm .admcal__table th {
@@ -852,13 +851,13 @@
   gap: 8px;
   padding: 10px 16px;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 600;
 }
 
 .adm .admcal__table-link {
   font-family: var(--mono);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .adm .admcal__cell-stack {
@@ -882,7 +881,7 @@
   padding: 28px 18px;
   color: var(--adm-muted);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .adm .admcal__info-actions {
@@ -913,14 +912,14 @@
   min-width: 92px;
   color: var(--adm-muted);
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .adm .admcal__info-value {
   flex: 1;
   text-align: right;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .adm .admcal__info-block + .admcal__info-block {
@@ -930,7 +929,7 @@
 .adm .admcal__info-block-title {
   margin-bottom: 10px;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 600;
 }
 
 .adm .admcal__access-list {
@@ -950,7 +949,7 @@
   flex: 1;
   min-width: 0;
   font-size: 11.5px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ink-soft);
 }
 
@@ -959,7 +958,7 @@
   margin-left: 6px;
   color: var(--faint);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .adm .admcal__code-chip,
@@ -971,7 +970,7 @@
   text-align: center;
   font-family: var(--mono);
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .adm .admcal__code-chip {
@@ -1060,50 +1059,6 @@
   box-shadow: var(--sh-pop);
 }
 
-.adm .admcal__panel-header {
-  padding: 18px 18px 14px;
-  border-bottom: 0.5px solid var(--separator);
-}
-
-.adm .admcal__panel-kicker {
-  font-size: 10.5px;
-  font-weight: 800;
-  color: var(--adm-primary);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.adm .admcal__panel-close {
-  position: absolute;
-  top: 18px;
-  right: 18px;
-  width: 34px;
-  height: 34px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: var(--card);
-  color: var(--adm-muted);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-.adm .admcal__panel-title {
-  margin-top: 10px;
-  font-size: 20px;
-  font-weight: 900;
-  letter-spacing: -0.02em;
-}
-
-.adm .admcal__panel-subtitle {
-  margin-top: 3px;
-  color: var(--adm-muted);
-  font-family: var(--mono);
-  font-size: 12px;
-  font-weight: 700;
-}
-
 .adm .admcal__panel-pills {
   display: flex;
   flex-wrap: wrap;
@@ -1115,18 +1070,6 @@
   flex: 1;
   overflow: auto;
   padding: 16px 18px 22px;
-}
-
-.adm .admcal__panel-section + .admcal__panel-section,
-.adm .admcal__panel-section + .admcal__readonly-box,
-.adm .admcal__readonly-box + .admcal__panel-section {
-  margin-top: 16px;
-}
-
-.adm .admcal__section-title {
-  margin-bottom: 10px;
-  font-size: 12px;
-  font-weight: 900;
 }
 
 .adm .admcal__staybar {
@@ -1142,7 +1085,7 @@
 .adm .admcal__stay-label {
   display: block;
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--faint);
   text-transform: uppercase;
 }
@@ -1152,7 +1095,7 @@
   margin-top: 4px;
   font-family: var(--mono);
   font-size: 15px;
-  font-weight: 900;
+  font-weight: 600;
 }
 
 .adm .admcal__stay-node span:last-child {
@@ -1160,7 +1103,7 @@
   margin-top: 2px;
   color: var(--adm-muted);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .adm .admcal__stay-line {
@@ -1170,7 +1113,7 @@
   color: var(--adm-primary);
   font-family: var(--mono);
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .adm .admcal__stay-line::before {
@@ -1190,8 +1133,7 @@
   background: var(--card);
 }
 
-.adm .admcal__channel-row,
-.adm .admcal__linked-card {
+.adm .admcal__channel-row {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1211,7 +1153,7 @@
   color: #fff;
   font-family: var(--mono);
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 600;
   flex: 0 0 auto;
   border: 1px solid rgba(255, 255, 255, 0.28);
   box-shadow:
@@ -1219,14 +1161,12 @@
     0 10px 18px -16px rgba(36, 49, 78, 0.55);
 }
 
-.adm .admcal__channel-name,
-.adm .admcal__linked-card-title {
+.adm .admcal__channel-name {
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 600;
 }
 
-.adm .admcal__channel-sub,
-.adm .admcal__linked-card-body {
+.adm .admcal__channel-sub {
   margin-top: 2px;
   color: var(--adm-muted);
   font-size: 11px;
@@ -1242,14 +1182,14 @@
 .adm .admcal__kv-list dt {
   color: var(--faint);
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 600;
   text-transform: uppercase;
 }
 
 .adm .admcal__kv-list dd {
   margin-top: 2px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .adm .admcal__readonly-box {
@@ -1265,7 +1205,7 @@
 .adm .admcal__readonly-title {
   color: var(--info);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 600;
 }
 
 .adm .admcal__readonly-body {
@@ -1309,7 +1249,7 @@
   display: block;
   color: var(--ink);
   font-size: 12.5px;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: -0.015em;
   line-height: 1.45;
   word-break: keep-all;
@@ -1365,7 +1305,7 @@
 
 .adm .admcal__timeline-title {
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .adm .admcal__timeline-value {
@@ -1373,27 +1313,6 @@
   color: var(--adm-muted);
   font-size: 11px;
   font-weight: 600;
-}
-
-.adm .admcal__linked-empty {
-  padding: 14px;
-  border-radius: 12px;
-  background: var(--adm-surface);
-  color: var(--adm-muted);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.adm .admcal__panel-footer {
-  display: flex;
-  gap: 10px;
-  padding: 14px 18px 18px;
-  border-top: 0.5px solid var(--separator);
-  background: var(--card2);
-}
-
-.adm .admcal__panel-footer .admcal__primary-btn {
-  min-width: 132px;
 }
 
 @media (max-width: 1180px) {
@@ -1429,9 +1348,7 @@
 :lang(ko) .adm .admcal__legend-label,
 :lang(ja) .adm .admcal__legend-label,
 :lang(ko) .adm .admcal__table th,
-:lang(ja) .adm .admcal__table th,
-:lang(ko) .adm .admcal__panel-kicker,
-:lang(ja) .adm .admcal__panel-kicker {
+:lang(ja) .adm .admcal__table th {
   letter-spacing: 0;
 }
 
@@ -1466,7 +1383,7 @@
     );
   color: #475569;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
   pointer-events: none;
 }
 
@@ -1519,23 +1436,31 @@
 .adm .acw-k { font-size: 12px; color: #6b6878; }
 .adm .acw-sp { flex: 1; }
 .adm .acw-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 4px 2px 18px; }
-.adm .acw-bar .dd > button { border: 0; background: transparent; box-shadow: none; font-weight: 600; color: #16141f; }
+.adm .acw-bar .dd > button { min-height: 40px; border: 0; background: transparent; box-shadow: none; font-weight: 600; color: #16141f; }
+.adm .acw-bar .lviews button { height: 40px; font-weight: 500; }
+.adm .acw-bar .lviews button.on { font-weight: 600; }
+/* 월 — 공용 `AdminMonthPicker`(화살표를 스스로 든다, 2026-11-18). 판매 캘린더 `.scw .amp` 와 같은 모양 · 40px 누름 영역. */
+.adm .acw-month .amp { gap: 2px; }
+.adm .acw-month .amp__label { height: 40px; min-width: 0; padding: 0 10px; border: 0; border-radius: 10px; background: transparent; font-size: 15px; font-weight: 600; color: #16141f; font-variant-numeric: tabular-nums; box-shadow: none; }
+.adm .acw-month .amp__label:hover { background: #f4f4f7; }
+.adm .acw-month .amp__arw { width: 40px; height: 40px; padding: 0; border: 0; border-radius: 10px; background: transparent; color: #3a3746; transition: background 150ms ease, transform 140ms ease; }
+.adm .acw-month .amp__arw:hover { background: #f4f4f7; }
+.adm .acw-month .amp__arw:active { transform: scale(.94); }
 .adm .acw-month { display: flex; align-items: center; gap: 2px; margin-left: 6px; }
-.adm .acw-month__label { padding: 0 6px; font-size: 15px; font-weight: 700; color: #16141f; }
-.adm .acw-ib { display: grid; place-items: center; width: 34px; height: 34px; flex: none; border: 0; border-radius: 9px; background: transparent; color: #3a3746; cursor: pointer; transition: background 150ms ease, transform 140ms ease; }
+.adm .acw-ib { display: grid; place-items: center; width: 40px; height: 40px; flex: none; border: 0; border-radius: 10px; background: transparent; color: #3a3746; cursor: pointer; transition: background 150ms ease, transform 140ms ease; }
 .adm .acw-ib svg { width: 16px; height: 16px; }
 .adm .acw-ib:hover { background: #f4f4f7; }
 .adm .acw-ib:active { transform: scale(.94); }
-.adm .acw-ib.is-sm { width: 26px; height: 26px; color: var(--text-3); }
+.adm .acw-ib.is-sm { width: 32px; height: 32px; border-radius: 8px; color: var(--text-3); }
 .adm .acw-ib.is-sm svg { width: 13px; height: 13px; }
-.adm .acw-link { display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 4px; border: 0; background: none; font: inherit; font-size: 13px; font-weight: 600; color: #5a30cf; text-decoration: none; cursor: pointer; }
+.adm .acw-link { display: inline-flex; align-items: center; gap: 4px; height: 40px; padding: 0 6px; border: 0; background: none; font: inherit; font-size: 13px; font-weight: 600; color: #5a30cf; text-decoration: none; cursor: pointer; }
 .adm .acw-link svg { width: 13px; height: 13px; }
 .adm .acw-link:hover { text-decoration: underline; text-underline-offset: 3px; }
 .adm .acw-link.is-soft { color: #6b6878; }
-.adm .acw-chip { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 8px; border-radius: 10px; font-size: 14px; color: #3a3746; text-decoration: none; }
+.adm .acw-chip { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 8px; border-radius: 10px; font-size: 14px; color: #3a3746; text-decoration: none; }
 .adm .acw-chip svg { width: 15px; height: 15px; }
 .adm .acw-chip:hover { background: #f4f4f7; }
-.adm .acw-fresh { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; font: inherit; font-size: 12px; color: #6b6878; cursor: pointer; }
+.adm .acw-fresh { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; font: inherit; font-size: 12px; color: #6b6878; cursor: pointer; }
 .adm .acw-fresh:hover { background: #f4f4f7; }
 .adm .acw-fresh i { width: 6px; height: 6px; border-radius: 50%; background: #1f7a4d; }
 .adm .acw-fresh.is-paused i { background: #c5282e; }
@@ -1560,14 +1485,14 @@
 .adm .acw .admcal__grid-corner svg { display: none; }
 .adm .acw .admcal__day-head { border: 0; padding: 6px 0 6px; color: #6b6878; }
 .adm .acw .admcal__day-head.is-sat { color: #2f6fde; background: #fafafc; }
-.adm .acw .admcal__day-head.is-sun { color: #d8455a; background: #fafafc; }
+.adm .acw .admcal__day-head.is-sun { color: #c4364b; background: #fafafc; }
 .adm .acw .admcal__day-head.is-today { background: #f4f1fd; color: #5a30cf; }
 .adm .acw .admcal__day-week { font-size: 11px; font-weight: 500; }
-.adm .acw .admcal__day-number { font-family: inherit; font-size: 14px; font-weight: 700; color: #16141f; }
+.adm .acw .admcal__day-number { font-family: inherit; font-size: 14px; font-weight: 600; color: #16141f; font-variant-numeric: tabular-nums; }
 .adm .acw .admcal__day-head.is-today .admcal__day-number { color: #5a30cf; }
 .adm .acw .admcal__group { border-top: 0.5px solid var(--separator); }
 .adm .acw-ghead { position: sticky; left: 0; z-index: 5; display: flex; align-items: baseline; gap: 8px; width: max-content; padding: 12px 12px 2px; }
-.adm .acw-ghead b { font-size: 14px; font-weight: 700; color: #16141f; }
+.adm .acw-ghead b { font-size: 14px; font-weight: 600; color: #16141f; }
 .adm .acw-ghead span { font-size: 12px; color: #6b6878; }
 .adm .acw-empty-row { display: grid; grid-template-columns: var(--admcal-label-width) max-content; min-height: 26px; }
 .adm .acw-empty-row .admcal__room-label { font-family: inherit; font-size: 11px; font-weight: 500; color: #6b6878; border: 0; background: #fff; }
@@ -1597,13 +1522,13 @@
 .adm .acw-kpi { display: flex; flex-direction: column; gap: 4px; padding: 0 16px; }
 .adm .acw-kpi > span { font-size: 13px; color: #6b6878; }
 .adm .acw-kpi > span:last-child { font-size: 12px; }
-.adm .acw-kpi b { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; color: #16141f; }
+.adm .acw-kpi b { font-size: 30px; font-weight: 600; letter-spacing: -0.02em; color: #16141f; font-variant-numeric: tabular-nums; }
 .adm .acw-kpi b.is-accent { color: #5a30cf; }
 .adm .acw-kpi small { margin-left: 3px; font-size: 13px; font-weight: 500; color: #6b6878; }
 .adm .acw-cols { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); column-gap: 28px; margin-top: 8px; }
 .adm .acw-col { display: flex; flex-direction: column; min-width: 0; }
 .adm .acw-col__h { display: flex; align-items: baseline; gap: 8px; padding-bottom: 8px; border-bottom: 0.5px solid var(--separator); }
-.adm .acw-col__h b { font-size: 15px; font-weight: 700; color: #16141f; }
+.adm .acw-col__h b { font-size: 15px; font-weight: 600; color: #16141f; }
 .adm .acw-col__h span { font-size: 12px; color: #6b6878; }
 .adm .acw-col__empty { margin: 0; padding: 20px 0; font-size: 13px; color: var(--text-done); }
 .adm .acw-row { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 58px; padding: 0 8px; margin: 0 -8px; border: 0; border-top: 0.5px solid var(--separator); border-radius: 0; background: transparent; font: inherit; text-align: left; color: #16141f; cursor: pointer; transition: background 150ms ease; animation: acw-in 300ms cubic-bezier(.23, 1, .32, 1) both; }
@@ -1620,24 +1545,24 @@
 .adm .acw .admcal__table th { background: #fff; border-bottom: 0.5px solid var(--separator); font-size: 12px; font-weight: 500; letter-spacing: 0; text-transform: none; color: #6b6878; }
 .adm .acw .admcal__table td { border-bottom: 0; border-top: 0.5px solid var(--separator); font-size: 13px; }
 .adm .acw .admcal__table-group td { background: #fff; border-top: 0; padding-top: 18px; }
-.adm .acw .admcal__table-group-title { display: inline-flex; align-items: baseline; gap: 10px; font-size: 16px; font-weight: 700; color: #16141f; }
+.adm .acw .admcal__table-group-title { display: inline-flex; align-items: baseline; gap: 10px; font-size: 16px; font-weight: 600; color: #16141f; }
 .adm .acw .admcal__table-group-title small { font-size: 12px; font-weight: 400; color: #6b6878; }
-.adm .acw .admcal__table-link { font-family: var(--mono); font-weight: 600; color: #16141f; }
+.adm .acw .admcal__table-link { display: inline-flex; align-items: center; min-height: 36px; padding: 0 6px; margin: 0 -6px; font-family: var(--mono); font-weight: 600; color: #16141f; }
 .adm .acw .admcal__table .pill { padding: 0; border: 0; background: none; font-size: 13px; font-weight: 400; color: #16141f; }
 .adm .acw .admcal__table .pill--done { color: #16141f; }
 .adm .acw .admcal__table .pill--info { font-weight: 600; color: #1f7a4d; }
 .adm .acw .admcal__table .pill--warn { color: #16141f; }
-.adm .acw .admcal__table .pill--muted { color: #5a30cf; font-weight: 600; }
+.adm .acw .admcal__table .pill--muted { color: #6b6878; }
 
 /* 건물 정보 */
 .adm .acw-infos { display: flex; flex-direction: column; }
 .adm .acw-info { display: grid; grid-template-columns: 260px 260px minmax(0, 1fr); column-gap: 40px; padding: 22px 12px; border-top: 0.5px solid var(--separator); }
 .adm .acw-info__a { display: flex; flex-direction: column; gap: 6px; }
-.adm .acw-info__a > b { font-size: 16px; font-weight: 700; color: #16141f; }
+.adm .acw-info__a > b { font-size: 16px; font-weight: 600; color: #16141f; }
 .adm .acw-info__links { display: flex; align-items: center; gap: 10px; margin-top: 2px; }
 .adm .acw-info__b { display: flex; flex-direction: column; gap: 12px; }
 .adm .acw-code { display: flex; flex-direction: column; gap: 3px; }
-.adm .acw-code b { font-size: 18px; font-weight: 700; color: #16141f; }
+.adm .acw-code b { font-size: 18px; font-weight: 600; color: #16141f; font-variant-numeric: tabular-nums; }
 .adm .acw-note { font-size: 14px; line-height: 1.5; color: #3a3746; white-space: pre-wrap; }
 .adm .acw-note.is-dim { color: var(--text-done); }
 .adm .acw-info__c { display: flex; flex-direction: column; }
@@ -1645,8 +1570,8 @@
 .adm .acw-rcs { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); column-gap: 28px; }
 .adm .acw-rc { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 34px; border-top: 0.5px solid var(--separator); font-size: 13px; }
 
-.adm .acw-copy { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 2px 6px; margin: -2px -6px; border: 0; border-radius: 7px; background: transparent; font: inherit; font-size: 13px; color: #16141f; cursor: pointer; transition: background 150ms ease, transform 140ms ease; }
-.adm .acw-copy.is-big { font-size: 18px; font-weight: 700; }
+.adm .acw-copy { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 2px 6px; margin: -2px -6px; border: 0; border-radius: 7px; background: transparent; font: inherit; font-size: 13px; color: #16141f; cursor: pointer; transition: background 150ms ease, transform 140ms ease; }
+.adm .acw-copy.is-big { font-size: 18px; font-weight: 600; }
 .adm .acw-copy:hover { background: #f4f4f7; }
 .adm .acw-copy:active { transform: scale(.97); }
 .adm .acw-copy:focus-visible { outline: 2px solid #7a52e6; outline-offset: 2px; }
@@ -1664,15 +1589,24 @@
 .adm .acw-ph { display: flex; align-items: center; gap: 8px; padding: 18px 20px 4px 24px; }
 .adm .acw-kick { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 13px; color: #6b6878; }
 .adm .acw-kick i { width: 7px; height: 7px; border-radius: 50%; }
+.adm .acw-kick__sub { font-size: 12px; color: var(--text-3); }
+/* 객실 상태 패널 — 지금 손님 · 다음 예약 줄(테두리 없는 옅은 바탕, 2026-11-18) */
+.adm .acw-lsec { display: flex; flex-direction: column; gap: 6px; padding-top: 16px; border-top: 0.5px solid var(--separator); }
+.adm .acw-lcard { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; padding: 12px 14px; border: 0; border-radius: 12px; background: #f6f6f9; font: inherit; text-align: left; color: #16141f; cursor: pointer; transition: background 150ms ease, transform 140ms ease; }
+.adm .acw-lcard:hover { background: #efeff4; }
+.adm .acw-lcard:active { transform: scale(.98); }
+.adm .acw-lcard b { font-size: 15px; font-weight: 600; }
+.adm .acw-lcard span { font-size: 13px; color: #6b6878; }
+.adm .acw-lempty { margin: 0; font-size: 14px; color: #6b6878; }
 .adm .acw-ph__x { margin-right: -6px; }
 .adm .acw-pb { display: flex; flex-direction: column; gap: 18px; padding: 4px 24px 28px; animation: acw-fade 220ms ease both; }
 @keyframes acw-fade { from { opacity: 0; } }
-.adm .acw-who h2 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.03em; color: #16141f; overflow-wrap: anywhere; }
+.adm .acw-who h2 { margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.03em; color: #16141f; overflow-wrap: anywhere; }
 .adm .acw-who > span { font-size: 14px; color: #6b6878; }
 .adm .acw-who b { color: #16141f; }
 .adm .acw-stay { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding-top: 16px; border-top: 0.5px solid var(--separator); }
 .adm .acw-stay > div { display: flex; flex-direction: column; gap: 2px; }
-.adm .acw-stay b { font-size: 18px; font-weight: 700; color: #16141f; }
+.adm .acw-stay b { font-size: 18px; font-weight: 500; color: #16141f; font-variant-numeric: tabular-nums; }
 .adm .acw-phone { display: flex; align-items: center; gap: 8px; padding-top: 16px; border-top: 0.5px solid var(--separator); }
 .adm .acw-phone > span { flex: 1; min-width: 0; font-size: 15px; color: #16141f; }
 .adm .acw-sq { display: grid; place-items: center; width: 44px; height: 44px; flex: none; border: 0; border-radius: 12px; background: #f4f4f7; color: #4c4958; cursor: pointer; transition: transform 140ms ease, background 150ms ease; }

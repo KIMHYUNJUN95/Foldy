@@ -447,6 +447,10 @@ Permissions · Invite Codes · Attendance Sites/QR 등)은 위 3개 그룹의 �
 `buildAdminTableWorkbookBase64` / `buildAdminTableReportHtml`로 되살린다. 새 화면에 내보내기를 붙일
 때는 여전히 Excel + PDF 2종을 함께, `<AdminExportButtons>`로만 제공한다.
 
+**확정 예외 — 예약 캘린더 「인쇄」(`/admin/calendar/print`)는 Excel + PDF 규칙 밖이다 (2026-11-18, 사용자 결정).**
+표 데이터 내보내기가 아니라 현장에 붙이는 A4 가로 월 보드(막대 그림)라 브라우저 인쇄 창으로 출력 · PDF 저장한다.
+`<AdminExportButtons>` 를 붙이지 않고 새 Excel/PDF 도 만들지 않는다. 인쇄 화면도 콘솔 색(흰 시트 · `--primary` 계열 · 600)을 따른다 — `docs/product/15-reservation-calendar.md` 「unslop 다듬기」.
+
 ### 설정 섹션 — 마스터·디테일 (2026-07-31)
 
 `/admin/settings` · `/admin/settings/organization` · `/admin/settings/attendance` 는 이 콘솔에서

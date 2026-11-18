@@ -7589,3 +7589,10 @@ Status: Confirmed (2026-10-19). 실제 Beds24 시험 대기.
 - 보내기 직전 서버가 직원 원문과 최종 본문 둘 다에서 자리 표시(3개 언어 이름표 · 원래 토큰)를 찾으면 막는다(`assist_placeholder`) — 화면 차단과 따로.
 - 한 달 비용 상한은 「미리 잡고 → 실제 비용으로 정산」(`guest_reply_assist_reserve`, advisory lock). 실패한 호출 비용도 센다.
 - 표 3개는 RLS 켜고 정책 없음 · service_role 만, 함수는 security invoker + 조직 id 인자. 운영 적용은 마이그레이션 먼저(따로 허락) → 코드.
+
+## 2026-11-18 — 예약 캘린더 unslop: 인쇄는 Excel + PDF 규칙 예외 · 달 이름은 공용 월 피커 (문서 15 · 05)
+
+- PC 예약 캘린더의 「인쇄」(`/admin/calendar/print`)는 내보내기가 아니라 종이 출력용 화면이라, 「Excel + PDF 같이」 규칙의 확인된 예외로 둔다(사용자 2026-11-18 추천안 채택).
+- PC 상단 달 이름을 누르면 공용 `AdminMonthPicker` 가 열린다. 달 이동은 `shiftMonthKey()` 그대로.
+- 예약번호는 채널 번호(Airbnb HM… · Booking 번호)를 먼저, Beds24 번호는 회색 보조로. 복사도 채널 번호.
+- 객실 패널 아래 「패널 닫기」 버튼을 없앤다(X · Esc · 바깥 누르기로 닫힘). 모바일 지도 건물 칩은 보이는 높이 28px 그대로, 누름 영역만 36px(지시선 배치가 28px 기준 — 문서 15 예외).

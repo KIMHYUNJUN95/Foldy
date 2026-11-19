@@ -23,6 +23,7 @@
  */
 
 import { getCanonicalPropertyName } from "@/lib/room-label-normalization";
+import { isPendingBeds24InquiryStatus } from "@/lib/beds24/reservation-status";
 
 export type SalesChannel = "airbnb" | "booking" | "direct" | "other";
 
@@ -181,6 +182,8 @@ export function isSalesCountedReservation(reservation: Pick<SalesSummaryReservat
   if (reservation.status === "cancelled") return false;
   const raw = reservation.raw.status;
   if (raw === null || raw === undefined || raw === "") return true;
+  // 문의 · 요청은 운영 화면과 같은 판정(`isPendingBeds24InquiryStatus`)으로 먼저 뺀다(2026-11-19). 나머지는 저쪽 규칙.
+  if (isPendingBeds24InquiryStatus(raw)) return false;
   return isLegacyConfirmedStatus(raw);
 }
 

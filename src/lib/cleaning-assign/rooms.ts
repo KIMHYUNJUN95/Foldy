@@ -2,6 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getCleaningTargets } from "@/lib/cleaning-targets";
+import { excludePendingInquiries } from "@/lib/beds24/reservation-status";
 import { getReservationGuests } from "@/lib/reservation-guests";
 import { GUEST_PAYLOAD_KEYS, slimPayloadOf, slimPayloadSelect } from "@/lib/reservation-payload-slim";
 import { readAllPages } from "@/lib/supabase/read-all-pages";
@@ -43,13 +44,16 @@ export { buildingRank, compareAssignRooms, MAX_DEFER_DAYS } from "@/lib/cleaning
  * 하루에 걸친 예약만 읽어 방 수만큼이다.
  */
 export async function loadStayKeys(supabase: Client, organizationId: string, date: string): Promise<StayKeys> {
-  const { data, error } = await supabase
-    .from("reservations")
-    .select("property_name, room_label, check_in_date")
-    .eq("organization_id", organizationId)
-    .eq("status", "confirmed")
-    .lte("check_in_date", date)
-    .gt("check_out_date", date);
+  // 문의 · 예약 요청은 손님 있는 방으로 치지 않는다(2026-11-19).
+  const { data, error } = await excludePendingInquiries(
+    supabase
+      .from("reservations")
+      .select("property_name, room_label, check_in_date")
+      .eq("organization_id", organizationId)
+      .eq("status", "confirmed")
+      .lte("check_in_date", date)
+      .gt("check_out_date", date),
+  );
   if (error) throw new Error(error.message);
   const staying = new Set<string>();
   const arriving = new Set<string>();
@@ -85,13 +89,15 @@ export async function loadRangeRooms(
   // 한 달 퇴실이 1,000줄(Supabase 한 번 상한)에 가깝다 — 페이지로 끝까지 읽는다.
   const [resResult, extraResult] = await Promise.all([
     readAllPages<{ check_out_date: string; property_name: string | null; room_label: string | null }>((start, end) =>
-      supabase
-        .from("reservations")
-        .select("check_out_date, property_name, room_label")
-        .eq("organization_id", organizationId)
-        .eq("status", "confirmed")
-        .gte("check_out_date", from)
-        .lte("check_out_date", to)
+      excludePendingInquiries(
+        supabase
+          .from("reservations")
+          .select("check_out_date, property_name, room_label")
+          .eq("organization_id", organizationId)
+          .eq("status", "confirmed")
+          .gte("check_out_date", from)
+          .lte("check_out_date", to),
+      )
         .order("id")
         .range(start, end),
     ),
@@ -347,13 +353,15 @@ async function fillCheckIns(supabase: Client, organizationId: string, date: stri
   const blank = new Map(rooms.filter((room) => !room.hasTurnover && !room.nextCheckInDate).map((room) => [room.roomKey, room]));
   if (blank.size === 0) return;
   const result = await readAllPages<Record<string, unknown>>((start, end) =>
-    supabase
-      .from("reservations")
-      .select(CHECKIN_SELECT)
-      .eq("organization_id", organizationId)
-      .eq("status", "confirmed")
-      .gte("check_in_date", date)
-      .lt("check_in_date", addDays(date, CHECKIN_LOOKAHEAD_DAYS))
+    excludePendingInquiries(
+      supabase
+        .from("reservations")
+        .select(CHECKIN_SELECT)
+        .eq("organization_id", organizationId)
+        .eq("status", "confirmed")
+        .gte("check_in_date", date)
+        .lt("check_in_date", addDays(date, CHECKIN_LOOKAHEAD_DAYS)),
+    )
       .order("check_in_date")
       .order("id")
       .range(start, end) as unknown as PromiseLike<{ data: Record<string, unknown>[] | null; error: { message: string } | null }>,

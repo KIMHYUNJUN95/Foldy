@@ -153,9 +153,18 @@ export function createFakeSupabase(
         filters.push((row) => re.test(String(valueOf(row, column) ?? "")));
         return api;
       },
-      /** `not(칸, "is", null)` 만 흉내(그 밖은 거르지 않음). */
+      /** `not(칸, "is", null)` · `not(jsonb 칸, "cs", '{"키":값}')`(얕은 포함) 만 흉내(그 밖은 거르지 않음). */
       not(column?: string, operator?: string, value?: unknown) {
         if (column && operator === "is") filters.push((row) => (valueOf(row, column) ?? null) !== value);
+        if (column && operator === "cs") {
+          const needle = JSON.parse(String(value)) as Row;
+          filters.push((row) => {
+            const json = valueOf(row, column);
+            // PostgreSQL 처럼 칸이 NULL 이면 `NOT (NULL @> …)` 도 NULL — 줄이 빠진다.
+            if (!json || typeof json !== "object") return false;
+            return !Object.entries(needle).every(([key, expected]) => (json as Row)[key] === expected);
+          });
+        }
         return api;
       },
       order(column: string, options?: { ascending?: boolean }) {

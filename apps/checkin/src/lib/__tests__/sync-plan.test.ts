@@ -138,4 +138,40 @@ describe("planSync", () => {
     const plan = planSync([resv(), resv({ id: "r5", organization_id: "org-2" })], [stay()], [{ id: "sr1", stay_id: "s1", reservation_id: "r1" }], TODAY);
     expect(plan.inserts.map((insert) => insert.organization_id)).toEqual(["org-2"]);
   });
+  // 2026-11-19 — Beds24 문의(inquiry · 5) · 예약 요청(request · 3)이 들어온다. 우리 표엔 `confirmed` 라 원본 상태로 가린다.
+  it("문의 · 예약 요청은 stay 도 체크인 코드도 만들지 않는다", () => {
+    for (const status of ["inquiry", "request", 3, 5, "5"]) {
+      const plan = planSync([resv({ raw_payload: { status, numAdult: 2 } })], [], [], TODAY);
+      expect(plan.inserts).toHaveLength(0);
+    }
+    // Foldy DB 거르기와 같게 정확한 값만 — 대소문자가 다른 값은 숙박으로 센다.
+    expect(planSync([resv({ raw_payload: { status: " Inquiry ", numAdult: 2 } })], [], [], TODAY).inserts).toHaveLength(1);
+    const counted = planSync([resv({ raw_payload: { status: "new", numAdult: 2 } })], [], [], TODAY);
+    expect(counted.inserts).toHaveLength(1);
+  });
+
+  it("열린 stay 의 예약이 문의로 돌아오면 취소처럼 닫는다", () => {
+    const plan = planSync([resv({ raw_payload: { status: "request" } })], [stay()], [], TODAY);
+    expect(plan.updates).toEqual([
+      { id: "s1", patch: { status: "cancelled", retain_until: "2026-12-02" }, needsCode: false },
+    ]);
+  });
+
+  it("체크인한 stay 는 예약이 문의로 돌아가도 그대로 둔다", () => {
+    const plan = planSync([resv({ raw_payload: { status: "inquiry" } })], [stay({ status: "checked_in" })], [], TODAY);
+    expect(plan.updates).toHaveLength(0);
+    expect(plan.inserts).toHaveLength(0);
+  });
+
+  it("문의가 확정되면 다음 실행에서 stay 를 만든다(닫혔던 stay 는 다시 연다)", () => {
+    const created = planSync([resv({ raw_payload: { status: "confirmed", numAdult: 2, numChild: 1 } })], [], [], TODAY);
+    expect(created.inserts).toHaveLength(1);
+    const revived = planSync(
+      [resv({ raw_payload: { status: "new", numAdult: 2, numChild: 1 } })],
+      [stay({ status: "cancelled", retain_until: "2026-12-01" })],
+      [],
+      TODAY,
+    );
+    expect(revived.updates[0]).toMatchObject({ patch: { status: "pending" }, needsCode: true });
+  });
 });

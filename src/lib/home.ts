@@ -1,6 +1,7 @@
 import { joinBuildingRoom } from "@/lib/home-activity";
 import type { AppSession } from "@/lib/session";
 import { getCleaningOperatingDateKey } from "@/lib/cleaning";
+import { excludePendingInquiries } from "@/lib/beds24/reservation-status";
 import {
   getCanonicalPropertyName,
   getCanonicalRoomLabel,
@@ -91,11 +92,14 @@ export async function getHomeCheckInOutCounts(
   try {
     const supabase = await getSupabaseServerClient();
     const today = getCleaningOperatingDateKey();
-    const { data, error } = await supabase
-      .from("reservations")
-      .select("check_in_date, check_out_date, status")
-      .eq("organization_id", session.organization.id)
-      .or(`check_in_date.eq.${today},check_out_date.eq.${today}`);
+    // 문의 · 예약 요청은 오늘 체크인 · 체크아웃 수에 넣지 않는다(2026-11-19).
+    const { data, error } = await excludePendingInquiries(
+      supabase
+        .from("reservations")
+        .select("check_in_date, check_out_date, status")
+        .eq("organization_id", session.organization.id)
+        .or(`check_in_date.eq.${today},check_out_date.eq.${today}`),
+    );
     if (error) return { status: "error" };
     const rows = ((data ?? []) as ReservationCountRow[]).filter(
       (r) => !EXCLUDED_RESERVATION_STATUSES.includes(r.status),
@@ -131,13 +135,15 @@ export async function getHomeCheckInOutReservations(
     // 캘린더와 똑같이 정식 방으로 해석한다 (카탈로그가
     // 권위 있는 방 축이며, `raw_payload.roomId` 로 계정 2개짜리 방을 구분한다).
     const [{ data, error }, catalog] = await Promise.all([
-      supabase
-        .from("reservations")
-        .select(
-          "id, guest_name, property_name, room_label, source, check_in_date, check_out_date, status, raw_payload",
-        )
-        .eq("organization_id", session.organization.id)
-        .or(`check_in_date.eq.${today},check_out_date.eq.${today}`),
+      excludePendingInquiries(
+        supabase
+          .from("reservations")
+          .select(
+            "id, guest_name, property_name, room_label, source, check_in_date, check_out_date, status, raw_payload",
+          )
+          .eq("organization_id", session.organization.id)
+          .or(`check_in_date.eq.${today},check_out_date.eq.${today}`),
+      ),
       getActiveRoomCatalog(session.organization.id, supabase),
     ]);
     if (error) return { status: "error" };

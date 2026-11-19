@@ -695,6 +695,7 @@ export function MobileCalendarView({
   // 고르기 전에 표시만 해 두었다가 고른 뒤 시트가 뜬금없이 뜨던 일을 막는다. 못 열면 이유를 알림으로, 한 번 쓴 주소 값은 지운다.
   const deepLinkMessages: Record<CalendarDeepLinkNotice, string> = {
     cancelled: wcopy.deepLinkCancelled,
+    inquiry: wcopy.deepLinkInquiry,
     no_property: wcopy.deepLinkNoProperty,
     not_found: wcopy.deepLinkNotFound,
     out_of_window: wcopy.deepLinkOutOfWindow,

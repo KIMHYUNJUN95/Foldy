@@ -468,6 +468,8 @@ check_in_date date not null        -- Beds24 firstNight date
 check_out_date date not null       -- lastNight + 1 calendar day
 status reservation_status not null
 raw_payload jsonb                  -- original Beds24 webhook payload for recovery/debugging
+                                   -- raw_payload.status keeps the Beds24 status. inquiry/request (3/5) are stored as status='confirmed'
+                                   -- and excluded from operational reads by excludePendingInquiries() (2026-11-19, src/lib/beds24/reservation-status.ts)
 created_at timestamptz not null
 updated_at timestamptz not null
 unique (organization_id, source, source_reservation_id)

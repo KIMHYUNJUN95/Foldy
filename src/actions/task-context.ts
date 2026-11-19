@@ -1,6 +1,7 @@
 "use server";
 
 import { getDictionary } from "@/lib/i18n";
+import { excludePendingInquiries } from "@/lib/beds24/reservation-status";
 import { collectBlockedRooms } from "@/lib/room-blocks";
 import {
   getCanonicalPropertyName,
@@ -105,13 +106,16 @@ async function loadLiveTodayRows(
   orgId: string,
   todayYmd: string,
 ): Promise<LiveResolveRow[]> {
-  const res = await supabase
-    .from("reservations")
-    .select("property_name, room_label, raw_payload")
-    .eq("organization_id", orgId)
-    .lte("check_in_date", todayYmd)
-    .gt("check_out_date", todayYmd)
-    .not("status", "in", "(cancelled,no_show)");
+  // 문의 · 예약 요청은 점유 · 투숙객 수에 넣지 않는다(2026-11-19).
+  const res = await excludePendingInquiries(
+    supabase
+      .from("reservations")
+      .select("property_name, room_label, raw_payload")
+      .eq("organization_id", orgId)
+      .lte("check_in_date", todayYmd)
+      .gt("check_out_date", todayYmd)
+      .not("status", "in", "(cancelled,no_show)"),
+  );
   return (res.data as LiveResolveRow[] | null) ?? [];
 }
 
@@ -304,16 +308,18 @@ export async function fetchRoomReservations(
 
   const supabase = getSupabaseServiceClient();
 
-  const rawResult = await supabase
-    .from("reservations")
-    .select(
-      "id, guest_name, source, check_in_date, check_out_date, property_name, room_label, raw_payload",
-    )
-    .eq("organization_id", orgId)
-    .lt("check_in_date", windowEndExclusive)
-    .gte("check_out_date", windowStart)
-    .not("status", "in", "(cancelled,no_show)")
-    .order("check_in_date", { ascending: true });
+  // 할 일에 붙일 예약 고르기 — 문의 · 예약 요청은 내지 않는다(2026-11-19).
+  const rawResult = await excludePendingInquiries(
+    supabase
+      .from("reservations")
+      .select(
+        "id, guest_name, source, check_in_date, check_out_date, property_name, room_label, raw_payload",
+      )
+      .eq("organization_id", orgId)
+      .lt("check_in_date", windowEndExclusive)
+      .gte("check_out_date", windowStart)
+      .not("status", "in", "(cancelled,no_show)"),
+  ).order("check_in_date", { ascending: true });
 
   const rows = (rawResult.data as ResWindowRow[] | null) ?? [];
   if (rawResult.error || rows.length === 0) {
@@ -434,16 +440,19 @@ export async function searchReservations(query: string): Promise<ReservationSear
 
   const supabase = getSupabaseServiceClient();
 
-  const rawResult = await supabase
-    .from("reservations")
-    .select(
-      "id, guest_name, source, source_reservation_id, check_in_date, check_out_date, property_name, room_label, raw_payload",
-    )
-    .eq("organization_id", orgId)
-    .not("status", "in", "(cancelled,no_show)")
-    .gte("check_out_date", windowStart)
-    .lt("check_in_date", windowEnd)
-    .or(`guest_name.ilike.%${q}%,source_reservation_id.ilike.%${q}%`)
+  // 검색도 `limit(20)` 이라 DB 에서 문의 · 예약 요청을 뺀다(2026-11-19).
+  const rawResult = await excludePendingInquiries(
+    supabase
+      .from("reservations")
+      .select(
+        "id, guest_name, source, source_reservation_id, check_in_date, check_out_date, property_name, room_label, raw_payload",
+      )
+      .eq("organization_id", orgId)
+      .not("status", "in", "(cancelled,no_show)")
+      .gte("check_out_date", windowStart)
+      .lt("check_in_date", windowEnd)
+      .or(`guest_name.ilike.%${q}%,source_reservation_id.ilike.%${q}%`),
+  )
     .order("check_in_date", { ascending: false })
     .limit(20);
 

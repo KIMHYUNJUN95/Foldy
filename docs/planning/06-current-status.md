@@ -5,6 +5,8 @@
 > 2026-11-17: 손님 메시지 목록 순서를 손님 말 · 우리 답장 기준으로(리뷰 알림 system 줄 · 직원 메모는 올리지 않음) — `ingest-plan.ts` + 마이그레이션 `202611170001`(2026-11-17 운영 적용 · 어긋남 0). 커밋 · main 푸시.
 > 2026-10-25: 남은 일 전체(결정 대기 · 개발 순서 · 사용자 할 일 · 출시 일정)는 `docs/planning/19-open-tasks.md` 한곳에 모았다. 운영 마이그레이션은 `202610230008` 까지 전부 적용 확인.
 
+**2026-11-19 Beds24 문의 · 예약 요청을 운영 화면에서 빼기 — 커밋 · main 푸시** (문서 15 · 07 · 47 · 43 · 엔지니어링 16 · 04 · 01) — Beds24 채널 설정을 바꿔 문의(`inquiry` · 5) · 요청(`request` · 3)이 들어오고 우리 표엔 `confirmed` 로 적힌다. 판정 한 곳 `src/lib/beds24/reservation-status.ts`(`isPendingBeds24InquiryStatus` · `isPendingBeds24Inquiry` · `excludePendingInquiries`, DB 에서 `NOT (raw_payload @> …)`)으로 청소 대상 · 청소 배정 · PC/모바일 캘린더(딥링크 새 안내 `deepLinkInquiry`) · 홈 · 건물 지도 · 피드백/할 일 예약 고르기 · 자동화 명단 경고 · 셀프 체크인 sync-stays(`apps/checkin/src/lib/pending-inquiry.ts`)에서 뺀다. 메시지함은 그대로. 마이그레이션 없음. 테스트 `beds24-pending-inquiry` · `pending-inquiry-consumers` · `apps/checkin sync-plan`.
+
 **2026-11-18 Beds24 크레딧 「최근 호출」 목록 개선 (PC + 모바일) — 구현, 커밋 안 함 — 컨펌 대기** (문서 36 「Beds24 크레딧」 · 엔지니어링 01 · 결정 기록 01) — 30개 고정 → 고른 기간 · 50개씩 「더 보기」(커서 `called_at` + `id`), 연달아 난 같은 호출 한 줄 묶기(60초 사슬 · 실패 제외 · 펼침), 누가/어디에 줄 눌러 거르기(서버), 자동 갱신은 위에 합침(아래 줄 · 펼침 · 거르기 · 스크롤 유지). 공용 액션 `loadBeds24CreditCalls` · 훅 `beds24-credit-calls.tsx`. 새 색인 · 마이그레이션 없음. 화면 실제 확인은 아직.
 
 **2026-11-18 자동화 관제실 전체 실시간 (PC + 모바일) — 구현, 커밋 안 함 — 컨펌 대기** (문서 36 「관제실 실시간 (2026-11-18)」 · 01) — 크레딧 칸만 실시간이던 관제실 전체(상태 줄 · 오늘 줄 · 목록 켜짐/마지막/다음 · 실행 기록 · 설정 이력)를 탭이 보일 때 15초마다 · 복귀 즉시 공용 액션 `loadAutomationLive()`(우리 DB 만, 크레딧 · Beds24 안 읽음)로 갱신. 나중 응답이 이기고 저장 뒤 서버 그림이 옛 응답을 이긴다. 설정 칸은 발송 시각이 바뀌어도 다시 만들지 않고 손대던 초안은 덮지 않음(`src/lib/automation/live-view.ts`). 테스트 `automation-live-view` · `automation-live-action`.

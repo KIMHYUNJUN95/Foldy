@@ -23,6 +23,7 @@ import {
 } from "@/lib/automation/reservation-fields";
 import { resolveReservationNumber } from "@/lib/reservation-display-id";
 import { getCleaningTargets } from "@/lib/cleaning-targets";
+import { excludePendingInquiries } from "@/lib/beds24/reservation-status";
 import { getDictionary } from "@/lib/i18n";
 import {
   buildRoomKey,
@@ -334,12 +335,15 @@ export async function loadCleaningRoomOptions(
  * 예약 하나로 아침 명단이 통째로 안 나가는 쪽이 현장에 더 위험).
  */
 export async function findCleaningDataIssues(supabase: Client, organizationId: string, date: string): Promise<CleaningDataIssue[]> {
-  const result = await supabase
-    .from("reservations")
-    .select("id, source_reservation_id, original_reservation_id, property_name, room_label, check_in_date, check_out_date, rp_id:raw_payload->id, rp_bookId:raw_payload->bookId")
-    .eq("organization_id", organizationId)
-    .eq("status", "confirmed")
-    .or(`check_in_date.eq.${date},check_out_date.eq.${date}`);
+  // 청소 명단과 같게 문의 · 예약 요청은 데이터 경고에서도 뺀다(2026-11-19).
+  const result = await excludePendingInquiries(
+    supabase
+      .from("reservations")
+      .select("id, source_reservation_id, original_reservation_id, property_name, room_label, check_in_date, check_out_date, rp_id:raw_payload->id, rp_bookId:raw_payload->bookId")
+      .eq("organization_id", organizationId)
+      .eq("status", "confirmed")
+      .or(`check_in_date.eq.${date},check_out_date.eq.${date}`),
+  );
   if (result.error) throw new Error(result.error.message);
   const known = new Set(AUTOMATION_BUILDING_ORDER);
   const issues: CleaningDataIssue[] = [];

@@ -1,5 +1,6 @@
 import { shiftMonthKey } from "@/components/admin/shared/admin-month-key";
 import { normalizeReservationSource } from "@/lib/beds24/source-normalization";
+import { excludePendingInquiries } from "@/lib/beds24/reservation-status";
 import { isBeds24SyncPaused } from "@/lib/beds24/sync-control";
 import { loadPropertyMapMeta } from "@/lib/property-operation-info";
 import { getCalendarReservationNumbers } from "@/lib/reservation-display-id";
@@ -231,14 +232,17 @@ export async function getAdminCalendarDashboardData(
     // 1,000행 상한을 넘으면 조용히 잘린다 — 페이지로 끝까지 읽는다(`read-all-pages.ts`).
     // `raw_payload` 는 쓰는 키만(`reservation-payload-slim.ts`) — 통째면 954행에 약 2MB 였다.
     readAllPages<Record<string, unknown>>((from, to) =>
-      supabase
-        .from("reservations")
-        .select(RESERVATION_SELECT)
-        .eq("organization_id", session.organization.id)
-        .lt("check_in_date", operationalWindowEnd)
-        .gte("check_out_date", operationalWindowStart)
-        .neq("status", "cancelled")
-        .neq("status", "no_show")
+      // 문의 · 예약 요청은 캘린더에 그리지 않는다(2026-11-19) — 확정되면 웹훅이 원본을 고쳐 저절로 나타난다.
+      excludePendingInquiries(
+        supabase
+          .from("reservations")
+          .select(RESERVATION_SELECT)
+          .eq("organization_id", session.organization.id)
+          .lt("check_in_date", operationalWindowEnd)
+          .gte("check_out_date", operationalWindowStart)
+          .neq("status", "cancelled")
+          .neq("status", "no_show"),
+      )
         .order("check_in_date", { ascending: true })
         .order("id", { ascending: true })
         .range(from, to) as unknown as PromiseLike<{ data: Record<string, unknown>[] | null; error: { message: string } | null }>,

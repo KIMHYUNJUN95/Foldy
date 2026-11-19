@@ -10,6 +10,7 @@ import {
   localizePropertyName,
 } from "@/lib/room-label-normalization";
 import { getActiveRoomCatalogServer } from "@/lib/rooms";
+import { excludePendingInquiries } from "@/lib/beds24/reservation-status";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 
 export type ReservationPickRow = {
@@ -122,16 +123,18 @@ export async function listComplaintPickerReservations(
   limit.setDate(limit.getDate() + 30);
   const window30 = tokyoFormatter.format(limit);
 
-  const { data, error } = await supabase
-    .from("reservations")
-    .select("id, guest_name, property_name, room_label, source, check_in_date, check_out_date")
-    .eq("organization_id", organizationId)
-    .not("status", "in", '("cancelled","no_show")')
-    .or(
-      `and(check_in_date.lte.${today},check_out_date.gt.${today}),` +
-        `and(check_in_date.gt.${today},check_in_date.lte.${window30})`,
-    )
-    .order("check_in_date", { ascending: true });
+  // 문의 · 예약 요청은 피드백을 붙일 예약 고르기에 내지 않는다(2026-11-19).
+  const { data, error } = await excludePendingInquiries(
+    supabase
+      .from("reservations")
+      .select("id, guest_name, property_name, room_label, source, check_in_date, check_out_date")
+      .eq("organization_id", organizationId)
+      .not("status", "in", '("cancelled","no_show")')
+      .or(
+        `and(check_in_date.lte.${today},check_out_date.gt.${today}),` +
+          `and(check_in_date.gt.${today},check_in_date.lte.${window30})`,
+      ),
+  ).order("check_in_date", { ascending: true });
 
   if (error || !data) {
     return [];

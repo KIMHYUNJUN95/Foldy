@@ -1,5 +1,13 @@
 # Reservation Calendar
 
+## Beds24 문의 · 예약 요청은 캘린더에 그리지 않는다 (2026-11-19)
+
+- Beds24 채널 설정을 바꿔 문의(`inquiry` · 5) · 예약 요청(`request` · 3)도 들어온다. 우리 표에는 `status = 'confirmed'` 로 적히고 원본 상태는 `raw_payload.status` 에만 남는다(enum 은 그대로).
+- PC 캘린더(`admin-calendar-dashboard.ts`) · 모바일 캘린더(`mobile/calendar/page.tsx`) 읽기에서 DB 단계로 뺀다(페이지 읽기라 건수가 맞는다). 판정은 `src/lib/beds24/reservation-status.ts` 한 곳 — `isPendingBeds24InquiryStatus` · `isPendingBeds24Inquiry`(원본 값이 정확히 `inquiry` · `request` · 글자 "3"/"5" · 숫자 3/5 — DB 거르기와 같은 집합, 대소문자 · 공백이 다르면 셈) · `excludePendingInquiries`(DB 에서 `NOT (raw_payload @> '{"status":…}')`). `raw_payload->>status NOT IN (…)` 은 원본 상태가 없는 줄(운영 3,490줄)까지 떨어뜨려서 쓰지 않는다.
+- 모바일 딥링크(`?reservationId=`)로 문의를 열면 새 안내 「아직 문의 · 예약 요청이라 캘린더에 없어요」(`deepLinkInquiry`, ko · ja · en)를 띄운다 — 사유 `inquiry`(`calendar-deep-link.ts`).
+- 확정되면 Beds24 웹훅이 `raw_payload` 를 새로 적어(`new` · `confirmed`) 다음 읽기부터 저절로 나타난다. 판매 캘린더 · 매출(`isSalesCountedReservation`)은 원래도 빼고 있었고, 이제 같은 판정 위에 있다.
+- 일부러 거르지 않은 곳: 판매 캘린더 검색(취소도 찾는 검색), 특정 예약 하나를 여는 링크 · 동작.
+
 ## unslop 다듬기 · 버그 4개 (2026-11-18, 시안 캔버스 Dy3mRoHd…)
 
 PC(`/admin/calendar` · 인쇄) + 모바일(`/mobile/calendar`). 회귀 테스트 `src/lib/__tests__/calendar-unslop.test.ts`.

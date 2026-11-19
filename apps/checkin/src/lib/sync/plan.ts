@@ -1,5 +1,6 @@
 import { buildingKeyOf } from "../building-key";
 import { guestCountOf } from "../guest-count";
+import { isPendingBeds24Inquiry } from "../pending-inquiry";
 import { addDays, addYears } from "../tokyo-date";
 
 // sync-stays 의 판단만 모은 곳(DB 없음 — 테스트로 덮는다). 읽기 · 쓰기는 run.ts.
@@ -137,7 +138,8 @@ export function planSync(
   for (const [id, rows] of groups) {
     const stay = stayByGroup.get(id);
     const active = rows
-      .filter((row) => !INACTIVE.has(row.status))
+      // 문의 · 예약 요청은 아직 숙박이 아니다(2026-11-19) — 취소처럼 본다. 확정되면 웹훅이 원본을 고쳐 다음 실행에서 만든다.
+      .filter((row) => !INACTIVE.has(row.status) && !isPendingBeds24Inquiry(row.raw_payload))
       .sort((a, b) => a.room_label.localeCompare(b.room_label) || a.id.localeCompare(b.id));
 
     if (active.length === 0) {

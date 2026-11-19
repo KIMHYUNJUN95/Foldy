@@ -5,7 +5,7 @@
  * 채 들어오면 건물을 고른 뒤에야 시트가 뜬금없이 떴다. 이제 서버가 예약을 먼저 찾아 **그 예약의 달 · 건물로 다시 보내** 열고,
  * 못 여는 경우는 이유를 알려 준다.
  */
-export type CalendarDeepLinkNotice = "cancelled" | "no_property" | "not_found" | "out_of_window";
+export type CalendarDeepLinkNotice = "cancelled" | "inquiry" | "no_property" | "not_found" | "out_of_window";
 
 export type CalendarDeepLinkDecision =
   | { kind: "open"; month: string; property: string }
@@ -13,7 +13,14 @@ export type CalendarDeepLinkDecision =
 
 export function decideCalendarDeepLink(input: {
   /** 찾은 예약(이 조직). 없으면 `null`. `propertyName` 은 정규 건물 이름. */
-  reservation: { checkInDate: string; checkOutDate: string; propertyName: string; status: string } | null;
+  reservation: {
+    checkInDate: string;
+    checkOutDate: string;
+    /** Beds24 문의 · 예약 요청인가(`isPendingBeds24InquiryStatus`, 2026-11-19) — 캘린더에 그리지 않는다. */
+    pendingInquiry?: boolean;
+    propertyName: string;
+    status: string;
+  } | null;
   /** 캘린더에서 빠지는 건물 · 객실인가(`isExcludedOperationalProperty` · `Room`). */
   excluded: boolean;
   /** 읽는 창 — 이번 달 · 다음 달(`YYYY-MM`). */
@@ -23,6 +30,7 @@ export function decideCalendarDeepLink(input: {
   const { reservation, currentMonth, nextMonth } = input;
   if (!reservation) return { kind: "notice", reason: "not_found" };
   if (reservation.status === "cancelled" || reservation.status === "no_show") return { kind: "notice", reason: "cancelled" };
+  if (reservation.pendingInquiry) return { kind: "notice", reason: "inquiry" };
   if (input.excluded || !reservation.propertyName.trim()) return { kind: "notice", reason: "no_property" };
   const checkInMonth = reservation.checkInDate.slice(0, 7);
   if (checkInMonth === currentMonth || checkInMonth === nextMonth) {

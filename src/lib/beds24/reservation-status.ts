@@ -68,6 +68,46 @@ function normalizeBeds24StatusValue(raw: unknown): ReservationStatus {
   return "confirmed";
 }
 
+// ── 문의 · 예약 요청(2026-11-19) ─────────────────────────────────────────
+//
+// Beds24 채널 설정을 바꿔 문의(`inquiry` · 5) · 예약 요청(`request` · 3)도 Beds24 로 들어오고, 웹훅 · 백필로 우리 표에도 온다.
+// 우리 표는 위 매핑대로 `status = 'confirmed'` 로 적고 **원본 상태는 `raw_payload.status` 에만** 남는다(enum 은 그대로).
+// 아직 확정되지 않은 예약이라 청소 · 캘린더 · 홈 · 셀프 체크인 · 건물 지도 · 고르기 목록 같은 **운영 화면은 이 판정으로 뺀다.**
+// 손님 메시지함은 빼지 않는다(직원이 문의에 답해야 한다). 확정되면 Beds24 웹훅이 `raw_payload` 를 새로 적어 저절로 나타난다.
+
+/**
+ * 문의 · 요청의 원본 상태 값 — Beds24 가 실제로 보내는 형태(소문자 글자 · 숫자 글자 · 숫자) **정확히 이 값만.**
+ * JS 판정과 DB 거르기(`excludePendingInquiries`, jsonb 포함은 정확히 같은 값만 맞는다)가 같은 집합을 써서, 한 예약이 화면마다
+ * 다르게 보이지 않는다. 대소문자 · 공백이 다른 값(운영 0건, 2026-11-19)은 문의로 보지 않는다 = 센다.
+ */
+const PENDING_INQUIRY_PAYLOAD_MATCHES: ReadonlyArray<string | number> = ["inquiry", "request", "3", "5", 3, 5];
+
+/** 원본 상태 값이 문의 · 예약 요청인가. 없음(null · 빈 글자)은 문의가 아니다 = 센다. */
+export function isPendingBeds24InquiryStatus(rawStatus: unknown): boolean {
+  if (typeof rawStatus !== "string" && typeof rawStatus !== "number") return false;
+  return PENDING_INQUIRY_PAYLOAD_MATCHES.includes(rawStatus);
+}
+
+/** 예약 원본(`raw_payload`)이 문의 · 예약 요청인가 — `status` 칸을 본다. */
+export function isPendingBeds24Inquiry(rawPayload: unknown): boolean {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) return false;
+  return isPendingBeds24InquiryStatus((rawPayload as JsonRecord).status);
+}
+
+type NotFilterable<Q> = { not(column: string, operator: string, value: unknown): Q };
+
+/**
+ * `reservations` 읽기에서 문의 · 요청을 **DB 에서** 뺀다 — 페이지 · `limit` 이 있는 읽기도 건수가 맞는다.
+ * `NOT (raw_payload @> '{"status":…}')` 를 값마다 건다. `raw_payload->>status NOT IN (…)` 은 원본 상태가 없는 줄(NULL)까지
+ * 떨어뜨려서 쓰지 않는다(운영 3,490줄, 2026-11-19). `raw_payload` 칸은 `NOT NULL default '{}'`(마이그레이션 202605220001)라 칸 자체가 NULL 인 줄은 없다.
+ * 다른 `.or()` 와 섞지 않으므로 이미 `.or()` 를 쓰는 읽기에도 그대로 붙는다.
+ */
+export function excludePendingInquiries<Q extends NotFilterable<Q>>(query: Q): Q {
+  let next = query;
+  for (const status of PENDING_INQUIRY_PAYLOAD_MATCHES) next = next.not("raw_payload", "cs", JSON.stringify({ status }));
+  return next;
+}
+
 /** Beds24 가 「살아 있는 예약」에 쓰는 명시적 상태 값 — 이 값이 오면 `cancelTime` 보다 믿는다. */
 const ACTIVE_EXPLICIT_STATUSES = new Set(["confirmed", "new", "request", "inquiry", "black", "1", "2", "3", "4", "5"]);
 

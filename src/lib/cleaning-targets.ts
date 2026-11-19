@@ -8,6 +8,7 @@ import {
   isExcludedOperationalRoom,
 } from "@/lib/room-label-normalization";
 import { getCleaningOperatingDateKey } from "@/lib/cleaning";
+import { excludePendingInquiries } from "@/lib/beds24/reservation-status";
 import { getReservationGuests } from "@/lib/reservation-guests";
 import { GUEST_PAYLOAD_KEYS, slimPayloadOf, slimPayloadSelect } from "@/lib/reservation-payload-slim";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
@@ -111,20 +112,24 @@ export async function getCleaningTargets(
   const supabase = client ?? (await getSupabaseServerClient());
 
   const [depResult, arrResult] = await Promise.all([
-    supabase
-      .from("reservations")
-      .select(BASE_COLUMNS)
-      .eq("organization_id", organizationId)
-      .eq("status", "confirmed")
-      .eq("check_out_date", targetDate),
-    supabase
-      .from("reservations")
-      .select(ARRIVAL_SELECT)
-      .eq("organization_id", organizationId)
-      .eq("status", "confirmed")
-      .gte("check_in_date", targetDate)
-      .lt("check_in_date", windowEnd)
-      .order("check_in_date", { ascending: true }),
+    // 문의 · 예약 요청은 청소 · 셋팅 · 다음 체크인에서 뺀다(2026-11-19, `excludePendingInquiries`).
+    excludePendingInquiries(
+      supabase
+        .from("reservations")
+        .select(BASE_COLUMNS)
+        .eq("organization_id", organizationId)
+        .eq("status", "confirmed")
+        .eq("check_out_date", targetDate),
+    ),
+    excludePendingInquiries(
+      supabase
+        .from("reservations")
+        .select(ARRIVAL_SELECT)
+        .eq("organization_id", organizationId)
+        .eq("status", "confirmed")
+        .gte("check_in_date", targetDate)
+        .lt("check_in_date", windowEnd),
+    ).order("check_in_date", { ascending: true }),
   ]);
 
   if (depResult.error) throw new Error(depResult.error.message);

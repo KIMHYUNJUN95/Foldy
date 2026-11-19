@@ -1,5 +1,10 @@
 ﻿# Cleaning Workflow
 
+## Beds24 문의 · 예약 요청은 청소 대상이 아니다 (2026-11-19)
+
+- 문의(`inquiry` · 5) · 예약 요청(`request` · 3)은 우리 표에 `confirmed` 로 들어오지만 아직 숙박이 아니다. 퇴실 청소 · 셋팅 · 턴오버 · 다음 체크인(`cleaning-targets.ts`), 청소 배정 방 목록 · 한 달 퇴실 · 다음 체크인 채우기 · 오늘 내 방 청소 종류(`cleaning-assign/rooms.ts`), 자동화 청소 명단 데이터 경고(`automation/data.ts` `findCleaningDataIssues`)에서 DB 단계로 뺀다. 판정은 `src/lib/beds24/reservation-status.ts` 한 곳 — `isPendingBeds24InquiryStatus` · `isPendingBeds24Inquiry`(원본 값이 정확히 `inquiry` · `request` · 글자 "3"/"5" · 숫자 3/5 — DB 거르기와 같은 집합, 대소문자 · 공백이 다르면 셈) · `excludePendingInquiries`(DB 에서 `NOT (raw_payload @> '{"status":…}')`). `raw_payload->>status NOT IN (…)` 은 원본 상태가 없는 줄(운영 3,490줄)까지 떨어뜨려서 쓰지 않는다.
+- 청소 대상은 저장하지 않고 매번 예약에서 계산하므로, 문의가 확정되면 다음 읽기부터 저절로 들어오고 취소되면 저절로 빠진다(지울 기록 없음).
+
 ## 2026-08-06 multilingual warning contract
 
 The mobile unresolved room-label production warning is user-facing operations copy. Its heading, count, and examples must be rendered from the `ko`/`ja`/`en` cleaning dictionary; the warning must never fall back to a hardcoded English sentence.

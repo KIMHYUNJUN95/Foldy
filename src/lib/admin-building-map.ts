@@ -20,6 +20,7 @@ import {
   type ActiveRoomCatalogItem,
 } from "@/lib/rooms";
 import { dashboardRoomCleanState } from "@/lib/cleaning-record-rules";
+import { excludePendingInquiries } from "@/lib/beds24/reservation-status";
 import { storedSessionRoomKey, type RoomRecord } from "@/lib/cleaning-assign/room-key";
 import { sortBuildings } from "@/lib/admin-calendar-dashboard";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
@@ -96,18 +97,23 @@ export async function fetchBuildingMapSource(session: AppSession, today: string)
   const supabase = await getSupabaseServerClient();
   const columns = "id, property_name, room_label, source, check_in_date, check_out_date, status, created_at, raw_payload";
   const [around, fresh, catalog] = await Promise.all([
-    supabase
-      .from("reservations")
-      .select(columns)
-      .eq("organization_id", session.organization.id)
-      .lte("check_in_date", today)
-      .gte("check_out_date", today),
-    supabase
-      .from("reservations")
-      .select(columns)
-      .eq("organization_id", session.organization.id)
-      .gte("created_at", tokyoDayStart(today))
-      .lt("created_at", tokyoDayEndExclusive(today))
+    // 문의 · 예약 요청은 방 상태 · 새 예약 소식에서 뺀다(2026-11-19). 소식은 `limit` 이 있어 DB 에서 거른다.
+    excludePendingInquiries(
+      supabase
+        .from("reservations")
+        .select(columns)
+        .eq("organization_id", session.organization.id)
+        .lte("check_in_date", today)
+        .gte("check_out_date", today),
+    ),
+    excludePendingInquiries(
+      supabase
+        .from("reservations")
+        .select(columns)
+        .eq("organization_id", session.organization.id)
+        .gte("created_at", tokyoDayStart(today))
+        .lt("created_at", tokyoDayEndExclusive(today)),
+    )
       .order("created_at", { ascending: false })
       .limit(FEED_LIMIT),
     getActiveRoomCatalog(session.organization.id, supabase),

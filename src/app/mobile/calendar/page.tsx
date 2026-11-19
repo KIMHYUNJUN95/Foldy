@@ -4,6 +4,7 @@ import { MobileCalendarLiveView } from "@/components/calendar/mobile-calendar-li
 import { shiftMonthKey } from "@/components/admin/shared/admin-month-key";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { getDictionary } from "@/lib/i18n";
+import { excludePendingInquiries, isPendingBeds24InquiryStatus } from "@/lib/beds24/reservation-status";
 import { getMobileNavBadges } from "@/lib/nav-badges";
 import { getOnboardingState } from "@/lib/onboarding";
 import { loadPropertyMapMeta } from "@/lib/property-operation-info";
@@ -208,7 +209,7 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
     const found = UUID_PATTERN.test(initialReservationId)
       ? await supabase
           .from("reservations")
-          .select("id, check_in_date, check_out_date, property_name, room_label, status")
+          .select("id, check_in_date, check_out_date, property_name, room_label, status, rp_status:raw_payload->status")
           .eq("organization_id", session.organization.id)
           .eq("id", initialReservationId)
           .maybeSingle()
@@ -224,6 +225,7 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
         ? {
             checkInDate: row.check_in_date,
             checkOutDate: row.check_out_date,
+            pendingInquiry: isPendingBeds24InquiryStatus(row.rp_status),
             propertyName: getCanonicalPropertyName(row.property_name),
             status: row.status,
           }
@@ -275,14 +277,17 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
     const [{ data, error }, catalog, notesInWindow] = await Promise.all([
       // 1,000행 상한을 넘으면 조용히 잘린다 — 페이지로 끝까지 읽는다(`read-all-pages.ts`).
       readAllPages<Record<string, unknown>>((from, to) =>
-        supabase
-          .from("reservations")
-          .select(RESERVATION_SELECT)
-          .eq("organization_id", session.organization.id)
-          .lt("check_in_date", operationalWindowEnd)
-          .gte("check_out_date", operationalMonthStart)
-          .neq("status", "cancelled")
-          .neq("status", "no_show")
+        // 문의 · 예약 요청은 캘린더에 그리지 않는다(2026-11-19).
+        excludePendingInquiries(
+          supabase
+            .from("reservations")
+            .select(RESERVATION_SELECT)
+            .eq("organization_id", session.organization.id)
+            .lt("check_in_date", operationalWindowEnd)
+            .gte("check_out_date", operationalMonthStart)
+            .neq("status", "cancelled")
+            .neq("status", "no_show"),
+        )
           .order("check_in_date", { ascending: true })
           .order("id", { ascending: true })
           .range(from, to) as unknown as PromiseLike<{ data: Record<string, unknown>[] | null; error: { message: string } | null }>,

@@ -4,6 +4,7 @@
  * 도메인 계약: docs/product/36-automation-control.md 「실시간(2026-11-18)」.
  * 화면 쪽 훅(`use-automation-live.ts`)과 설정 칸(PC · 모바일)은 판정을 여기서만 가져다 쓴다.
  */
+import { mergeFields } from "@/lib/automation/save-merge";
 
 /**
  * 조용한 갱신 간격. 정시 발송은 1분 틱이 보내므로 그 4분의 1이면 「보냄」이 틱 뒤 15초 안에 보이고,
@@ -58,8 +59,8 @@ export function pickLiveData<P extends object, D extends object>(props: P, polle
  * - `original` · `originalVersion`: 지금 화면의 서버 값(객체)과 그 버전. 같은 객체면 아무것도 하지 않는다.
  * - `base`: 초안이 맞춰 본 기준(직렬화) — 「바뀜」 · 칸 단위 합치기의 「손댐」은 이것과 비교한다. 저장 성공 뒤엔 저장한 값.
  * - `holding`: 저장을 보낸 뒤 결과를 기다리는 중 — 들어온 그림은 맞추지 않고 원본으로만 기억한다(보낸 값과 화면이 같게).
- * - `floor`: 마지막으로 성공한 내 저장의 버전. 이보다 옛 그림은 저장 전 값이라 버린다 — 저장이 설정 줄 · 받는 곳을
- *   통째로 덮어쓰므로, 그 앞의 다른 사람 변경도 서버에 남아 있지 않다.
+ * - `floor`: 마지막으로 성공한 내 저장의 버전. 이보다 옛 그림은 저장 전 값이라 버린다 — 그 앞의 다른 사람 변경은
+ *   서버가 저장 때 합쳐(`mergeAutomationSave`) 저장 값(`settle` 의 `saved`)에 이미 들어 있다.
  */
 export type DraftSync<T> = {
   draft: T;
@@ -81,26 +82,8 @@ export function draftSyncOf<T>(original: T, version: number | null): DraftSync<T
   return { base: JSON.stringify(original), draft: original, floor: null, holding: false, original, originalVersion: version };
 }
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
-
-/**
- * 칸 단위 3방향 합치기 — 초안의 칸이 기준과 같으면(손대지 않음) 새 서버 값, 다르면(손댐) 초안 값.
- * 객체는 안쪽 칸까지 내려가고, 목록(요일 · 받는 곳 · 채널)과 글자 · 숫자는 한 칸이다. 칸 순서는 새 서버 값을 따른다
- * (`dirty` 가 직렬화를 비교하므로). 서버에서 없어진 칸은 손대지 않았으면 빼고, 손댔으면 남긴다.
- */
-export function mergeDraftFields<T>(draft: T, previous: T, next: T): T {
-  if (isPlainObject(draft) && isPlainObject(previous) && isPlainObject(next)) {
-    const merged: Record<string, unknown> = {};
-    for (const key of Object.keys(next)) merged[key] = key in draft ? mergeDraftFields(draft[key], previous[key], next[key]) : next[key];
-    for (const key of Object.keys(draft)) if (!(key in next) && !same(draft[key], previous[key])) merged[key] = draft[key];
-    return merged as T;
-  }
-  return same(draft, previous) ? next : draft;
-}
+/** 칸 단위 3방향 합치기 — 서버 저장과 같은 규칙 하나(`mergeFields`, `src/lib/automation/save-merge.ts`). */
+export const mergeDraftFields = mergeFields;
 
 /** 내 마지막 저장보다 옛 그림인가 — 버전을 모르는 그림도 저장 뒤엔 옛 것으로 본다. */
 const beforeMySave = (floor: number | null, version: number | null) => floor !== null && (version === null || version < floor);
@@ -131,11 +114,14 @@ export function editDraft<T>(state: DraftSync<T>, update: (current: T) => T): Dr
   return { ...state, draft: update(state.draft) };
 }
 
-/** 저장을 보낼 때의 표 — 보낸 초안(직렬화). */
-export type DraftSubmit = { draft: string };
+/**
+ * 저장을 보낼 때의 표 — 보낸 초안과 그때의 기준(둘 다 직렬화). 서버는 기준과 같은 칸을 「안 건드림」으로 보고
+ * 저장 때 DB 값을 둔다(`mergeAutomationSave`) — 화면의 「바뀜」과 서버의 「바꾼 칸」이 같은 기준을 쓴다.
+ */
+export type DraftSubmit = { base: string; draft: string };
 
 export function draftSubmitOf<T>(state: DraftSync<T>): DraftSubmit {
-  return { draft: JSON.stringify(state.draft) };
+  return { base: state.base, draft: JSON.stringify(state.draft) };
 }
 
 /** 저장을 보냈다 — 결과가 올 때까지 들어오는 그림은 미뤄 둔다. */
@@ -144,13 +130,18 @@ export function holdDraft<T>(state: DraftSync<T>): DraftSync<T> {
 }
 
 /**
- * 저장 성공 — `savedVersion` 은 서버가 이 저장으로 쓴 버전. 기준을 저장한 값으로 옮기고(「바뀜」 · 저장 단추가 바로 꺼짐,
- * 보낸 뒤 또 고친 칸만 「바뀜」), 바닥을 그 버전으로 올린 뒤 미뤄 둔 그림에 맞춘다 — 저장 전 그림이면 버리고,
- * 저장 뒤 그림(서버가 정리한 값)이 이미 와 있으면 받는다.
+ * 저장 성공 — `savedVersion` 은 서버가 이 저장으로 쓴 버전, `saved` 는 실제로 쓴 값(다른 사람이 바꾼 칸이 섞인 합친 값).
+ * 기준을 저장한 값으로 옮기고(「바뀜」 · 저장 단추가 바로 꺼짐), 초안은 보낸 뒤 또 고친 칸만 남기고 나머지를 저장 값으로
+ * 바꾼다. 바닥을 그 버전으로 올린 뒤 미뤄 둔 그림에 맞춘다 — 저장 전 그림이면 버리고, 저장 뒤 그림이 와 있으면 받는다.
+ * `saved` 가 없으면 보낸 초안을 저장 값으로 본다.
  */
-export function settleDraft<T>(state: DraftSync<T>, submit: DraftSubmit, savedVersion: number | null): DraftSync<T> {
+export function settleDraft<T>(state: DraftSync<T>, submit: DraftSubmit, savedVersion: number | null, saved?: T): DraftSync<T> {
   const floor = savedVersion === null ? state.floor : Math.max(state.floor ?? savedVersion, savedVersion);
-  return alignDraft({ ...state, base: submit.draft, floor, holding: false }, state.original, state.originalVersion);
+  if (saved === undefined) return alignDraft({ ...state, base: submit.draft, floor, holding: false }, state.original, state.originalVersion);
+  const base = JSON.stringify(saved);
+  const merged = mergeDraftFields(state.draft, JSON.parse(submit.draft) as T, saved);
+  const draft = JSON.stringify(merged) === base ? saved : merged;
+  return alignDraft({ ...state, base, draft, floor, holding: false }, state.original, state.originalVersion);
 }
 
 /** 저장 실패 · 예외 — 미뤄 둔 그림을 평소 규칙으로 맞춘다(초안은 남김). 다음 폴링도 막지 않는다. */

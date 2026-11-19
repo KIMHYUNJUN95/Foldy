@@ -109,7 +109,7 @@ export function useAutomationLive(props: AutomationPageData): AutomationPageData
 /**
  * 설정 초안 — 서버 값(폴링 · 저장 뒤 새 그림)이 바뀌어 들어와도 손대던 중이면 덮지 않는다. `version` 은 그 그림의
  * 설정 줄 버전(`job.version`). 저장할 때 `submit()` 표를 받고(그때부터 들어온 그림은 미뤄 둠), 성공하면
- * `settle(표, 결과.version)`, 실패 · 예외면 `release()` — 판정은 `live-view.ts` 의 `alignDraft` 하나.
+ * `settle(표, 결과.version, 결과.saved)`, 실패 · 예외면 `release()` — 판정은 `live-view.ts` 의 `alignDraft` 하나.
  */
 export function useAutomationDraft<T>(original: T, version: string | null) {
   const originalVersion = draftVersionOf(version);
@@ -131,7 +131,7 @@ export function useAutomationDraft<T>(original: T, version: string | null) {
     return ticket;
   };
   const settle = useCallback(
-    (ticket: DraftSubmit, savedVersion: string) => setState((s) => settleDraft(s, ticket, draftVersionOf(savedVersion))),
+    (ticket: DraftSubmit, savedVersion: string, saved: T) => setState((s) => settleDraft(s, ticket, draftVersionOf(savedVersion), saved)),
     [],
   );
   const release = useCallback(() => setState((s) => releaseDraft(s)), []);

@@ -291,15 +291,17 @@ export function MobileAutomationSettings({
   const doSave = () => {
     const ticket = submit();
     startSave(async () => {
-      const result = await actionResult(() => saveAutomationJob({ jobKey: job.jobKey, ...draft }), "save_failed");
+      const result = await actionResult(() => saveAutomationJob({ ...draft, base: JSON.parse(ticket.base) as Draft, jobKey: job.jobKey }), "save_failed");
       setConfirming(false);
       if (!result.ok) {
         release();
         haptic("error");
+        // 다른 사람이 방금 바꾼 시각과 겹쳤다 — 그 시각이 바로 보이게 한 번 새로 읽는다(안내 문구와 화면이 맞게).
+        if (result.error === "conflict") router.refresh();
         setSaveError(errorTextOf(copy, result.error));
         return flash(errorTextOf(copy, result.error));
       }
-      settle(ticket, result.version);
+      settle(ticket, result.version, result.saved);
       flash(s.saved);
       setJustSaved(true);
       router.refresh();

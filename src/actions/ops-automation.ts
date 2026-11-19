@@ -16,22 +16,11 @@ import {
   loadPropertyLabeler,
   withLocalizedCodes,
 } from "@/lib/automation/data";
-import {
-  AUTOMATION_JOB_KIND,
-  CHANNEL_KEY_PATTERN,
-  isAutomationJobKey,
-  isAutomationLocale,
-  isHhmm,
-  parseLocales,
-  parseSettings,
-  parseWeekdays,
-  type AutomationDestination,
-  type AutomationJobKey,
-  type AutomationSettings,
-} from "@/lib/automation/jobs";
+import { AUTOMATION_JOB_KIND, isAutomationJobKey, isAutomationLocale, type AutomationJobKey } from "@/lib/automation/jobs";
 import { buildPreview, sendJobNow } from "@/lib/automation/runner";
 import { automationBuildingLabel, type AlertCard } from "@/lib/automation/messages";
 import { computeNextWake } from "@/lib/automation/schedule";
+import { mergeAutomationSave, parseSaveFields, type AutomationSaveFields } from "@/lib/automation/save-merge";
 import { canAccessOpsAdmin } from "@/lib/ops-admin";
 import { getAutomationLiveData, type AutomationLiveData } from "@/lib/automation/console-data";
 import { hasOrganizationContext } from "@/lib/session";
@@ -54,7 +43,7 @@ import type { Json } from "@/types/database";
  */
 
 /** `room_locked` — 청소 중 · 끝남 · 미룸 · 처리 끝 방이라 더할 수 없음. `room_in_use` — 배정 · 기록이 있는 방이라 뺄 수 없음(문서 45 A16). */
-type Fail = { ok: false; error: "forbidden" | "invalid" | "not_found" | "save_failed" | "no_destination" | "no_sample" | "room_locked" | "room_in_use" };
+type Fail = { ok: false; error: "forbidden" | "invalid" | "conflict" | "not_found" | "save_failed" | "no_destination" | "no_sample" | "room_locked" | "room_in_use" };
 
 async function viewer() {
   // 화면을 옮기지 않고 「권한 없음」만 돌려준다 — 모바일 판매 캘린더 · 자동화도 같은 액션을 부른다.
@@ -227,13 +216,11 @@ export async function loadAssigneeBoard(
 
 // ── 바꾸기 · 보내기 (automation.manage) ──────────────────────────────────────
 
-export type SaveJobInput = {
+export type SaveJobInput = AutomationSaveFields & {
   jobKey: string;
-  sendTime: string;
-  retryUntil: string;
-  weekdays: number[];
-  settings: AutomationSettings;
-  destinations: AutomationDestination[];
+  /** 화면 초안이 맞춰 본 서버 값 — 이것과 같은 칸은 「안 건드림」이라 저장 때 DB 값을 둔다. 믿지 않고 다시 읽는다.
+   *  없으면(예전 탭) 초안 전체를 저장한다. */
+  base?: AutomationSaveFields;
 };
 
 function diff(before: Record<string, unknown>, after: Record<string, unknown>) {
@@ -251,29 +238,47 @@ async function writeLog(organizationId: string, jobKey: AutomationJobKey, actorI
     .insert({ actor_id: actorId, changes: changes as Json, job_key: jobKey, organization_id: organizationId });
 }
 
-/** 성공이면 `version` = 이 저장이 쓴 설정 줄 버전(`updated_at`) — 화면 초안이 이보다 옛 그림을 저장 전 값으로 버린다. */
-export async function saveAutomationJob(input: SaveJobInput): Promise<{ ok: true; version: string } | Fail> {
+/**
+ * 성공이면 `version` = 이 저장이 쓴 설정 줄 버전(`updated_at`) — 화면 초안이 이보다 옛 그림을 저장 전 값으로 버린다.
+ * `saved` = 실제로 쓴 값: 지금 DB 값 위에 **내가 바꾼 칸만** 얹은 것(`mergeAutomationSave`, 2026-11-19).
+ */
+export async function saveAutomationJob(
+  input: SaveJobInput,
+): Promise<{ ok: true; version: string; saved: AutomationSaveFields } | Fail> {
   const session = await manager();
   if (!session) return { error: "forbidden", ok: false };
-  if (!isAutomationJobKey(input.jobKey) || !isHhmm(input.sendTime) || !isHhmm(input.retryUntil)) return { error: "invalid", ok: false };
-  if (input.retryUntil < input.sendTime) return { error: "invalid", ok: false };
+  if (!isAutomationJobKey(input.jobKey)) return { error: "invalid", ok: false };
   const jobKey = input.jobKey;
-  const weekdays = parseWeekdays(input.weekdays);
-  const settings = parseSettings(input.settings);
-
   const known = new Set(listAutomationChannels().map((channel) => channel.key));
-  const destinations: AutomationDestination[] = [];
-  for (const item of Array.isArray(input.destinations) ? input.destinations : []) {
-    const channelKey = String(item?.channelKey ?? "");
-    const locales = parseLocales(item?.locales);
-    if (!CHANNEL_KEY_PATTERN.test(channelKey) || !known.has(channelKey)) return { error: "invalid", ok: false };
-    if (locales.length > 0) destinations.push({ channelKey, locales });
-  }
+  const draft = parseSaveFields(input, known);
+  // 기준은 그 사이 연결이 끊긴 채널을 들 수 있다 — 모양만 본다. 기준을 안 보내는 예전 탭(배포 전 화면)은
+  // 합치지 않고 예전처럼 초안 전체를 저장한다(`null`). 시각 순서는 합친 결과 한 곳에서만 본다.
+  const base = input.base === undefined ? null : parseSaveFields(input.base, null);
+  if (!draft || (input.base !== undefined && !base)) return { error: "invalid", ok: false };
 
   const supabase = getSupabaseServiceClient();
   const organizationId = session.organization.id;
   const [jobs, currentDestinations] = await Promise.all([loadJobs(supabase, organizationId), loadDestinations(supabase, organizationId)]);
   const current = jobs[jobKey];
+  const merged = base
+    ? mergeAutomationSave({
+        base,
+        current: {
+          destinations: currentDestinations[jobKey],
+          retryUntil: current.retryUntil,
+          sendTime: current.sendTime,
+          settings: current.settings,
+          weekdays: current.weekdays,
+        },
+        draft,
+      })
+    : draft;
+  // 시각 순서는 합친 결과로만 본다. 내 초안만 틀렸으면 invalid, 내 값은 맞았는데 다른 사람이 방금 바꾼 칸과 합치니
+  // 틀렸으면 conflict — 한쪽을 몰래 버리지 않고 아무것도 쓰지 않는다.
+  if (merged.retryUntil < merged.sendTime) {
+    return { error: draft.retryUntil < draft.sendTime ? "invalid" : "conflict", ok: false };
+  }
+  const { destinations, retryUntil, sendTime, settings, weekdays } = merged;
   // 켜져 있는 자동화를 받는 곳 0곳으로 저장하면 다음 발송이 조용히 건너뛴다 — 막고 이유를 알려 준다(끄지는 않는다).
   // 꺼진 것을 저장하거나 끄려고 저장하는 것은 그대로 된다.
   if (current.enabled && !canEnableAutomation(destinations, [...known]).ok) return { error: "no_destination", ok: false };
@@ -284,8 +289,8 @@ export async function saveAutomationJob(input: SaveJobInput): Promise<{ ok: true
       lastDoneOn: current.lastDoneOn,
       recheckEveryMinutes: settings.resend.debounceMinutes,
       recheckUntil: settings.resend.enabled ? settings.resend.until : null,
-      retryUntil: input.retryUntil,
-      sendTime: input.sendTime,
+      retryUntil,
+      sendTime,
       weekdays,
     },
     now,
@@ -296,8 +301,8 @@ export async function saveAutomationJob(input: SaveJobInput): Promise<{ ok: true
       job_key: jobKey,
       next_wake_at: AUTOMATION_JOB_KIND[jobKey] === "scheduled" ? (nextWake?.toISOString() ?? null) : null,
       organization_id: organizationId,
-      retry_until: input.retryUntil,
-      send_time: input.sendTime,
+      retry_until: retryUntil,
+      send_time: sendTime,
       settings: settings as unknown as Json,
       updated_at: now.toISOString(),
       updated_by: session.user.id,
@@ -389,11 +394,11 @@ export async function saveAutomationJob(input: SaveJobInput): Promise<{ ok: true
     session.user.id,
     diff(
       { destinations: currentDestinations[jobKey], retryUntil: current.retryUntil, sendTime: current.sendTime, settings: current.settings, weekdays: current.weekdays },
-      { destinations, retryUntil: input.retryUntil, sendTime: input.sendTime, settings, weekdays },
+      { destinations, retryUntil, sendTime, settings, weekdays },
     ),
   );
   revalidatePath("/admin/ops/automation");
-  return { ok: true, version: now.toISOString() };
+  return { ok: true, saved: merged, version: now.toISOString() };
 }
 
 export async function setAutomationEnabled(jobKey: string, enabled: boolean): Promise<{ ok: true } | Fail> {

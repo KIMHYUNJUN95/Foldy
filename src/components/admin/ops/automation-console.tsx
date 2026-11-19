@@ -2,6 +2,7 @@
 
 import { type CSSProperties, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Check, Plus, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 import {
   addCleaningExtraRoom,
   loadAssigneeBoard,
@@ -1078,6 +1079,7 @@ function SettingsPane({
   const original = useMemo(() => draftOf(job), [job]);
   // 실시간 갱신으로 서버 값이 바뀌어도 손대던 초안은 덮지 않는다(`reconcileDraft`).
   const { draft, setDraft, dirty, submit, settle, release } = useAutomationDraft<Draft>(original, job.version);
+  const router = useRouter();
   const [saving, startSave] = useTransition();
   const [confirmSave, setConfirmSave] = useState(false);
   const weekdayLabels = copy.settings.weekdayShort.split(",");
@@ -1151,13 +1153,15 @@ function SettingsPane({
     setConfirmSave(false);
     const ticket = submit();
     startSave(async () => {
-      const result = await actionResult(() => saveAutomationJob({ jobKey: job.jobKey, ...draft }), "save_failed");
+      const result = await actionResult(() => saveAutomationJob({ ...draft, base: JSON.parse(ticket.base) as Draft, jobKey: job.jobKey }), "save_failed");
       if (!result.ok) {
         release();
+        // 다른 사람이 방금 바꾼 시각과 겹쳤다 — 그 시각이 바로 보이게 한 번 새로 읽는다(안내 문구와 화면이 맞게).
+        if (result.error === "conflict") router.refresh();
         setSaveError(errorText(result.error));
         return flash(errorText(result.error));
       }
-      settle(ticket, result.version);
+      settle(ticket, result.version, result.saved);
       flash(copy.settings.saved);
       onSaved(job.jobKey);
     });

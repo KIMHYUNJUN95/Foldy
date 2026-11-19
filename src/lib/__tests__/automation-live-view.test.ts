@@ -523,3 +523,33 @@ describe("mergeDraftFields — 서버에서 없어진 칸", () => {
   it("손댄 칸은 서버에서 없어져도 남긴다", () =>
     expect(mergeDraftFields<Record<string, unknown>>({ a: 1, gone: 3 }, { a: 1, gone: 2 }, { a: 1 })).toEqual({ a: 1, gone: 3 }));
 });
+
+describe("저장 성공 — 서버가 실제로 쓴 값(합친 값)으로 맞춘다(2026-11-19)", () => {
+  type F = { a: string; b: string };
+  it("표는 보낸 초안과 그때의 기준을 든다 — 서버가 「안 건드린 칸」을 가르는 기준", () => {
+    let s = draftSyncOf<F>({ a: "1", b: "1" }, 1);
+    s = editDraft(s, (d) => ({ ...d, b: "2" }));
+    expect(draftSubmitOf(s)).toEqual({ base: JSON.stringify({ a: "1", b: "1" }), draft: JSON.stringify({ a: "1", b: "2" }) });
+  });
+  it("상대가 바꾼 a 가 섞인 저장 결과 → 초안 = 저장 값, 「바뀜」 없음(새 그림을 기다리지 않음)", () => {
+    let s = draftSyncOf<F>({ a: "1", b: "1" }, 1);
+    s = editDraft(s, (d) => ({ ...d, b: "2" }));
+    const ticket = draftSubmitOf(s);
+    s = holdDraft(s);
+    s = settleDraft(s, ticket, 5, { a: "9", b: "2" });
+    expect(s.draft).toEqual({ a: "9", b: "2" });
+    expect(JSON.stringify(s.draft) === s.base).toBe(true);
+    // 뒤이어 온 저장 뒤 그림(같은 값)은 아무것도 바꾸지 않는다.
+    expect(reconcileDraft(s, { a: "9", b: "2" }, 5).draft).toEqual({ a: "9", b: "2" });
+  });
+  it("보낸 뒤 또 고친 칸은 남고 「바뀜」으로 보인다", () => {
+    let s = draftSyncOf<F>({ a: "1", b: "1" }, 1);
+    s = editDraft(s, (d) => ({ ...d, b: "2" }));
+    const ticket = draftSubmitOf(s);
+    s = holdDraft(s);
+    s = editDraft(s, (d) => ({ ...d, b: "3" }));
+    s = settleDraft(s, ticket, 5, { a: "9", b: "2" });
+    expect(s.draft).toEqual({ a: "9", b: "3" });
+    expect(s.base).toBe(JSON.stringify({ a: "9", b: "2" }));
+  });
+});

@@ -587,6 +587,8 @@ Device-aware behavior:
 - **나가기**: 라벨은 `dictionary.auth.blocked.logout`(「로그아웃」), 누름 영역 모바일 44px · PC 40px 이상, 색 `var(--primary)`.
 - **폴드 · 태블릿**(≥600px): 내용 기둥 560px 가운데, 높이 ≥600px 이면 세로 가운데 + 버튼이 내용 바로 아래(`.obw-col` 최소 높이
   `min(680px, 100dvh − 140px − 키보드)`), 키보드가 올라오면 `--keyboard-inset` 만큼 아래 여백을 줘 버튼을 가리지 않는다. 폰은 그대로.
+- **폰 전화번호 줄 밀림 · PC 일본어 줄바꿈 수정**: 전화 칸(`flex-1` input)에 `min-w-0` — 없으면 줄보다 넓어져 autoFocus 가 스크롤 영역을 옆으로 13px 밀었다.
+  PC `.obd` 에도 폰 `.obw-main` 과 같은 `:lang(ko)` keep-all · `:lang(ja)` auto-phrase 규칙(「コ / ード」 방지, 루트에 `lang={locale}`). 회귀 테스트 `onboarding-css-scope.test.ts`.
 - **PC**: 보조 버튼 투명 테두리 + `#f4f4f7`, 확인 버튼 비활성 `--primary-soft`, 팝오버 테두리 없음, 「확인됨」 중복 표시(`.obd__orgok`) 삭제.
 
 ### CSS 이름 충돌 고침

@@ -1604,7 +1604,7 @@ export function OnboardingWizard({
                     goTo(5);
                   }}
                   placeholder={steps.phoneInputPlaceholder}
-                  className="h-[54px] flex-1 rounded-[14px] border border-border bg-surface px-[15px] text-[16px] font-semibold tabular-nums text-foreground outline-none transition-colors placeholder:font-medium placeholder:text-text-done focus:border-primary focus:ring-[3.5px] focus:ring-primary/15"
+                  className="h-[54px] min-w-0 flex-1 rounded-[14px] border border-border bg-surface px-[15px] text-[16px] font-semibold tabular-nums text-foreground outline-none transition-colors placeholder:font-medium placeholder:text-text-done focus:border-primary focus:ring-[3.5px] focus:ring-primary/15"
                 />
               </div>
               <p className="mt-2 text-[11.5px] font-medium leading-[1.5] text-text-done">

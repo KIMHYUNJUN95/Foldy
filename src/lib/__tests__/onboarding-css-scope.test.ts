@@ -49,3 +49,18 @@ describe("온보딩 CSS 이름 겹침", () => {
     expect(() => readFileSync(path.join(dir, "onboarding-done.css"))).toThrow();
   });
 });
+
+describe("온보딩 줄바꿈 · 폭 회귀", () => {
+  it("PC 화면 최상위(.obd)에도 ko keep-all · ja auto-phrase 규칙이 있다", () => {
+    const desktop = read("desktop-onboarding.css");
+    expect(desktop).toMatch(/\.obd:lang\(ko\)\s*\{[^}]*word-break:\s*keep-all/);
+    expect(desktop).toMatch(/\.obd:lang\(ja\)\s*\{[^}]*word-break:\s*auto-phrase/);
+  });
+
+  it("폰 전화번호 칸(flex-1 input)에 min-w-0 이 있어 줄 밖으로 넓어지지 않는다", () => {
+    const src = readFileSync(path.join(dir, "onboarding-wizard.tsx"), "utf8");
+    const tel = src.match(/<input[^>]*type="tel"[\s\S]*?\/>/);
+    expect(tel).not.toBeNull();
+    expect(tel![0]).toMatch(/className="[^"]*\bmin-w-0\b/);
+  });
+});

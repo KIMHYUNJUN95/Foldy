@@ -30,6 +30,10 @@
   --sh-pop: 0 12px 40px -8px rgba(22, 20, 31, 0.22);
   font-variant-numeric: tabular-nums;
 }
+
+/* 줄바꿈 — 폰 마법사(.obw-main)와 같은 규칙: ko 는 어절 단위, ja 는 낱말 경계(「コ / ード」 방지). */
+.obd:lang(ko) { word-break: keep-all; overflow-wrap: anywhere; }
+.obd:lang(ja) { word-break: auto-phrase; line-break: strict; }
 .obd__body {
   flex: 1;
   display: flex;

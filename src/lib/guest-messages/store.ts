@@ -116,18 +116,17 @@ export async function resolveConversationSeed(
     seed.guest_language = booking.guestLanguage;
   }
 
-  try {
-    type ReservationPick = {
-      id: string;
-      property_name: string;
-      room_label: string;
-      guest_name: string;
-      check_in_date: string;
-      check_out_date: string;
-      source: string;
-    };
-    const select = "id, property_name, room_label, guest_name, check_in_date, check_out_date, source";
-    let reservation: ReservationPick | null = null;
+  type ReservationPick = {
+    id: string;
+    property_name: string;
+    room_label: string;
+    guest_name: string;
+    check_in_date: string;
+    check_out_date: string;
+    source: string;
+  };
+  const select = "id, property_name, room_label, guest_name, check_in_date, check_out_date, source";
+  const findReservation = async (): Promise<ReservationPick | null> => {
     if (args.reservationId) {
       const found = await supabase
         .from("reservations")
@@ -135,65 +134,73 @@ export async function resolveConversationSeed(
         .eq("organization_id", args.organizationId)
         .eq("id", args.reservationId)
         .maybeSingle();
-      reservation = (found.data as ReservationPick | null) ?? null;
+      const row = (found.data as ReservationPick | null) ?? null;
+      if (row) return row;
     }
-    if (!reservation) {
-      // 예약 행의 원본(raw_payload)에 Beds24 자기 번호가 v2 `id` 또는 v1 `bookId` 로 있다.
-      for (const path of ["raw_payload->>id", "raw_payload->>bookId"]) {
-        const found = await supabase
-          .from("reservations")
-          .select(select)
-          .eq("organization_id", args.organizationId)
-          .filter(path, "eq", args.providerBookingId)
-          .limit(1);
-        const row = ((found.data ?? []) as ReservationPick[])[0];
-        if (row) {
-          reservation = row;
-          break;
-        }
-      }
+    // 예약 행의 원본(raw_payload)에 Beds24 자기 번호가 v2 `id` 또는 v1 `bookId` 로 있다(식 인덱스 202611190001). 순서대로 — 앞이 맞으면 멈춘다.
+    for (const path of ["raw_payload->>id", "raw_payload->>bookId"]) {
+      const found = await supabase
+        .from("reservations")
+        .select(select)
+        .eq("organization_id", args.organizationId)
+        .filter(path, "eq", args.providerBookingId)
+        .limit(1);
+      const row = ((found.data ?? []) as ReservationPick[])[0];
+      if (row) return row;
     }
-    if (reservation) {
-      seed.reservation_id = reservation.id;
-      seed.property_name = reservation.property_name;
-      seed.room_label = reservation.room_label;
-      seed.guest_name = seed.guest_name ?? reservation.guest_name;
-      seed.check_in_date = seed.check_in_date ?? reservation.check_in_date;
-      seed.check_out_date = seed.check_out_date ?? reservation.check_out_date;
-      // 채널을 모르면 우리 예약 행의 출처로(보내기는 OTA 허용 목록만 — 그래도 모르면 unknown_channel 로 거절).
-      seed.channel = resolveOutboundChannel(seed.channel as GuestChannelKey | null, reservation.source);
-    }
+    return null;
+  };
+  const externalPropertyId = booking?.externalPropertyId ?? args.externalPropertyId;
+  const findProperty = async (): Promise<{ id: string; name: string } | null> => {
+    if (!externalPropertyId) return null;
+    const property = await supabase
+      .from("properties")
+      .select("id, name")
+      .eq("organization_id", args.organizationId)
+      .eq("external_provider", "beds24")
+      .eq("external_property_id", externalPropertyId)
+      .limit(1);
+    return ((property.data ?? []) as Array<{ id: string; name: string }>)[0] ?? null;
+  };
+  const externalRoomId = booking?.externalRoomId ?? args.externalRoomId;
+  const findRoom = async (): Promise<{ id: string } | null> => {
+    if (!externalRoomId) return null;
+    const room = await supabase
+      .from("rooms")
+      .select("id")
+      .eq("organization_id", args.organizationId)
+      .eq("external_provider", "beds24")
+      .eq("external_room_id", externalRoomId)
+      .limit(1);
+    return ((room.data ?? []) as Array<{ id: string }>)[0] ?? null;
+  };
 
-    const externalPropertyId = booking?.externalPropertyId ?? args.externalPropertyId;
-    if (externalPropertyId) {
-      const property = await supabase
-        .from("properties")
-        .select("id, name")
-        .eq("organization_id", args.organizationId)
-        .eq("external_provider", "beds24")
-        .eq("external_property_id", externalPropertyId)
-        .limit(1);
-      const row = ((property.data ?? []) as Array<{ id: string; name: string }>)[0];
-      if (row) {
-        seed.property_id = row.id;
-        seed.property_name = seed.property_name ?? row.name;
-      }
+  // 셋은 서로 기다릴 일이 없다 — 동시에 읽고(2026-11-19 성능), 채우는 순서(예약 → 건물 → 객실)는 예전 그대로.
+  // 한 갈래가 실패해도 나머지는 쓴다(예전엔 앞 갈래가 실패하면 뒤 갈래는 읽지도 않았다 — 칸이 덜 채워질 뿐 같은 방향).
+  const [reservationResult, propertyResult, roomResult] = await Promise.allSettled([findReservation(), findProperty(), findRoom()]);
+  for (const result of [reservationResult, propertyResult, roomResult]) {
+    if (result.status === "rejected") {
+      console.error("[guest-messages] seed lookup failed", result.reason instanceof Error ? result.reason.message : "unknown");
     }
-    const externalRoomId = booking?.externalRoomId ?? args.externalRoomId;
-    if (externalRoomId) {
-      const room = await supabase
-        .from("rooms")
-        .select("id")
-        .eq("organization_id", args.organizationId)
-        .eq("external_provider", "beds24")
-        .eq("external_room_id", externalRoomId)
-        .limit(1);
-      const row = ((room.data ?? []) as Array<{ id: string }>)[0];
-      if (row) seed.room_id = row.id;
-    }
-  } catch (error) {
-    console.error("[guest-messages] seed lookup failed", error instanceof Error ? error.message : "unknown");
   }
+  const reservation = reservationResult.status === "fulfilled" ? reservationResult.value : null;
+  if (reservation) {
+    seed.reservation_id = reservation.id;
+    seed.property_name = reservation.property_name;
+    seed.room_label = reservation.room_label;
+    seed.guest_name = seed.guest_name ?? reservation.guest_name;
+    seed.check_in_date = seed.check_in_date ?? reservation.check_in_date;
+    seed.check_out_date = seed.check_out_date ?? reservation.check_out_date;
+    // 채널을 모르면 우리 예약 행의 출처로(보내기는 OTA 허용 목록만 — 그래도 모르면 unknown_channel 로 거절).
+    seed.channel = resolveOutboundChannel(seed.channel as GuestChannelKey | null, reservation.source);
+  }
+  const property = propertyResult.status === "fulfilled" ? propertyResult.value : null;
+  if (property) {
+    seed.property_id = property.id;
+    seed.property_name = seed.property_name ?? property.name;
+  }
+  const room = roomResult.status === "fulfilled" ? roomResult.value : null;
+  if (room) seed.room_id = room.id;
   return seed;
 }
 
@@ -283,6 +290,15 @@ export type IngestResult = {
 };
 
 const ECHO_LOOKBACK_MS = 3 * 24 * 60 * 60 * 1000;
+
+/** `.in("external_id", …)` 한 번에 넣는 개수 — 메시지함 읽기(`inbox-server.ts` IN_CHUNK)와 같은 100. */
+const EXTERNAL_ID_CHUNK = 100;
+
+function chunkValues<T>(values: readonly T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < values.length; i += size) out.push(values.slice(i, i + size));
+  return out;
+}
 
 /** 되돌아온 host 메시지 하나를 발송 큐 줄에 잇는다. 성공하면 true. */
 async function mergeEcho(
@@ -391,14 +407,20 @@ export async function ingestConversationMessages(
   if (args.messages.length === 0) return result;
 
   const externalIds = [...new Set(args.messages.map((message) => message.externalId))];
-  const existing = await supabase
-    .from("guest_messages")
-    .select("external_id, read_at")
-    .eq("organization_id", args.organizationId)
-    .eq("provider", args.provider)
-    .in("external_id", externalIds);
-  if (existing.error) throw new Error(`message read failed: ${existing.error.message}`);
-  const existingRows = (existing.data ?? []) as Array<{ external_id: string | null; read_at: string | null }>;
+  // 이미 있는 메시지 찾기 — `.in()` 은 GET 주소에 실리니 100개씩 나눠 동시에(이력이 긴 예약은 웹훅 하나에 수백 개, 2026-11-19).
+  const existingParts = await Promise.all(
+    chunkValues(externalIds, EXTERNAL_ID_CHUNK).map(async (part) => {
+      const existing = await supabase
+        .from("guest_messages")
+        .select("external_id, read_at")
+        .eq("organization_id", args.organizationId)
+        .eq("provider", args.provider)
+        .in("external_id", part);
+      if (existing.error) throw new Error(`message read failed: ${existing.error.message}`);
+      return (existing.data ?? []) as Array<{ external_id: string | null; read_at: string | null }>;
+    }),
+  );
+  const existingRows = existingParts.flat();
   const existingIds = new Set(existingRows.map((row) => row.external_id).filter((id): id is string => !!id));
   const existingUnread = new Set(
     existingRows.filter((row) => row.external_id && !row.read_at).map((row) => row.external_id as string),
@@ -485,6 +507,7 @@ export async function ingestConversationMessages(
   // 자동 안내(5단계)가 되돌아온 host 메시지는 직원 답장이 아니다 — 손님이 기다리는 대화를 「처리 끝」으로 닫지 않게 답장 시각에서 뺀다.
   // 웹훅은 이력 전체를 싣으므로 매번 뺀다(큐 줄의 외부 번호 · 이번에 auto 큐 줄에 이은 것).
   let summarized: readonly NormalizedMessage[] = args.messages;
+  // 메아리 잇기 **뒤에** 읽는다(2026-11-19 리뷰) — 앞당기면 발송 처리가 external_id 를 적는 순간과 겹칠 때 낡은 줄을 읽을 틈이 넓어진다.
   if (args.messages.some((message) => message.direction === "host")) {
     const autoExternal = new Set<string>();
     const autoRows = await supabase

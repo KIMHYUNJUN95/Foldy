@@ -107,6 +107,11 @@ export function createFakeSupabase(
         filters.push((row) => String(valueOf(row, column)) !== String(value));
         return api;
       },
+      /** `filter(칸, "eq", 값)` 만 흉내(`raw_payload->>id` 같은 JSON 경로 포함). 그 밖 연산자는 거르지 않는다. */
+      filter(column: string, operator: string, value: unknown) {
+        if (operator === "eq") filters.push((row) => String(valueOf(row, column)) === String(value));
+        return api;
+      },
       gte(column: string, value: unknown) {
         filters.push((row) => String(valueOf(row, column)) >= String(value));
         return api;

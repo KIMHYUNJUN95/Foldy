@@ -2509,7 +2509,7 @@ INSERT · UPDATE 신호만, DELETE 는 오지 않는다. 대신 `task_occurrence
   `property_id` → `properties` · `room_id` → `rooms`(set null) · 표시용 `property_name` · `room_label`(정본 이름) · `channel`(airbnb · booking · expedia · agoda · vrbo · direct · other, check 없음) ·
   `booking_status`(통로 상태 원문) · `check_in_date` · `check_out_date` · `guest_name` · `guest_language` ·
   `status`(`awaiting` · `done` · `snoozed`, 기본 `done`) · `snooze_until`(`snoozed` 면 필수) · `last_guest_at` · `last_reply_at`(host 메시지만) · `last_message_at`(guest · host 메시지만 — system · internal 줄은 올리지 않음, 목록 정렬 기준).
-  인덱스: (조직, status, last_guest_at desc) · (조직, last_message_at desc) · reservation · property · room(부분). `(id, organization_id)` 고유 — 하위 표 복합 외래 키 대상.
+  인덱스: (조직, status, last_guest_at desc) · (조직, last_message_at desc) · reservation · property · room(부분) · (조직, status, last_message_at desc nulls last, id) — 2026-11-19 `202611190001`(운영 적용 2026-11-19). `(id, organization_id)` 고유 — 하위 표 복합 외래 키 대상.
 - `guest_messages` — 원본. `(conversation_id, organization_id)` → 대화(cascade, 조직 어긋남 막음). `provider` · `external_id`(내부 메모 · 번호 모르는 보낸 줄은 null) ·
   `provider_source`(통로 출처 원문) · `direction`(`guest` · `host` · `internal` · `system`) · `body`(기본 '') · `body_translated` · `translated_lang` · `sent_at` · `read_at` ·
   `author_user_id` → `auth.users`(set null) · `attachments` jsonb 배열(`[{ name, mimeType, url, inline }]`, base64 는 저장 안 함) · `outbox_id` → 발송 큐(set null).
@@ -2541,7 +2541,7 @@ INSERT · UPDATE 신호만, DELETE 는 오지 않는다. 대신 `task_occurrence
 - 함수 `guest_message_enqueue_reply(...)` — 답장 큐 줄 + 대기 메시지 줄을 한 번에. 같은 키면 `(outbox_id, duplicate = true, same_body)`.
   마지막 인자 `p_body_lang`(기본 null) = 번역해서 보낼 때 고른 언어 → `guest_messages.body_lang`(번역해서 보낸 답장만, 형식 `^[a-z]{2}(-[a-z]{2,4})?$` 체크).
 - `guest_messages.body_lang text` — 우리 답장이 손님에게 나간 언어(직원이 고른 번역 대상). 원문 그대로 보낸 답장 · 손님 말은 null.
-- 함수 `guest_conversation_last_lines(p_organization_id, p_conversation_ids)` — 대화마다 마지막 손님 말 · 답장 한 줄(`distinct on`).
+- 함수 `guest_conversation_last_lines(p_organization_id, p_conversation_ids)` — 대화마다 마지막 손님 말 · 답장 한 줄(`distinct on`). 2026-11-19 `202611190001` 이 LATERAL 판으로 다시 씀(아래 「손님 메시지 성능」).
 - 함수 `guest_conversation_apply_messages` 다시 정의 — 끝난 「나중에」(`snoozed` · `snooze_until <= p_now`)에 답장이 오면 `awaiting` 처럼 `done` + `snooze_until` 비움.
 - 새 표 · 함수는 모두 service_role 만(RLS 켬 · 정책 없음 · anon/authenticated 권한 없음, 05).
 
@@ -2650,3 +2650,13 @@ INSERT · UPDATE 신호만, DELETE 는 오지 않는다. 대신 `task_occurrence
   `language sql` · `stable` · security invoker · `search_path = ''`. 계산은 `src/lib/beds24/credit-usage-model.ts`.
 - 보관 30일: pg_cron `beds24-credit-usage-purge`(`35 15 * * *` UTC = 도쿄 0:35), 하드 삭제.
 - 쓰는 곳: `src/lib/beds24/credit-ledger.ts`(service role). 읽는 곳: `src/lib/beds24/credit-usage-read.ts`. 타입은 `src/types/database.ts` 손으로 맞춤.
+
+## 2026-11-19 손님 메시지 성능 — 인덱스 4개 · 마지막 한 줄 함수 (`202611190001_guest_messages_perf.sql`, 운영 적용 2026-11-19)
+
+기준 문서: `docs/product/47-guest-messaging.md` §5-13. 표 · 칸 · 권한은 바뀌지 않는다(`src/types/database.ts` 그대로).
+
+- `guest_conversations_org_status_last_message_idx` on `guest_conversations (organization_id, status, last_message_at desc nulls last, id)` — 메시지함 창(열린 대화 · 처리 끝)과 실시간 줄 다시 읽기의 처리 끝 경계 한 줄. 앱 순서 `last_message_at desc nulls last, id asc` 와 같다. 예전 `guest_conversations_org_last_message_idx (organization_id, last_message_at desc)` 는 지우지 않았다(NULLS 위치가 달라 이 정렬에는 못 씀).
+- jsonb 식 인덱스 — `reservations_org_raw_id_idx` on `reservations (organization_id, (raw_payload ->> 'id'))` · `reservations_org_raw_book_id_idx` (`->> 'bookId'`) · `reservations_org_raw_master_id_idx` (`->> 'masterId'`). 웹훅 대화 seed 의 예약 찾기 · 자동 안내 묶음 예약 찾기.
+- 함수 `guest_conversation_last_lines(uuid, uuid[])` 다시 정의 — 서명 · `stable` · `security definer` · `search_path = ''` · service_role 만 실행(public · anon · authenticated 회수)은 같다. `distinct on` 대신 대화마다 `cross join lateral (… order by sent_at desc, id desc limit 1)` — `guest_messages_conversation_sent_idx` 를 거꾸로 훑는다. 같은 입력에 같은 결과(로컬 시험 DB 대화 500개 · 462줄 일치).
+- CONCURRENTLY 없이 트랜잭션 안에서(표가 작음). 다시 돌려도 안전(`if not exists` · `create or replace`).
+- `set local lock_timeout = '5s'` — 긴 트랜잭션 뒤에 줄 서서 웹훅 쓰기를 막지 않게, 잠금을 5초 안에 못 잡으면 실패(다시 돌리면 됨).

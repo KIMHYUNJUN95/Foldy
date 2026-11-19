@@ -107,17 +107,23 @@ export async function ingestBeds24WebhookMessages(args: {
     const resolveOrg = (externalPropertyId: string | null, externalRoomId: string | null) =>
       resolveMessageOrganization(args.supabase, { externalPropertyId, externalRoomId }, args.organizationIdDefault);
 
-    const bookings = new Map<string, BookingEntry>();
+    // 예약마다 조직 찾기는 서로 기다릴 일이 없다 — 동시에(2026-11-19 성능). 같은 예약 번호는 처음 것만, 넣는 순서는 본문 순서 그대로.
+    const pending: Array<{ context: NormalizedBookingContext; reservationId: string | null }> = [];
+    const seenBookings = new Set<string>();
     for (let index = 0; index < args.bookingPayloads.length; index += 1) {
       const context = readBookingContext(args.bookingPayloads[index]);
-      if (!context || bookings.has(context.providerBookingId)) continue;
+      if (!context || seenBookings.has(context.providerBookingId)) continue;
+      seenBookings.add(context.providerBookingId);
       const result = args.results[index];
-      bookings.set(context.providerBookingId, {
-        context,
-        organization: await resolveOrg(context.externalPropertyId, context.externalRoomId),
-        reservationId: result && result.ok ? result.reservationId ?? null : null,
-      });
+      pending.push({ context, reservationId: result && result.ok ? result.reservationId ?? null : null });
     }
+    const organizations = await Promise.all(
+      pending.map((entry) => resolveOrg(entry.context.externalPropertyId, entry.context.externalRoomId)),
+    );
+    const bookings = new Map<string, BookingEntry>();
+    pending.forEach((entry, index) => {
+      bookings.set(entry.context.providerBookingId, { ...entry, organization: organizations[index] });
+    });
 
     const touched = new Map<string, boolean>();
     for (const entry of bookings.values()) {

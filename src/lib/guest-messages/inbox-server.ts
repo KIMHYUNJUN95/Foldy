@@ -135,44 +135,49 @@ function chunks<T>(values: readonly T[], size: number): T[][] {
   return out;
 }
 
-/** 대화마다 마지막 손님 말 · 답장 한 줄(내부 메모 · 시스템 줄은 목록에 안 띄운다). DB 함수가 대화마다 한 줄씩(distinct on) 돌려준다. */
+/**
+ * 대화마다 마지막 손님 말 · 답장 한 줄(내부 메모 · 시스템 줄은 목록에 안 띄운다). DB 함수가 대화마다 한 줄씩 돌려준다.
+ * RPC 는 POST 본문이라 URL 길이 걱정이 없다 — 100개씩 나눠 차례로 부르지 않고 **한 번에** 부른다(2026-11-19 성능).
+ */
 async function loadLastLines(db: Client, organizationId: string, ids: readonly string[]) {
   const out = new Map<string, { direction: GuestMessageDirection; body: string }>();
-  for (const part of chunks(ids, IN_CHUNK)) {
-    const { data, error } = await db.rpc("guest_conversation_last_lines", {
-      p_organization_id: organizationId,
-      p_conversation_ids: part,
-    });
-    if (error) throw new Error(`last lines read failed: ${error.message}`);
-    for (const row of (data ?? []) as Array<{
-      conversation_id: string;
-      direction: GuestMessageDirection;
-      body: string;
-    }>) {
-      if (!out.has(row.conversation_id))
-        out.set(row.conversation_id, {
-          direction: row.direction,
-          body: row.body,
-        });
-    }
+  if (ids.length === 0) return out;
+  const { data, error } = await db.rpc("guest_conversation_last_lines", {
+    p_organization_id: organizationId,
+    p_conversation_ids: [...ids],
+  });
+  if (error) throw new Error(`last lines read failed: ${error.message}`);
+  for (const row of (data ?? []) as Array<{
+    conversation_id: string;
+    direction: GuestMessageDirection;
+    body: string;
+  }>) {
+    if (!out.has(row.conversation_id))
+      out.set(row.conversation_id, {
+        direction: row.direction,
+        body: row.body,
+      });
   }
   return out;
 }
 
+/** 열린 발송 줄 — `.in()` 은 GET 주소에 실리니 100개씩 나누되, 묶음은 **동시에** 읽는다(차례로 기다리지 않는다). */
 async function loadOpenOutbox(db: Client, organizationId: string, ids: readonly string[]) {
   const out = new Map<string, string[]>();
-  for (const part of chunks(ids, IN_CHUNK)) {
-    const { data, error } = await db
-      .from("guest_message_outbox")
-      .select("conversation_id, status")
-      .eq("organization_id", organizationId)
-      .in("conversation_id", part)
-      .in("status", ["queued", "sending", "failed", "uncertain"]);
-    if (error) throw new Error(`outbox read failed: ${error.message}`);
-    for (const row of (data ?? []) as Array<{
-      conversation_id: string;
-      status: string;
-    }>) {
+  const parts = await Promise.all(
+    chunks(ids, IN_CHUNK).map(async (part) => {
+      const { data, error } = await db
+        .from("guest_message_outbox")
+        .select("conversation_id, status")
+        .eq("organization_id", organizationId)
+        .in("conversation_id", part)
+        .in("status", ["queued", "sending", "failed", "uncertain"]);
+      if (error) throw new Error(`outbox read failed: ${error.message}`);
+      return (data ?? []) as Array<{ conversation_id: string; status: string }>;
+    }),
+  );
+  for (const rows of parts) {
+    for (const row of rows) {
       const list = out.get(row.conversation_id) ?? [];
       list.push(row.status);
       out.set(row.conversation_id, list);
@@ -200,6 +205,7 @@ export async function loadInboxList(
       .eq("organization_id", organizationId)
       .in("status", ["awaiting", "snoozed"])
       .order("last_message_at", { ascending: false, nullsFirst: false })
+      .order("id", { ascending: true })
       .limit(OPEN_LIMIT),
     db
       .from("guest_conversations")
@@ -207,6 +213,7 @@ export async function loadInboxList(
       .eq("organization_id", organizationId)
       .eq("status", "done")
       .order("last_message_at", { ascending: false, nullsFirst: false })
+      .order("id", { ascending: true })
       .limit(DONE_LIMIT),
   ]);
   if (open.error) throw new Error(`conversation read failed: ${open.error.message}`);
@@ -246,8 +253,38 @@ function matchesInboxFilter(row: ConversationDbRow, filter: InboxFilter, now: Da
   );
 }
 
+/** 실시간 줄 다시 읽기가 열린 대화에서 읽는 칸 — 창 판정(id) · 머리 숫자(`headerCounts`)에 쓰는 것만. */
+const OPEN_WINDOW_COLUMNS = "id, status, snooze_until, property_name, channel, last_message_at";
+type OpenWindowColumn = "id" | "status" | "snooze_until" | "property_name" | "channel" | "last_message_at";
+
+type WindowKey = { id: string; last_message_at: string | null };
+
+/** 시각을 마이크로초까지(Postgres timestamptz 정밀도) — `Date.parse` 는 밀리초에서 자른다. */
+function microsOf(value: string): bigint | null {
+  const ms = Date.parse(value);
+  if (Number.isNaN(ms)) return null;
+  const fraction = /\.(\d+)/.exec(value)?.[1] ?? "";
+  return BigInt(ms) * BigInt(1000) + BigInt(Number((fraction + "000000").slice(3, 6)));
+}
+
+/**
+ * 목록 창 순서(`last_message_at desc nulls last, id asc`)에서 a 가 b 보다 앞이면 음수. `loadInboxList` 의 order 와 같아야 한다.
+ * id 는 소문자 uuid 라 글자 순 = Postgres uuid 순.
+ */
+function compareWindowKey(a: WindowKey, b: WindowKey): number {
+  const left = a.last_message_at ? microsOf(a.last_message_at) : null;
+  const right = b.last_message_at ? microsOf(b.last_message_at) : null;
+  if ((left === null) !== (right === null)) return left === null ? 1 : -1;
+  if (left !== null && right !== null && left !== right) return left > right ? -1 : 1;
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
 /** 머리 숫자는 상태 필터와 무관(건물 · 채널 필터는 따른다) — 「답장 기다림 N」 · 「목표 넘음 N」. */
-function headerCounts(rows: readonly ConversationDbRow[], filter: InboxFilter, now: Date) {
+function headerCounts(
+  rows: ReadonlyArray<Pick<ConversationDbRow, "status" | "snooze_until" | "property_name" | "channel">>,
+  filter: InboxFilter,
+  now: Date,
+) {
   let awaitingCount = 0;
   for (const row of rows) {
     if (effectiveRowState(row, now) !== "awaiting") continue;
@@ -302,28 +339,37 @@ export async function loadInboxRowsByIds(
   visibility: CodeVisibility = { canSeeCodes: true, canManageAuto: true },
 ): Promise<InboxRowsResult> {
   // 목록과 같은 창 — 열린 대화는 최근 메시지 500개, 처리 끝은 최근 200개. 그 밖의 줄은 목록에도 없으니 `matches` 도 아니다.
-  const [found, open, doneWindow] = await Promise.all([
+  // 2026-11-19 성능: 창 전체(전체 칸 500줄 + id 200줄)를 다시 읽지 않는다.
+  //  - 열린 대화: 머리 숫자(끝난 · 시각 없는 「나중에」 = 기다림, 건물 · 채널 필터)와 창 판정에 필요한 **좁은 칸**만 — 열린 대화는 작은 집합.
+  //  - 처리 끝: 200번째 줄(경계) **한 줄**만 읽고, 신호 온 줄이 그 앞이면 창 안(목록과 같은 순서 · 같은 동점 규칙).
+  const [found, open, doneEdge] = await Promise.all([
     db.from("guest_conversations").select(CONVERSATION_COLUMNS).eq("organization_id", organizationId).in("id", [...ids]),
     db
       .from("guest_conversations")
-      .select(CONVERSATION_COLUMNS)
+      .select(OPEN_WINDOW_COLUMNS)
       .eq("organization_id", organizationId)
       .in("status", ["awaiting", "snoozed"])
       .order("last_message_at", { ascending: false, nullsFirst: false })
+      .order("id", { ascending: true })
       .limit(OPEN_LIMIT),
     db
       .from("guest_conversations")
-      .select("id")
+      .select("id, last_message_at")
       .eq("organization_id", organizationId)
       .eq("status", "done")
       .order("last_message_at", { ascending: false, nullsFirst: false })
-      .limit(DONE_LIMIT),
+      .order("id", { ascending: true })
+      .range(DONE_LIMIT - 1, DONE_LIMIT - 1)
+      .maybeSingle(),
   ]);
   if (found.error) throw new Error(`conversation read failed: ${found.error.message}`);
   if (open.error) throw new Error(`conversation read failed: ${open.error.message}`);
-  if (doneWindow.error) throw new Error(`conversation read failed: ${doneWindow.error.message}`);
-  const openRows = (open.data ?? []) as ConversationDbRow[];
-  const inWindow = new Set([...openRows.map((row) => row.id), ...((doneWindow.data ?? []) as Array<{ id: string }>).map((row) => row.id)]);
+  if (doneEdge.error) throw new Error(`conversation read failed: ${doneEdge.error.message}`);
+  const openRows = (open.data ?? []) as Array<Pick<ConversationDbRow, OpenWindowColumn>>;
+  const openIds = new Set(openRows.map((row) => row.id));
+  const edge = (doneEdge.data ?? null) as WindowKey | null;
+  const inWindow = (row: ConversationDbRow) =>
+    row.status === "done" ? !edge || compareWindowKey(row, edge) <= 0 : openIds.has(row.id);
   const rows = (found.data ?? []) as ConversationDbRow[];
   const foundIds = rows.map((row) => row.id);
   const [lastLines, outbox] = await Promise.all([
@@ -335,7 +381,7 @@ export async function loadInboxRowsByIds(
   return {
     updates: rows.map((row) => ({
       row: toInboxRow(row, { lastLine: lastLines.get(row.id) ?? null, outboxStatuses: outbox.get(row.id) ?? [] }, now),
-      matches: inWindow.has(row.id) && matchesInboxFilter(row, filter, now),
+      matches: inWindow(row) && matchesInboxFilter(row, filter, now),
     })),
     missing: ids.filter((id) => !seen.has(id)),
     ...headerCounts(openRows, filter, now),

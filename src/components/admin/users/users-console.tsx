@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { IdDocumentPanel } from "@/components/identity/id-document-panel";
 import { useRouter } from "next/navigation";
-import { Check, ChevronRight, CircleHelp, Printer, Search, Trash2, X } from "lucide-react";
+import { Check, ChevronRight, CircleHelp, Printer, Search, X } from "lucide-react";
 import "./users-white.css";
 import { AdmDropdown, type AdmOption } from "../shared/adm-dropdown";
 import { AdminDatePicker } from "../shared/admin-date-picker";
@@ -26,7 +26,9 @@ import { haptic } from "@/lib/haptics";
 import { idDocChip } from "@/lib/staff-documents/chip";
 import { MAX_PRINT_PEOPLE } from "@/lib/staff-documents/print";
 import { settleAction } from "@/lib/settle-action";
-import { tokyoDateOf, tokyoToday } from "@/lib/tokyo-date";
+import { tokyoToday } from "@/lib/tokyo-date";
+import { formatPhoneDisplay, phoneHref } from "@/lib/phone-format";
+import { dotDateKey, dotDateOfIso } from "@/lib/users-display";
 
 /**
  * 사용자 콘솔 — 화이트 리디자인(2026-10-14, 시안 Users-PC · UsersGrant-PC · UsersDeact-PC).
@@ -147,8 +149,8 @@ export function UsersConsole({
   const visibleIds = useMemo(() => new Set(filtered.map((m) => m.userId)), [filtered]);
   const pickedVisible = picked.filter((id) => visibleIds.has(id));
 
-  // 가입일은 도쿄 날짜로(timestamptz 를 UTC 로 자르면 오전 0~9시 가입이 하루 전으로 보인다) — 패널의 longDate 와 같은 기준.
-  const joined = (value: string | null) => (value ? (tokyoDateOf(value) ?? "").replaceAll("-", ".") || "—" : "—");
+  // 가입일은 도쿄 날짜로(timestamptz 를 UTC 로 자르면 오전 0~9시 가입이 하루 전으로 보인다) — 패널과 같은 「2026.11.19」.
+  const joined = (value: string | null) => dotDateOfIso(value) || "—";
   const open = (id: string) => router.push(`/admin/users?member=${id}`, { scroll: false });
   const close = () => router.push("/admin/users", { scroll: false });
   const filtersOn = Boolean(query || fRole || fStatus || fDoc);
@@ -158,7 +160,7 @@ export function UsersConsole({
       <div className="usw-bar">
         <UsersSectionTabs
           active="members"
-          labels={{ members: c.tabMembers, invites: c.tabInvites, documents: docsCount != null ? c.tabDocs : null }}
+          labels={{ members: c.tabMembers, invites: c.tabInvites, documents: docsCount != null ? c.mTabDocs : null }}
           counts={{ members: members.length, invites: inviteCount ?? undefined, documents: docsCount ?? undefined }}
         />
         <form className="usw-search" role="search" onSubmit={(event) => event.preventDefault()}>
@@ -312,7 +314,7 @@ export function UsersConsole({
                 </span>
               </span>
               <span className="usw-c">{m.isDeveloper ? c.devRole : roleLabel(m.role)}</span>
-              <span className="usw-c num">{m.phone || "—"}</span>
+              <span className="usw-c num">{formatPhoneDisplay(m.phone) || "—"}</span>
               <span className={`usw-c${m.status === "active" ? "" : " is-dim"}`}>
                 {m.status === "active" ? c.statusActive : c.statusInactive}
               </span>
@@ -391,10 +393,9 @@ function MemberPanel({
   const role = optRole ?? m.role;
   const status = optStatus ?? (m.status === "active" ? "active" : "suspended");
 
-  const longDate = (iso: string | null) =>
-    iso ? new Intl.DateTimeFormat(locale, { timeZone: "Asia/Tokyo", year: "numeric", month: "long", day: "numeric" }).format(new Date(iso)) : "—";
-  const shortDate = (key: string) =>
-    new Intl.DateTimeFormat(locale, { timeZone: "Asia/Tokyo", month: "long", day: "numeric" }).format(new Date(`${key}T12:00:00+09:00`));
+  // 날짜는 사용자 관리 전체가 한 모양 — 「2026.11.19」(src/lib/users-display.ts).
+  const longDate = (iso: string | null) => dotDateOfIso(iso) || "—";
+  const shortDate = (key: string) => dotDateKey(key);
 
   function run(task: () => Promise<{ ok: boolean; error?: string }>, success: string, rollback?: () => void) {
     startTransition(async () => {
@@ -427,7 +428,7 @@ function MemberPanel({
   // ── 권한 줄 ──
   type Row = { id: string; label: string; on: boolean; src: string; bad?: boolean; disabled: boolean; onToggle: () => void };
   const rows: Row[] = [];
-  const expiryText = (iso: string) => shortDate(new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Tokyo" }));
+  const expiryText = (iso: string) => dotDateOfIso(iso);
   const daysLeft = (iso: string) => Math.ceil((new Date(iso).getTime() - Date.parse(`${today}T00:00:00+09:00`)) / 86_400_000) - 1;
 
   if (!readOnly) {
@@ -626,11 +627,6 @@ function MemberPanel({
             </h2>
             <span>{m.isDeveloper ? c.devRole : roleLabel(role)}</span>
           </div>
-          {!readOnly && !panel.lastOwner ? (
-            <button type="button" className="usw-ic is-danger" aria-label={c.wDeleteAria} title={c.wDeleteAria} onClick={() => setConfirm("delete")}>
-              <Trash2 aria-hidden="true" />
-            </button>
-          ) : null}
           <button type="button" className="usw-ic usw-ph__x" aria-label={c.wClose} onClick={onClose}>
             <X aria-hidden="true" />
           </button>
@@ -641,7 +637,7 @@ function MemberPanel({
             <dt>{u.email}</dt>
             <dd>{m.email || "—"}</dd>
             <dt>{c.wPhoneShort}</dt>
-            <dd className="num">{m.phone ? <a href={`tel:${m.phone}`}>{m.phone}</a> : "—"}</dd>
+            <dd className="num">{m.phone ? <a href={phoneHref(m.phone)}>{formatPhoneDisplay(m.phone)}</a> : "—"}</dd>
             <dt>{c.wJoinedShort}</dt>
             <dd className="num">{longDate(m.joinedAt)}</dd>
             {m.identityRows.map((row) => (
@@ -758,6 +754,15 @@ function MemberPanel({
               </ol>
             )}
           </section>
+
+          {/* 멤버에서 빼기(2026-11-19) — 머리의 빨간 휴지통 대신 맨 아래 글자 단추. 확인 창 · 권한 · 마지막 소유자 잠금은 그대로. */}
+          {!readOnly && !panel.lastOwner ? (
+            <div className="usw-remove">
+              <button type="button" className="usw-remove__btn" onClick={() => setConfirm("delete")}>
+                {c.wRemoveMember}
+              </button>
+            </div>
+          ) : null}
         </div>
       </aside>
 

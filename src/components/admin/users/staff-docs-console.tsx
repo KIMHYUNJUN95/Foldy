@@ -14,7 +14,8 @@ import { useMemo, useState } from "react";
 import { Printer, Search, X } from "lucide-react";
 import { IdDocumentPanel } from "@/components/identity/id-document-panel";
 import { StaffIdUploadForm } from "@/components/identity/staff-id-upload-form";
-import { statusLabel } from "@/components/identity/id-card-flow";
+import { ResidenceStatusText, statusLabel } from "@/components/identity/id-card-flow";
+import { dotDateKey, residenceStatusText } from "@/lib/users-display";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { MAX_PRINT_PEOPLE } from "@/lib/staff-documents/print";
 import {
@@ -71,7 +72,7 @@ export function StaffDocsConsole({
     missing: c.docsFilterMissing,
   };
   const kindLabel = (kind: string | null | undefined) => (kind === "residence_card" ? idc.titleResidence : kind === "my_number_card" ? idc.titleMyNumber : null);
-  const dateText = (key: string) => (key ? key.replaceAll("-", ". ").replace(/\. 0/g, ". ") : "—");
+  const dateText = (key: string) => dotDateKey(key) || "—";
 
   const go = (href: string) => router.replace(href, { scroll: false });
   const open = (row: StaffDocRosterRow) => go(`/admin/users/documents?u=${row.userId}`);
@@ -82,7 +83,7 @@ export function StaffDocsConsole({
       <div className="usw-bar">
         <UsersSectionTabs
           active="documents"
-          labels={{ members: c.tabMembers, invites: c.tabInvites, documents: c.tabDocs }}
+          labels={{ members: c.tabMembers, invites: c.tabInvites, documents: c.mTabDocs }}
           counts={{ members: memberCount ?? undefined, invites: inviteCount ?? undefined, documents: rows.length }}
         />
         <form className="usw-search" role="search" onSubmit={(event) => event.preventDefault()}>
@@ -154,8 +155,11 @@ export function StaffDocsConsole({
                   </span>
                 </span>
                 <span className={`usw-c${row.doc ? "" : " is-soft"}`}>{kindLabel(row.doc?.kind) ?? "—"}</span>
-                <span className={`usw-c${row.doc?.residenceStatus ? "" : " is-soft"}`} lang={row.doc?.residenceStatus ? "ja" : undefined}>
-                  {row.doc?.residenceStatus || "—"}
+                <span
+                  className={`usw-c${row.doc?.residenceStatus ? "" : " is-soft"}`}
+                  title={row.doc?.residenceStatus ? residenceStatusText(row.doc.residenceStatus, idc.residenceStatusNames) : undefined}
+                >
+                  {row.doc?.residenceStatus ? <ResidenceStatusText copy={idc} value={row.doc.residenceStatus} /> : "—"}
                 </span>
                 <span className={`usw-c num${row.doc?.expiresOn ? "" : " is-soft"}`}>{dateText(row.doc?.expiresOn ?? "")}</span>
                 <span className={`sdc-st is-${st.tone}`}>{st.text}</span>

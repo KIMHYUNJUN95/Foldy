@@ -32,6 +32,8 @@ import {
 } from "@/lib/staff-documents/fields";
 import type { IdDocumentView } from "@/lib/staff-documents/server";
 import type { Dictionary } from "@/lib/i18n";
+import "./residence-status.css";
+import { dotDateKey, dotDateOfIso, nationalityTextDisplay, residenceStatusDisplay } from "@/lib/users-display";
 
 type Copy = Dictionary["idCard"];
 type Side = "front" | "back";
@@ -80,10 +82,28 @@ export function idFieldLabel(copy: Copy, kind: IdDocumentKind, key: IdDocumentFi
   }
 }
 
-export function formatDateKey(value: string, locale: string) {
-  if (!value) return "";
-  const d = new Date(`${value}T00:00:00Z`);
-  return new Intl.DateTimeFormat(locale, { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" }).format(d);
+// 날짜는 사용자 관리 · 본인 서류 화면 전체가 한 모양 — 「2026.11.19」(2026-11-19, src/lib/users-display.ts).
+// locale 인자는 부르는 곳이 많아 남겨 둔다.
+export function formatDateKey(value: string, _locale?: string) {
+  void _locale;
+  return dotDateKey(value);
+}
+
+/**
+ * 재류자격 — 화면 언어 번역 + 카드 원문을 작게(2026-11-19). 사전에 없는 자격 · 일본어 화면은 원문만(일본어로 읽게 lang="ja").
+ */
+export function ResidenceStatusText({ copy, value }: { copy: Copy; value: string | null | undefined }) {
+  const { label, original } = residenceStatusDisplay(value, copy.residenceStatusNames);
+  if (!label) return null;
+  if (!original) return <span lang="ja">{label}</span>;
+  return (
+    <>
+      {label}{" "}
+      <small className="rs-orig" lang="ja">
+        {original}
+      </small>
+    </>
+  );
 }
 
 export function idFieldDisplay(copy: Copy, key: IdDocumentField, fields: IdDocumentFields, locale: string) {
@@ -93,6 +113,8 @@ export function idFieldDisplay(copy: Copy, key: IdDocumentField, fields: IdDocum
   if (key === "extraActivity") return extraActivityLabel(copy, value);
   if (key === "gender") return value === "male" ? copy.genderMale : copy.genderFemale;
   if (key === "birthDate" || key === "expiresOn") return formatDateKey(value, locale);
+  // 카드의 「국적 · 지역」이 나라 코드(VN)로 들어왔으면 화면 언어 이름으로.
+  if (key === "nationalityText") return nationalityTextDisplay(value, locale);
   return value;
 }
 
@@ -313,7 +335,7 @@ export function IdCardFlow({
           <div className="idc__statusrow">
             <span className="idc__chip" data-status={current.status}>{statusLabel(copy, current.status)}</span>
             <span className="idc__muted">
-              {copy.viewSubmitted.replace("{date}", formatDateKey(current.submittedAt.slice(0, 10), locale))}
+              {copy.viewSubmitted.replace("{date}", dotDateOfIso(current.submittedAt))}
             </span>
           </div>
           {current.status === "returned" && current.returnReason && (
@@ -343,7 +365,13 @@ export function IdCardFlow({
               .map((key) => (
                 <div className="idc__row" key={key}>
                   <dt>{idFieldLabel(copy, current.kind, key)}</dt>
-                  <dd>{idFieldDisplay(copy, key, current.fields, locale)}</dd>
+                  <dd>
+                    {key === "residenceStatus" ? (
+                      <ResidenceStatusText copy={copy} value={current.fields.residenceStatus} />
+                    ) : (
+                      idFieldDisplay(copy, key, current.fields, locale)
+                    )}
+                  </dd>
                 </div>
               ))}
           </dl>
@@ -549,7 +577,7 @@ export function IdCardFlow({
           <dd><span className="idc__chip" data-status="pending">{copy.statusPending}</span></dd>
         </div>
         {kind === "residence_card" && saved.residenceStatus && (
-          <div className="idc__row"><dt>{copy.fieldResidenceStatus}</dt><dd lang="ja">{saved.residenceStatus}</dd></div>
+          <div className="idc__row"><dt>{copy.fieldResidenceStatus}</dt><dd><ResidenceStatusText copy={copy} value={saved.residenceStatus} /></dd></div>
         )}
         {saved.expiresOn && (
           <div className="idc__row">

@@ -17,7 +17,8 @@ import { usePrivacyScreen } from "@/lib/native/privacy-screen";
 import { expiryTone, fieldsForKind, type IdDocumentField } from "@/lib/staff-documents/fields";
 import type { IdDocumentView } from "@/lib/staff-documents/server";
 import { ImageLightbox } from "@/components/shell/image-lightbox";
-import { formatDateKey, idFieldDisplay, idFieldLabel, statusLabel } from "@/components/identity/id-card-flow";
+import { dotDateOfIso } from "@/lib/users-display";
+import { idFieldDisplay, idFieldLabel, ResidenceStatusText, statusLabel } from "@/components/identity/id-card-flow";
 
 /** 출입국재류관리청 「在留カード等番号失効情報照会」. */
 const VERIFY_URL = "https://lapse-immi.moj.go.jp/html/top.html"; // 2026-01-05 주소 변경(옛 주소는 「不正なリクエスト」)
@@ -129,20 +130,26 @@ export function IdDocumentPanel({
         {fieldsForKind(doc.kind).map((key) => (
           <div key={key} data-edited={doc.editedFields.includes(key) ? "" : undefined}>
             <dt>{idFieldLabel(copy, doc.kind, key)}</dt>
-            <dd lang={key === "residenceStatus" ? "ja" : undefined}>{idFieldDisplay(copy, key, doc.fields, locale) || "—"}</dd>
+            <dd>
+              {key === "residenceStatus" && doc.fields.residenceStatus ? (
+                <ResidenceStatusText copy={copy} value={doc.fields.residenceStatus} />
+              ) : (
+                idFieldDisplay(copy, key, doc.fields, locale) || "—"
+              )}
+            </dd>
           </div>
         ))}
       </dl>
 
       <p className="idp__meta">
         {doc.uploadedByAdmin
-          ? copy.adminUploadedByAdmin.replace("{date}", formatDateKey(doc.submittedAt.slice(0, 10), locale))
-          : `${copy.viewSubmitted.replace("{date}", formatDateKey(doc.submittedAt.slice(0, 10), locale))} · ${doc.ocrUsed ? copy.adminOcr : copy.adminManual}`}
+          ? copy.adminUploadedByAdmin.replace("{date}", dotDateOfIso(doc.submittedAt))
+          : `${copy.viewSubmitted.replace("{date}", dotDateOfIso(doc.submittedAt))} · ${doc.ocrUsed ? copy.adminOcr : copy.adminManual}`}
         {editedLabels ? <><br />{copy.adminEdited.replace("{fields}", editedLabels)}</> : null}
         {doc.confirmedAt && doc.confirmedByName ? (
           <>
             <br />
-            {statusLabel(copy, doc.status)} — {copy.adminReviewedBy.replace("{name}", doc.confirmedByName).replace("{date}", formatDateKey(doc.confirmedAt.slice(0, 10), locale))}
+            {statusLabel(copy, doc.status)} — {copy.adminReviewedBy.replace("{name}", doc.confirmedByName).replace("{date}", dotDateOfIso(doc.confirmedAt))}
             {doc.status === "returned" && doc.returnReason ? `: ${doc.returnReason}` : ""}
           </>
         ) : null}

@@ -6,6 +6,7 @@ import { RefreshCw } from "lucide-react";
 import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
 import { AdminDatePicker } from "@/components/admin/shared/admin-date-picker";
 import { buildInviteName, generateInviteCode } from "@/lib/invite-code-gen";
+import { dotDateKey } from "@/lib/users-display";
 import { countText } from "@/lib/count-text";
 
 export type InviteCreateOrganization = {
@@ -53,6 +54,8 @@ type InviteCreateFormProps = {
    * 다시 생성 버튼)에서만 일어난다.
    */
   defaultCode: string;
+  /** 처음 고른 조직 — 서버가 지금 조직으로 정한다(pickDefaultInviteOrganization, 2026-11-19). */
+  defaultOrganizationId: string;
   defaultMaxUses: number;
   localeTag: string;
 };
@@ -71,11 +74,12 @@ export function InviteCreateForm({
   today,
   defaultExpiresAt,
   defaultCode,
+  defaultOrganizationId,
   defaultMaxUses,
   localeTag,
   copy,
 }: InviteCreateFormProps & { copy: InviteCreateFormCopy }) {
-  const [organizationId, setOrganizationId] = useState(organizations[0]?.id ?? "");
+  const [organizationId, setOrganizationId] = useState(defaultOrganizationId);
   const [role, setRole] = useState(roles[0]?.value ?? "");
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
@@ -132,7 +136,7 @@ export function InviteCreateForm({
     Math.round((Date.parse(`${expiresAt}T00:00:00+09:00`) - Date.parse(`${today}T00:00:00+09:00`)) / 86_400_000),
   );
   const expiresText = expiresAt
-    ? `${new Intl.DateTimeFormat(localeTag, { timeZone: "Asia/Tokyo", month: "long", day: "numeric" }).format(new Date(`${expiresAt}T12:00:00+09:00`))} (${countText(copy.days, expiresDays)})`
+    ? `${dotDateKey(expiresAt)} (${countText(copy.days, expiresDays)})`
     : "—";
 
   // 화이트 리디자인(2026-10-14, 시안 Invite-PC): 이름표 칸 둘(조직 · 역할) → 자동으로 채운 값 요약 → 「세부 설정 바꾸기」로 펼쳐 덮어쓰기.

@@ -2883,7 +2883,7 @@
 .adm .lviews button, .adm .lviews a { height: 34px; padding: 0 13px; border-radius: 10px; font-size: 14px; font-weight: 500; color: #6b6878; }
 .adm .lviews button.on, .adm .lviews a.on { background: #fff; color: #16141f; font-weight: 600; box-shadow: 0 1px 2px rgba(22, 20, 31, 0.08); }
 .adm .lviews .cnt { background: none; color: var(--text-3); font-weight: 500; }
-.adm .lviews .on .cnt { color: #7a52e6; }
+.adm .lviews .on .cnt { color: var(--adm-muted); } /* 2026-11-19 직원 목록 unslop — 켠 탭의 숫자도 회색(보라는 주 단추 · 선택에만) */
 .adm .btn--pri { background: #7a52e6; box-shadow: none; }
 .adm .btn--pri:hover { background: #6b40e0; }
 .adm .btn--ghost { background: #f4f4f7; border-color: transparent; color: #3a3746; }

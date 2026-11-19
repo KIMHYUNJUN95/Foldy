@@ -1084,6 +1084,7 @@ PC 에서 가입하면 `/onboarding` 이 **모바일 마법사가 아니라 한 
 
 - **뷰 2개.** 「기록」(반품 한 건 = 한 행) / 「품목별 수량」(같은 조건의 품목별 대조표). 다른 콘솔의
   `.cviewbar` + `.lviews` 뷰 전환 패턴을 그대로 쓴다.
+  (2026-11-19 직원 목록 unslop) 공용 `.lviews` 의 켠 탭 숫자(`.on .cnt`)는 보라가 아니라 회색(`--adm-muted`) — 사용자 관리 · 근태 교통비 탭이 숫자를 쓴다. 사용자 관리 PC 는 탭 「멤버 · 초대 · 서류」 · 누르는 크기 40px · 멤버 빼기는 패널 맨 아래 글 단추(문서 17).
 - **「기록」 뷰 열:** 등록 일시(요일 보조 표기) · 건물 · 반품 품목(요약 + 전체 품목/수량 나열) ·
   \[품목 필터 시 그 품목의 수량 열\] · 총 수량 · 등록자. 행을 잘라 단일 품목처럼 보이게 하지 않는다.
 - **「품목별 수량」 뷰 열:** 반품 품목 · 수량(+막대) · \[건물을 좁혔을 때 전체 건물 수량\] · 기록 수 ·
@@ -1354,7 +1355,7 @@ Management Console" → Current Implementation Note.
 - 초대코드 생성/수정/비활성화 — **`설정` → `사용자`로 이전됨 (2026-07-13)**. 초대(팀코드) 관리 화면이
   `/admin/settings/invite-codes`에서 `/admin/users/invites`로 옮겨져, 멤버 라이프사이클(초대 → 관리 →
   비활성 → 삭제)이 사용자 화면 한 곳으로 통일됐다. `/admin/users`와 `/admin/users/invites`는 상단
-  "멤버 목록"/"멤버 초대" 탭 스위처(`src/components/admin/users/users-section-tabs.tsx`)로 오간다.
+  "멤버 · 초대 · 서류" 탭 스위처(2026-11-19)(`src/components/admin/users/users-section-tabs.tsx`)로 오간다.
   게이트는 `/admin/users`와 동일하게 **개발자 또는 `manage_users` 위임**(`actorCanOpenUserManagement`,
   `src/lib/user-management-access.ts`) — 기존 owner/office_admin/전무 역할 하드코딩 체크는 이걸로
   대체됐고, 그 과정에서 전무(`senior_managing_director`)가 초대코드를 못 만들던 버그도 함께 해소됐다.

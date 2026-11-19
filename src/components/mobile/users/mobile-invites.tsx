@@ -12,6 +12,7 @@ import { haptic } from "@/lib/haptics";
 import { settleAction } from "@/lib/settle-action";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { buildInviteName, generateInviteCode } from "@/lib/invite-code-gen";
+import { dotDateKey } from "@/lib/users-display";
 import { MobileUsersHead } from "./mobile-users-head";
 import { MobileUsersToast, type UsersToast } from "./mobile-users-toast";
 import "./mobile-users.css";
@@ -50,6 +51,7 @@ export function MobileInvites({
   roles,
   today,
   defaultCode,
+  defaultOrganizationId,
   defaultExpiresAt,
   defaultMaxUses,
   memberCount,
@@ -61,6 +63,8 @@ export function MobileInvites({
   roles: string[];
   today: string;
   defaultCode: string;
+  /** 처음 고른 조직 — 서버가 지금 조직으로 정한다(pickDefaultInviteOrganization). */
+  defaultOrganizationId: string;
   defaultExpiresAt: string;
   defaultMaxUses: number;
   memberCount: number | null;
@@ -74,7 +78,7 @@ export function MobileInvites({
   const settings = dict.admin.settings;
   const roleLabel = (role: string) => (dict.roles as Record<string, string>)[role] ?? role;
   const [pending, startTransition] = useTransition();
-  const [orgId, setOrgId] = useState(organizations[0]?.id ?? "");
+  const [orgId, setOrgId] = useState(defaultOrganizationId);
   const [role, setRole] = useState(roles[0] ?? "");
   const [code, setCode] = useState(defaultCode);
   const [advanced, setAdvanced] = useState(false);
@@ -101,7 +105,7 @@ export function MobileInvites({
 
   const org = organizations.find((item) => item.id === orgId);
   const days = Math.max(0, Math.round((Date.parse(`${expiresAt}T00:00:00+09:00`) - Date.parse(`${today}T00:00:00+09:00`)) / 86_400_000));
-  const expiresText = new Intl.DateTimeFormat(locale, { timeZone: "Asia/Tokyo", month: "short", day: "numeric" }).format(new Date(`${expiresAt}T12:00:00+09:00`));
+  const expiresText = dotDateKey(expiresAt);
   const live = rows.filter((row) => row.state === "live").length;
 
   async function copy(row: MobileInviteRow) {

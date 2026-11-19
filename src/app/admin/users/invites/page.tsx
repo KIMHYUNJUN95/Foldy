@@ -14,12 +14,9 @@ import "@/components/admin/users/users-white.css";
 import { loadStaffDocumentRoster } from "@/lib/staff-documents/roster-server";
 import { listManageableOrganizations, selectableInviteRoles } from "@/lib/invite-codes-server";
 import { getDictionary } from "@/lib/i18n";
-import {
-  DEFAULT_INVITE_MAX_USES,
-  defaultInviteExpiry,
-  generateInviteCode,
-} from "@/lib/invite-code-gen";
+import { inviteFormDefaults } from "@/lib/invite-code-gen";
 import { tokyoToday } from "@/lib/tokyo-date";
+import { dotDateOfIso } from "@/lib/users-display";
 import { requireAdminSession } from "@/lib/admin-session";
 import { actorCanManageUsersInOrg } from "@/lib/user-management-access";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
@@ -79,9 +76,8 @@ export default async function AdminUsersInvitesPage({ searchParams }: PageProps)
   // 초대코드의 첫 랜덤값은 서버가 정한다 — 클라이언트가 첫 렌더에서 새로 뽑으면 SSR 결과와
   // 어긋나 하이드레이션이 깨진다. 이후 재생성은 사용자가 조직을 바꾸거나 ↻ 를 누를 때만 일어난다.
   const today = tokyoToday();
-  const defaultCode = generateInviteCode(
-    organizations[0]?.slug || organizations[0]?.name || "",
-  );
+  // 처음 값(조직 = 지금 보고 있는 조직)은 모바일과 같은 함수(2026-11-19 — 예전엔 목록 첫 조직이라 다른 조직 코드를 만들 뻔했다).
+  const formDefaults = inviteFormDefaults(organizations, session.organization.id, today);
 
   const created = firstParam(params.created) === "1";
   const deactivated = firstParam(params.deactivated) === "1";
@@ -91,15 +87,8 @@ export default async function AdminUsersInvitesPage({ searchParams }: PageProps)
 
   const localeTag = session.user.preferredLanguage;
   const now = nowMs();
-  const thisYear = today.slice(0, 4);
-  // 올해가 아니면 연도까지 — 「1월 1일까지」가 내년인지 지난해인지 헷갈리지 않게.
-  const dayText = (iso: string) =>
-    new Intl.DateTimeFormat(localeTag, {
-      timeZone: "Asia/Tokyo",
-      ...(new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Tokyo" }).slice(0, 4) === thisYear ? {} : { year: "numeric" }),
-      month: "long",
-      day: "numeric",
-    }).format(new Date(iso));
+  // 날짜는 사용자 관리 전체가 한 모양 — 「2026.11.19」(연도까지 늘 보여 내년 · 지난해가 헷갈리지 않는다).
+  const dayText = (iso: string) => dotDateOfIso(iso);
   // 코드 하나의 상태 — 쓸 수 있음 / 꺼 둠 / 다 씀 / 만료. 끝난 코드는 회색 줄로 내린다.
   const rows = inviteCodes.map((invite) => {
     const expired = Boolean(invite.expires_at) && new Date(invite.expires_at as string).getTime() <= now;
@@ -140,12 +129,12 @@ export default async function AdminUsersInvitesPage({ searchParams }: PageProps)
           : null;
 
   return (
-    <AdminShell activeItem="users" title={settings.inviteCodesTitle}>
+    <AdminShell activeItem="users" title={dictionary.admin.users.title}>
       {/* 화이트 리디자인(2026-10-14, 시안 Invite-PC): 상자 없이 왼쪽 새 코드 폼 · 오른쪽 코드 표. */}
       <div className="usi">
         <UsersSectionTabs
           active="invites"
-          labels={{ members: tabs.tabMembers, invites: tabs.tabInvites, documents: canViewDocs ? tabs.tabDocs : null }}
+          labels={{ members: tabs.tabMembers, invites: tabs.tabInvites, documents: canViewDocs ? tabs.mTabDocs : null }}
           counts={{ members: memberCount ?? undefined, invites: liveCount, documents: docsCount ?? undefined }}
         />
         <div className="usi-grid">
@@ -171,9 +160,10 @@ export default async function AdminUsersInvitesPage({ searchParams }: PageProps)
                 label: dictionary.roles[role],
               }))}
               today={today}
-              defaultExpiresAt={defaultInviteExpiry(today)}
-              defaultCode={defaultCode}
-              defaultMaxUses={DEFAULT_INVITE_MAX_USES}
+              defaultExpiresAt={formDefaults.expiresAt}
+              defaultCode={formDefaults.code}
+              defaultOrganizationId={formDefaults.organizationId}
+              defaultMaxUses={formDefaults.maxUses}
               localeTag={localeTag}
               copy={{
                 organization: settings.organization,

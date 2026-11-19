@@ -145,7 +145,7 @@ Admin user management (`/admin/users`) — 화이트 리디자인(2026-10-14, �
 > DB `memberships.team_id` · `teams` 표와 지난 이력(「소속 A → B」)은 그대로 남는다(마이그레이션 없음 — 되돌릴 수 있다).
 > 아래 글에서 「소속」이 나오는 곳은 이 날 이전 설명이다.
 
-- Tabs 「멤버 목록 N · 멤버 초대 N」(shared `.lviews`; invite count = codes usable now) + search (name · email · phone digits) on one line; filters 역할 · 상태 below (소속 뺌 2026-10-28).
+- Tabs 「멤버 N · 초대 N · 서류 N」(2026-11-19; shared `.lviews`; invite count = codes usable now) + search (name · email · phone digits) on one line; filters 역할 · 상태 below (소속 뺌 2026-10-28).
 - Table: 이름+이메일 (「나」 on yourself) · 역할 · 전화 · 상태 · 가입일. No save buttons in rows anymore.
 - Clicking a row opens the **right panel** (`?member=<membershipId>`, shared `.panel`). The old profile page `/admin/users/[id]` now redirects there.
 - Panel: avatar · name · 역할, trash (delete member → confirm modal) · close. 이메일 / 전화 / 가입. Then 역할 (dropdown) · 상태 (활성 · 비활성).
@@ -169,9 +169,9 @@ Admin user management (`/admin/users`) — 화이트 리디자인(2026-10-14, �
 - Your own row: no role/status/permission controls (「내 역할 · 권한은 여기서 바꿀 수 없어요.」), no delete.
 - Delete member: confirm modal (그대로 두기 / 삭제). Blocked with a message when the member has attendance / cleaning / leave history (deactivate instead).
 - **보호 대상 · 마지막 대표 · 삭제/비활성 범위 (2026-10-19)** — 판정은 순수 함수 `src/lib/user-management-guard.ts`, 서버 액션(`src/actions/users.ts`)이 최종 판단. 회귀 테스트 `src/lib/__tests__/user-management-guard.test.ts`.
-  - 대상이 **owner · 전무**면 역할 · 소속 · 상태 · 권한 · 플래그 · 삭제 등 패널의 모든 변경은 **그 조직의 owner · 전무 또는 개발자만**. 대상이 **개발자**(`platform_admins` 활성)면 **개발자만**. `user.manage` 위임만 받은 사람은 불가(`protected_member`). 패널은 그런 대상에 컨트롤 · 휴지통을 숨기고 한 줄 안내(「대표 · 전무 계정은 …」 / 「개발자 계정은 개발자만 …」)를 보여 준다.
+  - 대상이 **owner · 전무**면 역할 · 소속 · 상태 · 권한 · 플래그 · 삭제 등 패널의 모든 변경은 **그 조직의 owner · 전무 또는 개발자만**. 대상이 **개발자**(`platform_admins` 활성)면 **개발자만**. `user.manage` 위임만 받은 사람은 불가(`protected_member`). 패널은 그런 대상에 컨트롤 · 「멤버에서 빼기」를 숨기고 한 줄 안내(「대표 · 전무 계정은 …」 / 「개발자 계정은 개발자만 …」)를 보여 준다.
   - 역할 변경의 「줄 수 있는 역할」(`officeAdminAssignableRoles` 밖)도 **대상 조직의** owner · 전무인지로 판정한다(세션 역할이 다른 조직 것일 수 있다).
-  - **마지막 활성 owner** 는 owner 가 아닌 역할로 바꾸기 · 비활성 · 삭제가 막힌다(`last_owner`). 패널은 역할 드롭다운 · 「비활성」 · 휴지통을 막고 안내 문구를 띄운다. 전무는 owner 수에 세지 않는다.
+  - **마지막 활성 owner** 는 owner 가 아닌 역할로 바꾸기 · 비활성 · 삭제가 막힌다(`last_owner`). 패널은 역할 드롭다운 · 「비활성」 · 「멤버에서 빼기」를 막고 안내 문구를 띄운다. 전무는 owner 수에 세지 않는다.
   - **삭제**는 이 조직 멤버십만 지운다. 그 사람에게 **다른 조직 멤버십(상태 무관)** 이 있으면 profile · 로그인 계정은 남긴다. 다른 조직 멤버십이 없을 때만 계정 전체 삭제 — **auth 로그인을 먼저** 지우고(실패하면 아무것도 안 지우고 `delete_failed`), 그 뒤 멤버십 → profile(오류 확인). 전에는 멤버십 · profile 을 지운 뒤 auth 삭제가 실패하면 로그인만 남았다(2026-10-26 버그 수정). 활동 기록 검사(근태 · 청소 · 연차)는 예전처럼 조직 무관. **이 조직에 신분 서류(재류카드 · 마이넘버 카드 앞면)가 있으면 삭제 대신 비활성**(`has_id_documents`, 2026-10-23 — 퇴사 후 3년 보관, `41-residence-card-workflow.md` §6).
   - **비활성(auth ban)** 기준은 「바뀐 뒤 어느 조직에도 활성 멤버십이 없으면 로그인 차단」 하나. 다른 조직에 활성 멤버십이 있으면 이 조직 멤버십 상태만 바뀌고 로그인은 막지 않는다. 활성으로 바꾸면 항상 차단 해제. 확인 창 문구도 그 경우 「이 조직에서만 …」으로 바뀐다. **로그인 차단 · 해제를 먼저** 하고 상태를 저장한다 — 차단이 실패하면 상태도 안 바뀌고, 상태 저장이 실패하면 차단을 되돌린다(2026-10-26 — 전에는 「비활성」으로 보이는데 로그인되는 상태가 남을 수 있었다).
 - Motion: rows rise in order, switch knob slide, expiry row unfolds, button press. Off under reduced motion.
@@ -179,7 +179,7 @@ Admin user management (`/admin/users`) — 화이트 리디자인(2026-10-14, �
 
 Invite codes (`/admin/users/invites`) — same redesign (시안 Invite-PC):
 
-- Left: 「새 초대코드」 — 조직 · 역할 (label-in-border fields), then the auto-filled summary (코드 + regenerate · 이름 · 만료일 (N일) · 최대 사용 횟수), 「세부 설정 바꾸기」 opens the editable fields, [초대코드 만들기].
+- Left: 「새 초대코드」 — 조직 · 역할 (회색 채운 칸 + 라벨 위, 2026-11-19 — 예전 label-in-border 아님), then the auto-filled summary (코드 + regenerate · 이름 · 만료일 (N일) · 최대 사용 횟수), 「세부 설정 바꾸기」 opens the editable fields, [초대코드 만들기].
 - Right: table 코드 · 이름 · 역할 · 사용 (purple bar, grey when ended) · 기한, state = 「M월 D일까지」 / 꺼 둠 / 다 씀 / 「M월 D일 만료」(year shown when not this year). Ended codes are grey rows.
 - Row icons with tooltips: 코드 복사 (→ ✓ 복사됨 for 1.6s) · 코드 끄기 / 다시 켜기 · 코드 삭제 (confirm modal 그대로 두기 / 삭제; joined members stay).
 
@@ -251,11 +251,11 @@ emil-design-eng · frontend-design). 대시보드 `/admin/users`(멤버 · 패�
 
 화면(`src/components/mobile/users/*`, `mobile-users.css`):
 
-- **목록** `/mobile/users` — 큰 제목 34 · 「멤버 · 초대코드」 탭(주소가 다른 두 화면) · 검색(이름 · 이메일 · 전화 2자리 이상) ·
+- **목록** `/mobile/users` — 큰 제목 34 · 「멤버 · 초대 · 서류」 탭(주소가 다른 세 화면, 2026-11-19) · 검색(이름 · 이메일 · 전화 2자리 이상) ·
   「역할 · 상태 ⌄」 버튼 하나 → 거르기 시트(칩 · 「n명 보기」, 고른 값이 버튼 글자가 됨) · 활성 / 비활성 묶음(17). 줄 = 이름(나) / 역할.
   결과가 없으면 「조건에 맞는 멤버가 없어요」 + 조건 지우기.
   `staff_documents.view` 가 있으면 거르기 줄에 「확인 대기 N」 토글(N>0 일 때만)과 줄 끝 서류 칩(확인 대기 · 만료됨 · 만료 임박 · 재제출 대기)이 보인다 — 문서 41 §10.
-- **상세** `/mobile/users/{membershipId}` — 이름 · 역할, 빨간 휴지통(바꿀 수 있고 마지막 대표가 아닐 때만) → 연락처(전화는 하이픈 표시 · 누르면 걸기)
+- **상세** `/mobile/users/{membershipId}` — 이름 · 역할(2026-11-19: 빨간 휴지통 대신 맨 아래 「멤버에서 빼기」 글 단추 — 바꿀 수 있고 마지막 대표가 아닐 때만) → 연락처(전화는 하이픈 표시 · 누르면 걸기)
   → 역할 ›(역할 시트 — 체크, 고르면 바로 저장 + 알림 「되돌리기」 6초 줄) · 상태(비활성은 확인 시트, 먹색 버튼 — 다시 켤 수 있어서;
   바꾼 뒤 「되돌리기」) → 권한 스위치(둘째 줄 = 역할로 받음 · 개인 부여 · 기한 · 개인 차단, 7일 안 만료 · 차단은 빨강). 기한을 묻는 권한은 그 줄이
   옅은 보라로 펼쳐져 **무기한** · 1주 · 1개월 · 3개월 · 날짜(공용 날짜 시트, 내일부터). 삭제 확인은 빨간 버튼 + 「되돌릴 수 없어요」.
@@ -275,3 +275,20 @@ emil-design-eng · frontend-design). 대시보드 `/admin/users`(멤버 · 패�
   시급(보기) · 지급 방식 · 원천세 구분(甲乙丙 세그먼트 + 뜻 한 줄) · 부양 인원(甲일 때만) · 일본 이름 · 입사일(보기) · 雇用保険(켜면 가입일 시트).
   고르면 바로 저장 + 되돌리기 알림, 「확인 필요 n」은 빨간 점 + 먹색 글. 월급제는 「세무사 담당」 한 줄. 폰 한 열 · 폴드 두 열 · 태블릿 오른쪽 칸 한 열.
   `docs/product/39` 「P1 구현」.
+
+### 직원 목록 unslop 다듬기 (2026-11-19, 2차 3순위 — PC + 모바일)
+
+시안 캔버스 7B3iDUgJ…(지금 vs 제안). 사용자 결정 5개 + 버그 3개. **서버 액션 · 권한 · 마지막 소유자 잠금 · 7454633f 동작은 그대로**, 색 · 글꼴 · 배치 · 폴드 레일 · 태블릿 2분할도 그대로.
+
+- **탭** — PC · 모바일 모두 「멤버 · 초대 · 서류」(새 키 없음 — 기존 키 `tabMembers` · `tabInvites` 값을 짧게, 서류는 `mTabDocs` 공용. en 「Members · Invites · Docs」). 초대 화면 제목도 「사용자」(멤버 화면과 같은 머리). PC 초대 화면에서 탭이 밀리던 것은 탭 줄의 인라인 `margin: 0` 을 빼서 `.usi > .lviews` 2px 이 `.usw-bar` 2px 과 같게 고침. 모바일 머리 부제는 한 줄(넘치면 「…」) — en 부제가 두 줄이 돼 탭 줄을 밀던 것.
+- **켠 탭 숫자는 회색** — 공용 `.adm .lviews .on .cnt` 를 `--adm-muted` 로(보라는 주 단추 · 선택에만). 이 규칙을 쓰는 곳: 사용자 관리 탭(멤버 · 초대 · 서류) · 근태 교통비 탭(`attendance-transport-client.tsx`). 숫자를 안 쓰는 다른 `.lviews`(채용 · 리넨 · 분실물 · 수리 · 발주 · 캘린더 · 컴플레인 · 연차 보기)는 바뀐 것 없음. 모바일 `.muw-tabs` 숫자도 회색.
+- **상태 표시** — 서류 칩(확인 대기 · 만료 · 재제출 대기) · 「확인 대기 N」 거르기 · 재류카드 상태(`.idp__chip`)가 색 알약 → **6px 점 + 잉크 글자**(점: 주황 확인 대기 · 90일 이내 / 초록 확인됨 / 회색 반려 · 재제출 / 빨강 30일 이내 · 만료). 글씨만 있던 `.sdc-st` · `.muw-dst` 는 점 없이 기본 600, 누르는 링크 모양(`.is-link`)만 500.
+- **굵기 600 상한**, 재류카드 값(`.idp__kv dd` · `/account/id-card` 요약)은 500. 보라 `#7a52e6` 직접 값은 `var(--primary)` 계열로.
+- **누르는 크기** — PC 40px(검색 · 버튼 · 세그먼트 · 날짜 · 복사 · 다시 만들기 · 「확인 대기만」), 모바일 44px(재류카드 버튼 · 인쇄 · 번호 복사 · 확인 링크 · 활성/비활성 · 현금/계좌 · 갑/을/병 · 부양 수 ± · 「켜진 것만」 · 도움말은 보이는 크기 그대로 누르는 자리만 넓힘). PC 는 거르기 · 활성/비활성 · 전화 링크(`::after`) 도 40. 관리자 콘솔(`.adm`) 안 재류카드 버튼 · 인쇄 · 번호 복사 · 확인 링크는 40. 공용이라 손대지 않은 것: PC `.lviews` 탭(34) · 모바일 셸 알림/프로필(38) · 공용 스위치(51×31).
+- **전화번호** 하이픈 표시(`formatPhoneDisplay`, 저장 값은 E.164 그대로). **국적** 두 글자 코드는 화면 언어 나라 이름(`nationalityTextDisplay`).
+- **재류자격** — 카드 원문(일본어)을 저장하고, 화면 언어 사전(`idCard.residenceStatusNames`, ko · en 번역 / ja 원문)에 있으면 「번역 + 작게 원문」(`.rs-orig`), 없으면 원문만(`residenceStatusDisplay`). 목록 한 줄 요약은 번역만(PC 서류 표 칸은 `title` 로 「번역 원문」 전체). 번역과 원문 사이는 띄어쓰기 한 칸(`ResidenceStatusText` · `residenceStatusText`), `.rs-orig` 모양은 `src/components/identity/residence-status.css` 한 곳 — PC 서류 화면이 재류카드 CSS 를 안 불러 원문이 붙어 보이던 것. 사전에 기능실습(技能実習) · 고도전문직(高度専門職)을 더해 `RESIDENCE_STATUSES` 전부가 세 언어에 있음(시험).
+- **초대 칸** — 회색 채운 칸 + 라벨 위(테두리 없음, 누르면 흰 바탕 + 보라 2px 링).
+- **초대 목록 표 칸 폭**(`.usi-th/.usi-tr`) — 코드 104 · 이름 나머지(최소 88) · 역할 124 · 사용 92 · 기한 128 · 단추 124 · 칸 사이 12. 1280 에서 목록 폭 764(좌우 여백 빼면 740) → 이름 108, 1440 에서 268(화면 확인). 복사 직후에는 같은 40×40 단추 안에서 아이콘만 체크로 바뀌고(1.6초, 글자 「복사됨」 은 숨김 상태 글 · `aria-label` 로만), 단추 칸 폭은 그대로 — 예전 글자 칩이 기한 칸을 덮던 것(ja 74px 넘침). 머리글은 한 줄(`nowrap`). 역할 칸을 136 으로 넓혔을 때 이름 칸이 16px 로 눌리던 것을 고침.
+- **멤버에서 빼기** — 머리의 빨간 휴지통을 없애고 상세 맨 아래 빨간 글 단추 「멤버에서 빼기」(PC 40 · 모바일 44). 보이는 조건(바꿀 수 있음 · 마지막 대표 아님) · 확인 단계는 그대로.
+- **버그** — ① 초대 만들기의 처음 조직이 늘 목록 첫 조직이라 다른 조직 코드를 만들 뻔함 → 지금 조직(`pickDefaultInviteOrganization`, PC · 모바일). ② 날짜 모양이 화면마다 달랐음 → 한 가지 「2026.11.19」(`dotDateKey` · `dotDateOfIso`, `timestamptz` 는 도쿄 날짜). 바뀐 곳: 초대 만료 요약 · 초대 목록(이제 **늘 연도 포함**) · 변경 기록 날짜 · 권한 만료일 · 재류카드 제출일 · 확인일. 제출 · 확인 시각(`submittedAt` · `confirmedAt`)은 `slice(0,10)`(UTC 날짜) 대신 `dotDateOfIso` 로 도쿄 날짜 — 오전 0~9시 제출이 전날로 찍히던 것(시험). 가입일 · 채용 · 컴플레인 · 리넨 · 조직 설정이 이미 이 모양이라 맞춤. 초대 폼 처음 값(조직 · 코드 · 만료일 · 최대 사용)은 `inviteFormDefaults()`(`src/lib/invite-code-gen.ts`) 하나를 PC · 모바일 초대 화면이 같이 씀. ③ `/account/id-card` 는 같은 표시 규칙으로 계속 동작(요약 · 확인 대기 · 재류자격 번역).
+- 표시 규칙 한 곳: `src/lib/users-display.ts`, 시험 `src/lib/__tests__/users-display.test.ts` · `member-history.test.ts`.

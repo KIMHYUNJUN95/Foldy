@@ -4,7 +4,7 @@ import { getDictionary, type Locale } from "@/lib/i18n";
 /**
  * 모바일 사용자 관리 머리 — 큰 제목 · 한 줄 설명 · 멤버 / 초대코드 / 서류 탭(주소가 다른 세 화면).
  * 「서류」(재류카드 R4, 2026-10-26)는 `staff_documents.view` 가 있을 때만 — 부르는 쪽이 `docsCount` 를 넘길 때만 그린다.
- * 폰은 짧은 이름(「서류」), 폴드부터 「직원 서류」.
+ * 탭 이름은 세 폭 모두 짧게 「멤버 · 초대 · 서류」(2026-11-19). 설명 줄은 늘 한 줄(mobile-users.css `.muw-head p`) — 탭 줄 높이가 탭마다 같다.
  */
 export function MobileUsersHead({
   active,
@@ -39,8 +39,7 @@ export function MobileUsersHead({
         </Link>
         {docsCount != null ? (
           <Link href="/mobile/users/documents" aria-current={active === "documents" ? "page" : undefined} replace>
-            <span className="muw-tab-s">{c.mTabDocs}</span>
-            <span className="muw-tab-l">{c.tabDocs}</span>
+            {c.mTabDocs}
             <i className="num">{docsCount}</i>
           </Link>
         ) : null}

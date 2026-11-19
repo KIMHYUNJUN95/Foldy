@@ -1381,4 +1381,5 @@ Future navigation additions must also update the side-menu badge table and `getM
 - 로딩: `messages/loading.tsx` · `messages/[id]/loading.tsx` 한 줄 재내보내기.
 - AI 답장 도우미(2026-11-18, 47 §5-11 · 49): 답장 칸 바로 위 한 줄 · 「비슷한 대화」는 폰 · 폴드 · 태블릿 칸 모두 공용 `BottomSheet`(태블릿은 가운데 카드). 칩 줄은 가로로 넘겨 `data-swipe-back="off"`.
 
+- **사용자 관리 unslop (2026-11-19)**: 탭 「멤버 · 초대 · 서류」 · 켠 탭 숫자 회색, 서류 칩 · 「확인 대기」 → 6px 점 + 잉크 글자, 굵기 600 상한, 누르는 자리 44px(작은 알약 · 도움말은 `::after` 로 넓힘), 휴지통 대신 상세 맨 아래 「멤버에서 빼기」(44px). 폴드 레일 · 태블릿 2분할 그대로. 문서 17 「직원 목록 unslop 다듬기」.
 - **청소 현황판 unslop (2026-11-16)**: 「손이 필요한 방」 주황 카드 → 투명 + 6px 점, 「담당 없음」 회색 글자 + 점, 「넣기」 옅은 보라 알약, 필터 44px. 상세는 `37-cleaning-shift-assignment.md` 「2026-11-16 unslop 다듬기」.

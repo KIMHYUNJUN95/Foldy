@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useRef, useState, useTransition } from "react";
 import { IdDocumentPanel } from "@/components/identity/id-document-panel";
 import { useRouter } from "next/navigation";
-import { CalendarDays, Check, ChevronRight, CircleAlert, CircleHelp, Lock, Phone, Trash2 } from "lucide-react";
+import { CalendarDays, Check, ChevronRight, CircleAlert, CircleHelp, Lock, Phone } from "lucide-react";
 import {
   assignDeveloper,
   deleteMember,
@@ -19,6 +19,7 @@ import { isOrgTopAdmin, officeAdminAssignableRoles, organizationRoles, type Role
 import { haptic } from "@/lib/haptics";
 import { settleAction } from "@/lib/settle-action";
 import { formatPhoneDisplay, phoneHref } from "@/lib/phone-format";
+import { dotDateKey, dotDateOfIso } from "@/lib/users-display";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { tokyoToday } from "@/lib/tokyo-date";
 import type { MemberPanelVM } from "@/lib/user-management-data";
@@ -138,10 +139,9 @@ export function MobileMemberDetail({
     setToast((prev) => ({ ...next, id: (prev?.id ?? 0) + 1 }));
   };
 
-  const longDate = (iso: string | null) =>
-    iso ? new Intl.DateTimeFormat(locale, { timeZone: "Asia/Tokyo", year: "numeric", month: "long", day: "numeric" }).format(new Date(iso)) : "—";
-  const shortDate = (key: string) =>
-    new Intl.DateTimeFormat(locale, { timeZone: "Asia/Tokyo", month: "long", day: "numeric" }).format(new Date(`${key}T12:00:00+09:00`));
+  // 날짜는 사용자 관리 전체가 한 모양 — 「2026.11.19」(src/lib/users-display.ts).
+  const longDate = (iso: string | null) => dotDateOfIso(iso) || "—";
+  const shortDate = (key: string) => dotDateKey(key);
 
   function run(task: () => Promise<{ ok: boolean; error?: string }>, success: string, rollback?: () => void, undo?: () => void) {
     startTransition(async () => {
@@ -203,7 +203,7 @@ export function MobileMemberDetail({
   // ── 권한 줄 ── (대시보드 패널과 같은 규칙)
   type Row = { id: string; label: string; on: boolean; src: string; bad?: boolean; disabled: boolean; onToggle: () => void };
   const rows: Row[] = [];
-  const expiryText = (iso: string) => shortDate(new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Tokyo" }));
+  const expiryText = (iso: string) => dotDateOfIso(iso);
   const daysLeft = (iso: string) => Math.ceil((new Date(iso).getTime() - Date.parse(`${today}T00:00:00+09:00`)) / 86_400_000) - 1;
 
   if (!readOnly) {
@@ -403,11 +403,6 @@ export function MobileMemberDetail({
           </h1>
           <span>{m.isDeveloper ? c.devRole : roleLabel(role)}</span>
         </div>
-        {!readOnly && !panel.lastOwner ? (
-          <button type="button" className="muw-ic is-danger" aria-label={c.wDeleteAria} onClick={() => setSheet("delete")}>
-            <Trash2 aria-hidden="true" />
-          </button>
-        ) : null}
       </div>
 
       <div className="muw-kvs">
@@ -558,6 +553,15 @@ export function MobileMemberDetail({
           </ol>
         )}
       </section>
+
+      {/* 멤버에서 빼기(2026-11-19) — 머리의 빨간 휴지통 대신 맨 아래 글자 단추. 확인 시트 · 권한 · 마지막 소유자 잠금은 그대로. */}
+      {!readOnly && !panel.lastOwner ? (
+        <div className="muw-remove">
+          <button type="button" className="muw-remove__btn" onClick={() => setSheet("delete")}>
+            {c.wRemoveMember}
+          </button>
+        </div>
+      ) : null}
 
       {dateOpen && picker ? (
         <DatePickerSheet

@@ -1,4 +1,5 @@
 import { tokyoToday, ymdShift } from "@/lib/tokyo-date";
+import { pickDefaultInviteOrganization } from "@/lib/users-display";
 
 /**
  * 초대코드 자동 생성 규칙 (2026-09-09).
@@ -67,4 +68,23 @@ export function buildInviteName(
   today: string = tokyoToday(),
 ): string {
   return template.replace("{role}", roleLabel).replace("{date}", today.slice(5));
+}
+
+/**
+ * 초대 만들기 폼의 처음 값 — PC `/admin/users/invites` · 모바일 `/mobile/users/invites` 가 같이 쓴다(2026-11-19).
+ * 조직은 **지금 보고 있는 조직**(관리할 수 없으면 목록 첫 조직), 코드 앞자리는 그 조직, 만료일은 오늘 + 30일.
+ * 코드의 랜덤값은 서버가 한 번 정해 내려 준다 — 클라이언트 첫 렌더에서 뽑으면 SSR 결과와 어긋난다.
+ */
+export function inviteFormDefaults(
+  organizations: readonly { id: string; slug?: string | null; name?: string | null }[],
+  currentOrganizationId: string | null | undefined,
+  today: string = tokyoToday(),
+): { organizationId: string; code: string; expiresAt: string; maxUses: number } {
+  const organization = pickDefaultInviteOrganization(organizations, currentOrganizationId);
+  return {
+    organizationId: organization?.id ?? "",
+    code: generateInviteCode(organization?.slug || organization?.name || ""),
+    expiresAt: defaultInviteExpiry(today),
+    maxUses: DEFAULT_INVITE_MAX_USES,
+  };
 }

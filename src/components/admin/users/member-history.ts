@@ -1,5 +1,6 @@
 import type { getDictionary } from "@/lib/i18n";
 import type { MemberHistoryItem } from "@/lib/user-audit";
+import { dotDateOfIso } from "@/lib/users-display";
 
 /**
  * 멤버 「최근 변경」 한 줄 글 — 대시보드 패널과 모바일 상세가 같이 쓴다(2026-10-20 권한 정리 ④).
@@ -36,7 +37,8 @@ export function formatMemberHistory(
     new Intl.DateTimeFormat(locale, { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }).format(
       new Date(iso),
     );
-  const shortDay = (iso: string) => new Intl.DateTimeFormat(locale, { timeZone: "Asia/Tokyo", month: "long", day: "numeric" }).format(new Date(iso));
+  // 기한 날짜도 사용자 관리 전체와 같은 「2026.11.19」.
+  const shortDay = (iso: string) => dotDateOfIso(iso);
 
   const lines: MemberHistoryLine[] = [];
   for (const item of items) {

@@ -4,6 +4,9 @@ import Link from "next/link";
  * 멤버 목록 / 멤버 초대 / 직원 서류 탭 — /admin/users · /admin/users/invites · /admin/users/documents 가 함께 쓴다
  * (2026-07-13 초대코드를 설정에서 옮김, 2026-10-26 재류카드 R4 「직원 서류」).
  * 화이트 리디자인(2026-10-14): 공용 `.lviews` 탭 + 숫자(멤버 수 · 쓸 수 있는 초대코드 수 · 서류 목록 사람 수).
+ * 탭 이름은 짧게 「멤버 · 초대 · 서류」(2026-11-19 unslop) — 쓰는 곳 위 제목이 「사용자」라 되풀이하지 않는다.
+ * 자리(여백)는 부르는 쪽 한 곳이 정한다 — 멤버 · 서류는 `.usw-bar`, 초대는 `.usi > .lviews`, 둘 다 2px(인라인 여백 없음 —
+ * 예전 `margin: 0` 이 초대 쪽만 2px 어긋나게 했다).
  * 「직원 서류」는 `staff_documents.view` 가 있을 때만 — 부르는 쪽이 `labels.documents` 를 넘길 때만 그린다.
  */
 export function UsersSectionTabs({
@@ -22,7 +25,7 @@ export function UsersSectionTabs({
     </Link>
   );
   return (
-    <nav className="lviews" aria-label={labels.members} style={{ margin: 0 }}>
+    <nav className="lviews" aria-label={labels.members}>
       {tab("members", "/admin/users", labels.members, counts?.members)}
       {tab("invites", "/admin/users/invites", labels.invites, counts?.invites)}
       {labels.documents ? tab("documents", "/admin/users/documents", labels.documents, counts?.documents) : null}

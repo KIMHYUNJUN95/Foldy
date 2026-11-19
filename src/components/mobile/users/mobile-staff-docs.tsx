@@ -10,6 +10,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { haptic } from "@/lib/haptics";
+import { dotDateKey, residenceStatusDisplay } from "@/lib/users-display";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import {
   ROSTER_FILTERS,
@@ -48,15 +49,16 @@ export function MobileStaffDocs({
     within90: c.docsFilter90,
     missing: c.docsFilterMissing,
   };
-  const monthDay = (key: string) =>
-    new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${key}T00:00:00Z`));
+  // 날짜는 사용자 관리 전체가 한 모양 — 「2026.11.19」.
+  const monthDay = (key: string) => dotDateKey(key);
 
   const meta = (row: StaffDocRosterRow) => {
     // 국적이 없으면 오른쪽 할 일 칸이 「국적 없음」이라 여기서는 되풀이하지 않는다.
     const parts: string[] = row.nationalityName ? [row.nationalityName] : [];
     if (!row.doc) parts.push(c.docsNoDoc);
     else if (row.doc.kind === "my_number_card") parts.push(idc.titleMyNumber);
-    else if (row.doc.residenceStatus) parts.push(row.doc.residenceStatus);
+    // 목록 한 줄은 좁아 번역만(원문은 상세에서) — 사전에 없으면 원문.
+    else if (row.doc.residenceStatus) parts.push(residenceStatusDisplay(row.doc.residenceStatus, idc.residenceStatusNames).label);
     if (row.doc?.expiresOn && (row.bucket === "expired" || row.bucket === "within30")) parts.push(monthDay(row.doc.expiresOn));
     return parts.join(" · ");
   };

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Check, Copy } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Check, Copy, X } from "lucide-react";
 import { copyTextToClipboard } from "@/lib/copy-to-clipboard";
 import { haptic } from "@/lib/haptics";
 
@@ -11,30 +11,46 @@ type InviteCopyButtonProps = {
 };
 
 /**
- * 초대코드 복사 — 화이트 리디자인(2026-10-14, 시안 Invite-PC): 아이콘 버튼(툴팁 · aria-label).
- * 복사되면 그 자리가 「✓ 복사됨」(체크 그리기)으로 1.6초 바뀐다. 대체 복사(execCommand)는 `copyTextToClipboard` 공용.
+ * 초대코드 복사 — 아이콘 단추(툴팁 · aria-label).
+ * 2026-11-19: 복사되면 **같은 40×40 단추 안에서** 아이콘만 체크(실패면 ✕)로 1.6초 바뀐다. 예전엔 「✓ 복사됨」 글자 칩으로
+ * 바뀌어 단추 묶음이 넓어지고 기한 칸 글자를 덮었다(ja 「コピーしました」 126px). 글자는 화면에 그리지 않고 숨김 상태 글
+ * (`role="status"`)과 단추 `aria-label` 로만 알린다. 대체 복사(execCommand)는 `copyTextToClipboard` 공용.
  */
 export function InviteCopyButton({ code, labels }: InviteCopyButtonProps) {
   const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
+  const timer = useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (timer.current !== null) window.clearTimeout(timer.current);
+  }, []);
 
   async function copy() {
     const ok = await copyTextToClipboard(code);
     haptic(ok ? "success" : "error");
     setState(ok ? "copied" : "failed");
-    window.setTimeout(() => setState("idle"), 1600);
+    if (timer.current !== null) window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setState("idle"), 1600);
   }
 
-  if (state !== "idle") {
-    return (
-      <span className="usi-copied" role="status" style={state === "failed" ? { color: "#c5282e" } : undefined}>
-        {state === "copied" ? <Check aria-hidden="true" strokeWidth={2.4} /> : null}
-        {state === "copied" ? labels.copied : labels.failed}
-      </span>
-    );
-  }
+  const label = state === "copied" ? labels.copied : state === "failed" ? labels.failed : labels.copy;
   return (
-    <button type="button" className="usi-ib" onClick={copy} aria-label={labels.copy} title={labels.copy}>
-      <Copy aria-hidden="true" />
+    <button
+      type="button"
+      className={`usi-ib usi-copy${state === "idle" ? "" : ` is-${state}`}`}
+      onClick={copy}
+      aria-label={label}
+      title={labels.copy}
+    >
+      {state === "copied" ? (
+        <Check key="ok" aria-hidden="true" strokeWidth={2.4} />
+      ) : state === "failed" ? (
+        <X key="bad" aria-hidden="true" strokeWidth={2.4} />
+      ) : (
+        <Copy key="idle" aria-hidden="true" />
+      )}
+      <span className="sr-only" role="status" aria-live="polite">
+        {state === "copied" ? labels.copied : state === "failed" ? labels.failed : ""}
+      </span>
     </button>
   );
 }

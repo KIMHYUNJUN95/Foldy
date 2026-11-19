@@ -107,7 +107,7 @@
 .idc__row { display: flex; align-items: center; gap: 12px; min-height: 46px; border-bottom: 0.5px solid var(--separator); }
 .idc__row:last-child { border-bottom: 0; }
 .idc__row dt { flex: none; width: 96px; font-size: 13.5px; color: var(--muted-foreground); text-align: left; }
-.idc__row dd { margin: 0; flex: 1; min-width: 0; font-size: 14.5px; font-weight: 700; text-align: left; overflow-wrap: anywhere; }
+.idc__row dd { margin: 0; flex: 1; min-width: 0; font-size: 14.5px; font-weight: 500; text-align: left; overflow-wrap: anywhere; }
 .idc__summary { width: 100%; margin-top: 26px; border-radius: 16px; background: #f7f7f9; padding: 6px 16px; box-sizing: border-box; }
 .idc__summary dd { text-align: right; }
 .idc__check { width: 72px; height: 72px; border-radius: 999px; background: #f3effd; color: var(--primary); display: flex; align-items: center; justify-content: center; animation: idc-pop 420ms cubic-bezier(.23, 1, .32, 1) both; }

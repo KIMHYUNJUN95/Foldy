@@ -1,12 +1,15 @@
 /* 사용자 상세 「신분 서류」 칸 — PC 사용자 패널 · 모바일 사용자 관리 상세 공용(docs/product/41 §3-3). */
 .idp { margin-top: 18px; padding-top: 16px; border-top: 0.5px solid #e4e3e9; }
 .idp__head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.idp__title { margin: 0; margin-right: auto; font-size: 14px; font-weight: 800; color: var(--foreground); }
+.idp__title { margin: 0; margin-right: auto; font-size: 14px; font-weight: 600; color: var(--foreground); }
 .idp__none { margin: 6px 0 0; font-size: 13px; color: var(--muted-foreground); }
-.idp__chip { display: inline-flex; align-items: center; height: 24px; padding: 0 9px; border-radius: 999px; font-size: 12px; font-weight: 800; background: #ece5fd; color: #5b3fc4; }
-.idp__chip[data-status="confirmed"] { background: #e3f3ea; color: #2a7a4f; }
-.idp__chip[data-status="returned"], .idp__chip[data-tone="within90"] { background: #fff6e0; color: #7a5300; }
-.idp__chip[data-tone="within30"], .idp__chip[data-tone="expired"] { background: #fdecef; color: #c4364b; }
+.idp__chip { display: inline-flex; align-items: center; gap: 6px; height: 24px; font-size: 12px; font-weight: 500; color: #3a3746; }
+/* 상태(2026-11-19 unslop) — 색 알약 대신 점 + 잉크 글자. 점 색: 확인 대기 · 90일 이내 주황 · 확인됨 초록 · 반려 회색 · 30일 이내 · 만료 빨강. */
+.idp__chip::before { content: ""; width: 6px; height: 6px; flex: none; border-radius: 50%; background: #d08a00; }
+.idp__chip[data-status="confirmed"]::before { background: #2a7a4f; }
+.idp__chip[data-status="returned"]::before { background: #9a97a6; }
+.idp__chip[data-tone="within90"]::before { background: #d08a00; }
+.idp__chip[data-tone="within30"]::before, .idp__chip[data-tone="expired"]::before { background: #c4364b; }
 .idp__photos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
 .idp__photo { display: block; padding: 0; background: none; border: 0; text-align: left; cursor: pointer; min-width: 0; color: var(--muted-foreground); font-size: 11.5px; }
 .idp__photo img { display: block; width: 100%; aspect-ratio: 85.6 / 54; object-fit: cover; border-radius: 8px; border: 1px solid #e4e3e9; background: #f4f2fa; transition: opacity 160ms ease; }
@@ -16,20 +19,24 @@
 .idp__kv div { display: flex; gap: 10px; padding: 7px 0; border-bottom: 0.5px solid #e4e3e9; font-size: 13px; }
 .idp__kv div:last-child { border-bottom: 0; }
 .idp__kv dt { flex: none; width: 92px; color: var(--muted-foreground); }
-.idp__kv dd { margin: 0; flex: 1; min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
-.idp__kv div[data-edited] dd::after { content: ""; display: inline-block; width: 6px; height: 6px; margin-left: 6px; border-radius: 999px; background: #7a52e6; vertical-align: middle; }
+.idp__kv dd { margin: 0; flex: 1; min-width: 0; font-weight: 500; overflow-wrap: anywhere; }
+.idp__kv div[data-edited] dd::after { content: ""; display: inline-block; width: 6px; height: 6px; margin-left: 6px; border-radius: 999px; background: var(--primary); vertical-align: middle; }
 .idp__meta { margin: 8px 0 0; font-size: 12px; line-height: 1.6; color: var(--muted-foreground); }
-.idp__verify { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; font-size: 12.5px; font-weight: 700; }
-.idp__verify a { color: #5b3fc4; text-decoration: underline; text-underline-offset: 2px; }
-.idp__verify button { height: 28px; padding: 0 10px; border-radius: 8px; background: #f4f2fa; color: var(--foreground); }
+.idp__verify { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; font-size: 12.5px; font-weight: 600; }
+.idp__verify a { display: inline-flex; align-items: center; min-height: 44px; color: var(--primary-ink); text-decoration: underline; text-underline-offset: 2px; }
+.idp__verify button { height: 44px; padding: 0 10px; border-radius: 8px; background: #f4f2fa; color: var(--foreground); }
 .idp__actions { display: flex; gap: 8px; margin-top: 12px; }
-.idp__btn { flex: 1; height: 38px; border-radius: 10px; font-size: 13.5px; font-weight: 800; background: #f4f4f7; color: var(--foreground); transition: transform 160ms cubic-bezier(.23, 1, .32, 1); }
+.idp__btn { flex: 1; height: 44px; border-radius: 10px; font-size: 13.5px; font-weight: 600; background: #f4f4f7; color: var(--foreground); transition: transform 160ms cubic-bezier(.23, 1, .32, 1); }
 .idp__btn--pri { background: var(--primary); color: #fff; }
 .idp__btn:disabled { opacity: .5; }
 .idp__btn:active:not(:disabled) { transform: scale(0.98); }
 .idp__return textarea { width: 100%; margin-top: 12px; padding: 10px 12px; border-radius: 10px; border: 1px solid #e4e3e9; font-size: 13.5px; resize: vertical; background: var(--surface); color: var(--foreground); }
-.idp__error { margin: 8px 0 0; font-size: 12.5px; font-weight: 700; color: #c4364b; }
-.idp__print { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 10px; border-radius: 8px; background: #f4f2fa; color: var(--foreground); font-size: 12.5px; font-weight: 800; text-decoration: none; }
+.idp__error { margin: 8px 0 0; font-size: 12.5px; font-weight: 600; color: #c4364b; }
+.idp__print { display: inline-flex; align-items: center; gap: 5px; height: 44px; padding: 0 12px; border-radius: 10px; background: #f4f2fa; color: var(--foreground); font-size: 12.5px; font-weight: 600; text-decoration: none; }
 .idp__print:hover { background: #ece5fd; }
 /* 앱(Capacitor) WebView 는 인쇄 · PDF 저장을 못 한다 — 앱 화면에는 인쇄 입구를 두지 않는다(docs/planning/17 H8). */
 html[data-native-app] .idp__print { display: none; }
+/* 터치 크기(2026-11-19 unslop) — 폰 · 본인 화면 44px, 관리자 콘솔(.adm) 안에서는 PC 기준 40(확인 · 돌려보내기 · 인쇄 · 번호 복사 · 확인 링크). */
+.adm .idp__btn, .adm .idp__print, .adm .idp__verify button { height: 40px; }
+.adm .idp__verify a { min-height: 40px; }
+/* 재류자격 번역 옆 카드 원문 — 작게 · 흐리게(번역이 없으면 원문만 보인다). */

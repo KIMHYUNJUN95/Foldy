@@ -1,7 +1,8 @@
 import { MobileInvites, type MobileInviteRow } from "@/components/mobile/users/mobile-invites";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { getDictionary } from "@/lib/i18n";
-import { DEFAULT_INVITE_MAX_USES, defaultInviteExpiry, generateInviteCode } from "@/lib/invite-code-gen";
+import { inviteFormDefaults } from "@/lib/invite-code-gen";
+import { dotDateOfIso } from "@/lib/users-display";
 import { listManageableOrganizations, selectableInviteRoles } from "@/lib/invite-codes-server";
 import { getMobileNavBadges } from "@/lib/nav-badges";
 import { loadStaffDocumentRoster } from "@/lib/staff-documents/roster-server";
@@ -53,14 +54,10 @@ export default async function MobileInvitesPage() {
 
   const today = tokyoToday();
   const now = nowMs();
-  const thisYear = today.slice(0, 4);
-  const dayText = (iso: string) =>
-    new Intl.DateTimeFormat(locale, {
-      timeZone: "Asia/Tokyo",
-      ...(new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Tokyo" }).slice(0, 4) === thisYear ? {} : { year: "numeric" }),
-      month: "short", // ko · ja 는 long 과 같은 글자, 영어만 «Nov 22»(목록 보조 줄이 잘리지 않게)
-      day: "numeric",
-    }).format(new Date(iso));
+  // 날짜는 사용자 관리 전체가 한 모양 — 「2026.11.19」(src/lib/users-display.ts).
+  const dayText = (iso: string) => dotDateOfIso(iso);
+  // 초대 폼 처음 값(조직 = 지금 보고 있는 조직)은 PC 와 같은 함수(2026-11-19 — 예전엔 목록 첫 조직이었다).
+  const formDefaults = inviteFormDefaults(organizations, session.organization.id, today);
   const rows: MobileInviteRow[] = invites.map((invite) => {
     const expired = Boolean(invite.expires_at) && new Date(invite.expires_at as string).getTime() <= now;
     const usedUp = invite.used_count >= invite.max_uses;
@@ -100,9 +97,10 @@ export default async function MobileInvitesPage() {
         roles={selectableInviteRoles(session.user.role)}
         today={today}
         // 초대코드의 첫 랜덤값은 서버가 정한다 — 클라이언트 첫 렌더에서 뽑으면 SSR 결과와 어긋난다.
-        defaultCode={generateInviteCode(organizations[0]?.slug || organizations[0]?.name || "")}
-        defaultExpiresAt={defaultInviteExpiry(today)}
-        defaultMaxUses={DEFAULT_INVITE_MAX_USES}
+        defaultCode={formDefaults.code}
+        defaultOrganizationId={formDefaults.organizationId}
+        defaultExpiresAt={formDefaults.expiresAt}
+        defaultMaxUses={formDefaults.maxUses}
         memberCount={memberCountResult.count ?? null}
         docsCount={docsCount}
         locale={locale}

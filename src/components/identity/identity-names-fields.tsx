@@ -124,7 +124,7 @@ function NationalitySheet({
         }}
         type="button"
       >
-        <span className="flex-1 text-[15px] font-bold text-foreground">{n.name}</span>
+        <span className="flex-1 text-[15px] font-semibold text-foreground">{n.name}</span>
         {on ? <CheckIcon className="size-5 text-primary" /> : null}
       </button>
     );
@@ -135,7 +135,7 @@ function NationalitySheet({
       className="max-h-[80dvh]"
       header={
         <div className="pb-[10px] pt-1">
-          <p className="text-center text-[15px] font-extrabold text-foreground">{copy.nationalitySheetTitle}</p>
+          <p className="text-center text-[15px] font-semibold text-foreground">{copy.nationalitySheetTitle}</p>
           <input
             aria-label={copy.nationalitySearch}
             autoComplete="off"
@@ -159,9 +159,9 @@ function NationalitySheet({
             )
           ) : (
             <>
-              <p className="px-3 pb-1 pt-1 text-[12px] font-bold text-muted-foreground">{copy.nationalityFrequent}</p>
+              <p className="px-3 pb-1 pt-1 text-[12px] font-semibold text-muted-foreground">{copy.nationalityFrequent}</p>
               {frequent.map((n) => row(n, close))}
-              <p className="px-3 pb-1 pt-4 text-[12px] font-bold text-muted-foreground">{copy.nationalityAll}</p>
+              <p className="px-3 pb-1 pt-4 text-[12px] font-semibold text-muted-foreground">{copy.nationalityAll}</p>
               {all.map((n) => row(n, close))}
             </>
           )}
@@ -525,7 +525,7 @@ export function IdentityNamesFields({
     <div className="grid gap-[14px]">
       {hidden}
       <div>
-        <span className="mb-2 block text-[12.5px] font-extrabold text-[#3a3746]" id="identity-nationality-label">
+        <span className="mb-2 block text-[12.5px] font-semibold text-[#3a3746]" id="identity-nationality-label">
           {copy.nationalityLabel}
         </span>
         {nationalityPopover ? (
@@ -570,7 +570,7 @@ export function IdentityNamesFields({
           />
         ) : null}
         {natErr ? (
-          <p className="mt-2 text-[12px] font-bold text-destructive" id="identity-nationality-err" role="alert">
+          <p className="mt-2 text-[12.5px] font-medium text-destructive" id="identity-nationality-err" role="alert">
             {natErr}
           </p>
         ) : null}
@@ -580,7 +580,7 @@ export function IdentityNamesFields({
         const hintId = `identity-${f.field}-hint`;
         return (
           <label className="block" key={f.field}>
-            <span className="mb-2 block text-[12.5px] font-extrabold text-[#3a3746]">
+            <span className="mb-2 block text-[12.5px] font-semibold text-[#3a3746]">
               {f.label}
               {f.optional ? <span className="font-semibold text-muted-foreground"> ({copy.optional})</span> : null}
             </span>
@@ -602,11 +602,11 @@ export function IdentityNamesFields({
               value={value[f.field]}
             />
             {err ? (
-              <span className="mt-2 block text-[12px] font-bold text-destructive" id={hintId} role="alert">
+              <span className="mt-2 block text-[12.5px] font-medium text-destructive" id={hintId} role="alert">
                 {err}
               </span>
             ) : f.hint ? (
-              <span className="mt-2 block text-[12px] font-semibold leading-[1.5] text-muted-foreground" id={hintId}>
+              <span className="mt-2 block text-[12px] font-medium leading-[1.5] text-muted-foreground" id={hintId}>
                 {f.hint}
               </span>
             ) : null}

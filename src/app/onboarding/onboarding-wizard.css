@@ -1,0 +1,87 @@
+/*
+ * 모바일 가입 마법사(`/onboarding`, 폰 · 폴드 · 태블릿) 전용 스타일.
+ *
+ * ⚠ 이름 앞머리는 `obm`(모바일 완료 모션) · `obw`(마법사 배치)만 쓴다. PC 가입 화면(desktop-onboarding.css)은 `.obd` 를 쓰고,
+ *   두 파일은 같은 /onboarding 번들에 함께 실린다 — 같은 이름을 쓰면 서로 샌다(2026-11-19 버그: PC `.obd__org` 회색 상자가
+ *   폰 완료 문장 속 조직 이름에, 폰 `.obd{overflow:hidden}` 이 PC 화면에 새었다). 회귀 테스트:
+ *   src/lib/__tests__/onboarding-css-scope.test.ts
+ */
+
+/* 숫자는 자리 폭을 맞춘다(진행 N/5 · 생년월일 · 전화 · 코드). */
+.obw-main { font-variant-numeric: tabular-nums; }
+
+/* 굵기 — globals.css 의 레이어 밖 `button, input { font: inherit }` 가 Tailwind(@layer) 굵기 유틸을 이겨
+ * 버튼 · 입력 글자가 400 으로 떨어졌다. 마법사 안에서는 적어 둔 굵기를 다시 살린다(상한 600). */
+.obw-main .font-semibold { font-weight: 600; }
+.obw-main .font-medium { font-weight: 500; }
+
+/* 줄바꿈 — 한국어는 어절 단위로만 꺾고(「1~2 / 분」 · 「업 / 무」 방지), 문단 끝 한 글자 줄은 피한다. */
+.obw-main:lang(ko) { word-break: keep-all; overflow-wrap: anywhere; }
+/* 일본어는 낱말 경계를 브라우저가 찾는다(지원하는 곳만 — 「入力しま / す」 방지, 나머지는 기본 줄바꿈). */
+.obw-main:lang(ja) { word-break: auto-phrase; line-break: strict; }
+.obw-main p,
+.obw-main h1,
+.obw-main h2 { text-wrap: pretty; }
+
+/* ── 폴드 · 태블릿(unslop 2026-11-19) — 460px 기둥 + 맨 아래 버튼 → 560px 가운데 기둥, 버튼은 내용 바로 아래.
+ *    폰(< 600px)은 그대로. 키보드가 열리면 `--keyboard-inset`(keyboard-inset-sync.tsx)만큼 아래를 비우고 기둥이 줄어들어
+ *    버튼이 키보드에 가려지지 않는다. */
+@media (min-width: 600px) {
+  .obw-col,
+  .obw-row { max-width: 560px; }
+}
+@media (min-width: 600px) and (min-height: 600px) {
+  .obw-main {
+    justify-content: center;
+    padding-bottom: var(--keyboard-inset, 0px);
+  }
+  .obw-col {
+    flex: 0 1 auto;
+    min-height: min(680px, calc(100dvh - 140px - var(--keyboard-inset, 0px)));
+  }
+  /* 키보드 높이는 .obw-main 이 한 번만 비운다 — 버튼 아래에서 두 번 비우지 않는다. */
+  .obw-main .obw-cta { padding-bottom: max(14px, env(safe-area-inset-bottom)); }
+}
+
+/* ── 완료 모션(2026-10-14, 시안 Motion-B-OnbDone-Phone) — 한 번 재생. 값은 승인 그대로, 이름만 obd → obm(2026-11-19). */
+.obm {
+  --sp: linear(0.000,0.034,0.123,0.247,0.390,0.536,0.677,0.804,0.912,0.999,1.064,1.109,1.136,1.147,1.146,1.135,1.119,1.098,1.077,1.055,1.036,1.019,1.005,0.994,0.986,0.981,0.979,0.978,0.979,0.981,0.984,0.987,0.991,0.994,0.996,0.999,1.000,1.002,1.003,1.003,1.000);
+  --spb: linear(0.000,0.045,0.160,0.317,0.490,0.657,0.801,0.913,0.989,1.032,1.047,1.042,1.024,1.002,0.982,0.968,0.962,0.962,0.968,0.976,0.985,0.993,0.999,1.003,1.005,1.005,1.004,1.002,1.000,0.999,0.998,0.998,0.998,0.999,0.999,1.000,1.000,1.000,1.000,1.000,1.000);
+  position: relative; overflow: hidden;
+}
+.obm__ic { position: relative; display: block; width: 84px; height: 84px; }
+.obm__glow { position: absolute; left: 50%; top: 50%; width: 280px; height: 280px; margin: -140px 0 0 -140px; border-radius: 50%; background: radial-gradient(circle, rgba(185, 160, 250, .42), rgba(239, 231, 255, 0) 62%); opacity: 0; transform: scale(.5); animation: obm-glow 900ms cubic-bezier(.23, 1, .32, 1) 120ms forwards; }
+@keyframes obm-glow { to { opacity: 1; transform: scale(1); } }
+.obm__ray { position: absolute; left: 50%; top: 50%; width: 3px; height: 12px; margin: -6px 0 0 -1.5px; border-radius: 2px; background: #8a63f0; opacity: 0; animation: obm-ray 460ms cubic-bezier(.23, 1, .32, 1) 520ms; }
+@keyframes obm-ray {
+  0% { opacity: 0; transform: rotate(var(--r)) translateY(-44px) scaleY(.2); }
+  22% { opacity: 1; transform: rotate(var(--r)) translateY(-58px) scaleY(1); }
+  100% { opacity: 0; transform: rotate(var(--r)) translateY(-76px) scaleY(.3); }
+}
+.obm__dot { position: absolute; inset: 0; border-radius: 50%; background: linear-gradient(150deg, #9b78f5 0%, #6b3fe0 60%, #5b2bd6 100%); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 18px 36px -14px rgba(91, 43, 214, .75); display: flex; align-items: center; justify-content: center; opacity: 0; transform: scale(.88); animation: obm-pop 750ms var(--spb) 150ms forwards; }
+@keyframes obm-pop { to { opacity: 1; transform: scale(1); } }
+.obm__dot path { stroke-dasharray: 24; stroke-dashoffset: 24; animation: obm-draw 340ms cubic-bezier(.23, 1, .32, 1) 420ms forwards; }
+@keyframes obm-draw { to { stroke-dashoffset: 0; } }
+.obm__ln { display: block; overflow: hidden; padding: 2px 0; }
+.obm__ln > span { transform: translateY(110%) rotate(2deg); transform-origin: 0 100%; animation: obm-up 600ms var(--sp) 600ms forwards; }
+.obm__d2 > span { animation-delay: 660ms; }
+.obm__d3 > span { animation-delay: 720ms; }
+@keyframes obm-up { to { transform: translateY(0) rotate(0deg); } }
+.obm__org { font-weight: 600; color: transparent; background: linear-gradient(100deg, #16141f 0%, #16141f 38%, #8a63f0 50%, #16141f 62%, #16141f 100%); background-size: 300% 100%; background-position: 150% 0; -webkit-background-clip: text; background-clip: text; animation: obm-sweep 800ms cubic-bezier(.77, 0, .175, 1) 1300ms forwards; }
+@keyframes obm-sweep { to { background-position: -50% 0; } }
+.obm__cta { opacity: 0; transform: translateY(16px) scale(.98); animation: obm-cta 600ms var(--sp) 900ms forwards; }
+.obm__cta button { position: relative; overflow: hidden; }
+.obm__cta button::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 40%; background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, .35), rgba(255, 255, 255, 0)); transform: translateX(-120%) skewX(-20deg); animation: obm-shine 700ms cubic-bezier(.77, 0, .175, 1) 1700ms forwards; }
+@keyframes obm-cta { to { opacity: 1; transform: none; } }
+@keyframes obm-shine { to { transform: translateX(320%) skewX(-20deg); } }
+.obm__dust { position: absolute; left: 50%; top: 42%; width: 0; height: 0; pointer-events: none; }
+.obm__dust i { position: absolute; left: var(--x); top: 0; width: 4px; height: 4px; border-radius: 50%; background: #b9a0fa; opacity: 0; animation: obm-dust 2300ms linear forwards; }
+@keyframes obm-dust {
+  0% { opacity: 0; transform: translateY(0); }
+  15% { opacity: .8; transform: translateY(-30px); }
+  100% { opacity: 0; transform: translateY(-150px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .obm *, .obm *::after { animation-duration: 1ms !important; animation-delay: 0ms !important; }
+  .obm__dust, .obm__ray { display: none; }
+}

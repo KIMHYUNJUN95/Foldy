@@ -564,3 +564,35 @@ Device-aware behavior:
 지점인지 알 수 없고, 깊이 0 에서 뒤로를 누르면 앱 밖으로 나가버린다.
 
 새 i18n 키: `onboarding.steps.backCta` (ko `뒤로` / ja `戻る` / en `Back`).
+
+## 온보딩 unslop 다듬기 (2026-11-19)
+
+모바일 마법사(`onboarding-wizard.tsx`)와 PC 한 화면 폼(`desktop-onboarding.tsx`)을 같이 다듬었다. 기능 · 단계 순서는 그대로다.
+
+- **굵기 · 숫자**: 굵기 상한 600, 보조 글 · 힌트 · 오류는 500. 진행 N/5 · 생년월일 · 전화 · 초대 코드는 `tabular-nums`.
+  공용 `identity-names-fields.tsx` 도 같은 규칙이라 계정 화면의 이름 칸 굵기도 함께 바뀐다.
+  `globals.css` 의 `button, input { font: inherit }`(레이어 밖)가 Tailwind 굵기 유틸을 이겨 버튼 글자가 400 으로 떨어지던 것을
+  `onboarding-wizard.css` 가 `.obw-main` 안에서만 되살린다(버튼 · 「코드 없이 나중에 입력」 · 「로그아웃」 600 — 폰 `font-semibold`, PC `.obd__link` · `.obd__link--skip` 600).
+- **줄바꿈**: ko 는 어절 단위(`word-break: keep-all`)로만 꺾고 문단은 `text-wrap: pretty` — 「1~2 / 분」 · 「업 / 무」 같은 낱말 중간 꺾임 없음.
+  전화 예시 번호(`phoneHint`)는 하이픈 양옆에 줄바꿈 금지 문자(U+2060)를 넣어 한 줄로 유지한다.
+- **PC 초대 코드**: 고정폭 · 넓은 자간은 적은 값에만, 빈 칸 안내 글은 보통 글꼴. 확인된 팀은 상자 없이 아바타 + 두 줄(역할 줄 500).
+- **오류는 칸 아래 빨간 한 줄**(`FieldError` — `role="alert"`, 12.5px/500, `text-destructive` 토큰, 14px 경고 아이콘 — 이름 칸 오류와 같은 빨강). 분홍 상자 · 제목 줄은 없다.
+  틀린 초대 코드는 메시지 하나(ko 「코드가 맞지 않아요. 관리자에게 받은 코드를 다시 확인해 주세요」). 전화번호 중복일 때만 보조 안내 한 줄을 더 보인다.
+  PC 상단 배너(`.obd__banner`)는 분홍 바탕을 유지하고 글자만 12.5px/500.
+- **소개 화면**: 언어 항목을 뺐다(언어는 계정에서 바꾼다). 걸리는 시간 「1~2분」, 「초대 코드」 띄어쓰기 통일.
+- **검토 화면**: 언어 줄 삭제 · 전화번호는 `formatPhoneDisplay()`(+81-90-2345-6789) · 안내 상자는 테두리 없는 `#f4f4f7`.
+- **완료 화면**(폰 · PC 같은 문구): 머리글(eyebrow) · 인사 문구 없음. 제목 `onboarding.success.title`
+  (ko 「가입을 마쳤어요」 · ja 「登録が完了しました」 · en "You're signed up"), 이름은 본문 `{name}` 자리로(`bodyJoined` · `bodyNoTeam`).
+  승인된 완료 모션(2026-10-14)은 그대로 — 클래스 이름만 바뀌었다.
+- **나가기**: 라벨은 `dictionary.auth.blocked.logout`(「로그아웃」), 누름 영역 모바일 44px · PC 40px 이상, 색 `var(--primary)`.
+- **폴드 · 태블릿**(≥600px): 내용 기둥 560px 가운데, 높이 ≥600px 이면 세로 가운데 + 버튼이 내용 바로 아래(`.obw-col` 최소 높이
+  `min(680px, 100dvh − 140px − 키보드)`), 키보드가 올라오면 `--keyboard-inset` 만큼 아래 여백을 줘 버튼을 가리지 않는다. 폰은 그대로.
+- **PC**: 보조 버튼 투명 테두리 + `#f4f4f7`, 확인 버튼 비활성 `--primary-soft`, 팝오버 테두리 없음, 「확인됨」 중복 표시(`.obd__orgok`) 삭제.
+
+### CSS 이름 충돌 고침
+
+`/onboarding` 은 PC 스킨(`desktop-onboarding.css`, `.obd__*`)과 모바일 완료 모션(예전 `onboarding-done.css`, 역시 `.obd__*`)을
+한 페이지에서 같이 불러, PC 의 `.obd__org`(회색 상자 · flex)가 폰 완료 문장 속 조직 이름에 새어 들어갔다.
+모바일 쪽을 새 파일 `src/app/onboarding/onboarding-wizard.css` 로 옮기고 이름을 `obm`(완료 모션) · `obw`(마법사 배치)로 바꿨다.
+`onboarding-done.css` 는 삭제. 회귀 테스트 `src/lib/__tests__/onboarding-css-scope.test.ts` 가 두 파일 사이 클래스 · keyframes 이름이
+겹치지 않는지, 마법사 CSS 가 `obm`/`obw` 만 쓰는지 확인한다. 문구 키 테스트: `onboarding-copy.test.ts`.

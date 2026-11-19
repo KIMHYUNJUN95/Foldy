@@ -169,9 +169,7 @@ export default async function OnboardingPage({
           phoneRequired: d.phoneRequired,
           inviteVerifyFirst: d.inviteVerifyFirst,
           errors: o.errors,
-          successEyebrow: o.success.eyebrow,
-          welcomePrefix: o.success.welcomePrefix,
-          welcomeSuffix: o.success.welcomeSuffix,
+          successTitle: o.success.title,
           bodyJoined: o.success.bodyJoined,
           bodyNoTeam: o.success.bodyNoTeam,
           startCta: o.success.startCta,
@@ -197,8 +195,6 @@ export default async function OnboardingPage({
           subtitle: o.intro.subtitle,
           itemBasicsTitle: o.intro.itemBasicsTitle,
           itemBasicsSub: o.intro.itemBasicsSub,
-          itemLangTitle: o.intro.itemLangTitle,
-          itemLangSub: o.intro.itemLangSub,
           itemInviteTitle: o.intro.itemInviteTitle,
           itemInviteSub: o.intro.itemInviteSub,
           startCta: o.intro.startCta,
@@ -245,7 +241,6 @@ export default async function OnboardingPage({
           verifyCta: o.joinFlow.verifyCta,
           checking: o.joinFlow.checking,
           skip: o.joinFlow.skip,
-          invalidTitle: o.joinFlow.invalidTitle,
           confirmEyebrow: o.joinFlow.confirmEyebrow,
           confirmTitle: o.joinFlow.confirmTitle,
           confirmSubtitle: o.joinFlow.confirmSubtitle,
@@ -265,7 +260,6 @@ export default async function OnboardingPage({
           rowDob: o.review.rowDob,
           rowGender: o.review.rowGender,
           rowPhone: o.review.rowPhone,
-          rowLang: o.review.rowLang,
           rowOrg: o.review.rowOrg,
           rowRole: o.review.rowRole,
           edit: o.review.edit,
@@ -274,17 +268,15 @@ export default async function OnboardingPage({
           submit: o.review.submit,
         }}
         success={{
-          eyebrow: o.success.eyebrow,
-          welcomePrefix: o.success.welcomePrefix,
-          welcomeSuffix: o.success.welcomeSuffix,
+          title: o.success.title,
           bodyJoined: o.success.bodyJoined,
           bodyNoTeam: o.success.bodyNoTeam,
           startCta: o.success.startCta,
         }}
         exit={{
-          backToLogin: dictionary.auth.email.resetSentBackToLogin,
+          // 마법사 안 나가기 링크는 실제 동작대로 「로그아웃」(PC 와 같은 말, 2026-11-19).
+          logout: dictionary.auth.blocked.logout,
         }}
-        languageName={dictionary.languages[locale]}
         profile={{
           copy: {
             nameLabel: o.fullNamePlaceholder,
@@ -324,8 +316,6 @@ export default async function OnboardingPage({
           subtitle: o.intro.subtitle,
           itemBasicsTitle: o.intro.itemBasicsTitle,
           itemBasicsSub: o.intro.itemBasicsSub,
-          itemLangTitle: o.intro.itemLangTitle,
-          itemLangSub: o.intro.itemLangSub,
           itemInviteTitle: o.intro.itemInviteTitle,
           itemInviteSub: o.intro.itemInviteSub,
           startCta: o.intro.startCta,
@@ -372,7 +362,6 @@ export default async function OnboardingPage({
           verifyCta: o.joinFlow.verifyCta,
           checking: o.joinFlow.checking,
           skip: o.joinFlow.skip,
-          invalidTitle: o.joinFlow.invalidTitle,
           confirmEyebrow: o.joinFlow.confirmEyebrow,
           confirmTitle: o.joinFlow.confirmTitle,
           confirmSubtitle: o.joinFlow.confirmSubtitle,
@@ -392,7 +381,6 @@ export default async function OnboardingPage({
           rowDob: o.review.rowDob,
           rowGender: o.review.rowGender,
           rowPhone: o.review.rowPhone,
-          rowLang: o.review.rowLang,
           rowOrg: o.review.rowOrg,
           rowRole: o.review.rowRole,
           edit: o.review.edit,
@@ -401,17 +389,15 @@ export default async function OnboardingPage({
           submit: o.review.submit,
         }}
         success={{
-          eyebrow: o.success.eyebrow,
-          welcomePrefix: o.success.welcomePrefix,
-          welcomeSuffix: o.success.welcomeSuffix,
+          title: o.success.title,
           bodyJoined: o.success.bodyJoined,
           bodyNoTeam: o.success.bodyNoTeam,
           startCta: o.success.startCta,
         }}
         exit={{
-          backToLogin: dictionary.auth.email.resetSentBackToLogin,
+          // 마법사 안 나가기 링크는 실제 동작대로 「로그아웃」(PC 와 같은 말, 2026-11-19).
+          logout: dictionary.auth.blocked.logout,
         }}
-        languageName={dictionary.languages[locale]}
         profile={{
           copy: {
             nameLabel: o.fullNamePlaceholder,

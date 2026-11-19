@@ -14,7 +14,7 @@
   --line-soft: var(--separator);
   --primary-ink: #5a30cf;
   --primary-soft: #f1ecfd;
-  --authx-primary: #7a52e6;
+  --authx-primary: var(--primary);
   --authx-muted: #6b6878;
   --authx-surface: #f4f4f7;
   --mono: var(--font-mono);
@@ -28,6 +28,7 @@
   --ink-soft: #3a3746;
   --primary-lift: #8a63f0;
   --sh-pop: 0 12px 40px -8px rgba(22, 20, 31, 0.22);
+  font-variant-numeric: tabular-nums;
 }
 .obd__body {
   flex: 1;
@@ -56,12 +57,12 @@
   align-items: center;
   justify-content: center;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text-3);
   box-shadow: inset 0 0 0 1.5px #e0e0e6;
 }
 .obd__rn svg { width: 13px; height: 13px; }
-.obd__rs.done .obd__rn { background: #f1ecfd; color: #7a52e6; box-shadow: none; }
+.obd__rs.done .obd__rn { background: var(--primary-soft); color: var(--primary); box-shadow: none; }
 .obd__rs.on .obd__rn { background: #16141f; color: #fff; box-shadow: none; }
 .obd__rt { font-size: 14px; font-weight: 600; color: #16141f; line-height: 24px; }
 .obd__rs.done .obd__rt, .obd__rs.todo .obd__rt { font-weight: 400; color: #6b6878; }
@@ -88,7 +89,7 @@
 .obd__title {
   margin: 0;
   font-size: 28px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.3;
   letter-spacing: -0.03em;
   color: var(--ink);
@@ -147,7 +148,7 @@
 }
 .obd__fld.bad .obd__in { border-color: var(--danger); }
 .obd__hint { margin: 6px 0 0; font-size: 12px; color: var(--faint); }
-.obd__err { margin: 6px 0 0; font-size: 12px; font-weight: 600; color: var(--danger); }
+.obd__err { margin: 6px 0 0; font-size: 12.5px; font-weight: 500; color: var(--danger); }
 
 /* 생년월일 · 성별 · 전화 — 칸 여러 개를 테두리 하나로 묶는다(시안). */
 .obd__dob, .obd__seg, .obd__phone {
@@ -212,7 +213,7 @@
   width: 260px;
   padding: 6px;
   border-radius: 13px;
-  border: 1px solid var(--line);
+  border: 0;
   background: var(--card);
   box-shadow: var(--sh-pop);
   animation: obdIn 0.14s ease;
@@ -247,7 +248,7 @@
   background: none;
   font: inherit;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ink-soft);
   text-align: left;
   cursor: pointer;
@@ -269,14 +270,14 @@
   gap: 8px;
 }
 .obd__in--code { font-family: var(--mono); letter-spacing: 0.12em; }
+/* 고정폭 · 넓은 자간은 적은 코드에만 — 빈 칸 안내 글(placeholder)은 보통 글꼴. */
+.obd__in--code::placeholder { font-family: inherit; letter-spacing: normal; }
+/* 확인된 팀 — 상자 없이 아바타 + 두 줄(시안 그대로). */
 .obd__org {
-  margin-top: 14px;
+  margin-top: 16px;
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 18px;
-  border-radius: 14px;
-  background: #f7f7f9;
 }
 .obd__orgav {
   width: 36px;
@@ -289,19 +290,18 @@
   background: #16141f;
   color: #fff;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
 }
 .obd__org b { display: block; font-size: 15px; font-weight: 600; color: var(--ink); }
-.obd__org small { font-size: 13px; color: var(--authx-muted); }
-.obd__orgok { margin-left: auto; font-size: 13px; font-weight: 500; color: var(--authx-muted); }
+.obd__org small { display: block; margin-top: 2px; font-size: 13px; font-weight: 500; color: var(--authx-muted); }
 
 .obd__banner {
   margin: 18px 0 0;
   padding: 12px 14px;
   border-radius: 12px;
   background: var(--danger-bg);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12.5px;
+  font-weight: 500;
   line-height: 1.5;
   color: var(--danger);
 }
@@ -316,19 +316,23 @@
 .obd__foot .obd__btn--pri { order: -1; }
 .obd__sp { display: none; }
 .obd__link {
+  /* 누름 영역 40px 이상(unslop 2026-11-19) — 글자는 그대로, 위아래만 넓힌다. */
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
   border: none;
   background: none;
   padding: 0;
   font: inherit;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--authx-muted);
   cursor: pointer;
 }
 .obd__link:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
 .obd__link--skip {
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--authx-muted);
 }
 .obd__link--skip:hover { color: var(--primary-ink); }
@@ -341,18 +345,21 @@
   justify-content: center;
   gap: 7px;
   border-radius: 14px;
-  border: 1px solid var(--line);
-  background: #fff;
+  /* 보조 버튼은 테두리 없이 옅은 회색 바탕(unslop 2026-11-19) — 입력 칸만 테두리를 가진다. */
+  border: 1px solid transparent;
+  background: #f4f4f7;
   font: inherit;
   font-size: 15px;
+  font-variant-numeric: tabular-nums;
   font-weight: 600;
   color: var(--ink);
   white-space: nowrap;
   cursor: pointer;
 }
 .obd__btn svg { width: 15px; height: 15px; }
+.obd__btn:not(.obd__btn--pri):hover:not(:disabled) { background: #ececf1; }
 .obd__btn:disabled { cursor: default; opacity: 0.6; }
-.obd__btn--ok:disabled { opacity: 1; color: var(--authx-primary); border-color: var(--line); background: #fff; }
+.obd__btn--ok:disabled { opacity: 1; color: var(--authx-primary); border-color: transparent; background: var(--primary-soft); }
 /* 주 버튼 — 로그인과 같은 단색 보라(화이트 리디자인, 그라데이션 없음). */
 .obd__btn--pri {
   border-color: transparent;

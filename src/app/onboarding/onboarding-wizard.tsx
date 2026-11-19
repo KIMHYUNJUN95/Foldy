@@ -29,15 +29,16 @@ import {
 import type { Locale } from "@/lib/i18n";
 import type { ProfileGender } from "@/lib/onboarding";
 import { haptic } from "@/lib/haptics";
-import "./onboarding-done.css";
+import { formatPhoneDisplay } from "@/lib/phone-format";
+import "./onboarding-wizard.css";
 
-// 네이비 강조 그라디언트 + 그림자를 디자인 토큰에서 가져옴(인증 화면과 동일).
-const GRADIENT = "#7a52e6";
+// 강조색은 디자인 토큰(`--primary`) 하나에서 — 색 값을 따로 적지 않는다(unslop 2026-11-19).
+const GRADIENT = "var(--primary)";
 const SHADOW = "none";
 // 흰 한 장(화이트 리디자인 2026-10-09) — 예전 아이보리 방사 그라데이션 대신.
 const IVORY_BG = "#ffffff";
 const PRIMARY_SOFT =
-  "color-mix(in oklab, #7a52e6 8%, #ffffff)";
+  "color-mix(in oklab, var(--primary) 8%, #ffffff)";
 
 // 진행 막대에 보이는 번호 단계: 이름 → 생년월일 → 전화 → 초대.
 // (언어는 로그인 때 이미 선택하므로 일부러 마법사 단계에 넣지 않는다.)
@@ -48,8 +49,6 @@ export type OnboardingIntroCopy = {
   subtitle: string;
   itemBasicsTitle: string;
   itemBasicsSub: string;
-  itemLangTitle: string;
-  itemLangSub: string;
   itemInviteTitle: string;
   itemInviteSub: string;
   startCta: string;
@@ -96,7 +95,6 @@ export type OnboardingJoinCopy = {
   verifyCta: string;
   checking: string;
   skip: string;
-  invalidTitle: string;
   confirmEyebrow: string;
   confirmTitle: string;
   confirmSubtitle: string;
@@ -118,7 +116,6 @@ export type OnboardingReviewCopy = {
   rowDob: string;
   rowGender: string;
   rowPhone: string;
-  rowLang: string;
   rowOrg: string;
   rowRole: string;
   edit: string;
@@ -128,16 +125,17 @@ export type OnboardingReviewCopy = {
 };
 
 export type OnboardingSuccessCopy = {
-  eyebrow: string;
-  welcomePrefix: string;
-  welcomeSuffix: string;
+  /** 「가입을 마쳤어요」 — 인사말 대신 상황을 말하는 제목(2026-11-19). */
+  title: string;
+  /** `{name}` · `{org}` · `{role}` 자리표시. 이름은 제목이 아니라 여기 들어간다. */
   bodyJoined: string;
   bodyNoTeam: string;
   startCta: string;
 };
 
 export type OnboardingExitCopy = {
-  backToLogin: string;
+  /** 「로그아웃」 — 모바일 · PC 같은 말(2026-11-19). */
+  logout: string;
 };
 
 type Country = { iso: string; flag: string; dial: string };
@@ -170,15 +168,6 @@ function UserIcon() {
     <svg viewBox="0 0 24 24" fill="none" className="size-[18px]" aria-hidden="true">
       <circle cx="12" cy="8.5" r="3.6" stroke="currentColor" strokeWidth="1.8" />
       <path d="M5 19.5c1.3-3.3 4-4.9 7-4.9s5.7 1.6 7 4.9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function GlobeIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className="size-[18px]" aria-hidden="true">
-      <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.7" />
-      <path d="M3.5 12h17M12 3.5c2.4 2.3 3.6 5.3 3.6 8.5S14.4 18.2 12 20.5C9.6 18.2 8.4 15.2 8.4 12S9.6 5.8 12 3.5z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -244,6 +233,21 @@ function ShieldIcon() {
       <path d="M12 3l7 2.5v5.2c0 4.5-3 8-7 10-4-2-7-5.5-7-10V5.5L12 3z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
       <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
+  );
+}
+
+/**
+ * 칸 바로 아래 빨간 한 줄(unslop 2026-11-19) — 분홍 바탕 · 테두리 상자 · 제목 줄 없이 무엇이 틀렸는지만 말한다.
+ * 굵기 500, 아이콘 14px. 글은 늘 사전에서(ko · ja · en).
+ */
+function FieldError({ children, className = "mt-2" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <p role="alert" className={`${className} flex items-start gap-[6px] text-[12.5px] font-medium leading-[1.5] text-destructive`}>
+      <span className="mt-[2px] flex-none [&>svg]:size-[14px]">
+        <WarnIcon />
+      </span>
+      <span className="min-w-0">{children}</span>
+    </p>
   );
 }
 
@@ -347,7 +351,7 @@ function ProgressHeader({
   onBack?: () => void;
 }) {
   return (
-    <header className="flex-none px-[24px] pb-[10px] pt-1">
+    <header className="obw-row mx-auto w-full max-w-[460px] flex-none px-[24px] pb-[10px] pt-1">
       <div className="flex h-[48px] items-center gap-3">
         {onBack ? (
           <button
@@ -395,8 +399,8 @@ function ExitToLoginForm({
         type="submit"
         className={
           compact
-            ? "inline-flex h-9 items-center justify-end text-right text-[12.5px] font-extrabold leading-tight text-muted-foreground underline-offset-2 hover:underline"
-            : "text-[13px] font-extrabold text-muted-foreground underline-offset-2 hover:underline"
+            ? "-mr-2 inline-flex min-h-[44px] items-center justify-end px-2 text-right text-[12.5px] font-semibold leading-tight text-muted-foreground underline-offset-2 hover:underline"
+            : "inline-flex min-h-[44px] items-center px-3 text-[13px] font-semibold text-muted-foreground underline-offset-2 hover:underline"
         }
       >
         {label}
@@ -417,12 +421,12 @@ function StickyCta({
   withArrow?: boolean;
 }) {
   return (
-    <div className="flex-none py-[14px] pb-[calc(max(14px,env(safe-area-inset-bottom))+var(--keyboard-inset,0px))]">
+    <div className="obw-cta flex-none py-[14px] pb-[calc(max(14px,env(safe-area-inset-bottom))+var(--keyboard-inset,0px))]">
       <button
         type="button"
         onClick={onClick}
         disabled={disabled}
-        className={`flex h-[54px] w-full items-center justify-center gap-2 rounded-[15px] text-[15.5px] font-extrabold tracking-[-0.01em] text-white ${
+        className={`flex h-[54px] w-full items-center justify-center gap-2 rounded-[15px] text-[15.5px] font-semibold tracking-[-0.01em] text-white ${
           disabled ? "text-[#8b80ac]" : ""
         }`}
         style={{ background: disabled ? "#e6e1f5" : GRADIENT, boxShadow: "none" }}
@@ -642,10 +646,10 @@ function Wheel({
             onClick={() => commit(i)}
             className={`cursor-pointer snap-center text-[17px] tabular-nums ${
               i === active
-                ? "font-extrabold text-foreground"
+                ? "font-semibold text-foreground"
                 : Math.abs(i - active) === 1
-                  ? "font-semibold text-muted-foreground"
-                  : "font-semibold text-text-done"
+                  ? "font-medium text-muted-foreground"
+                  : "font-medium text-text-done"
             }`}
             style={{ height: ITEM_H, lineHeight: `${ITEM_H}px` }}
           >
@@ -700,7 +704,7 @@ function BirthDateSheet({
     <BottomSheet
       onClose={onClose}
       header={
-        <p className="pb-[12px] pt-1 text-center text-[15px] font-extrabold text-foreground">
+        <p className="pb-[12px] pt-1 text-center text-[15px] font-semibold text-foreground">
           {title}
         </p>
       }
@@ -774,13 +778,13 @@ function DateCell({
 }) {
   return (
     <div className={grow ? "flex-[1.4]" : "flex-1"}>
-      <div className="mb-[6px] text-center text-[11px] font-extrabold uppercase tracking-[0.05em] t-eyebrow text-text-done">
+      <div className="mb-[6px] text-center text-[12px] font-medium text-text-done">
         {label}
       </div>
       <button
         type="button"
         onClick={onClick}
-        className="h-[54px] w-full rounded-[14px] border border-border bg-surface text-center text-[16px] font-semibold text-foreground"
+        className="h-[54px] w-full rounded-[14px] border border-border bg-surface text-center text-[16px] font-semibold tabular-nums text-foreground"
       >
         {value ?? (
           <span className="font-medium text-text-done">{placeholder}</span>
@@ -809,17 +813,17 @@ function ReviewRow({
         divider ? "border-t-[0.5px] border-[var(--separator)]" : ""
       }`}
     >
-      <span className="w-[78px] flex-none text-[12px] font-bold text-muted-foreground">
+      <span className="w-[78px] flex-none text-[12px] font-medium text-muted-foreground">
         {label}
       </span>
-      <span className="min-w-0 flex-1 truncate text-[14px] font-bold text-foreground">
+      <span className="min-w-0 flex-1 truncate text-[14px] font-medium tabular-nums text-foreground">
         {value}
       </span>
       {onEdit && (
         <button
           type="button"
           onClick={onEdit}
-          className="flex-none text-[12px] font-extrabold text-primary"
+          className="-my-[10px] -mr-2 inline-flex min-h-[44px] flex-none items-center px-2 text-[12px] font-semibold text-primary"
         >
           {editLabel}
         </button>
@@ -848,14 +852,14 @@ function GenderChoice({
       }`}
     >
       <div>
-        <div className="text-[14.5px] font-extrabold tracking-[-0.01em] text-foreground">
+        <div className="text-[14.5px] font-semibold tracking-[-0.01em] text-foreground">
           {label}
         </div>
       </div>
       <span
         className={`mt-[2px] flex size-6 items-center justify-center rounded-full border transition-colors ${
           active
-            ? "border-[#7a52e6] bg-[#7a52e6] text-white"
+            ? "border-primary bg-primary text-white"
             : "border-[#d0cfd8] bg-white text-transparent"
         }`}
         aria-hidden="true"
@@ -884,7 +888,7 @@ function CountrySheet({
       onClose={onClose}
       className="max-h-[72dvh]"
       header={
-        <p className="pb-[12px] pt-1 text-center text-[15px] font-extrabold text-foreground">
+        <p className="pb-[12px] pt-1 text-center text-[15px] font-semibold text-foreground">
           {title}
         </p>
       }
@@ -906,10 +910,10 @@ function CountrySheet({
                 }`}
               >
                 <span className="text-[22px] leading-none">{c.flag}</span>
-                <span className="flex-1 text-[15px] font-bold text-foreground">
+                <span className="flex-1 text-[15px] font-semibold text-foreground">
                   {countryNames[c.iso] ?? c.iso.toUpperCase()}
                 </span>
-                <span className="font-mono text-[14px] font-bold tabular-nums text-muted-foreground">
+                <span className="font-mono text-[14px] font-semibold tabular-nums text-muted-foreground">
                   {c.dial}
                 </span>
                 {on && (
@@ -945,7 +949,6 @@ export function OnboardingWizard({
   review,
   success,
   exit,
-  languageName,
   profile,
   initialStep = 0,
   allowInviteSkip = true,
@@ -960,7 +963,6 @@ export function OnboardingWizard({
   review: OnboardingReviewCopy;
   success: OnboardingSuccessCopy;
   exit: OnboardingExitCopy;
-  languageName: string;
   profile: {
     copy: ProfileFormCopy;
     locale: Locale;
@@ -1160,7 +1162,7 @@ export function OnboardingWizard({
   const phoneValid = nationalDigits.length >= 6;
   const showExitLink = showExitToLogin;
   const exitAction = showExitLink ? (
-    <ExitToLoginForm label={exit.backToLogin} locale={profile.locale} compact />
+    <ExitToLoginForm label={exit.logout} locale={profile.locale} compact />
   ) : null;
 
   // ── 대체 · 기존 올인원 프로필 폼(정상 흐름에서는 도달하지 않음) ─
@@ -1168,12 +1170,12 @@ export function OnboardingWizard({
     return (
       <main
         lang={profile.locale}
-        className="flex min-h-dvh flex-col pt-[env(safe-area-inset-top)] text-foreground"
+        className="obw-main flex min-h-dvh flex-col pt-[env(safe-area-inset-top)] text-foreground"
         style={{ background: IVORY_BG }}
       >
         <ProgressHeader step={5} backLabel={steps.backCta} onBack={depth > 0 ? goBack : undefined} />
         {showExitLink ? (
-          <div className="flex justify-end px-[26px] pb-1">{exitAction}</div>
+          <div className="obw-row mx-auto flex w-full max-w-[460px] justify-end px-[26px] pb-1">{exitAction}</div>
         ) : null}
         <section className="mx-auto w-full max-w-[460px] flex-1 px-[26px] pb-[max(26px,env(safe-area-inset-bottom))]">
           <ProfileForm
@@ -1195,56 +1197,49 @@ export function OnboardingWizard({
     const roleLabel = preview
       ? join.roleCategories[preview.roleCategory] ?? preview.roleCategory
       : "";
-    const body = preview
-      ? success.bodyJoined
-          .replace("{org}", preview.organizationName)
-          .replace("{role}", roleLabel)
-      : success.bodyNoTeam;
-    // 모션(2026-10-14, 시안 Motion-B-OnbDone-Phone): 빛 번짐 위로 체크 원이 튀어나오고 방사선 8개 · 체크 그리기 → 글이 폭포처럼 →
-    // 조직 이름에 빛이 지나감 → 버튼이 올라오며 반짝 한 번. 빛 알갱이가 천천히 떠오름. 체크가 그려질 때 성공 진동(onboarding-done.css).
+    // 이름은 제목이 아니라 본문에(unslop 2026-11-19 — 인사 제목 「환영해요, ○○님」 → 「가입을 마쳤어요」).
+    // 조직 이름 자리(`{org}`)는 바꾸기 전에 잘라 둔다 — 이름 · 역할 글자에 조직 이름이 섞여 있어도 빛 지나감이 엉뚱한 곳에 붙지 않는다.
+    const displayName = name.trim();
+    const template = (preview ? success.bodyJoined : success.bodyNoTeam)
+      .replace("{name}", displayName)
+      .replace("{role}", roleLabel);
     const orgName = preview?.organizationName ?? "";
-    const bodyParts = orgName && body.includes(orgName) ? body.split(orgName) : null;
+    const bodyParts = preview && template.includes("{org}") ? template.split("{org}") : null;
+    const body = template.replace("{org}", orgName);
     return (
       <main
         lang={profile.locale}
-        className="obd flex min-h-dvh flex-col pt-[env(safe-area-inset-top)] text-foreground"
+        className="obm obw-main flex min-h-dvh flex-col pt-[env(safe-area-inset-top)] text-foreground"
         style={{ background: IVORY_BG }}
       >
         <header className="h-[48px] flex-none" />
-        <span className="obd__dust" aria-hidden="true">
+        <span className="obm__dust" aria-hidden="true">
           {Array.from({ length: 10 }, (_, i) => (
             <i key={i} style={{ "--x": `${Math.round(Math.cos(i * 2.39996) * 130)}px`, animationDelay: `${900 + i * 90}ms` } as React.CSSProperties} />
           ))}
         </span>
-        <section className="mx-auto flex w-full max-w-[460px] flex-1 flex-col px-[26px]">
+        <section className="obw-col mx-auto flex w-full max-w-[460px] flex-1 flex-col px-[26px]">
           <div className="flex flex-1 flex-col items-center justify-center text-center">
-            <span className="obd__ic mb-6" aria-hidden="true">
-              <span className="obd__glow" />
+            <span className="obm__ic mb-6" aria-hidden="true">
+              <span className="obm__glow" />
               {Array.from({ length: 8 }, (_, i) => (
-                <span key={i} className="obd__ray" style={{ "--r": `${i * 45}deg` } as React.CSSProperties} />
+                <span key={i} className="obm__ray" style={{ "--r": `${i * 45}deg` } as React.CSSProperties} />
               ))}
-              <span className="obd__dot">
+              <span className="obm__dot">
                 <svg viewBox="0 0 24 24" width="36" height="36" fill="none">
                   <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </span>
             </span>
-            <span className="obd__ln">
-              <span className="mb-[9px] inline-block text-[11px] font-extrabold uppercase tracking-[0.13em] t-eyebrow text-primary">{success.eyebrow}</span>
-            </span>
-            <h1 className="obd__ln obd__d2 whitespace-pre-line text-[32px] font-bold leading-[1.25] tracking-[-0.035em] t-display">
-              <span className="inline-block">
-                {success.welcomePrefix}
-                {name.trim()}
-                {success.welcomeSuffix}
-              </span>
+            <h1 className="obm__ln obm__d2 text-[32px] font-semibold leading-[1.25] tracking-[-0.035em] t-display">
+              <span className="inline-block">{success.title}</span>
             </h1>
-            <p className="obd__ln obd__d3 mt-3 max-w-[290px] text-[13.5px] font-semibold leading-[1.6] text-muted-foreground">
+            <p className="obm__ln obm__d3 mt-3 max-w-[290px] text-[13.5px] font-medium leading-[1.6] text-muted-foreground">
               <span className="inline-block">
                 {bodyParts ? (
                   <>
                     {bodyParts[0]}
-                    <span className="obd__org">{orgName}</span>
+                    <span className="obm__org">{orgName}</span>
                     {bodyParts.slice(1).join(orgName)}
                   </>
                 ) : (
@@ -1254,7 +1249,7 @@ export function OnboardingWizard({
             </p>
           </div>
 
-          <div className="obd__cta">
+          <div className="obm__cta">
             <StickyCta
               label={success.startCta}
               onClick={() => {
@@ -1280,20 +1275,21 @@ export function OnboardingWizard({
     const dobDisplay = dob
       ? `${dob.year}. ${pad2(dob.month)}. ${pad2(dob.day)}`
       : "";
-    const phoneDisplay = `${selectedCountry.dial} ${nationalDigits}`;
+    // 전화번호는 공용 보여 주기 형식(하이픈) — +81 9023456789 → +81-90-2345-6789(unslop 2026-11-19).
+    const phoneDisplay = formatPhoneDisplay(phoneE164);
     return (
       <main
         lang={profile.locale}
-        className="flex min-h-dvh flex-col pt-[env(safe-area-inset-top)] text-foreground"
+        className="obw-main flex min-h-dvh flex-col pt-[env(safe-area-inset-top)] text-foreground"
         style={{ background: IVORY_BG }}
       >
         <ProgressHeader step={5} backLabel={steps.backCta} onBack={depth > 0 ? goBack : undefined} />
         {showExitLink ? (
-          <div className="flex justify-end px-[26px] pb-1">{exitAction}</div>
+          <div className="obw-row mx-auto flex w-full max-w-[460px] justify-end px-[26px] pb-1">{exitAction}</div>
         ) : null}
-        <section className="mx-auto flex w-full max-w-[460px] flex-1 flex-col px-[26px]">
+        <section className="obw-col mx-auto flex w-full max-w-[460px] flex-1 flex-col px-[26px]">
           <div className="flex-1 overflow-y-auto pt-2 px-1 -mx-1">
-            <h1 className="whitespace-pre-line text-[26px] font-bold leading-[1.3] tracking-[-0.03em] t-display">
+            <h1 className="whitespace-pre-line text-[26px] font-semibold leading-[1.3] tracking-[-0.03em] t-display">
               {review.title}
             </h1>
             <p className="mt-[10px] text-[15px] leading-[1.6] text-muted-foreground">
@@ -1329,13 +1325,7 @@ export function OnboardingWizard({
                 onEdit={() => goTo(4)}
                 divider
               />
-              {/* 언어는 로그인 때 선택하며(마법사 단계 아님) 읽기 전용으로 보여준다. */}
-              <ReviewRow
-                label={review.rowLang}
-                value={languageName}
-                editLabel={review.edit}
-                divider
-              />
+              {/* 언어 줄은 뺐다(2026-11-19) — 고칠 수 없는 줄이고, 언어는 로그인 화면에서 이미 골랐다. */}
               {preview && (
                 <>
                   <ReviewRow
@@ -1357,30 +1347,17 @@ export function OnboardingWizard({
             </div>
 
             {submitErrorKey ? (
-              <div className="mt-[14px] flex items-start gap-[11px] rounded-[14px] border border-[rgb(197_40_46/0.24)] bg-[#fdecec] px-[14px] py-[13px]">
-                <span className="mt-[1px] flex-none text-[#c5282e]">
-                  <WarnIcon />
-                </span>
-                <div className="text-[12px] font-semibold leading-[1.5] text-[#c5282e]">
-                  {join.errors[submitErrorKey] ?? submitErrorKey}
-                </div>
-              </div>
+              <FieldError>{join.errors[submitErrorKey] ?? submitErrorKey}</FieldError>
             ) : (
-              <div
-                className="mt-[14px] flex items-start gap-[11px] rounded-[14px] border px-[14px] py-[13px]"
-                style={{
-                  background: "hsl(206 66% 93%)",
-                  borderColor: "color-mix(in oklab, hsl(206 70% 40%) 22%, transparent)",
-                }}
-              >
-                <span className="mt-[1px] flex-none text-[hsl(206_70%_40%)]">
+              <div className="mt-[14px] flex items-start gap-[11px] rounded-[14px] bg-[#f4f4f7] px-[14px] py-[13px]">
+                <span className="mt-[1px] flex-none text-[#6b6878]">
                   <InfoIcon />
                 </span>
                 <div>
-                  <div className="text-[12.5px] font-extrabold text-[hsl(206_70%_40%)]">
+                  <div className="text-[12.5px] font-semibold text-foreground">
                     {review.infoTitle}
                   </div>
-                  <div className="mt-[2px] text-[11.5px] font-semibold leading-[1.5] text-[#3a3746]">
+                  <div className="mt-[2px] text-[12px] font-medium leading-[1.5] text-[#3a3746]">
                     {review.infoBody}
                   </div>
                 </div>
@@ -1388,7 +1365,7 @@ export function OnboardingWizard({
             )}
           </div>
 
-          <div className="flex-none py-[14px] pb-[max(14px,env(safe-area-inset-bottom))]">
+          <div className="obw-cta flex-none py-[14px] pb-[max(14px,env(safe-area-inset-bottom))]">
             <SpinnerButton label={review.submit} onClick={submit} busy={submitting} />
           </div>
         </section>
@@ -1402,19 +1379,19 @@ export function OnboardingWizard({
     return (
       <main
         lang={profile.locale}
-        className="flex min-h-dvh flex-col pt-[env(safe-area-inset-top)] text-foreground"
+        className="obw-main flex min-h-dvh flex-col pt-[env(safe-area-inset-top)] text-foreground"
         style={{ background: IVORY_BG }}
       >
         <ProgressHeader step={5} backLabel={steps.backCta} onBack={depth > 0 ? goBack : undefined} />
         {showExitLink ? (
-          <div className="flex justify-end px-[26px] pb-1">{exitAction}</div>
+          <div className="obw-row mx-auto flex w-full max-w-[460px] justify-end px-[26px] pb-1">{exitAction}</div>
         ) : null}
-        <section className="mx-auto flex w-full max-w-[460px] flex-1 flex-col px-[26px]">
+        <section className="obw-col mx-auto flex w-full max-w-[460px] flex-1 flex-col px-[26px]">
           <div className="flex-1 overflow-y-auto pt-2 px-1 -mx-1">
             <p className="mb-[10px] mt-[14px] text-[13px] font-semibold t-eyebrow text-primary">
               {join.confirmEyebrow}
             </p>
-            <h1 className="whitespace-pre-line text-[26px] font-bold leading-[1.3] tracking-[-0.03em] t-display">
+            <h1 className="whitespace-pre-line text-[26px] font-semibold leading-[1.3] tracking-[-0.03em] t-display">
               {join.confirmTitle}
             </h1>
             <p className="mt-[10px] text-[15px] leading-[1.6] text-muted-foreground">
@@ -1424,25 +1401,25 @@ export function OnboardingWizard({
             <div className="mt-[22px] overflow-hidden rounded-[16px] bg-[#f7f7f9]">
               <div className="relative px-[18px] pb-4 pt-[18px] text-foreground">
                 <div className="relative flex items-center gap-[11px]">
-                  <span className="flex size-[42px] flex-none items-center justify-center rounded-[12px] bg-[#16141f] text-[15px] font-bold text-white">
+                  <span className="flex size-[42px] flex-none items-center justify-center rounded-[12px] bg-[#16141f] text-[15px] font-semibold text-white">
                     {preview.organizationName.slice(0, 2)}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-[16px] font-extrabold tracking-[-0.01em]">
+                    <div className="truncate text-[16px] font-semibold tracking-[-0.01em]">
                       {preview.organizationName}
                     </div>
                   </div>
-                  <span className="ml-auto inline-flex flex-none items-center gap-1 rounded-full bg-white/20 px-[9px] py-1 text-[10.5px] font-extrabold">
+                  <span className="ml-auto inline-flex flex-none items-center gap-1 rounded-full bg-white/20 px-[9px] py-1 text-[10.5px] font-semibold">
                     <ShieldIcon />
                     {join.verified}
                   </span>
                 </div>
               </div>
               <div className="bg-surface px-[18px] py-[15px]">
-                <div className="text-[10.5px] font-extrabold uppercase tracking-[0.06em] t-eyebrow text-muted-foreground">
+                <div className="text-[12px] font-medium text-muted-foreground">
                   {join.roleLabel}
                 </div>
-                <div className="mt-2 text-[16px] font-extrabold tracking-[-0.01em]">
+                <div className="mt-2 text-[16px] font-semibold tracking-[-0.01em]">
                   {roleLabel}
                 </div>
               </div>
@@ -1454,9 +1431,7 @@ export function OnboardingWizard({
           ) : (
             <>
               {submitErrorKey && (
-                <p className="px-[26px] pb-2 text-center text-[13px] font-bold text-red-600">
-                  {join.errors[submitErrorKey] ?? submitErrorKey}
-                </p>
+                <FieldError className="mb-1 justify-center text-center">{join.errors[submitErrorKey] ?? submitErrorKey}</FieldError>
               )}
               <StickyCta label={join.submitCta} onClick={submitMembership} disabled={submitting} />
             </>
@@ -1472,19 +1447,19 @@ export function OnboardingWizard({
     return (
       <main
         lang={profile.locale}
-        className="flex min-h-dvh flex-col pt-[env(safe-area-inset-top)] text-foreground"
+        className="obw-main flex min-h-dvh flex-col pt-[env(safe-area-inset-top)] text-foreground"
         style={{ background: IVORY_BG }}
       >
         <ProgressHeader step={5} backLabel={steps.backCta} onBack={depth > 0 ? goBack : undefined} />
         {showExitLink ? (
-          <div className="flex justify-end px-[26px] pb-1">{exitAction}</div>
+          <div className="obw-row mx-auto flex w-full max-w-[460px] justify-end px-[26px] pb-1">{exitAction}</div>
         ) : null}
-        <section className="mx-auto flex w-full max-w-[460px] flex-1 flex-col px-[26px]">
+        <section className="obw-col mx-auto flex w-full max-w-[460px] flex-1 flex-col px-[26px]">
           <div className="flex-1 overflow-y-auto pt-2 px-1 -mx-1">
             <p className="mb-[10px] mt-[14px] text-[13px] font-semibold t-eyebrow text-primary">
               {join.inviteEyebrow}
             </p>
-            <h1 className="whitespace-pre-line text-[26px] font-bold leading-[1.3] tracking-[-0.03em] t-display">
+            <h1 className="whitespace-pre-line text-[26px] font-semibold leading-[1.3] tracking-[-0.03em] t-display">
               {join.inviteTitle}
             </h1>
             <p className="mt-[10px] text-[15px] leading-[1.6] text-muted-foreground">
@@ -1516,35 +1491,25 @@ export function OnboardingWizard({
                 // 큼직한 분할 코드 입력(19px) — 터치 16px 이상 규칙에서 제외해
                 // 의도한 큰 크기를 유지한다(여전히 16px 이상이라 iOS 포커스 확대는 일어나지 않음).
                 data-keep-font-size
-                className={`h-[56px] w-full rounded-[14px] border bg-surface px-[15px] text-center font-mono text-[19px] font-bold tracking-[0.12em] text-foreground outline-none transition-colors placeholder:font-sans placeholder:text-[15px] placeholder:font-medium placeholder:tracking-normal placeholder:text-text-done ${
+                className={`h-[56px] w-full rounded-[14px] border bg-surface px-[15px] text-center font-mono text-[19px] font-semibold tracking-[0.12em] tabular-nums text-foreground outline-none transition-colors placeholder:font-sans placeholder:text-[15px] placeholder:font-medium placeholder:tracking-normal placeholder:text-text-done ${
                   inviteStatus === "error"
-                    ? "border-[#c5282e]"
+                    ? "border-destructive"
                     : "border-border focus:border-primary focus:ring-[3.5px] focus:ring-primary/15"
                 }`}
               />
               {inviteStatus === "error" ? (
-                <div className="mt-[18px] flex items-start gap-[11px] rounded-[14px] border border-[rgb(197_40_46/0.24)] bg-[#fdecec] px-[14px] py-[13px]">
-                  <span className="mt-[1px] flex-none text-[#c5282e]">
-                    <WarnIcon />
-                  </span>
-                  <div>
-                    <div className="text-[13px] font-extrabold text-[#c5282e]">
-                      {join.invalidTitle}
-                    </div>
-                    <div className="mt-[3px] text-[11.5px] font-semibold leading-[1.5] text-[#3a3746]">
-                      {(inviteErrorKey && join.errors[inviteErrorKey]) ?? join.invalidTitle}
-                    </div>
-                  </div>
-                </div>
+                <FieldError className="mt-[14px]">
+                  {(inviteErrorKey && join.errors[inviteErrorKey]) ?? join.errors.invalid_invite}
+                </FieldError>
               ) : (
-                <p className="mt-[14px] text-[11.5px] font-semibold text-text-done">
+                <p className="mt-[14px] text-[11.5px] font-medium text-text-done">
                   {join.caseHint}
                 </p>
               )}
             </div>
           </div>
 
-          <div className="flex-none py-[14px] pb-[calc(max(14px,env(safe-area-inset-bottom))+var(--keyboard-inset,0px))]">
+          <div className="obw-cta flex-none py-[14px] pb-[calc(max(14px,env(safe-area-inset-bottom))+var(--keyboard-inset,0px))]">
             <button
               type="button"
               onClick={verifyInvite}
@@ -1567,7 +1532,7 @@ export function OnboardingWizard({
                     setPreview(null);
                     goTo(7);
                   }}
-                  className="text-[13px] font-extrabold text-muted-foreground"
+                  className="inline-flex min-h-[44px] items-center px-3 text-[13px] font-semibold text-muted-foreground"
                 >
                   {join.skip}
                 </button>
@@ -1584,19 +1549,19 @@ export function OnboardingWizard({
     return (
       <main
         lang={profile.locale}
-        className="flex min-h-dvh flex-col pt-[env(safe-area-inset-top)] text-foreground"
+        className="obw-main flex min-h-dvh flex-col pt-[env(safe-area-inset-top)] text-foreground"
         style={{ background: IVORY_BG }}
       >
         <ProgressHeader step={4} backLabel={steps.backCta} onBack={depth > 0 ? goBack : undefined} />
         {showExitLink ? (
-          <div className="flex justify-end px-[26px] pb-1">{exitAction}</div>
+          <div className="obw-row mx-auto flex w-full max-w-[460px] justify-end px-[26px] pb-1">{exitAction}</div>
         ) : null}
-        <section className="mx-auto flex w-full max-w-[460px] flex-1 flex-col px-[26px]">
+        <section className="obw-col mx-auto flex w-full max-w-[460px] flex-1 flex-col px-[26px]">
           <div className="flex-1 overflow-y-auto pt-2 px-1 -mx-1">
             <p className="mb-[10px] mt-[14px] text-[13px] font-semibold t-eyebrow text-primary">
               {steps.basicsEyebrow}
             </p>
-            <h1 className="whitespace-pre-line text-[26px] font-bold leading-[1.3] tracking-[-0.03em] t-display">
+            <h1 className="whitespace-pre-line text-[26px] font-semibold leading-[1.3] tracking-[-0.03em] t-display">
               {steps.phoneTitle}
             </h1>
             <p className="mt-[10px] text-[15px] leading-[1.6] text-muted-foreground">
@@ -1604,14 +1569,14 @@ export function OnboardingWizard({
             </p>
 
             <div className="mt-[22px]">
-              <div className="mb-2 text-[12.5px] font-extrabold text-[#3a3746]">
+              <div className="mb-2 text-[12.5px] font-semibold text-[#3a3746]">
                 {steps.phoneNumLabel}
               </div>
               <div className="flex gap-[10px]">
                 <button
                   type="button"
                   onClick={() => setCountrySheet(true)}
-                  className="flex h-[54px] flex-none items-center gap-[7px] rounded-[14px] border border-border bg-surface px-[13px] text-[15px] font-bold text-foreground"
+                  className="flex h-[54px] flex-none items-center gap-[7px] rounded-[14px] border border-border bg-surface px-[13px] text-[15px] font-semibold text-foreground"
                 >
                   <span className="text-[17px] leading-none">
                     {selectedCountry.flag}
@@ -1639,28 +1604,22 @@ export function OnboardingWizard({
                     goTo(5);
                   }}
                   placeholder={steps.phoneInputPlaceholder}
-                  className="h-[54px] flex-1 rounded-[14px] border border-border bg-surface px-[15px] text-[16px] font-semibold text-foreground outline-none transition-colors placeholder:font-medium placeholder:text-text-done focus:border-primary focus:ring-[3.5px] focus:ring-primary/15"
+                  className="h-[54px] flex-1 rounded-[14px] border border-border bg-surface px-[15px] text-[16px] font-semibold tabular-nums text-foreground outline-none transition-colors placeholder:font-medium placeholder:text-text-done focus:border-primary focus:ring-[3.5px] focus:ring-primary/15"
                 />
               </div>
-              <p className="mt-2 text-[11.5px] font-semibold leading-[1.5] text-text-done">
+              <p className="mt-2 text-[11.5px] font-medium leading-[1.5] text-text-done">
                 {steps.phoneHint}
               </p>
               {phoneErrorKey ? (
-                <div className="mt-[14px] flex items-start gap-[11px] rounded-[14px] border border-[rgb(197_40_46/0.24)] bg-[#fdecec] px-[14px] py-[13px]">
-                  <span className="mt-[1px] flex-none text-[#c5282e]">
-                    <WarnIcon />
-                  </span>
-                  <div>
-                    <div className="text-[13px] font-extrabold text-[#c5282e]">
-                      {join.errors[phoneErrorKey] ?? phoneErrorKey}
-                    </div>
-                    <div className="mt-[3px] text-[11.5px] font-semibold leading-[1.5] text-[#3a3746]">
-                      {phoneErrorKey === "phone_duplicate"
-                        ? steps.phoneDuplicateHelp
-                        : steps.phoneHint}
-                    </div>
-                  </div>
-                </div>
+                <>
+                  <FieldError>{join.errors[phoneErrorKey] ?? phoneErrorKey}</FieldError>
+                  {/* 이미 쓰는 번호일 때만 다음에 할 일을 한 줄 더(힌트는 위에 이미 있어 되풀이하지 않는다). */}
+                  {phoneErrorKey === "phone_duplicate" ? (
+                    <p className="mt-1 pl-5 text-[12px] font-medium leading-[1.5] text-muted-foreground">
+                      {steps.phoneDuplicateHelp}
+                    </p>
+                  ) : null}
+                </>
               ) : null}
             </div>
           </div>
@@ -1696,19 +1655,19 @@ export function OnboardingWizard({
     return (
       <main
         lang={profile.locale}
-        className="flex min-h-dvh flex-col pt-[env(safe-area-inset-top)] text-foreground"
+        className="obw-main flex min-h-dvh flex-col pt-[env(safe-area-inset-top)] text-foreground"
         style={{ background: IVORY_BG }}
       >
         <ProgressHeader step={2} backLabel={steps.backCta} onBack={depth > 0 ? goBack : undefined} />
         {showExitLink ? (
-          <div className="flex justify-end px-[26px] pb-1">{exitAction}</div>
+          <div className="obw-row mx-auto flex w-full max-w-[460px] justify-end px-[26px] pb-1">{exitAction}</div>
         ) : null}
-        <section className="mx-auto flex w-full max-w-[460px] flex-1 flex-col px-[26px]">
+        <section className="obw-col mx-auto flex w-full max-w-[460px] flex-1 flex-col px-[26px]">
           <div className="flex-1 overflow-y-auto pt-2 px-1 -mx-1">
             <p className="mb-[10px] mt-[14px] text-[13px] font-semibold t-eyebrow text-primary">
               {steps.basicsEyebrow}
             </p>
-            <h1 className="whitespace-pre-line text-[26px] font-bold leading-[1.3] tracking-[-0.03em] t-display">
+            <h1 className="whitespace-pre-line text-[26px] font-semibold leading-[1.3] tracking-[-0.03em] t-display">
               {steps.dobTitle}
             </h1>
             <p className="mt-[10px] text-[15px] leading-[1.6] text-muted-foreground">
@@ -1736,7 +1695,7 @@ export function OnboardingWizard({
                 onClick={() => setDobSheet(true)}
               />
             </div>
-            <p className="mt-2 text-[11.5px] font-semibold leading-[1.45] text-text-done">
+            <p className="mt-2 text-[11.5px] font-medium leading-[1.45] text-text-done">
               {steps.dobHint}
             </p>
           </div>
@@ -1772,19 +1731,19 @@ export function OnboardingWizard({
     return (
       <main
         lang={profile.locale}
-        className="flex min-h-dvh flex-col pt-[env(safe-area-inset-top)] text-foreground"
+        className="obw-main flex min-h-dvh flex-col pt-[env(safe-area-inset-top)] text-foreground"
         style={{ background: IVORY_BG }}
       >
         <ProgressHeader step={3} backLabel={steps.backCta} onBack={depth > 0 ? goBack : undefined} />
         {showExitLink ? (
-          <div className="flex justify-end px-[26px] pb-1">{exitAction}</div>
+          <div className="obw-row mx-auto flex w-full max-w-[460px] justify-end px-[26px] pb-1">{exitAction}</div>
         ) : null}
-        <section className="mx-auto flex w-full max-w-[460px] flex-1 flex-col px-[26px]">
+        <section className="obw-col mx-auto flex w-full max-w-[460px] flex-1 flex-col px-[26px]">
           <div className="flex-1 overflow-y-auto pt-2 px-1 -mx-1">
             <p className="mb-[10px] mt-[14px] text-[13px] font-semibold t-eyebrow text-primary">
               {steps.basicsEyebrow}
             </p>
-            <h1 className="whitespace-pre-line text-[26px] font-bold leading-[1.3] tracking-[-0.03em] t-display">
+            <h1 className="whitespace-pre-line text-[26px] font-semibold leading-[1.3] tracking-[-0.03em] t-display">
               {steps.genderTitle}
             </h1>
             <p className="mt-[10px] text-[15px] leading-[1.6] text-muted-foreground">
@@ -1792,7 +1751,7 @@ export function OnboardingWizard({
             </p>
 
             <div className="mt-[22px]">
-              <div className="mb-3 flex items-center gap-2 text-[12.5px] font-extrabold text-[#3a3746]">
+              <div className="mb-3 flex items-center gap-2 text-[12.5px] font-semibold text-[#3a3746]">
                 <span className="text-primary">
                   <SparkIcon />
                 </span>
@@ -1809,7 +1768,7 @@ export function OnboardingWizard({
                   />
                 ))}
               </div>
-              <p className="mt-3 text-[11.5px] font-semibold leading-[1.5] text-text-done">
+              <p className="mt-3 text-[11.5px] font-medium leading-[1.5] text-text-done">
                 {steps.genderHint}
               </p>
             </div>
@@ -1837,14 +1796,14 @@ export function OnboardingWizard({
     return (
       <main
         lang={profile.locale}
-        className="flex min-h-dvh flex-col pt-[env(safe-area-inset-top)] text-foreground"
+        className="obw-main flex min-h-dvh flex-col pt-[env(safe-area-inset-top)] text-foreground"
         style={{ background: IVORY_BG }}
       >
         <ProgressHeader step={1} backLabel={steps.backCta} onBack={depth > 0 ? goBack : undefined} />
         {showExitLink ? (
-          <div className="flex justify-end px-[26px] pb-1">{exitAction}</div>
+          <div className="obw-row mx-auto flex w-full max-w-[460px] justify-end px-[26px] pb-1">{exitAction}</div>
         ) : null}
-        <section className="mx-auto flex w-full max-w-[460px] flex-1 flex-col px-[26px]">
+        <section className="obw-col mx-auto flex w-full max-w-[460px] flex-1 flex-col px-[26px]">
           <form
             className="flex flex-1 flex-col"
             noValidate
@@ -1857,7 +1816,7 @@ export function OnboardingWizard({
               <p className="mb-[10px] mt-[14px] text-[13px] font-semibold t-eyebrow text-primary">
                 {steps.basicsEyebrow}
               </p>
-              <h1 className="whitespace-pre-line text-[26px] font-bold leading-[1.3] tracking-[-0.03em] t-display">
+              <h1 className="whitespace-pre-line text-[26px] font-semibold leading-[1.3] tracking-[-0.03em] t-display">
                 {identityCopy.title}
               </h1>
               <p className="mt-[10px] text-[15px] leading-[1.6] text-muted-foreground">
@@ -1891,15 +1850,15 @@ export function OnboardingWizard({
   return (
     <main
       lang={profile.locale}
-      className="flex min-h-dvh flex-col pt-[env(safe-area-inset-top)] text-foreground"
+      className="obw-main flex min-h-dvh flex-col pt-[env(safe-area-inset-top)] text-foreground"
       style={{ background: IVORY_BG }}
     >
-      <header className="mx-auto flex h-[64px] w-full max-w-[460px] flex-none items-center px-[26px]">
+      <header className="obw-row mx-auto flex h-[64px] w-full max-w-[460px] flex-none items-center px-[26px]">
         <FoldyMark size={36} />
       </header>
-      <section className="mx-auto flex w-full max-w-[460px] flex-1 flex-col px-[26px]">
+      <section className="obw-col mx-auto flex w-full max-w-[460px] flex-1 flex-col px-[26px]">
         <div className="flex-1 overflow-y-auto pt-2 px-1 -mx-1">
-          <h1 className="mt-[18px] whitespace-pre-line text-[26px] font-bold leading-[1.3] tracking-[-0.03em] t-display">
+          <h1 className="mt-[18px] whitespace-pre-line text-[26px] font-semibold leading-[1.3] tracking-[-0.03em] t-display">
             {intro.title}
           </h1>
           <p className="mt-[10px] text-[15px] leading-[1.6] text-muted-foreground">
@@ -1912,12 +1871,6 @@ export function OnboardingWizard({
               title={intro.itemBasicsTitle}
               sub={intro.itemBasicsSub}
               divider={false}
-            />
-            <ChecklistRow
-              icon={<GlobeIcon />}
-              title={intro.itemLangTitle}
-              sub={intro.itemLangSub}
-              divider
             />
             <ChecklistRow
               icon={<TicketIcon />}

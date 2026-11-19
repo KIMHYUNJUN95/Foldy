@@ -110,9 +110,8 @@ export type DesktopOnboardingCopy = {
   phoneRequired: string;
   inviteVerifyFirst: string;
   errors: Record<string, string>;
-  successEyebrow: string;
-  welcomePrefix: string;
-  welcomeSuffix: string;
+  /** 완료 제목 「가입을 마쳤어요」 — 이름은 본문(`{name}`)에 들어간다(2026-11-19). */
+  successTitle: string;
   bodyJoined: string;
   bodyNoTeam: string;
   startCta: string;
@@ -295,23 +294,19 @@ export function DesktopOnboarding({
 
   if (done) {
     const displayName = displayNameFrom(identityNormalized) || initialName;
-    const body = preview
+    const body = (preview
       ? copy.bodyJoined
           .replace("{org}", preview.organizationName)
           .replace("{role}", copy.roleCategories[preview.roleCategory] ?? preview.roleCategory)
-      : copy.bodyNoTeam;
+      : copy.bodyNoTeam
+    ).replace("{name}", displayName);
     return (
       <Frame copy={copy} locale={locale} step="done">
         <div className="obd__done">
           <span className="obd__doneic" aria-hidden="true">
             <CheckIcon />
           </span>
-          <p className="obd__eye">{copy.successEyebrow}</p>
-          <h1 className="obd__title obd__title--center">
-            {copy.welcomePrefix.replace(/\n/g, " ")}
-            {displayName}
-            {copy.welcomeSuffix}
-          </h1>
+          <h1 className="obd__title obd__title--center">{copy.successTitle}</h1>
           <p className="obd__lede obd__lede--center">{body}</p>
           <button className="obd__btn obd__btn--pri obd__btn--lg" onClick={() => window.location.assign(done.dest)} type="button">
             {copy.startCta}
@@ -505,7 +500,6 @@ export function DesktopOnboarding({
                   {copy.roleLabel} · {copy.roleCategories[preview.roleCategory] ?? preview.roleCategory}
                 </small>
               </div>
-              <span className="obd__orgok">{copy.verified}</span>
             </div>
           ) : null}
         </section>

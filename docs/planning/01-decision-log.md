@@ -2,6 +2,13 @@
 
 This file records important project decisions.
 
+## 2026-11-19 온보딩 완료 문구 · 언어 항목 · 모바일 CSS 이름 (온보딩 unslop, 사용자 「구현시작」)
+
+- 완료 화면은 머리글 · 인사 없이 제목 「가입을 마쳤어요」, 이름은 본문으로(폰 · PC 같은 키 `onboarding.success.title`). 완료 모션은 유지.
+- 소개 화면의 언어 항목 · 검토 화면의 언어 줄을 뺀다(언어는 계정에서). 걸리는 시간 「1~2분」. 나가기 라벨은 `auth.blocked.logout`.
+- 오류는 칸 아래 빨간 한 줄(상자 없음), 틀린 초대 코드는 메시지 하나. 폴드 · 태블릿은 560px 가운데 기둥 + 버튼이 내용 바로 아래.
+- `/onboarding` 모바일 CSS 는 `obm` · `obw` 이름만 쓴다 — PC `.obd__*` 와 겹쳐 생긴 스타일 새는 버그 때문. 테스트 `onboarding-css-scope`. 상세: `docs/product/04-organization-invitations.md` → 「온보딩 unslop 다듬기 (2026-11-19)」.
+
 ## 2026-11-18 Beds24 크레딧 사용 기록 — 모든 호출은 `beds24Fetch` 하나로, 30일 보관
 
 - Beds24 를 부르는 모든 서버 코드는 `beds24Fetch`(`src/lib/beds24/credit-ledger.ts`)를 지난다. 새 호출 지점도 이 함수를 쓴다(직접 `fetch` 금지). 한 호출 = `beds24_credit_usage` 한 줄(누가 · 어디에 · 비용 · 남은 값), 토큰 · 헤더 원문 · 본문은 남기지 않는다.

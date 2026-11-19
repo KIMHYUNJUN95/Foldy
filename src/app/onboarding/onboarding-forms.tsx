@@ -12,7 +12,7 @@ import {
 } from "@/app/onboarding/invite-code-field";
 import type { Locale } from "@/lib/i18n";
 
-const GRADIENT = "linear-gradient(165deg, #8a63f0, #5a30cf)";
+const GRADIENT = "var(--primary)";
 const SHADOW = "0 18px 36px -20px rgb(122 82 230 / 0.7)";
 
 const inputClass =
@@ -25,7 +25,7 @@ function SubmitButton({ label, disabled }: { label: string; disabled?: boolean }
     <button
       type="submit"
       disabled={off}
-      className={`relative flex h-[54px] w-full items-center justify-center rounded-[15px] text-[15.5px] font-extrabold tracking-[-0.01em] text-white ${off ? "pointer-events-none opacity-80" : ""}`}
+      className={`relative flex h-[54px] w-full items-center justify-center rounded-[15px] text-[15.5px] font-semibold tracking-[-0.01em] text-white ${off ? "pointer-events-none opacity-80" : ""}`}
       style={{ background: GRADIENT, boxShadow: off ? "none" : SHADOW }}
     >
       {pending ? (
@@ -87,7 +87,7 @@ export function ProfileForm({
       {safeNext && <input name="next" type="hidden" value={safeNext} />}
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block space-y-2">
-          <span className="text-sm font-bold text-foreground">{copy.nameLabel}</span>
+          <span className="text-sm font-semibold text-foreground">{copy.nameLabel}</span>
           <input
             className={inputClass}
             name="name"
@@ -99,7 +99,7 @@ export function ProfileForm({
           />
         </label>
         <label className="block space-y-2">
-          <span className="text-sm font-bold text-foreground">{copy.birthDateLabel}</span>
+          <span className="text-sm font-semibold text-foreground">{copy.birthDateLabel}</span>
           <input
             className={inputClass}
             name="birthDate"
@@ -115,7 +115,7 @@ export function ProfileForm({
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block space-y-2">
-          <span className="text-sm font-bold text-foreground">{copy.genderLabel}</span>
+          <span className="text-sm font-semibold text-foreground">{copy.genderLabel}</span>
           <select
             className={`${inputClass} w-full`}
             defaultValue={defaultGender}
@@ -131,7 +131,7 @@ export function ProfileForm({
           </select>
         </label>
         <label className="block space-y-2">
-          <span className="text-sm font-bold text-foreground">{copy.phoneLabel}</span>
+          <span className="text-sm font-semibold text-foreground">{copy.phoneLabel}</span>
           <input
             className={inputClass}
             name="phoneNumber"
@@ -146,7 +146,7 @@ export function ProfileForm({
           </span>
         </label>
         <label className="block space-y-2">
-          <span className="text-sm font-bold text-foreground">{copy.languageLabel}</span>
+          <span className="text-sm font-semibold text-foreground">{copy.languageLabel}</span>
           <select
             className={`${inputClass} w-full`}
             defaultValue={locale}

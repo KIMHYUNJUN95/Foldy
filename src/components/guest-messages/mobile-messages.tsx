@@ -498,6 +498,7 @@ export function MobileThreadScreen({
         <div hidden={selecting}>
           <Composer
             key={row.id}
+            organizationId={organizationId}
             thread={thread}
             copy={copy}
             locale={locale}

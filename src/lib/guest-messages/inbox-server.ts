@@ -26,6 +26,7 @@ import { buildingBaseFor, loadBuildingGuestInfo, loadBuildingGuestInfos, type Bu
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { getReservationGuests } from "@/lib/reservation-guests";
+import { GUEST_PAYLOAD_KEYS, slimPayloadOf, slimPayloadSelect } from "@/lib/reservation-payload-slim";
 import { signGuestMessageMedia } from "@/lib/guest-messages/media-copy-server";
 import { imageViewsFor, providerAttachmentCount } from "@/lib/guest-messages/message-media";
 import {
@@ -511,16 +512,14 @@ function readString(record: Record<string, unknown>, keys: readonly string[]): s
 async function loadMemberNames(db: Client, organizationId: string, userIds: readonly string[]): Promise<Map<string, string>> {
   const names = new Map<string, string>();
   if (userIds.length === 0) return names;
-  const members = await db
-    .from("memberships")
-    .select("user_id")
-    .eq("organization_id", organizationId)
-    .in("user_id", [...userIds]);
+  // 구성원 확인과 이름 읽기를 **함께**(2026-11-19 성능 — 차례로 두 번 기다리지 않는다). 이름은 이 조직 구성원인 것만 남긴다.
+  const [members, profiles] = await Promise.all([
+    db.from("memberships").select("user_id").eq("organization_id", organizationId).in("user_id", [...userIds]),
+    db.from("profiles").select("id, name").in("id", [...userIds]),
+  ]);
   if (members.error) return names;
-  const memberIds = [...new Set(((members.data ?? []) as Array<{ user_id: string }>).map((row) => row.user_id))];
-  if (memberIds.length === 0) return names;
-  const { data } = await db.from("profiles").select("id, name").in("id", memberIds);
-  for (const row of (data ?? []) as Array<{ id: string; name: string }>) names.set(row.id, row.name);
+  const memberIds = new Set(((members.data ?? []) as Array<{ user_id: string }>).map((row) => row.user_id));
+  for (const row of (profiles.data ?? []) as Array<{ id: string; name: string }>) if (memberIds.has(row.id)) names.set(row.id, row.name);
   return names;
 }
 
@@ -532,23 +531,85 @@ async function loadTranslations(
   lang: "ko" | "ja" | "en",
 ): Promise<Map<string, string>> {
   const out = new Map<string, string>();
-  for (const part of chunks(messageIds, IN_CHUNK)) {
-    const { data, error } = await db
-      .from("guest_message_translations")
-      .select("message_id, body")
-      .eq("organization_id", organizationId)
-      .eq("lang", lang)
-      .in("message_id", part);
+  // 묶음(100개씩)은 **동시에** 읽고, 결과는 예전 차례대로 — 실패한 묶음부터는 버린다(예전에도 거기서 멈췄다).
+  const parts = await Promise.all(
+    chunks(messageIds, IN_CHUNK).map((part) =>
+      db.from("guest_message_translations").select("message_id, body").eq("organization_id", organizationId).eq("lang", lang).in("message_id", part),
+    ),
+  );
+  for (const { data, error } of parts) {
     if (error) return out;
-    for (const row of (data ?? []) as Array<{
-      message_id: string;
-      body: string;
-    }>)
-      out.set(row.message_id, row.body);
+    for (const row of (data ?? []) as Array<{ message_id: string; body: string }>) out.set(row.message_id, row.body);
   }
   return out;
 }
 
+/**
+ * 대화 하나에 읽는 예약 원본 키 — 인원(`getReservationGuests`) · 채널 예약 번호 · 손님 이메일(아래 `readString`).
+ * 원본을 통째로 받지 않고 JSON 경로로 이 키만 받는다(2026-11-19 성능). **읽는 키가 늘면 여기에도 넣는다** — 빠진 키는 조용히 「값 없음」.
+ */
+const THREAD_PAYLOAD_KEYS: readonly string[] = [...GUEST_PAYLOAD_KEYS, "apiReference", "api_reference", "email", "guestEmail"];
+const THREAD_RESERVATION_SELECT = slimPayloadSelect(THREAD_PAYLOAD_KEYS);
+
+/** 발송 줄 — 최근 것부터 이만큼(보이는 메시지 수와 같다). 꽉 차면 화면이 쓰는 줄(열린 줄 · 보이는 메시지의 줄)을 더 읽는다. */
+const THREAD_OUTBOX_LIMIT = THREAD_MESSAGE_LIMIT;
+const THREAD_OUTBOX_COLUMNS = "id, kind, status, error_code, next_try_at";
+/** 목록 경고(`strongestOutboxAlert`)가 보는 상태 — 이 줄들은 몇 개든 다 읽는다. */
+const ALERT_OUTBOX_STATUSES: OutboxDisplayStatus[] = ["queued", "sending", "failed", "uncertain"];
+
+type ThreadOutboxRow = {
+  id: string;
+  kind: "reply" | "auto";
+  status: OutboxDisplayStatus;
+  error_code: string | null;
+  next_try_at: string | null;
+};
+
+/** 먼저 출발시킨 읽기가 기다리기 전에 실패해도 「처리 안 된 실패」로 새지 않게 — 결과 · 실패는 돌려준 약속으로 그대로 받는다. */
+function quiet<T>(promise: PromiseLike<T>): Promise<T> {
+  const started = Promise.resolve(promise);
+  started.catch(() => {});
+  return started;
+}
+
+/**
+ * 발송 줄 채우기 — 상한보다 적게 왔으면 그 대화의 줄 전부라 그대로. 꽉 찼으면 잘린 쪽에서 화면이 쓰는 줄만 더 읽는다:
+ * 경고 상태 줄 전부 + 보이는 메시지가 가리키는 줄. 읽기 실패는 예전처럼 던진다.
+ */
+async function completeThreadOutbox(
+  db: Client,
+  organizationId: string,
+  conversationId: string,
+  rows: ThreadOutboxRow[],
+  messageRows: readonly MessageDbRow[],
+): Promise<ThreadOutboxRow[]> {
+  if (rows.length < THREAD_OUTBOX_LIMIT) return rows;
+  const have = new Set(rows.map((row) => row.id));
+  const missing = [...new Set(messageRows.map((row) => row.outbox_id).filter((id): id is string => !!id && !have.has(id)))];
+  const base = () =>
+    db.from("guest_message_outbox").select(THREAD_OUTBOX_COLUMNS).eq("organization_id", organizationId).eq("conversation_id", conversationId);
+  const results = await Promise.all([
+    base().in("status", ALERT_OUTBOX_STATUSES),
+    ...chunks(missing, IN_CHUNK).map((part) => base().in("id", part)),
+  ]);
+  const out = [...rows];
+  for (const { data, error } of results) {
+    if (error) throw new Error(`outbox read failed: ${error.message}`);
+    for (const row of (data ?? []) as ThreadOutboxRow[]) {
+      if (have.has(row.id)) continue;
+      have.add(row.id);
+      out.push(row);
+    }
+  }
+  return out;
+}
+
+/**
+ * 대화 하나 열기 — 직원이 대화를 바꿀 때마다 부른다(2026-11-19 성능: 차례로 기다리는 단계 7 → 3).
+ * 1단계: 대화 줄 · 메시지 · 발송 줄 · 업무 링크(대화 id 만 있으면 된다 — 대화가 없으면 버린다).
+ * 2단계: 예약(원본은 쓰는 키만) · 자동 안내 / 작성자 이름 · 번역 · 사진 서명 · 건물 코드 / 링크의 업무 줄.
+ * 3단계: 자동 안내의 규칙 이름 · 해결 초안 문구. 던지는 것(대화 · 메시지 · 발송 줄 읽기 실패)과 비워 두는 것은 예전 그대로.
+ */
 export async function loadInboxThread(
   db: Client,
   organizationId: string,
@@ -564,10 +625,9 @@ export async function loadInboxThread(
 ): Promise<InboxThread | null> {
   const visibility = options.visibility ?? { canSeeCodes: true, canManageAuto: true };
   const now = options.now ?? new Date();
-  const conversation = await loadConversationRow(db, organizationId, conversationId);
-  if (!conversation) return null;
 
-  const [messagesRes, outboxRes, reservationRes, autoRuns, links] = await Promise.all([
+  const conversationP = quiet(loadConversationRow(db, organizationId, conversationId));
+  const messagesP = quiet(
     db
       .from("guest_messages")
       .select("id, direction, body, body_translated, translated_lang, body_lang, sent_at, author_user_id, attachments, outbox_id")
@@ -575,58 +635,76 @@ export async function loadInboxThread(
       .eq("conversation_id", conversationId)
       .order("sent_at", { ascending: false })
       .limit(THREAD_MESSAGE_LIMIT),
+  );
+  const outboxP = quiet(
     db
       .from("guest_message_outbox")
-      .select("id, kind, status, error_code, next_try_at")
+      .select(THREAD_OUTBOX_COLUMNS)
       .eq("organization_id", organizationId)
-      .eq("conversation_id", conversationId),
+      .eq("conversation_id", conversationId)
+      .order("created_at", { ascending: false })
+      .limit(THREAD_OUTBOX_LIMIT),
+  );
+  const linksP = loadThreadLinks(db, organizationId, conversationId, options.viewerUserId ?? null).catch(() => [] as ThreadLinkView[]);
+
+  // 대화 줄 실패가 먼저 던진다(메시지 읽기 실패보다 앞 — 예전 차례).
+  const conversation = await conversationP;
+  if (!conversation) return null;
+
+  const reservationP = quiet<{ data: unknown }>(
     conversation.reservation_id
       ? db
           .from("reservations")
-          .select("id, raw_payload, source")
+          .select(THREAD_RESERVATION_SELECT)
           .eq("organization_id", organizationId)
           .eq("id", conversation.reservation_id)
           .maybeSingle()
-      : Promise.resolve({ data: null, error: null }),
-    loadBookingAutoRuns(db, organizationId, conversation.provider_booking_id),
-    loadThreadLinks(db, organizationId, conversationId, options.viewerUserId ?? null).catch(() => []),
-  ]);
+      : Promise.resolve({ data: null }),
+  );
+  const autoRunsP = quiet(loadBookingAutoRuns(db, organizationId, conversation.provider_booking_id));
+
+  const [messagesRes, outboxRes] = await Promise.all([messagesP, outboxP]);
   if (messagesRes.error) throw new Error(`messages read failed: ${messagesRes.error.message}`);
   if (outboxRes.error) throw new Error(`outbox read failed: ${outboxRes.error.message}`);
 
   const messageRows = ((messagesRes.data ?? []) as MessageDbRow[]).reverse();
-  const outboxById = new Map(
-    (
-      (outboxRes.data ?? []) as Array<{
-        id: string;
-        kind: "reply" | "auto";
-        status: OutboxDisplayStatus;
-        error_code: string | null;
-        next_try_at: string | null;
-      }>
-    ).map((row) => [row.id, row]),
-  );
-
   const authorIds = [...new Set(messageRows.map((row) => row.author_user_id).filter((id): id is string => !!id))];
   const guestIds = messageRows.filter((row) => row.direction === "guest").map((row) => row.id);
-  // 사진 사본(47 §5-8) — 대화 하나 = 서명 한 번(service_role 저장소). 실패 · 사본 없음이면 Airbnb `?im_w=` 주소로 보인다.
-  const [authors, translations, signedMedia] = await Promise.all([
-    loadMemberNames(db, organizationId, authorIds),
+  const authorsP = quiet(loadMemberNames(db, organizationId, authorIds));
+  const translationsP = quiet(
     options.locale ? loadTranslations(db, organizationId, guestIds, options.locale) : Promise.resolve(new Map<string, string>()),
-    signGuestMessageMedia(db, organizationId, messageRows),
-  ]);
+  );
+  // 사진 사본(47 §5-8) — 대화 하나 = 서명 한 번(service_role 저장소). 실패 · 사본 없음이면 Airbnb `?im_w=` 주소로 보인다.
+  const signedMediaP = quiet(signGuestMessageMedia(db, organizationId, messageRows));
+  // 「해결됐어요」 초안 — 링크와 메시지(방향 · 시각)만 있으면 고를 수 있다.
+  const draftInput = messageRows.map((row) => ({ direction: row.direction, sentAt: row.sent_at }));
+  const resolvedDraftP = quiet(linksP.then((links) => resolvedDraftFor(db, organizationId, conversation, links, draftInput)));
+
+  const outboxRows = await completeThreadOutbox(db, organizationId, conversationId, (outboxRes.data ?? []) as ThreadOutboxRow[], messageRows);
+  const outboxById = new Map(outboxRows.map((row) => [row.id, row]));
 
   // 자동 안내 글의 출입 코드 — 볼 권한이 없으면 가린다(코드를 못 읽으면 숫자 묶음을 모두 가린다).
   const hasAuto = messageRows.some((row) => row.outbox_id && outboxById.get(row.outbox_id)?.kind === "auto");
-  let mask: ((text: string) => string) | null = null;
-  if (!visibility.canSeeCodes && hasAuto) {
-    try {
-      const codes = codesOf(await loadBuildingGuestInfo(db, organizationId, conversation.property_name));
-      mask = (text) => maskEntryCodes(text, codes);
-    } catch {
-      mask = maskAllCodeLike;
-    }
-  }
+  const maskP: Promise<((text: string) => string) | null> =
+    !visibility.canSeeCodes && hasAuto
+      ? loadBuildingGuestInfo(db, organizationId, conversation.property_name)
+          .then((building) => codesOf(building))
+          .then(
+            (codes) => (text: string) => maskEntryCodes(text, codes),
+            () => maskAllCodeLike,
+          )
+      : Promise.resolve(null);
+
+  const [authors, translations, signedMedia, mask, reservationRes, autoRuns, links, resolvedDraft] = await Promise.all([
+    authorsP,
+    translationsP,
+    signedMediaP,
+    maskP,
+    reservationP,
+    autoRunsP,
+    linksP,
+    resolvedDraftP,
+  ]);
 
   const messages: InboxMessage[] = messageRows.map((row) => {
     const outbox = row.outbox_id ? outboxById.get(row.outbox_id) : undefined;
@@ -668,15 +746,9 @@ export async function loadInboxThread(
     now,
   );
 
-  const reservation = (reservationRes.data ?? null) as {
-    id: string;
-    raw_payload: unknown;
-    source: string;
-  } | null;
-  const payload =
-    reservation?.raw_payload && typeof reservation.raw_payload === "object" && !Array.isArray(reservation.raw_payload)
-      ? (reservation.raw_payload as Record<string, unknown>)
-      : {};
+  // 예약 읽기 실패 · 예약 없음 → 빈 원본(인원 · 예약 번호 없이 열린다 — 예전 그대로).
+  const reservation = (reservationRes.data ?? null) as Record<string, unknown> | null;
+  const payload = reservation ? slimPayloadOf(reservation, THREAD_PAYLOAD_KEYS) : {};
   const guests = getReservationGuests(payload);
 
   return {
@@ -703,7 +775,7 @@ export async function loadInboxThread(
     sendEnabled: options.sendEnabled,
     autoRuns,
     links,
-    resolvedDraft: await resolvedDraftFor(db, organizationId, conversation, links, messages),
+    resolvedDraft,
   };
 }
 
@@ -713,7 +785,7 @@ async function resolvedDraftFor(
   organizationId: string,
   conversation: ConversationDbRow,
   links: ThreadLinkView[],
-  messages: InboxMessage[],
+  messages: ReadonlyArray<{ direction: string; sentAt: string }>,
 ): Promise<ResolvedDraft | null> {
   const link = pickResolvedLink(links, messages);
   if (!link) return null;

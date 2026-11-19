@@ -473,6 +473,7 @@ export function MessagesConsole({
               <NewMessagesPill count={follow.unseen} copy={copy} onJump={follow.jump} />
               <Composer
                 key={thread.conversation.id}
+                organizationId={organizationId}
                 thread={thread}
                 copy={copy}
                 locale={locale}

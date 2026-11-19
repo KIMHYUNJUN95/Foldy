@@ -73,6 +73,7 @@ import { InsertTools } from "@/components/guest-messages/composer-inserts";
 import { AssistFieldLayer, AssistLine, useReplyAssist } from "@/components/guest-messages/ai-assist";
 import { blockingSlots, fitFieldHeight, sendFailureView } from "@/components/guest-messages/ai-assist-model";
 import type { AssistSimilar } from "@/lib/guest-messages/ai-assist-types";
+import { useComposerDraft } from "@/components/guest-messages/use-composer-draft";
 import { MessageBodyView } from "@/components/guest-messages/message-body-view";
 import { messagePlainText, messageTextForTranslation } from "@/lib/guest-messages/message-body";
 import { TaskLinkLine } from "@/components/guest-messages/task-create";
@@ -848,6 +849,7 @@ type Preview =
   | { kind: "failed"; budget: boolean };
 
 export function Composer({
+  organizationId,
   thread,
   copy,
   locale,
@@ -860,6 +862,8 @@ export function Composer({
   insertsRefreshKey = 0,
   onAssistSimilar,
 }: {
+  /** 쓰던 글 보관 칸을 조직별로 나눈다(같은 기기를 다른 조직이 쓸 때 섞이지 않게). */
+  organizationId: string;
   thread: InboxThread;
   copy: GmCopy;
   locale: string;
@@ -974,6 +978,25 @@ export function Composer({
   // 초안 상태와 상관없이 글 기준 — 다시 만들기 실패 · 상태가 바뀌어도 남은 자리 표시는 손님에게 못 나간다.
   const slotsLeft = mode === "reply" ? blockingSlots(text, aiDraft?.placeholders) : [];
 
+  // 쓰던 글은 대화마다 이 탭 세션에 보관한다 — 뒤로 가기 · 다른 대화 · 다시 그리기 · 새로고침 뒤에도 돌아온다.
+  // 타이핑 · 정해 둔 문구 · AI 초안 · 번역 언어 바꿈 모두 `text` 하나로 모이므로 여기서 한 번에 다룬다(글만, 사진 제외).
+  const { clearDraft, clearReplyDraftIfSame } = useComposerDraft({
+    organizationId,
+    conversationId: row.id,
+    text,
+    enabled: canReply && mode === "reply",
+    // 자동으로 들어온 글(「해결됐어요」 초안 · AI 초안)은 직원이 고치기 전까지 보관하지 않는다.
+    isUntouchedAuto: (value) => (draftText !== null && value === draftText) || (aiTextRef.current !== null && value === aiTextRef.current),
+    onRestore: (saved) => {
+      setText(saved);
+      setDraftText(null);
+    },
+    onSentElsewhere: () => {
+      setText("");
+      setDraftText(null);
+    },
+  });
+
   // 대화가 바뀌면 칸을 비운다 — 부르는 쪽이 `key={대화 id}` 로 새로 그린다(효과 안 setState 대신).
 
   if (!canReply) {
@@ -1016,6 +1039,8 @@ export function Composer({
         notify(
           result.sendEnabled ? copy.queuedToast : copy.queuedDisabledToast,
         );
+        // 보내는 동안 화면을 떠났어도 상태로는 못 비우므로 보관을 직접 지운다.
+        clearDraft(body);
         setText("");
         setDraftText(null);
         setPreview({ kind: "none" });
@@ -1048,6 +1073,7 @@ export function Composer({
         if (result.ok) {
           haptic("success");
           notify(copy.noteSaved);
+          clearReplyDraftIfSame(body);
           setText("");
           onSent();
         } else {

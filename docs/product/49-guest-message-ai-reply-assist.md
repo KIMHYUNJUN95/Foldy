@@ -220,7 +220,7 @@
   이번 몫이 넘으면 초안만 `cap`(문구 추천은 계속 — 개요의 `capReached`). 한도 잡기가 실패하면 초안은 `unavailable`(막는 쪽).
 - 환경 변수: `VOYAGE_API_KEY` · `ANTHROPIC_API_KEY`(서버 전용). 로컬 시험용 `GUEST_AI_FAKE=1` — 외부 호출 없이 고정 숫자 · 고정 초안
   (`NODE_ENV=production` 이면 켜도 무시).
-- 과거 묶음 백필: `scripts/dev/guest-reply-pairs-backfill.ts`(최근 12개월 — 도쿄 날짜 기준, 건물 이름은 정본으로 저장, 이미 있는 줄도 지금 가리기 규칙으로 다시 가려 고쳐 씀 — 가리기 규칙이 늘면 다시 돌린다, 배치 128, 다시 돌려도 이어서 — 같은 모델 숫자 + 같은 질문 글이면 다시 부르지 않음,
+- 과거 묶음 백필: `scripts/dev/guest-reply-pairs-backfill.ts`(최근 12개월 — 도쿄 날짜 기준, 건물 이름은 정본으로 저장, 이미 있는 줄도 지금 가리기 규칙으로 다시 가려 고쳐 씀 — 가리기 규칙이 늘면 다시 돌린다, 배치 128(뜻 숫자) · 저장 16개씩 — 표가 커지면 벡터 색인 때문에 큰 묶음 저장이 시간 초과(57014)라 반으로 나눠 다시, 다시 돌려도 이어서 — 같은 모델 숫자 + 같은 질문 글이면 다시 부르지 않음,
   `--dry-run` 은 세기만). `.env` 를 읽지 않고, 로컬 주소가 아니면 `--allow-remote` 없이 멈춘다. 운영 실행은 사용자 허락 뒤.
 - 액션(`src/actions/guest-messages-assist.ts`, 권한 `guest_messages.view` + `reply`, 거부는 `forbidden` · 개요는 `unavailable`):
   `getReplyAssist(conversationId)` · `draftGuestReply(conversationId)` · `markAssistWrong({ draftId, reason })` · `markAssistDiscarded(draftId)`.

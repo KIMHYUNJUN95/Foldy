@@ -6,7 +6,7 @@
  * - 가리기 규칙이 늘면(예: 2026-11-18 와이파이 이름 · 비밀번호 추가) 다시 돌린다 — 이미 있는 줄도 지금 규칙으로 다시 가려
  *   글이 바뀌면 고쳐 쓴다(답 글만 바뀌면 글만, 질문 글이 바뀌면 숫자도 다시).
  * - 가짜 모드(`GUEST_AI_FAKE=1`)는 `embed_model = "fake"` 로 적는다 — 진짜 키로 돌리면 그 줄을 다시 바꾼다.
- * - 128개씩 묶어 보낸다. `--dry-run` 은 세기만(외부 호출 · 쓰기 없음).
+ * - 뜻 숫자는 128개씩 묶어 부르고, 저장은 16개씩 넣는다(시간 초과면 반으로 나눠 다시). `--dry-run` 은 세기만(외부 호출 · 쓰기 없음).
  * - `.env` 를 읽지 않는다(운영 값이 들어 있다). 환경 변수를 직접 넘긴다. 로컬(127.0.0.1 · localhost)이 아니면
  *   `--allow-remote` 없이는 멈춘다 — 운영에 돌리는 것은 「배포」라 사용자 허락이 먼저다.
  *
@@ -103,13 +103,31 @@ async function flush() {
     embed_model: activeEmbedModel(),
     updated_at: now,
   }));
+  for (let start = 0; start < rows.length; start += SAVE_CHUNK) {
+    await saveRows(rows.slice(start, start + SAVE_CHUNK));
+  }
+}
+
+/**
+ * 저장은 작은 묶음으로 — 벡터 색인(HNSW)이 커지면 한 번에 많이 넣을 때 서버 시간 제한(57014)에 걸린다
+ * (2026-11-19, 2만여 줄 위에서 128개 묶음이 두 번 다 실패). 시간 초과면 반으로 나눠 다시, 1개도 실패하면 건너뛴다.
+ */
+const SAVE_CHUNK = 16;
+
+async function saveRows(rows: Database["public"]["Tables"]["guest_reply_pairs"]["Insert"][]): Promise<void> {
   const { error } = await db.from("guest_reply_pairs").upsert(rows, { onConflict: "question_message_id" });
-  if (error) {
-    stats.failedBatches += 1;
-    console.error(`  저장 실패(${error.code ?? "unknown"}) — ${part.length}개`);
+  if (!error) {
+    stats.written += rows.length;
     return;
   }
-  stats.written += part.length;
+  if (error.code === "57014" && rows.length > 1) {
+    const half = Math.ceil(rows.length / 2);
+    await saveRows(rows.slice(0, half));
+    await saveRows(rows.slice(half));
+    return;
+  }
+  stats.failedBatches += 1;
+  console.error(`  저장 실패(${error.code ?? "unknown"}) — ${rows.length}개(다시 돌리면 이어서)`);
 }
 
 async function processConversation(conversation: Conversation) {

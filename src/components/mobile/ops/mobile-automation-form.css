@@ -157,7 +157,7 @@
   transition: transform 400ms cubic-bezier(.22, 1, .36, 1);
   animation: maf-rise 320ms var(--maf-ease) both;
 }
-.maf-save.is-lifted { transform: translateY(calc(-1 * var(--maf-lift, 0px))); }
+.maf-save[data-lifted] { transform: translateY(calc(-1 * var(--maf-lift, 0px))); }
 .maf-save::before {
   content: ""; position: absolute; inset: 0 -28px -48px; z-index: -1;
   background: #fff; box-shadow: 0 -0.5px 0 var(--separator);
@@ -165,6 +165,12 @@
 .maf-save__t { flex: 1; min-width: 0; font-size: 12px; color: var(--maf-soft); }
 .maf-save__t b { color: var(--maf-ink); }
 .maf-save__t.is-bad { color: var(--maf-red); }
+/* 실패 안내는 단추 옆 좁은 칸이 아니라 단추 위 전체 폭으로 — 긴 안내(conflict 등 · en/ja · 글자 1.35배)도 2~3줄로 접히고,
+   저장 줄이 그만큼 자라 본문과 겹치지 않는다. 단추는 다음 줄 오른쪽에 그대로. */
+.maf-save.has-error { flex-wrap: wrap; row-gap: 8px; }
+.maf-save.has-error .maf-save__t { flex: 1 0 100%; line-height: 1.45; }
+.maf-save.has-error .maf-save__t:lang(ko) { word-break: keep-all; overflow-wrap: anywhere; }
+.maf-save.has-error .maf-btn.is-gray { margin-left: auto; }
 @keyframes maf-rise { from { opacity: 0; transform: translateY(24px); } }
 
 /* ── 담당자 ── */

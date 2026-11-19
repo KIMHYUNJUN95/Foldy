@@ -149,3 +149,26 @@ export function releaseDraft<T>(state: DraftSync<T>): DraftSync<T> {
   if (!state.holding) return state;
   return alignDraft({ ...state, holding: false }, state.original, state.originalVersion);
 }
+
+/**
+ * 저장 줄의 실패 안내(모바일) — 언제 뜨고 언제 사라지는지 한 곳. 저장을 누르면(다시 시도) · 사용자가 칸을 고치면 ·
+ * 「되돌리기」를 누르면 지운다. 실시간 갱신 · conflict 뒤 새로 읽은 값은 사용자 편집이 아니라 이벤트가 없다(안내 유지).
+ */
+export type SaveNoticeEvent = { type: "blocked"; message: string } | { type: "edit" } | { type: "revert" } | { type: "retry" };
+
+export function nextSaveNotice(event: SaveNoticeEvent): string | null {
+  return event.type === "blocked" ? event.message : null;
+}
+
+/**
+ * 저장 줄을 보일지 · 「되돌리기」를 누를 수 있는지. 안내가 떠 있으면 바뀐 곳이 0이어도 줄을 남기고, 그때는
+ * 「되돌리기」가 안내를 닫는 길이 된다 — 두 단추가 다 꺼진 채 줄만 남는 일이 없게.
+ */
+export function saveBarOf(input: { view: boolean; dirty: boolean; saving: boolean; justSaved: boolean; notice: string | null }) {
+  const { view, dirty, saving, justSaved, notice } = input;
+  return {
+    canRevert: !saving && (dirty || notice !== null),
+    canSave: !saving && dirty,
+    shown: !view && (dirty || saving || justSaved || notice !== null),
+  };
+}

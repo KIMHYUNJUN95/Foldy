@@ -16,6 +16,7 @@ import {
   type AutomationSettings,
 } from "@/lib/automation/jobs";
 import { canEnableAutomation, orphanDestinations } from "@/lib/automation/enable-guard";
+import { nextSaveNotice, saveBarOf, type SaveNoticeEvent } from "@/lib/automation/live-view";
 import { isScheduledSendDue, tokyoClock } from "@/lib/automation/schedule";
 import { haptic } from "@/lib/haptics";
 import type { Dictionary } from "@/lib/i18n";
@@ -106,7 +107,8 @@ function useStickyBar(active: boolean) {
         // 단추 아랫변이 탭바 윗변보다 24px 위(가운데 + 단추가 14px 솟는다).
         bar.style.setProperty("--maf-lift", `${Math.max(0, nav.offsetHeight + 24 - barPad)}px`);
       }
-      bar.classList.toggle("is-lifted", shown);
+      // className 은 React 가 그리므로(실패 때 has-error) 손으로 붙인 클래스는 다시 그릴 때 지워진다 — data 속성에 둔다.
+      bar.toggleAttribute("data-lifted", shown);
     };
     update();
     const observer = nav ? new MutationObserver(update) : null;
@@ -237,11 +239,17 @@ export function MobileAutomationSettings({
   const s = copy.settings;
   const original = useMemo(() => draftOf(job), [job]);
   // 실시간 갱신 · 저장 뒤 refresh 로 서버 값이 바뀌어도 손대던 초안은 덮지 않는다(`reconcileDraft`).
-  const { draft, setDraft, dirty, submit, settle, release } = useAutomationDraft<Draft>(original, job.version);
+  const { draft, setDraft: setDraftRaw, dirty, submit, settle, release } = useAutomationDraft<Draft>(original, job.version);
   const [saving, startSave] = useTransition();
   const [confirming, setConfirming] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const notice = (event: SaveNoticeEvent) => setSaveError(nextSaveNotice(event));
+  // 사용자가 칸을 고칠 때만 지나는 길 — 실시간 갱신 · conflict 뒤 새로 읽은 값은 여기를 지나지 않아 안내가 남는다.
+  const setDraft = (update: Draft | ((current: Draft) => Draft)) => {
+    notice({ type: "edit" });
+    setDraftRaw(update);
+  };
 
   useEffect(() => {
     if (!justSaved) return;
@@ -298,8 +306,9 @@ export function MobileAutomationSettings({
         haptic("error");
         // 다른 사람이 방금 바꾼 시각과 겹쳤다 — 그 시각이 바로 보이게 한 번 새로 읽는다(안내 문구와 화면이 맞게).
         if (result.error === "conflict") router.refresh();
-        setSaveError(errorTextOf(copy, result.error));
-        return flash(errorTextOf(copy, result.error));
+        // 실패 안내는 저장 줄 위 전체 폭 한 곳에만 — 같은 긴 문구를 한 줄 토스트에 또 띄우면 「…」로 잘린다.
+        notice({ type: "blocked", message: errorTextOf(copy, result.error) });
+        return;
       }
       settle(ticket, result.version, result.saved);
       flash(s.saved);
@@ -310,17 +319,17 @@ export function MobileAutomationSettings({
   const channelKeys = useMemo(() => data.channels.map((channel) => channel.key), [data.channels]);
   const draftGuard = canEnableAutomation(draft.destinations, channelKeys);
   const save = () => {
-    setSaveError(null);
+    notice({ type: "retry" });
     // 연결 안 된 채널 줄이 남아 있으면 서버가 invalid 로 돌려보낸다 — 이유가 보이게 먼저 알린다.
     if (orphanDestinations(draft.destinations, channelKeys).length > 0) {
       haptic("error");
-      setSaveError(s.orphanSaveBlocked);
+      notice({ type: "blocked", message: s.orphanSaveBlocked });
       return;
     }
     // 켜져 있는데 실제로 나갈 곳이 0곳이면 저장하지 않는다(서버도 같은 판정으로 막는다) — 저장 줄에 이유를 적는다.
     if (job.enabled && !draftGuard.ok) {
       haptic("error");
-      setSaveError(copy.errors.no_destination);
+      notice({ type: "blocked", message: copy.errors.no_destination });
       return;
     }
     // 켜져 있고 바꾼 시각 · 받는 곳으로 지금이 발송 시간대면, 저장 직후 틱이 바로 보낸다 — 한 번 묻는다(PC 와 같은 조건).
@@ -406,8 +415,8 @@ export function MobileAutomationSettings({
     </div>
   );
 
-  const showSave = !view && (dirty || saving || justSaved);
-  const barRef = useStickyBar(showSave);
+  const bar = saveBarOf({ dirty, justSaved, notice: saveError, saving, view });
+  const barRef = useStickyBar(bar.shown);
 
   return (
     <div className={`maf maf-settings${view ? " is-view" : ""}`}>
@@ -589,23 +598,23 @@ export function MobileAutomationSettings({
         ))
       )}
 
-      {showSave ? (
-        <div className="maf-save" ref={barRef}>
+      {bar.shown ? (
+        <div className={`maf-save${saveError ? " has-error" : ""}`} ref={barRef}>
           <span className={`maf-save__t${saveError ? " is-bad" : ""}`} role={saveError ? "alert" : undefined}>
             {saveError ?? (dirty ? <Rich text={fill(m.changedShort, { n: changeCount })} /> : null)}
           </span>
           <button
             className="maf-btn is-gray"
-            disabled={!dirty || saving}
+            disabled={!bar.canRevert}
             onClick={() => {
-              setSaveError(null);
-              setDraft(original);
+              notice({ type: "revert" });
+              setDraftRaw(original);
             }}
             type="button"
           >
             {s.revert}
           </button>
-          <button className={`maf-btn is-primary${justSaved && !dirty ? " is-done" : ""}`} disabled={!dirty || saving} onClick={save} type="button">
+          <button className={`maf-btn is-primary${justSaved && !dirty ? " is-done" : ""}`} disabled={!bar.canSave} onClick={save} type="button">
             {justSaved && !dirty ? (
               <>
                 <DrawCheck />

@@ -5,6 +5,8 @@ import {
   BEDS24_CREDIT_STOP_BELOW,
   BEDS24_CREDIT_WARN_BELOW,
   type Beds24CreditActorUsage,
+  type Beds24CreditCallCursor,
+  type Beds24CreditCallFilter,
   type Beds24CreditDetail,
   type Beds24CreditFeature,
   type Beds24CreditFeatureUsage,
@@ -394,3 +396,23 @@ export function beds24CreditDetailFetchStart(range: Beds24CreditRange, nowMs: nu
   const barsStart = Math.floor(nowMs / WINDOW_MS) * WINDOW_MS - BAR_COUNT * WINDOW_MS;
   return Math.min(beds24CreditRangeStart(range, nowMs), barsStart, tokyoTodayStartMs(nowMs));
 }
+
+/** 커서 값은 PostgREST 필터 글자에 그대로 들어간다 — 모양을 엄격히 본다(액션도 한 번 더 본다). */
+const CURSOR_AT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$/;
+const CURSOR_ID = /^\d{1,18}$/;
+const USER_ACTOR = /^user:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isBeds24CreditCursor(value: unknown): value is Beds24CreditCallCursor {
+  if (!value || typeof value !== "object") return false;
+  const { calledAt, id } = value as Record<string, unknown>;
+  return typeof calledAt === "string" && CURSOR_AT.test(calledAt) && typeof id === "string" && CURSOR_ID.test(id);
+}
+
+export function isBeds24CreditCallFilter(value: unknown): value is Beds24CreditCallFilter {
+  if (!value || typeof value !== "object") return false;
+  const { actor, feature } = value as Record<string, unknown>;
+  const actorOk = actor === null || actor === "auto" || (typeof actor === "string" && USER_ACTOR.test(actor));
+  const featureOk = feature === null || (typeof feature === "string" && (BEDS24_CREDIT_FEATURES as readonly string[]).includes(feature));
+  return actorOk && featureOk;
+}
+

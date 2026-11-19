@@ -47,10 +47,12 @@ import { AUTOMATION_LOCALES, isAutomationJobKey, type AutomationJobKey, type Aut
 import { canEnableAutomation } from "@/lib/automation/enable-guard";
 import { isScheduledSendDue } from "@/lib/automation/schedule";
 import { DatePickerSheet } from "@/components/shell/date-picker-sheet";
+import { actionResult } from "@/lib/action-result";
 import { haptic } from "@/lib/haptics";
 import type { Beds24CreditCopy } from "@/lib/beds24-credit-view";
 import "./mobile-automation.css";
 import { useToastMotion } from "@/components/shell/use-toast-motion";
+import { useAutomationLive } from "@/components/admin/ops/use-automation-live";
 
 /**
  * 모바일 자동화 — 시안 AutoM-Phone · AutoMDetail-Phone · AutoMRuns-Phone · AutoMSettings-Phone · AutoMAssign-Phone ·
@@ -94,7 +96,7 @@ function DrawCheck() {
 type Confirm = { title: string; body: string; warnings: string[]; ok: string; run: () => Promise<void>; blocked?: boolean };
 
 export function MobileAutomation({
-  data,
+  data: serverData,
   copy,
   creditCopy,
   locale,
@@ -107,6 +109,8 @@ export function MobileAutomation({
   localeTag: string;
 }) {
   const m = copy.mobile;
+  // 새로고침 없이 15초마다 · 탭 복귀 때 우리 DB 만 다시 읽는다 — 셸 · 배지까지 다시 그리는 router.refresh() 를 주기로 쓰지 않는다.
+  const data = useAutomationLive(serverData);
   const params = useSearchParams();
   const isTablet = useIsTablet();
   const nowMinute = useNowMinute();
@@ -257,7 +261,7 @@ function ListView({
         })}
       </div>
 
-      <MobileCreditSection copy={creditCopy} detail={data.credit} serverNow={data.renderedAt} />
+      <MobileCreditSection copy={creditCopy} detail={data.credit} localeTag={localeTag} serverNow={data.renderedAt} />
 
       <div className="mat-foot">
         <span>{copy.footTz}</span>
@@ -364,8 +368,11 @@ function DetailView({
     haptic("light");
     if (job.enabled) {
       startTransition(async () => {
-        const result = await setAutomationEnabled(job.jobKey, false);
-        if (!result.ok) return flash(errorText(result.error));
+        const result = await actionResult(() => setAutomationEnabled(job.jobKey, false), "save_failed");
+        if (!result.ok) {
+          haptic("error");
+          return flash(errorText(result.error));
+        }
         flash(copy.toggleOffDone);
         router.refresh();
       });
@@ -388,8 +395,11 @@ function DetailView({
       blocked: !guard.ok,
       ok: copy.confirmOk,
       run: async () => {
-        const result = await setAutomationEnabled(job.jobKey, true);
-        if (!result.ok) return flash(errorText(result.error));
+        const result = await actionResult(() => setAutomationEnabled(job.jobKey, true), "save_failed");
+        if (!result.ok) {
+          haptic("error");
+          return flash(errorText(result.error));
+        }
         haptic("success");
         flash(copy.toggleOnDone);
         router.refresh();
@@ -490,7 +500,7 @@ function DetailView({
             data={data}
             flash={flash}
             job={job}
-            key={`${job.jobKey}-${job.sendTime}-${job.retryUntil}`}
+            key={job.jobKey}
             view={view}
           />
         ) : null}
@@ -557,7 +567,7 @@ function PreviewPane({
         : fill(m.sendBody, { date: mdOf(date), m: messageCountOf(job, channelKeys), n: recipients.count, name: copy.jobs[job.jobKey].name }),
       ok: asCorrection ? w.sendCorrection : m.sendOk,
       run: async () => {
-        const result = await sendAutomationNow(asCorrection ? { correction: true, date, jobKey: job.jobKey } : { date, jobKey: job.jobKey });
+        const result = await actionResult(() => sendAutomationNow(asCorrection ? { correction: true, date, jobKey: job.jobKey } : { date, jobKey: job.jobKey }), "save_failed");
         if (!result.ok) {
           haptic("error");
           return flash(errorText(result.error));
@@ -709,7 +719,7 @@ function HistoryPane({
     if (busy) return;
     haptic("light");
     setBusy(id);
-    loadAutomationRunMessage(id).then((result) => {
+    actionResult(() => loadAutomationRunMessage(id), "save_failed").then((result) => {
       setBusy(null);
       if (!result.ok) return flash(errorText(result.error));
       setMessage(result.text || "—");

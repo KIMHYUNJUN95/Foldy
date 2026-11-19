@@ -60,6 +60,9 @@
 /* 한글 · 일본어는 글자마다 끊겨 pretty 만으로는 「니다」 · 「ます」가 떨어진다 — ko 는 어절, ja 는 구 단위로(모르는 브라우저는 지금 그대로). 언어 판정은 globals.css 와 같은 `:lang()`. */
 .adm .cgpop__sub:lang(ko), .adm .bcd-sub:lang(ko), .adm .cgpop__empty:lang(ko), .adm .bcd-empty:lang(ko) { word-break: keep-all; }
 .adm .cgpop__sub:lang(ja), .adm .bcd-sub:lang(ja), .adm .cgpop__empty:lang(ja), .adm .bcd-empty:lang(ja) { word-break: auto-phrase; }
+/* 호출 목록 · 줄 설명도 같은 규칙 — 「어디에 썼나」 설명이 글자 중간에서 끊기지 않게. */
+.adm .bcd-row > span:lang(ko), .adm .bcd-log > span:lang(ko), .adm .bcd-flt:lang(ko) { word-break: keep-all; }
+.adm .bcd-row > span:lang(ja), .adm .bcd-log > span:lang(ja), .adm .bcd-flt:lang(ja) { word-break: auto-phrase; }
 .adm .cgpop__lh { margin-top: 18px; padding-bottom: 8px; border-bottom: 0.5px solid var(--separator); font-size: 12px; color: var(--adm-muted); font-variant-numeric: tabular-nums; }
 .adm .cgpop__list { list-style: none; margin: 0; padding: 0; }
 .adm .cgpop__row {
@@ -167,6 +170,45 @@
 .adm .bcd-msg { display: flex; align-items: center; gap: 12px; padding: 12px 0; font-size: 13px; color: #a82f25; }
 .adm .bcd-msg span { flex: 1; min-width: 0; }
 .adm .bcd-skel { height: 120px; border-radius: 10px; }
+
+/* 누가 · 어디에 줄 — 누르면 최근 호출이 그것만. 고른 줄은 옅은 배경만(왼쪽 막대 · 테두리 없음). */
+.adm .bcd-pick {
+  /* 배경이 글자에 붙지 않게 양옆 8px 를 바깥으로 — 글자 시작점은 다른 줄과 같다. */
+  width: calc(100% + 16px); margin: 0 -8px; padding-left: 8px; padding-right: 8px; border: 0; border-bottom: 0.5px solid var(--separator); border-radius: 0;
+  background: transparent; color: inherit; font: inherit; font-size: 14px; text-align: left; cursor: pointer;
+  transition: background-color 120ms ease-out;
+}
+.adm .bcd-pick:hover { background: var(--bg2); }
+.adm .bcd-pick[aria-pressed="true"] { background: var(--primary-soft); }
+.adm .bcd-pick:focus-visible { outline: 2px solid var(--adm-primary); outline-offset: -2px; border-radius: 8px; }
+.adm .bcd-flt { display: inline-flex; align-items: baseline; gap: 10px; min-width: 0; color: var(--ink); font-weight: 500; overflow-wrap: anywhere; }
+.adm .bcd-flt button, .adm .bcd-more {
+  border: 0; background: none; padding: 0; color: var(--primary-ink); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap;
+}
+.adm .bcd-flt button:hover, .adm .bcd-more:hover:not(:disabled) { color: #4420a8; }
+.adm .bcd-flt button:focus-visible, .adm .bcd-more:focus-visible { outline: 2px solid var(--adm-primary); outline-offset: 2px; border-radius: 6px; }
+.adm .bcd-more { display: block; height: 40px; margin-top: 4px; }
+.adm .bcd-more:disabled { color: var(--adm-muted); cursor: default; }
+.adm .bcd-skel--calls { height: 160px; margin-top: 10px; }
+/* 위에 새 줄이 붙을 때는 훅이 직접 자리를 맞춘다 — 브라우저의 자리 맞춤과 겹치지 않게. */
+.adm .bcd-calls { overflow-anchor: none; }
+
+/* 묶음 줄 — 「손님 메시지 5회」, 누르면 하나씩. */
+.adm .bcd-log--g { cursor: pointer; }
+.adm .bcd-log--g:hover { background: var(--bg2); }
+.adm .bcd-gbtn {
+  display: inline-flex; align-items: center; gap: 8px; max-width: 100%; margin: 0; padding: 0; border: 0; background: none;
+  color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.adm .bcd-gbtn em { font-style: normal; font-size: 12px; font-weight: 600; color: var(--primary-ink); background: var(--primary-soft); border-radius: 999px; padding: 1px 8px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.adm .bcd-gbtn svg { width: 14px; height: 14px; flex: none; color: var(--adm-muted); transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1); }
+.adm .bcd-gbtn[aria-expanded="true"] svg { transform: rotate(180deg); }
+.adm .bcd-gbtn:focus-visible { outline: 2px solid var(--adm-primary); outline-offset: 2px; border-radius: 6px; }
+.adm .bcd-gsub { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 220ms cubic-bezier(0.23, 1, 0.32, 1); }
+.adm .bcd-gsub.is-open { grid-template-rows: 1fr; }
+.adm .bcd-gsub__in { min-height: 0; overflow: hidden; }
+.adm .bcd-log--sub { background: var(--card2); font-size: 13px; }
+.adm .bcd-log--sub > span:first-child { padding-left: 12px; }
 .adm .bcd .wgseg { margin-left: auto; }
 
 /* 1280 아래 — 큰 숫자 칸을 그래프 위로. */
@@ -175,7 +217,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .adm .cg, .adm .cgpop, .adm .cg__bar i, .adm .cgpop__bar i, .adm .bcd-bar i, .adm .bcd-bars > div > i, .adm .bcd-m i, .adm .bcd[aria-busy="true"] .bcd-live {
+  .adm .cg, .adm .cgpop, .adm .cg__bar i, .adm .cgpop__bar i, .adm .bcd-bar i, .adm .bcd-bars > div > i, .adm .bcd-m i, .adm .bcd[aria-busy="true"] .bcd-live, .adm .bcd-pick, .adm .bcd-gsub, .adm .bcd-gbtn svg {
     animation: none; transition: none;
   }
   .adm .cg:active { transform: none; }

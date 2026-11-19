@@ -1,11 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { ExternalLink, RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react";
+import { ChevronDown, ExternalLink, RefreshCw } from "lucide-react";
 import { useBeds24Credit } from "@/components/admin/beds24-credit-gauge";
+import { useBeds24CreditCalls, type Beds24CreditCallsState } from "@/components/shared/beds24-credit-calls";
 import { fetchCreditDetail, useBeds24CreditLive } from "@/components/shared/beds24-credit-live";
 import {
   actorLines,
+  isCreditActorFilterable,
+  isCreditCallGroupOpen,
+  type CreditCallGroup,
   barCaption,
   pauseSummaryLine,
   chartLines,
@@ -64,6 +68,11 @@ export function Beds24CreditPanel({
   useEffect(() => {
     shared.current = source;
   });
+  const [calls, callsRoot] = useBeds24CreditCalls(initial);
+  const syncCalls = useRef(calls.syncDetail);
+  useEffect(() => {
+    syncCalls.current = calls.syncDetail;
+  });
 
   const run = useCallback(async (target: Beds24CreditRange, silent: boolean) => {
     const id = ++seq.current;
@@ -91,6 +100,7 @@ export function Beds24CreditPanel({
     setRange(result.data.range);
     setFailed(false);
     setDetail(result.data);
+    syncCalls.current(result.data);
     shared.current.commit(token, result.data.snapshot);
   }, []);
 
@@ -99,9 +109,16 @@ export function Beds24CreditPanel({
     void run(next, false);
   };
 
+  const refreshCalls = useRef(calls.refreshFiltered);
+  useEffect(() => {
+    refreshCalls.current = calls.refreshFiltered;
+  });
   useEffect(() => {
     const tick = () => {
-      if (document.visibilityState === "visible" && inFlight.current === 0) void run(wantedRange.current, true);
+      if (document.visibilityState !== "visible" || inFlight.current !== 0) return;
+      void run(wantedRange.current, true);
+      // 거르기가 걸려 있으면 목록 첫 장은 상세와 따로 읽는다(같은 주기).
+      refreshCalls.current();
     };
     const timer = window.setInterval(tick, creditPollMs(range)); // 7일은 무거워 60초
     document.addEventListener("visibilitychange", tick);
@@ -193,8 +210,8 @@ export function Beds24CreditPanel({
                   const max = Math.max(1, ...detail.actors.map((actor) => actor.credits));
                   return detail.actors.map((actor) => {
                     const lines = actorLines(actor, copy);
-                    return (
-                      <div className="bcd-row bcd-row--who" key={actor.key}>
+                    const inner = (
+                      <>
                         <span aria-hidden="true" className={`cgwho${actor.kind === "user" ? "" : " cgwho--auto"}`}>
                           {actor.kind === "user" ? lines.initial : actor.kind === "auto" ? <RefreshCw /> : <ExternalLink />}
                         </span>
@@ -207,6 +224,23 @@ export function Beds24CreditPanel({
                         </div>
                         <b>{num(actor.credits)}</b>
                         <em>{sharePercent(actor.credits, detail.total)}%</em>
+                      </>
+                    );
+                    // Foldy 밖은 호출 기록이 없어 거를 수 없다 — 누르지 않는 줄.
+                    return isCreditActorFilterable(actor) ? (
+                      <button
+                        aria-describedby="bcd-filter-hint"
+                        aria-pressed={calls.filter.actor === actor.key}
+                        className="bcd-row bcd-row--who bcd-pick"
+                        key={actor.key}
+                        onClick={() => calls.toggleFilter("actor", actor.key)}
+                        type="button"
+                      >
+                        {inner}
+                      </button>
+                    ) : (
+                      <div className="bcd-row bcd-row--who" key={actor.key}>
+                        {inner}
                       </div>
                     );
                   });
@@ -224,63 +258,199 @@ export function Beds24CreditPanel({
                 (() => {
                   const max = Math.max(1, ...detail.features.map((item) => item.credits));
                   return detail.features.map((item) => (
-                    <div className="bcd-row" key={item.feature}>
+                    <button
+                      aria-describedby="bcd-filter-hint"
+                      aria-pressed={calls.filter.feature === item.feature}
+                      className="bcd-row bcd-pick"
+                      key={item.feature}
+                      onClick={() => calls.toggleFilter("feature", item.feature)}
+                      type="button"
+                    >
                       <span>{featureLabel(item.feature, copy)}</span>
                       <div aria-hidden="true" className="bcd-m">
                         <i style={{ "--w": item.credits / max } as CSSProperties} />
                       </div>
                       <b>{num(item.credits)}</b>
                       <em>{sharePercent(item.credits, detail.total)}%</em>
-                    </div>
+                    </button>
                   ));
                 })()
               )}
             </div>
           </div>
 
-          <div className="bcd-live">
-            <div className="bcd-lh">
-              <b>{copy.recentTitle}</b>
-            </div>
-            {detail.recentCalls.length === 0 ? (
-              <div className="bcd-empty">{copy.emptyCalls}</div>
-            ) : (
-              <div role="table" aria-label={copy.recentTitle}>
-                <div className="bcd-log bcd-log--h" role="row">
-                  <span role="columnheader">{copy.colTime}</span>
-                  <span role="columnheader">{copy.colWho}</span>
-                  <span role="columnheader">{copy.colWhat}</span>
-                  <span className="n" role="columnheader">{copy.colCost}</span>
-                  <span className="n" role="columnheader">{copy.colRemaining}</span>
-                </div>
-                {detail.recentCalls.map((call) => (
-                  <CallRow call={call} copy={copy} key={call.id} time={timeFmt.format(call.at)} />
-                ))}
-              </div>
-            )}
-          </div>
+          <span className="sr-only" id="bcd-filter-hint">
+            {copy.filterHint}
+          </span>
+          <RecentCalls calls={calls} copy={copy} detail={detail} rootRef={callsRoot} time={(ms) => timeFmt.format(ms)} />
         </>
       ) : null}
     </section>
   );
 }
 
-function CallRow({ call, copy, time }: { call: Beds24CreditCall; copy: Beds24CreditCopy; time: string }) {
-  const who = call.actor.kind === "user" ? call.actor.name || "—" : copy.auto;
-  const what =
-    call.itemCount !== null && call.itemCount > 0
-      ? `${featureLabel(call.feature, copy)} · ${fillCopy(copy.itemCount, { n: call.itemCount })}`
-      : featureLabel(call.feature, copy);
+function callWhat(call: Beds24CreditCall, copy: Beds24CreditCopy): string {
+  return call.itemCount !== null && call.itemCount > 0
+    ? `${featureLabel(call.feature, copy)} · ${fillCopy(copy.itemCount, { n: call.itemCount })}`
+    : featureLabel(call.feature, copy);
+}
+
+function callWho(call: Beds24CreditCall, copy: Beds24CreditCopy): string {
+  return call.actor.kind === "user" ? call.actor.name || "—" : copy.auto;
+}
+
+/** 거르기 글자 — 「손님 메시지만」 · 둘 다면 「김 · 손님 메시지만」. 이름은 지금 「누가」 목록에서 찾는다. */
+function filterLabel(calls: Beds24CreditCallsState, detail: Beds24CreditDetail, copy: Beds24CreditCopy): string | null {
+  const parts: string[] = [];
+  if (calls.filter.actor) {
+    const actor = detail.actors.find((item) => item.key === calls.filter.actor);
+    parts.push(calls.filter.actor === "auto" ? copy.auto : actor?.name || "—");
+  }
+  if (calls.filter.feature) parts.push(featureLabel(calls.filter.feature, copy));
+  return parts.length ? fillCopy(copy.filterOnly, { name: parts.join(" · ") }) : null;
+}
+
+/** 최근 호출 — 고른 기간 · 새 것부터 50개씩, 연달아 난 같은 호출은 한 줄(누르면 펼침). */
+function RecentCalls({
+  calls,
+  copy,
+  detail,
+  rootRef,
+  time,
+}: {
+  calls: Beds24CreditCallsState;
+  copy: Beds24CreditCopy;
+  detail: Beds24CreditDetail;
+  rootRef: RefObject<HTMLDivElement | null>;
+  time: (ms: number) => string;
+}) {
+  const label = filterLabel(calls, detail, copy);
   return (
-    <div className="bcd-log" role="row">
+    <div className="bcd-live bcd-calls" ref={rootRef}>
+      <div className="bcd-lh">
+        <b>{copy.recentTitle}</b>
+        {label ? (
+          <span className="bcd-flt">
+            {label}
+            <button onClick={calls.clearFilter} type="button">
+              {copy.filterClear}
+            </button>
+          </span>
+        ) : null}
+      </div>
+      {calls.loadingHead ? (
+        <div aria-busy="true" className="bcd-skel bcd-skel--calls">
+          <span className="sr-only">{copy.loading}</span>
+        </div>
+      ) : calls.empty && !calls.failed ? (
+        <div className="bcd-empty">{label ? copy.emptyFiltered : copy.emptyCalls}</div>
+      ) : (
+        <div aria-label={copy.recentTitle} role="table">
+          <div className="bcd-log bcd-log--h" role="row">
+            <span role="columnheader">{copy.colTime}</span>
+            <span role="columnheader">{copy.colWho}</span>
+            <span role="columnheader">{copy.colWhat}</span>
+            <span className="n" role="columnheader">{copy.colCost}</span>
+            <span className="n" role="columnheader">{copy.colRemaining}</span>
+          </div>
+          {calls.groups.map((group) =>
+            group.calls.length === 1 ? (
+              <CallRow call={group.calls[0]} copy={copy} key={group.id} time={time(group.at)} />
+            ) : (
+              <GroupRows
+                copy={copy}
+                group={group}
+                key={group.id}
+                onToggle={() => calls.toggleGroup(group)}
+                open={isCreditCallGroupOpen(group, calls.openIds)}
+                time={time}
+              />
+            ),
+          )}
+        </div>
+      )}
+      {calls.failed ? (
+        <div className="bcd-msg" role="alert">
+          <span>{copy.loadError}</span>
+          <button onClick={calls.retry} type="button">
+            <RefreshCw aria-hidden="true" />
+            {copy.retry}
+          </button>
+        </div>
+      ) : null}
+      {calls.hasMore && !calls.loadingHead && !calls.failed ? (
+        <button aria-busy={calls.loadingMore ? true : undefined} className="bcd-more" disabled={calls.loadingMore} onClick={() => void calls.loadMore()} type="button">
+          {calls.loadingMore ? copy.loading : copy.loadMore}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function CallRow({ call, copy, time, sub = false }: { call: Beds24CreditCall; copy: Beds24CreditCopy; time: string; sub?: boolean }) {
+  return (
+    <div className={`bcd-log${sub ? " bcd-log--sub" : ""}`} data-row={call.id} role="row">
       <span role="cell">{time}</span>
-      <span role="cell">{who}</span>
-      <span role="cell">{what}</span>
+      <span role="cell">{callWho(call, copy)}</span>
+      <span role="cell">{callWhat(call, copy)}</span>
       <span className="n" role="cell">
         {call.cost !== null ? <b>{call.cost}</b> : <span className="bad">{fillCopy(copy.callFailed, { code: call.httpStatus ?? "—" })}</span>}
       </span>
       <span className="n" role="cell">{call.remaining ?? "—"}</span>
     </div>
+  );
+}
+
+/** 묶음 한 줄 + 펼친 호출들. 펼침은 높이 0fr → 1fr 로 부드럽게(접힌 동안은 inert). */
+function GroupRows({
+  group,
+  copy,
+  time,
+  open,
+  onToggle,
+}: {
+  group: CreditCallGroup;
+  copy: Beds24CreditCopy;
+  time: (ms: number) => string;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const head = group.calls[0];
+  const subId = `bcd-g-${group.id}`;
+  return (
+    <>
+      <div className="bcd-log bcd-log--g" data-row={group.id} onClick={onToggle} role="row">
+        <span role="cell">{time(group.at)}</span>
+        <span role="cell">{callWho(head, copy)}</span>
+        <span role="cell">
+          <button
+            aria-controls={subId}
+            aria-expanded={open}
+            className="bcd-gbtn"
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggle();
+            }}
+            type="button"
+          >
+            {featureLabel(head.feature, copy)}
+            <em>{fillCopy(copy.callCount, { n: group.calls.length })}</em>
+            <ChevronDown aria-hidden="true" />
+          </button>
+        </span>
+        <span className="n" role="cell">
+          <b>{group.cost ?? "—"}</b>
+        </span>
+        <span className="n" role="cell">{group.remaining ?? "—"}</span>
+      </div>
+      <div aria-hidden={open ? undefined : true} className={`bcd-gsub${open ? " is-open" : ""}`} id={subId} inert={!open} role="rowgroup">
+        <div className="bcd-gsub__in">
+          {group.calls.map((call) => (
+            <CallRow call={call} copy={copy} key={call.id} sub time={time(call.at)} />
+          ))}
+        </div>
+      </div>
+    </>
   );
 }
 

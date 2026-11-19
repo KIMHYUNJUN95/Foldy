@@ -12,8 +12,16 @@
 
 import { getAdminSessionForApi } from "@/lib/admin-session";
 import { canViewBeds24Credit } from "@/lib/beds24/credit-access";
-import { getBeds24CreditDetail, getBeds24CreditSummary } from "@/lib/beds24/credit-usage-read";
-import type { Beds24CreditDetail, Beds24CreditRange, Beds24CreditSummary } from "@/lib/beds24/credit-usage-types";
+import { isBeds24CreditCallFilter, isBeds24CreditCursor } from "@/lib/beds24/credit-usage-model";
+import { getBeds24CreditCalls, getBeds24CreditDetail, getBeds24CreditSummary } from "@/lib/beds24/credit-usage-read";
+import type {
+  Beds24CreditCallCursor,
+  Beds24CreditCallFilter,
+  Beds24CreditCallPage,
+  Beds24CreditDetail,
+  Beds24CreditRange,
+  Beds24CreditSummary,
+} from "@/lib/beds24/credit-usage-types";
 
 export type Beds24CreditErrorKey = "forbidden" | "invalid" | "failed";
 
@@ -48,6 +56,32 @@ export async function loadBeds24CreditDetail(
     return { ok: true, data: await getBeds24CreditDetail(organizationId, range) };
   } catch (error) {
     console.error("[beds24-credit] detail failed", error instanceof Error ? error.message : "unknown");
+    return { ok: false, error: "failed" };
+  }
+}
+
+/** 최근 호출 — 거르기 · 「더 보기」(커서 다음 50개). 권한 · 조직은 상세와 같다. 커서 · 거르기 값은 모양을 엄격히 본다(필터 글자에 들어간다). */
+export async function loadBeds24CreditCalls(
+  range: Beds24CreditRange,
+  filter: Beds24CreditCallFilter,
+  cursor: Beds24CreditCallCursor | null,
+): Promise<{ ok: true; data: Beds24CreditCallPage } | { ok: false; error: Beds24CreditErrorKey }> {
+  const organizationId = await viewerOrganizationId();
+  if (!organizationId) return { ok: false, error: "forbidden" };
+  if (!RANGES.includes(range) || !isBeds24CreditCallFilter(filter) || (cursor !== null && !isBeds24CreditCursor(cursor))) {
+    return { ok: false, error: "invalid" };
+  }
+  try {
+    return {
+      ok: true,
+      data: await getBeds24CreditCalls(organizationId, {
+        range,
+        filter: { actor: filter.actor, feature: filter.feature },
+        cursor: cursor ? { calledAt: cursor.calledAt, id: cursor.id } : null,
+      }),
+    };
+  } catch (error) {
+    console.error("[beds24-credit] calls failed", error instanceof Error ? error.message : "unknown");
     return { ok: false, error: "failed" };
   }
 }

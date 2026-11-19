@@ -9,6 +9,7 @@ import type {
   Beds24CreditSnapshot,
   Beds24CreditSummary,
 } from "@/lib/beds24/credit-usage-types";
+import { LIVE_REQUEST_TIMEOUT_MS, settleWithin } from "@/lib/live-request";
 
 /**
  * Beds24 크레딧 — 화면 쪽 값 받기(PC 상단 줄 · 요약 창 · 관제실 · 모바일 공용).
@@ -23,10 +24,11 @@ const CREDIT_MIN_GAP_MS = 5_000;
 
 export type CreditLoad<T> = { ok: true; data: T } | { ok: false };
 
-// 서버 액션의 결과 모양은 이 두 함수에서만 읽는다 — 화면은 `CreditLoad` 만 안다.
+// 서버 액션의 결과 모양은 이 두 함수에서만 읽는다 — 화면은 `CreditLoad` 만 안다. 끝나지 않는 액션은 시간 제한으로 실패 처리 —
+// 부르는 쪽의 「받는 중」 잠금이 영영 풀리지 않는 일을 막는다(`src/lib/live-request.ts`).
 export async function fetchCreditSummary(): Promise<CreditLoad<Beds24CreditSummary>> {
   try {
-    const result = await loadBeds24CreditSummary();
+    const result = await settleWithin(loadBeds24CreditSummary(), LIVE_REQUEST_TIMEOUT_MS);
     return result.ok ? { ok: true, data: result.data } : { ok: false };
   } catch {
     return { ok: false };
@@ -35,7 +37,7 @@ export async function fetchCreditSummary(): Promise<CreditLoad<Beds24CreditSumma
 
 export async function fetchCreditDetail(range: Beds24CreditRange): Promise<CreditLoad<Beds24CreditDetail>> {
   try {
-    const result = await loadBeds24CreditDetail(range);
+    const result = await settleWithin(loadBeds24CreditDetail(range), LIVE_REQUEST_TIMEOUT_MS);
     return result.ok ? { ok: true, data: result.data } : { ok: false };
   } catch {
     return { ok: false };

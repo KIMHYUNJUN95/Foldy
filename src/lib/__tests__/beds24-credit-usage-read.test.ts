@@ -10,6 +10,7 @@ vi.mock("@/lib/supabase/service", () => ({
 
 import {
   BEDS24_CREDIT_WINDOW_MAX_ROWS,
+  getBeds24CreditCalls,
   getBeds24CreditDetail,
   getBeds24CreditSummary,
 } from "@/lib/beds24/credit-usage-read";
@@ -178,5 +179,92 @@ describe("readBeds24Credits — 빈 헤더는 값이 없다", () => {
 
   it("진짜 0 은 0", () => {
     expect(readBeds24Credits(new Headers({ "x-five-min-limit-remaining": "0" })).remaining).toBe(0);
+  });
+});
+
+describe("최근 호출 한 장 — 기간 · 거르기 · 커서", () => {
+  function callClient(rows: Row[]) {
+    const log: Array<[string, ...unknown[]]> = [];
+    const chain: Record<string, unknown> = {};
+    for (const key of ["select", "eq", "or", "gte", "is", "order", "limit"]) {
+      chain[key] = (...args: unknown[]) => {
+        log.push([key, ...args]);
+        return chain;
+      };
+    }
+    chain.then = (resolve: (value: unknown) => unknown) => Promise.resolve({ data: rows, error: null }).then(resolve);
+    return { client: { from: () => chain } as never, log };
+  }
+  const row = (id: number): Row => ({
+    id,
+    called_at: new Date(NOW - id * 1000).toISOString(),
+    actor_kind: "user",
+    actor_user_id: "11111111-2222-3333-4444-555555555555",
+    actor_name: "Kim",
+    actor_job: null,
+    feature: "guest_messages",
+    action: "messages.get",
+    item_count: null,
+    cost: 1,
+    remaining: 150,
+    http_status: 200,
+  });
+
+  it("51줄 물어 50줄만 · 뒤에 더 있음, (called_at, id) 새 것부터, 기간 시작부터", async () => {
+    const { client, log } = callClient(Array.from({ length: 51 }, (_, i) => row(i + 1)));
+    const result = await getBeds24CreditCalls("org-1", { range: "1h" }, { supabase: client, nowMs: NOW });
+    expect(result.calls).toHaveLength(50);
+    expect(result.hasMore).toBe(true);
+    expect(result.since).toBe(NOW - 3_600_000);
+    expect(result.calls[0]).toMatchObject({ id: "1", calledAt: new Date(NOW - 1000).toISOString(), actor: { userId: "11111111-2222-3333-4444-555555555555" } });
+    expect(log).toContainEqual(["limit", 51]);
+    expect(log.filter(([k]) => k === "order")).toEqual([
+      ["order", "called_at", { ascending: false }],
+      ["order", "id", { ascending: false }],
+    ]);
+    expect(log).toContainEqual(["gte", "called_at", new Date(NOW - 3_600_000).toISOString()]);
+    expect(log).toContainEqual(["or", "and(or(organization_id.eq.org-1,organization_id.is.null))"]);
+  });
+
+  it("커서 — 같은 시각은 id 로 잇는 조건을 조직 조건과 한 묶음으로", async () => {
+    const { client, log } = callClient([row(1)]);
+    const result = await getBeds24CreditCalls(
+      "org-1",
+      { range: "7d", cursor: { calledAt: "2026-11-18T08:02:08.049123+00:00", id: "462" } },
+      { supabase: client, nowMs: NOW },
+    );
+    expect(result.hasMore).toBe(false);
+    expect(log).toContainEqual([
+      "or",
+      'and(or(organization_id.eq.org-1,organization_id.is.null),or(called_at.lt."2026-11-18T08:02:08.049123+00:00",and(called_at.eq."2026-11-18T08:02:08.049123+00:00",id.lt.462)))',
+    ]);
+  });
+
+  it("거르기 — 사람은 사용자 id, 자동 작업은 사람 id 없는 줄, 기능은 기능", async () => {
+    const user = callClient([]);
+    await getBeds24CreditCalls(
+      "org-1",
+      { range: "today", filter: { actor: "user:11111111-2222-3333-4444-555555555555", feature: "rates_write" } },
+      { supabase: user.client, nowMs: NOW },
+    );
+    expect(user.log).toContainEqual(["eq", "actor_user_id", "11111111-2222-3333-4444-555555555555"]);
+    expect(user.log).toContainEqual(["eq", "feature", "rates_write"]);
+    const auto = callClient([]);
+    await getBeds24CreditCalls("org-1", { range: "today", filter: { actor: "auto", feature: null } }, { supabase: auto.client, nowMs: NOW });
+    expect(auto.log).toContainEqual(["is", "actor_user_id", null]);
+    expect(auto.log.some(([k, col]) => k === "eq" && col === "feature")).toBe(false);
+  });
+
+  it("모양이 틀린 커서는 필터 글자에 넣지 않고 던진다", async () => {
+    const { client } = callClient([]);
+    await expect(
+      getBeds24CreditCalls("org-1", { range: "today", cursor: { calledAt: 'x",id.gt.0', id: "1" } }, { supabase: client, nowMs: NOW }),
+    ).rejects.toThrow(/cursor/);
+  });
+
+  it("상세의 최근 호출도 같은 한 장(50개 · 뒤에 더 있음)", async () => {
+    const { client } = fakeClient([windowRow(0)]);
+    const detail = await getBeds24CreditDetail("org-1", "today", { supabase: client, nowMs: NOW });
+    expect(detail.recentCalls).toMatchObject({ calls: [], hasMore: false });
   });
 });

@@ -1,13 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
-import { ChevronRight, RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
+import { ChevronDown, ChevronRight, RefreshCw } from "lucide-react";
+import { useBeds24CreditCalls, type Beds24CreditCallsState } from "@/components/shared/beds24-credit-calls";
 import { fetchCreditDetail, useBeds24CreditLive } from "@/components/shared/beds24-credit-live";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { haptic } from "@/lib/haptics";
 import {
   actorLines,
   creditPollMs,
+  isCreditActorFilterable,
+  isCreditCallGroupOpen,
+  type CreditCallGroup,
   creditTexts,
   showCreditLoadError,
   featureLabel,
@@ -17,7 +21,7 @@ import {
   type Beds24CreditCopy,
   type Beds24CreditTexts,
 } from "@/lib/beds24-credit-view";
-import type { Beds24CreditActorUsage, Beds24CreditDetail, Beds24CreditSnapshot } from "@/lib/beds24/credit-usage-types";
+import type { Beds24CreditActorUsage, Beds24CreditCall, Beds24CreditDetail, Beds24CreditSnapshot } from "@/lib/beds24/credit-usage-types";
 import "./beds24-credit-mobile.css";
 
 /**
@@ -33,10 +37,12 @@ import "./beds24-credit-mobile.css";
 export function MobileCreditNote({
   initial,
   copy,
+  localeTag,
   serverNow,
 }: {
   initial: Beds24CreditSnapshot | null;
   copy: Beds24CreditCopy;
+  localeTag?: string;
   /** 서버가 그린 시각 — 서버 그림과 붙기 전 첫 그림이 같은 상태 · 같은 카운트다운 글자를 쓰게(흔들림 없음). */
   serverNow: number | null;
 }) {
@@ -93,7 +99,7 @@ export function MobileCreditNote({
               <>
                 {showCreditLoadError(userFailed, live.failures) ? <ErrorLine copy={copy} onRetry={() => void retry()} /> : null}
                 <div className="mcr-lh">{windowHeadLine(live.summary.windowUsed, copy)}</div>
-                <ActorRows actors={live.summary.actors} copy={copy} empty={copy.windowEmpty} />
+                <ActorRows actors={live.summary.actors} copy={copy} empty={copy.windowEmpty} localeTag={localeTag} />
               </>
             )}
           </div>
@@ -124,24 +130,70 @@ function CreditHead({ texts, copy }: { texts: Beds24CreditTexts; copy: Beds24Cre
   );
 }
 
-function ActorRows({ actors, copy, empty, total }: { actors: Beds24CreditActorUsage[]; copy: Beds24CreditCopy; empty: string; total?: number }) {
+function ActorRows({
+  actors,
+  copy,
+  empty,
+  total,
+  picked,
+  onPick,
+  localeTag,
+}: {
+  actors: Beds24CreditActorUsage[];
+  copy: Beds24CreditCopy;
+  empty: string;
+  /** 숫자 형식 — PC 칸과 같이 화면 언어로(없으면 기기 기본). */
+  localeTag?: string;
+  total?: number;
+  /** 거르기 — 있으면 줄을 눌러 최근 호출을 그 사람만(Foldy 밖은 누를 수 없음). */
+  picked?: string | null;
+  onPick?: (key: string) => void;
+}) {
   if (actors.length === 0) return <div className="mcr-empty">{empty}</div>;
   return (
     <ul className="mcr-list">
       {actors.map((actor) => {
         const lines = actorLines(actor, copy);
-        return (
-          <li className="mcr-row" key={actor.key}>
+        const inner = (
+          <>
             <span className="mcr-row__t">
               {lines.name}
               {lines.sub ? <small>{lines.sub}</small> : null}
             </span>
-            <b>{actor.credits.toLocaleString()}</b>
+            <b>{actor.credits.toLocaleString(localeTag)}</b>
             {total !== undefined ? <em>{sharePercent(actor.credits, total)}%</em> : null}
+          </>
+        );
+        return onPick && isCreditActorFilterable(actor) ? (
+          <li className="mcr-row mcr-row--pick" key={actor.key}>
+            <PickButton onPick={() => onPick(actor.key)} pressed={picked === actor.key}>
+              {inner}
+            </PickButton>
+          </li>
+        ) : (
+          <li className="mcr-row" key={actor.key}>
+            {inner}
           </li>
         );
       })}
     </ul>
+  );
+}
+
+function PickButton({ pressed, onPick, children }: { pressed: boolean; onPick: () => void; children: ReactNode }) {
+  return (
+    <button
+      aria-describedby="mcr-filter-hint"
+      aria-pressed={pressed}
+      className="mcr-pick"
+      onClick={() => {
+        haptic("light");
+        onPick();
+      }}
+      type="button"
+    >
+      {children}
+    </button>
   );
 }
 
@@ -178,14 +230,21 @@ function ErrorLine({ copy, onRetry }: { copy: Beds24CreditCopy; onRetry: () => v
 export function MobileCreditSection({
   detail: initialDetail,
   copy,
+  localeTag,
   serverNow,
 }: {
   detail: Beds24CreditDetail | null;
   copy: Beds24CreditCopy;
+  localeTag: string;
   serverNow: number | null;
 }) {
   const [detail, setDetail] = useState(initialDetail);
   const [userFailed, setUserFailed] = useState(false);
+  const [calls, callsRoot] = useBeds24CreditCalls(initialDetail);
+  const callsShared = useRef(calls);
+  useEffect(() => {
+    callsShared.current = calls;
+  });
   const live = useBeds24CreditLive(detail?.snapshot ?? null, true, serverNow);
   const texts = creditTexts(live.display, copy);
   const state = live.display.state;
@@ -214,10 +273,16 @@ export function MobileCreditSection({
     }
     setUserFailed(false);
     setDetail(result.data);
+    callsShared.current.syncDetail(result.data);
     shared.current.commit(token, result.data.snapshot);
   }, []);
   useEffect(() => {
-    const timer = window.setInterval(() => void poll(), creditPollMs("today"));
+    const timer = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      void poll();
+      // 거르기가 걸려 있으면 최근 호출 첫 장은 따로 읽는다(같은 주기).
+      callsShared.current.refreshFiltered();
+    }, creditPollMs("today"));
     const onBack = () => void poll();
     document.addEventListener("visibilitychange", onBack);
     window.addEventListener("focus", onBack);
@@ -243,25 +308,197 @@ export function MobileCreditSection({
         <>
           <div className="mcr-lh">
             {copy.mobileWho}
-            <span>{fillCopy(copy.rangeTotal.today, { n: detail.total.toLocaleString() })}</span>
+            <span>{fillCopy(copy.rangeTotal.today, { n: detail.total.toLocaleString(localeTag) })}</span>
           </div>
-          <ActorRows actors={detail.actors.slice(0, 5)} copy={copy} empty={copy.emptyRange} total={detail.total} />
+          <span className="sr-only" id="mcr-filter-hint">
+            {copy.filterHint}
+          </span>
+          <ActorRows
+            actors={detail.actors.slice(0, 5)}
+            copy={copy}
+            empty={copy.emptyRange}
+            localeTag={localeTag}
+            onPick={(key) => calls.toggleFilter("actor", key)}
+            picked={calls.filter.actor}
+            total={detail.total}
+          />
           <div className="mcr-lh">{copy.mobileWhere}</div>
           {detail.features.length === 0 ? (
             <div className="mcr-empty">{copy.emptyRange}</div>
           ) : (
             <ul className="mcr-list">
               {detail.features.slice(0, 6).map((item) => (
-                <li className="mcr-row" key={item.feature}>
-                  <span className="mcr-row__t">{featureLabel(item.feature, copy)}</span>
-                  <b>{item.credits.toLocaleString()}</b>
-                  <em>{sharePercent(item.credits, detail.total)}%</em>
+                <li className="mcr-row mcr-row--pick" key={item.feature}>
+                  <PickButton onPick={() => calls.toggleFilter("feature", item.feature)} pressed={calls.filter.feature === item.feature}>
+                    <span className="mcr-row__t">{featureLabel(item.feature, copy)}</span>
+                    <b>{item.credits.toLocaleString(localeTag)}</b>
+                    <em>{sharePercent(item.credits, detail.total)}%</em>
+                  </PickButton>
                 </li>
               ))}
             </ul>
           )}
+          <MobileRecentCalls calls={calls} copy={copy} detail={detail} localeTag={localeTag} rootRef={callsRoot} />
         </>
       ) : null}
     </section>
+  );
+}
+
+function callFilterLabel(calls: Beds24CreditCallsState, detail: Beds24CreditDetail, copy: Beds24CreditCopy): string | null {
+  const parts: string[] = [];
+  if (calls.filter.actor) {
+    const actor = detail.actors.find((item) => item.key === calls.filter.actor);
+    parts.push(calls.filter.actor === "auto" ? copy.auto : actor?.name || "—");
+  }
+  if (calls.filter.feature) parts.push(featureLabel(calls.filter.feature, copy));
+  return parts.length ? fillCopy(copy.filterOnly, { name: parts.join(" · ") }) : null;
+}
+
+/** 오늘 최근 호출 — PC 관제실 칸과 같은 목록(50개씩 · 연달아 난 같은 호출은 한 줄 · 누가/어디에 거르기). */
+function MobileRecentCalls({
+  calls,
+  copy,
+  detail,
+  localeTag,
+  rootRef,
+}: {
+  calls: Beds24CreditCallsState;
+  copy: Beds24CreditCopy;
+  detail: Beds24CreditDetail;
+  localeTag: string;
+  rootRef: RefObject<HTMLDivElement | null>;
+}) {
+  const timeFmt = useMemo(
+    () => new Intl.DateTimeFormat(localeTag, { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }),
+    [localeTag],
+  );
+  const time = (ms: number) => timeFmt.format(ms);
+  const label = callFilterLabel(calls, detail, copy);
+  return (
+    <div className="mcr-calls" ref={rootRef}>
+      <div className="mcr-lh">
+        {copy.mobileRecent}
+        {label ? (
+          <span className="mcr-flt">
+            {label}
+            <button
+              onClick={() => {
+                haptic("light");
+                calls.clearFilter();
+              }}
+              type="button"
+            >
+              {copy.filterClear}
+            </button>
+          </span>
+        ) : null}
+      </div>
+      {calls.loadingHead ? (
+        <Loading copy={copy} />
+      ) : calls.empty && !calls.failed ? (
+        <div className="mcr-empty">{label ? copy.emptyFiltered : copy.emptyCalls}</div>
+      ) : (
+        <ul className="mcr-list" aria-label={copy.recentTitle}>
+          {calls.groups.map((group) =>
+            group.calls.length === 1 ? (
+              <li className="mcr-row mcr-call" data-row={group.id} key={group.id}>
+                <MobileCallLine call={group.calls[0]} copy={copy} time={time(group.at)} />
+              </li>
+            ) : (
+              <MobileGroup
+                copy={copy}
+                group={group}
+                key={group.id}
+                onToggle={() => {
+                  haptic("light");
+                  calls.toggleGroup(group);
+                }}
+                open={isCreditCallGroupOpen(group, calls.openIds)}
+                time={time}
+              />
+            ),
+          )}
+        </ul>
+      )}
+      {calls.failed ? <ErrorLine copy={copy} onRetry={calls.retry} /> : null}
+      {calls.hasMore && !calls.loadingHead && !calls.failed ? (
+        <button
+          aria-busy={calls.loadingMore ? true : undefined}
+          className="mcr-more"
+          disabled={calls.loadingMore}
+          onClick={() => void calls.loadMore()}
+          type="button"
+        >
+          {calls.loadingMore ? copy.loading : copy.loadMore}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function callWhatText(call: Beds24CreditCall, copy: Beds24CreditCopy): string {
+  return call.itemCount !== null && call.itemCount > 0
+    ? `${featureLabel(call.feature, copy)} · ${fillCopy(copy.itemCount, { n: call.itemCount })}`
+    : featureLabel(call.feature, copy);
+}
+
+/** 한 호출 — 윗줄 「무엇 · 크레딧」, 아랫줄 「시각 · 누가 · 남은 값」. */
+function MobileCallLine({ call, copy, time }: { call: Beds24CreditCall; copy: Beds24CreditCopy; time: string }) {
+  const who = call.actor.kind === "user" ? call.actor.name || "—" : copy.auto;
+  return (
+    <>
+      <span className="mcr-row__t">
+        {callWhatText(call, copy)}
+        <small>
+          {time} · {who} · {copy.colRemaining} {call.remaining ?? "—"}
+        </small>
+      </span>
+      {call.cost !== null ? <b>{call.cost}</b> : <span className="mcr-bad">{fillCopy(copy.callFailed, { code: call.httpStatus ?? "—" })}</span>}
+    </>
+  );
+}
+
+function MobileGroup({
+  group,
+  copy,
+  time,
+  open,
+  onToggle,
+}: {
+  group: CreditCallGroup;
+  copy: Beds24CreditCopy;
+  time: (ms: number) => string;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const head = group.calls[0];
+  const who = head.actor.kind === "user" ? head.actor.name || "—" : copy.auto;
+  const subId = `mcr-g-${group.id}`;
+  return (
+    <li className="mcr-row mcr-row--pick mcr-group" data-row={group.id}>
+      <button aria-controls={subId} aria-expanded={open} className="mcr-pick" onClick={onToggle} type="button">
+        <span className="mcr-row__t">
+          <span className="mcr-gt">
+            {featureLabel(head.feature, copy)}
+            <em>{fillCopy(copy.callCount, { n: group.calls.length })}</em>
+          </span>
+          <small>
+            {time(group.at)} · {who} · {copy.colRemaining} {group.remaining ?? "—"}
+          </small>
+        </span>
+        <b>{group.cost ?? "—"}</b>
+        <ChevronDown aria-hidden="true" className="mcr-gchev" />
+      </button>
+      <div aria-hidden={open ? undefined : true} className={`mcr-gsub${open ? " is-open" : ""}`} id={subId} inert={!open}>
+        <ul className="mcr-gsub__in">
+          {group.calls.map((call) => (
+            <li className="mcr-row mcr-call" key={call.id}>
+              <MobileCallLine call={call} copy={copy} time={time(call.at)} />
+            </li>
+          ))}
+        </ul>
+      </div>
+    </li>
   );
 }

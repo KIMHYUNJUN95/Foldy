@@ -33,6 +33,8 @@ import { buildPreview, sendJobNow } from "@/lib/automation/runner";
 import { automationBuildingLabel, type AlertCard } from "@/lib/automation/messages";
 import { computeNextWake } from "@/lib/automation/schedule";
 import { canAccessOpsAdmin } from "@/lib/ops-admin";
+import { getAutomationLiveData, type AutomationLiveData } from "@/lib/automation/console-data";
+import { hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { isYmd } from "@/lib/tokyo-date";
 import { changed } from "@/actions/cleaning-assign-guards";
@@ -73,6 +75,21 @@ async function manager() {
 }
 
 // ── 보기 ────────────────────────────────────────────────────────────────
+
+/**
+ * 관제실 실시간 갱신(PC · 모바일, 2026-11-18) — 페이지와 같은 문(`ops_admin.access` + 관리 웹 + 조직)을 다시 본다.
+ * 우리 DB 만 읽는다(크레딧 · Beds24 · Slack 없음). 언어는 세션에서만 — 화면이 넘기지 않는다.
+ */
+export async function loadAutomationLive(): Promise<{ ok: true; data: AutomationLiveData } | { ok: false; error: "forbidden" | "failed" }> {
+  const session = await viewer();
+  if (!session || !hasOrganizationContext(session)) return { error: "forbidden", ok: false };
+  try {
+    return { data: await getAutomationLiveData(session, session.user.preferredLanguage), ok: true };
+  } catch (error) {
+    console.error("[automation] live load failed", error instanceof Error ? error.message : error);
+    return { error: "failed", ok: false };
+  }
+}
 
 export async function previewAutomationMessage(input: {
   jobKey: string;
@@ -234,7 +251,8 @@ async function writeLog(organizationId: string, jobKey: AutomationJobKey, actorI
     .insert({ actor_id: actorId, changes: changes as Json, job_key: jobKey, organization_id: organizationId });
 }
 
-export async function saveAutomationJob(input: SaveJobInput): Promise<{ ok: true } | Fail> {
+/** 성공이면 `version` = 이 저장이 쓴 설정 줄 버전(`updated_at`) — 화면 초안이 이보다 옛 그림을 저장 전 값으로 버린다. */
+export async function saveAutomationJob(input: SaveJobInput): Promise<{ ok: true; version: string } | Fail> {
   const session = await manager();
   if (!session) return { error: "forbidden", ok: false };
   if (!isAutomationJobKey(input.jobKey) || !isHhmm(input.sendTime) || !isHhmm(input.retryUntil)) return { error: "invalid", ok: false };
@@ -375,7 +393,7 @@ export async function saveAutomationJob(input: SaveJobInput): Promise<{ ok: true
     ),
   );
   revalidatePath("/admin/ops/automation");
-  return { ok: true };
+  return { ok: true, version: now.toISOString() };
 }
 
 export async function setAutomationEnabled(jobKey: string, enabled: boolean): Promise<{ ok: true } | Fail> {

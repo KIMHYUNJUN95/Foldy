@@ -100,7 +100,9 @@ export type Beds24CreditWindowBar = {
 export type Beds24CreditCall = {
   id: string;
   at: number;
-  actor: { kind: "user" | "auto"; name: string; job: string | null };
+  /** DB 가 준 `called_at` 그대로(마이크로초까지) — 「더 보기」 커서는 이 값으로 잇는다(ms 로 줄이면 같은 ms 줄이 빠진다). */
+  calledAt: string;
+  actor: { kind: "user" | "auto"; userId: string | null; name: string; job: string | null };
   feature: Beds24CreditFeature;
   action: string;
   itemCount: number | null;
@@ -119,7 +121,28 @@ export type Beds24CreditDetail = {
   bars: Beds24CreditWindowBar[];
   actors: Beds24CreditActorUsage[];
   features: Beds24CreditFeatureUsage[];
-  recentCalls: Beds24CreditCall[];
+  /** 최근 호출 첫 장(기간 안 · 거르기 없음 · 새 것부터 50개). */
+  recentCalls: Beds24CreditCallPage;
   /** 오늘(도쿄) 쉰 횟수와 마지막으로 쉰 때. */
   pausesToday: { count: number; lastAt: number | null; lastSeconds: number | null };
+};
+
+/** 최근 호출 한 장에 담는 줄 수. 「더 보기」도 같은 수. */
+export const BEDS24_CREDIT_CALL_PAGE_SIZE = 50;
+
+/**
+ * 최근 호출 거르기 — 「누가」 줄(`user:<id>` · `auto`) · 「어디에」 줄(기능). 둘 다 고르면 둘 다 맞는 호출만.
+ * `outside`(Foldy 밖)는 호출 기록이 없어 거를 수 없다.
+ */
+export type Beds24CreditCallFilter = { actor: string | null; feature: Beds24CreditFeature | null };
+
+/** 「더 보기」 커서 — 지금 보이는 가장 옛 줄. (called_at, id) 순서로 그 다음부터. */
+export type Beds24CreditCallCursor = { calledAt: string; id: string };
+
+export type Beds24CreditCallPage = {
+  calls: Beds24CreditCall[];
+  /** 이 장 뒤에 더 있나(개수는 세지 않는다 — 한 줄 더 물어 안다). */
+  hasMore: boolean;
+  /** 기간 시작(epoch ms) — 화면이 범위를 벗어난 줄을 걷어 낼 때 쓴다(5분 · 1시간은 시간이 지나며 밀린다). */
+  since: number;
 };

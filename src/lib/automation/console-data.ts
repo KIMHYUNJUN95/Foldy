@@ -55,6 +55,8 @@ export type AutomationJobView = {
   /** 오늘 정시 발송을 끝낸 도쿄 날짜 — 켜기 · 저장 전 「지금 바로 나감」 경고에 쓴다. */
   lastDoneOn: string | null;
   destinations: AutomationDestination[];
+  /** 설정 줄 버전(`automation_jobs.updated_at`, 저장한 적 없으면 null) — 화면 초안이 「내 저장 전 / 뒤」 그림을 가른다. */
+  version: string | null;
   runs: AutomationRunView[];
   logs: AutomationLogView[];
 };
@@ -74,11 +76,25 @@ export type AutomationPageData = {
   renderedAt: number;
 };
 
+/** 관제실에서 크레딧 칸을 뺀 부분 — 크레딧은 칸이 스스로 다시 읽는다. 실시간 갱신(`loadAutomationLive`)이 이것만 다시 읽는다. */
+export type AutomationLiveData = Omit<AutomationPageData, "credit" | "renderedAt">;
+
 export async function getAutomationPageData(session: AppSession, locale: Locale): Promise<AutomationPageData> {
+  const renderedAt = Date.now();
+  const [live, credit] = await Promise.all([
+    getAutomationLiveData(session, locale),
+    // 우리 DB 의 호출 기록만 읽는다(Beds24 를 부르지 않는다). 실패해도 관제실은 연다.
+    getBeds24CreditDetail(session.organization.id, "today").catch(() => null),
+  ]);
+  return { ...live, credit, renderedAt };
+}
+
+/** 우리 DB 만 읽는다(Beds24 · Slack 등 바깥 호출 없음) — 쿼리 7번(+ 설정 기록을 쓴 사람이 있으면 이름 1번). */
+export async function getAutomationLiveData(session: AppSession, locale: Locale): Promise<AutomationLiveData> {
   const supabase = getSupabaseServiceClient();
   const organizationId = session.organization.id;
   const now = new Date();
-  const [jobs, destinations, runs, logs, gate, labeler, credit] = await Promise.all([
+  const [jobs, destinations, runs, logs, gate, labeler] = await Promise.all([
     loadJobs(supabase, organizationId),
     loadDestinations(supabase, organizationId),
     supabase
@@ -95,8 +111,6 @@ export async function getAutomationPageData(session: AppSession, locale: Locale)
       .limit(100),
     checkReservationGate(supabase, now),
     loadPropertyLabeler(supabase, organizationId),
-    // 우리 DB 의 호출 기록만 읽는다(Beds24 를 부르지 않는다). 실패해도 관제실은 연다.
-    getBeds24CreditDetail(organizationId, "today").catch(() => null),
   ]);
 
   const actorIds = [...new Set((logs.data ?? []).map((row) => row.actor_id).filter((id): id is string => !!id))];
@@ -138,8 +152,6 @@ export async function getAutomationPageData(session: AppSession, locale: Locale)
   return {
     buildings: AUTOMATION_BUILDING_ORDER.map((name) => ({ label: labeler(name, locale), name })),
     canManage: session.capabilities.includes("automation.manage"),
-    credit,
-    renderedAt: now.getTime(),
     channels: listAutomationChannels(),
     gate: { ageMinutes: gate.ageMinutes, ok: gate.ok },
     jobs: AUTOMATION_JOB_KEYS.map((jobKey) => {
@@ -156,6 +168,7 @@ export async function getAutomationPageData(session: AppSession, locale: Locale)
         runs: runsByJob.get(jobKey) ?? [],
         sendTime: job.sendTime,
         settings: job.settings,
+        version: job.updatedAt,
         weekdays: job.weekdays,
       };
     }),

@@ -3,6 +3,10 @@ import {
   BEDS24_CREDIT_STOP_BELOW,
   BEDS24_CREDIT_WARN_BELOW,
   type Beds24CreditActorUsage,
+  type Beds24CreditCall,
+  type Beds24CreditCallCursor,
+  type Beds24CreditCallFilter,
+  type Beds24CreditCallPage,
   type Beds24CreditDetail,
   type Beds24CreditFeature,
   type Beds24CreditRange,
@@ -283,4 +287,209 @@ export function pauseSummaryLine(
 /** 「지금 5분 동안 쓴 곳 · 50」. 0 이면(모름 · 기록 없음 포함) 합계 없이 — 아래 빈 문구와 「· 0」이 겹치지 않게. */
 export function windowHeadLine(windowUsed: number, copy: Beds24CreditCopy): string {
   return windowUsed > 0 ? fillCopy(copy.windowHead, { n: windowUsed.toLocaleString() }) : copy.windowHeadPlain;
+}
+
+/* ───────────── 최근 호출 목록 — 쌓기 · 묶기 · 거르기 (2026-11-18) ───────────── */
+
+export const NO_CREDIT_CALL_FILTER: Beds24CreditCallFilter = { actor: null, feature: null };
+
+/** 목록 열쇠 — 기간 · 거르기가 바뀌면 목록을 새로 시작한다. */
+export function creditCallListKey(range: Beds24CreditRange, filter: Beds24CreditCallFilter): string {
+  return `${range}|${filter.actor ?? ""}|${filter.feature ?? ""}`;
+}
+
+export function isCreditCallFilterOn(filter: Beds24CreditCallFilter): boolean {
+  return filter.actor !== null || filter.feature !== null;
+}
+
+/** 같은 줄을 다시 누르면 풀린다. 「누가」와 「어디에」는 따로 걸리고 둘 다 걸리면 둘 다 맞는 호출만. */
+export function toggleCreditCallFilter(
+  filter: Beds24CreditCallFilter,
+  part: "actor" | "feature",
+  value: string,
+): Beds24CreditCallFilter {
+  if (part === "actor") return { ...filter, actor: filter.actor === value ? null : value };
+  const feature = value as Beds24CreditCallFilter["feature"];
+  return { ...filter, feature: filter.feature === feature ? null : feature };
+}
+
+/** 「누가」 줄 중 누를 수 있는 줄 — Foldy 밖은 호출 기록이 없어 거를 수 없다. */
+export function isCreditActorFilterable(actor: Pick<Beds24CreditActorUsage, "kind">): boolean {
+  return actor.kind !== "outside";
+}
+
+/** 마이크로초 시각 — `called_at` 은 마이크로초까지 와서 ms(`at`)만으로는 같은 ms 줄 순서를 못 가린다. */
+export function creditCallTimeUs(call: Pick<Beds24CreditCall, "at" | "calledAt">): number {
+  const fraction = /\.(\d+)/.exec(call.calledAt)?.[1] ?? "";
+  const extra = Number((fraction + "000000").slice(3, 6));
+  return Math.floor(call.at) * 1000 + (Number.isFinite(extra) ? extra : 0);
+}
+
+function compareIdDesc(a: string, b: string): number {
+  if (a.length !== b.length) return b.length - a.length;
+  return a < b ? 1 : a > b ? -1 : 0;
+}
+
+/** DB 순서와 같은 (called_at desc, id desc). */
+export function compareCreditCallsDesc(a: Beds24CreditCall, b: Beds24CreditCall): number {
+  const time = creditCallTimeUs(b) - creditCallTimeUs(a);
+  return time !== 0 ? time : compareIdDesc(a.id, b.id);
+}
+
+/** id 로 하나만(뒤에 온 값이 이긴다) · 새 것부터. */
+export function mergeCreditCalls(current: readonly Beds24CreditCall[], incoming: readonly Beds24CreditCall[]): Beds24CreditCall[] {
+  const byId = new Map<string, Beds24CreditCall>();
+  for (const call of current) byId.set(call.id, call);
+  for (const call of incoming) byId.set(call.id, call);
+  return [...byId.values()].sort(compareCreditCallsDesc);
+}
+
+export type CreditCallList = {
+  key: string;
+  /** 목록을 새로 시작할 때마다 +1 — 그 전에 보낸 「더 보기」 · 첫 장 응답은 버린다. */
+  generation: number;
+  calls: Beds24CreditCall[];
+  hasMore: boolean;
+};
+
+export function startCreditCallList(key: string, generation: number, page: Beds24CreditCallPage | null): CreditCallList {
+  return { key, generation, calls: page ? [...page.calls].sort(compareCreditCallsDesc) : [], hasMore: page?.hasMore ?? false };
+}
+
+/**
+ * 자동 갱신으로 온 첫 장(새 것 50개)을 합친다 — 새 호출은 위에, 「더 보기」로 받아 둔 아래 줄은 그대로.
+ * 기간 시작보다 옛 줄은 걷어 낸다(5분 · 1시간은 시간이 지나며 밀린다).
+ * 첫 장이 받아 둔 줄과 하나도 겹치지 않고 뒤에 더 있으면 그 사이가 비었을 수 있다 — 그때는 첫 장으로 다시 시작한다.
+ * 다시 시작 · 비우기는 세대 +1 — 그 전에 보낸 「더 보기」가 새 첫 장 아래에 옛 줄을 붙이지 않게.
+ * 이미 비어 있고 더 없음이면 같은 객체(세대를 올리면 진행 중인 첫 장 「다시 받기」 응답까지 버려진다).
+ */
+export function mergeCreditCallHead(list: CreditCallList, page: Beds24CreditCallPage): CreditCallList {
+  if (page.calls.length === 0) {
+    if (list.calls.length === 0 && !list.hasMore) return list;
+    return { ...list, generation: list.generation + 1, calls: [], hasMore: false };
+  }
+  const kept = list.calls.filter((call) => call.at >= page.since);
+  const head = [...page.calls].sort(compareCreditCallsDesc);
+  const oldestHead = head[head.length - 1];
+  const newestKept = kept[0];
+  if (page.hasMore && newestKept && compareCreditCallsDesc(oldestHead, newestKept) < 0 && !kept.some((c) => head.some((h) => h.id === c.id))) {
+    return { ...list, generation: list.generation + 1, calls: head, hasMore: true };
+  }
+  const reachesPast = kept.some((call) => compareCreditCallsDesc(call, oldestHead) > 0);
+  return { ...list, calls: mergeCreditCalls(kept, head), hasMore: reachesPast ? list.hasMore : page.hasMore };
+}
+
+/**
+ * 「더 보기」로 온 장을 아래에 잇는다. 보낸 커서가 지금 목록의 맨 끝 줄일 때만 — 그사이 목록이 바뀌었으면(다시 시작 ·
+ * 옛 줄 걷어 냄) 그대로 돌려준다(같은 객체). 세대 판정과 겹치는 이중 방어.
+ */
+export function appendCreditCallPage(
+  list: CreditCallList,
+  page: Beds24CreditCallPage,
+  sentCursor: Beds24CreditCallCursor | null,
+): CreditCallList {
+  const last = creditCallCursor(list);
+  if (!sentCursor || !last || last.id !== sentCursor.id || last.calledAt !== sentCursor.calledAt) return list;
+  const calls = mergeCreditCalls(list.calls, page.calls).filter((call) => call.at >= page.since);
+  return { ...list, calls, hasMore: page.hasMore };
+}
+
+/** 마지막에 실패한 읽기. */
+export type CreditCallFailure = "head" | "more" | null;
+
+/**
+ * 「다시 받기」가 다시 부를 쪽 — 「더 보기」가 실패했고 아직 아래가 남았으면 「더 보기」, 아니면 첫 장.
+ * (첫 장 실패 뒤 상세 갱신이 목록만 채워 hasMore 가 꺼지면 「더 보기」는 아무것도 안 해 띠가 남았다.)
+ */
+export function creditCallRetryTarget(failed: CreditCallFailure, list: Pick<CreditCallList, "calls" | "hasMore">): "head" | "more" | null {
+  if (!failed) return null;
+  return failed === "more" && list.hasMore && list.calls.length > 0 ? "more" : "head";
+}
+
+/** 「더 보기」 커서 — 지금 가진 가장 옛 줄. */
+export function creditCallCursor(list: Pick<CreditCallList, "calls">): Beds24CreditCallCursor | null {
+  const last = list.calls[list.calls.length - 1];
+  return last ? { calledAt: last.calledAt, id: last.id } : null;
+}
+
+/** 보낸 때의 목록(열쇠 · 세대)과 지금 목록이 같을 때만 응답을 쓴다 — 기간 · 거르기를 바꾼 뒤 늦게 온 응답은 버린다. */
+export function isCurrentCreditCallResponse(
+  sent: Pick<CreditCallList, "key" | "generation">,
+  current: Pick<CreditCallList, "key" | "generation">,
+): boolean {
+  return sent.key === current.key && sent.generation === current.generation;
+}
+
+/** 묶는 간격 — 앞 호출과 이만큼 안에 난 같은 호출은 한 줄로. */
+export const CREDIT_CALL_GROUP_GAP_MS = 60_000;
+
+/** 실패한 호출(오류 응답 · 크레딧 헤더 없음)은 묶지 않는다 — 성공 줄에 섞이면 실패가 안 보인다. */
+export function isFailedCreditCall(call: Pick<Beds24CreditCall, "cost" | "httpStatus">): boolean {
+  return call.cost === null || (call.httpStatus ?? 0) >= 400;
+}
+
+/** 묶는 기준의 「누가」 — 사람은 사용자 id, 자동 작업은 작업 이름까지. */
+export function creditCallActorKey(call: Pick<Beds24CreditCall, "actor">): string {
+  const { actor } = call;
+  if (actor.kind === "user") return actor.userId ? `user:${actor.userId}` : `user-name:${actor.name}`;
+  return `auto:${actor.job ?? ""}`;
+}
+
+export type CreditCallGroup = {
+  /**
+   * 묶음 안 **가장 옛** 호출 id — React key · 스크롤 기준(`data-row`). 자동 갱신은 묶음을 위로 자라게 해서(10초마다 생길 수 있음)
+   * 가장 새 id 를 쓰면 그때마다 다시 마운트돼 펼친 버튼의 포커스를 잃는다. 가장 옛 id 는 「더 보기」로 장 경계에서 묶음이
+   * 아래로 이어질 때만 바뀐다(누른 사람의 포커스는 「더 보기」에 있다). 펼침 상태는 줄 id 로 따로 들고 있다.
+   */
+  id: string;
+  /** 새 것부터. */
+  calls: Beds24CreditCall[];
+  /** 크레딧 합(실패 줄은 혼자라 null 이 섞이지 않는다). */
+  cost: number | null;
+  /** 가장 최근 호출의 남은 값. */
+  remaining: number | null;
+  at: number;
+  firstAt: number;
+};
+
+/**
+ * 연달아 난 같은 호출을 한 줄로 — 같은 「누가」(`creditCallActorKey`) · 같은 기능 · 바로 앞 줄과 60초 안 · 둘 다 성공.
+ * 목록 전체(「더 보기」로 받은 줄 포함)로 매번 다시 계산해서 장 경계에 걸린 묶음도 이어진다.
+ */
+export function groupCreditCalls(calls: readonly Beds24CreditCall[]): CreditCallGroup[] {
+  const groups: Beds24CreditCall[][] = [];
+  for (const call of calls) {
+    const group = groups[groups.length - 1];
+    const prev = group?.[group.length - 1];
+    if (
+      group &&
+      prev &&
+      !isFailedCreditCall(prev) &&
+      !isFailedCreditCall(call) &&
+      creditCallActorKey(prev) === creditCallActorKey(call) &&
+      prev.feature === call.feature &&
+      Math.abs(prev.at - call.at) <= CREDIT_CALL_GROUP_GAP_MS
+    ) {
+      group.push(call);
+    } else {
+      groups.push([call]);
+    }
+  }
+  return groups.map((items) => {
+    const newest = items[0];
+    const cost = items.every((item) => item.cost !== null) ? items.reduce((sum, item) => sum + (item.cost ?? 0), 0) : null;
+    return { id: items[items.length - 1].id, calls: items, cost, remaining: newest.remaining, at: newest.at, firstAt: items[items.length - 1].at };
+  });
+}
+
+/** 펼침 — 묶음의 줄 id 중 하나라도 펼친 목록에 있으면 펼친 것(묶음이 위 · 아래로 자라도 유지). */
+export function isCreditCallGroupOpen(group: CreditCallGroup, openIds: ReadonlySet<string>): boolean {
+  return group.calls.some((call) => openIds.has(call.id));
+}
+
+export function toggleCreditCallGroup(group: CreditCallGroup, openIds: ReadonlySet<string>): Set<string> {
+  const next = new Set(openIds);
+  if (isCreditCallGroupOpen(group, openIds)) for (const call of group.calls) next.delete(call.id);
+  else for (const call of group.calls) next.add(call.id);
+  return next;
 }

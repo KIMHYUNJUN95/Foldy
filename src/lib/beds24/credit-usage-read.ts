@@ -7,8 +7,11 @@ import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { readAllPages, SUPABASE_PAGE_SIZE } from "@/lib/supabase/read-all-pages";
 import {
   BEDS24_DEFAULT_CREDENTIAL_KEY,
+  BEDS24_CREDIT_CALL_PAGE_SIZE,
   BEDS24_CREDIT_FEATURES,
-  type Beds24CreditCall,
+  type Beds24CreditCallCursor,
+  type Beds24CreditCallFilter,
+  type Beds24CreditCallPage,
   type Beds24CreditDetail,
   type Beds24CreditFeature,
   type Beds24CreditRange,
@@ -19,6 +22,7 @@ import {
   beds24CreditDetailFetchStart,
   beds24CreditRangeStart,
   buildBeds24CreditDetailView,
+  isBeds24CreditCursor,
   buildBeds24CreditSnapshot,
   groupBeds24CreditWindows,
   parseBeds24CreditWindowRows,
@@ -37,7 +41,6 @@ import {
 type Client = SupabaseClient<Database>;
 export type Beds24CreditReadDeps = { supabase?: Client; nowMs?: number };
 
-const RECENT_CALL_LIMIT = 30;
 const SUMMARY_LOOKBACK_MS = 6 * 60 * 1000;
 /**
  * 창 집계 줄 상한(7일 ≈ 창 2,016개 × 사람 · 기능 조합). 넘으면 잘라서 적게 보이지 않게 오류로 드러낸다 —
@@ -174,35 +177,74 @@ export async function getBeds24CreditSummary(
 const isFeature = (value: string): value is Beds24CreditFeature =>
   (BEDS24_CREDIT_FEATURES as readonly string[]).includes(value);
 
-async function readRecentCalls(
-  supabase: Client,
-  organizationId: string,
-  fromMs: number,
-): Promise<Beds24CreditCall[]> {
-  const result = await supabase
+const CALL_COLUMNS =
+  "id, called_at, actor_kind, actor_user_id, actor_name, actor_job, feature, action, item_count, cost, remaining, http_status";
+
+export type Beds24CreditCallQuery = {
+  range: Beds24CreditRange;
+  filter?: Beds24CreditCallFilter;
+  cursor?: Beds24CreditCallCursor | null;
+};
+
+/**
+ * 최근 호출 한 장 — 기간 안, (called_at, id) 새 것부터, 커서 다음부터 50개. 한 줄 더 물어 뒤에 더 있는지만 안다(개수 안 셈).
+ * 인덱스: `beds24_credit_usage_called_at_idx (called_at desc)` 로 위에서부터 읽고 id 는 같은 시각끼리만 정렬한다
+ * (기록이 30일 보관이라 거르기가 드문 기능이어도 7일치 훑기가 가볍다 — 새 인덱스 없음).
+ */
+async function readCallPage(supabase: Client, organizationId: string, query: Beds24CreditCallQuery, nowMs: number): Promise<Beds24CreditCallPage> {
+  const since = beds24CreditRangeStart(query.range, nowMs);
+  const org = `or(organization_id.eq.${organizationId},organization_id.is.null)`;
+  const cursor = query.cursor;
+  if (cursor && !isBeds24CreditCursor(cursor)) throw new Error("invalid cursor");
+  // 조직 조건과 커서 조건을 한 `or` 안의 `and` 로 묶는다(같은 시각 줄은 id 로 이어서 빠지거나 겹치지 않게).
+  const logic = cursor
+    ? `and(${org},or(called_at.lt."${cursor.calledAt}",and(called_at.eq."${cursor.calledAt}",id.lt.${cursor.id})))`
+    : `and(${org})`;
+  let request = supabase
     .from("beds24_credit_usage")
-    .select("id, called_at, actor_kind, actor_name, actor_job, feature, action, item_count, cost, remaining, http_status")
+    .select(CALL_COLUMNS)
     .eq("credential_key", BEDS24_DEFAULT_CREDENTIAL_KEY)
-    .or(`organization_id.eq.${organizationId},organization_id.is.null`)
-    .gte("called_at", new Date(fromMs).toISOString())
+    .or(logic)
+    .gte("called_at", new Date(since).toISOString());
+  const actor = query.filter?.actor ?? null;
+  // 「자동 작업」 줄은 모델이 사람 id 없는 줄을 모두 모은 것 — 같은 기준으로 거른다.
+  if (actor === "auto") request = request.is("actor_user_id", null);
+  else if (actor) request = request.eq("actor_user_id", actor.slice("user:".length));
+  const feature = query.filter?.feature ?? null;
+  if (feature) request = request.eq("feature", feature);
+  const result = await request
     .order("called_at", { ascending: false })
-    .limit(RECENT_CALL_LIMIT);
+    .order("id", { ascending: false })
+    .limit(BEDS24_CREDIT_CALL_PAGE_SIZE + 1);
   if (result.error) throw new Error(result.error.message);
-  return (result.data ?? []).map((row) => ({
+  const rows = result.data ?? [];
+  const calls = rows.slice(0, BEDS24_CREDIT_CALL_PAGE_SIZE).map((row) => ({
     id: String(row.id),
     at: Date.parse(row.called_at),
+    calledAt: row.called_at,
     actor: {
       kind: row.actor_kind === "user" ? ("user" as const) : ("auto" as const),
+      userId: row.actor_user_id,
       name: row.actor_name ?? "",
       job: row.actor_job,
     },
-    feature: isFeature(row.feature) ? row.feature : "other",
+    feature: isFeature(row.feature) ? row.feature : ("other" as const),
     action: row.action,
     itemCount: row.item_count,
     cost: row.cost,
     remaining: row.remaining,
     httpStatus: row.http_status,
   }));
+  return { calls, hasMore: rows.length > BEDS24_CREDIT_CALL_PAGE_SIZE, since };
+}
+
+/** 「더 보기」 · 거르기 — 최근 호출만 다시 읽는다. */
+export async function getBeds24CreditCalls(
+  organizationId: string,
+  query: Beds24CreditCallQuery,
+  deps: Beds24CreditReadDeps = {},
+): Promise<Beds24CreditCallPage> {
+  return readCallPage(deps.supabase ?? getSupabaseServiceClient(), organizationId, query, deps.nowMs ?? Date.now());
 }
 
 export async function getBeds24CreditDetail(
@@ -215,7 +257,7 @@ export async function getBeds24CreditDetail(
   const [snapshot, windows, recentCalls] = await Promise.all([
     readSnapshot(supabase, nowMs),
     readWindows(supabase, organizationId, beds24CreditDetailFetchStart(range, nowMs), nowMs),
-    readRecentCalls(supabase, organizationId, beds24CreditRangeStart(range, nowMs)),
+    readCallPage(supabase, organizationId, { range }, nowMs),
   ]);
   return { snapshot, range, recentCalls, ...buildBeds24CreditDetailView(windows, snapshot, range, nowMs) };
 }

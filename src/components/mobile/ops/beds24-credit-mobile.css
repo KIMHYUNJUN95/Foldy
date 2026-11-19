@@ -146,12 +146,18 @@
 /* 한글 · 일본어는 글자마다 끊겨 pretty 만으로는 「니다」 · 「ます」가 떨어진다 — ko 는 어절, ja 는 구 단위로(모르는 브라우저는 지금 그대로). 언어 판정은 globals.css 와 같은 `:lang()`. */
 .mcr-sub:lang(ko),
 .mcr-empty:lang(ko),
-.mcr-note__t:lang(ko) {
+.mcr-note__t:lang(ko),
+.mcr-row__t:lang(ko),
+.mcr-flt:lang(ko),
+.mcr-gt:lang(ko) {
   word-break: keep-all;
 }
 .mcr-sub:lang(ja),
 .mcr-empty:lang(ja),
-.mcr-note__t:lang(ja) {
+.mcr-note__t:lang(ja),
+.mcr-row__t:lang(ja),
+.mcr-flt:lang(ja),
+.mcr-gt:lang(ja) {
   word-break: auto-phrase;
 }
 .mcr-sub {
@@ -298,6 +304,134 @@
   font-size: 12px;
 }
 
+/* ── 누가 · 어디에 거르기 · 오늘 최근 호출 (2026-11-18) ───────────────────── */
+/* 누르는 줄 — 고른 줄은 옅은 배경만(왼쪽 막대 · 테두리 없음). 배경이 글자에 붙지 않게 양옆 8px 를 바깥으로. */
+/* 위에 새 줄이 붙을 때는 훅이 직접 자리를 맞춘다 — 브라우저의 자리 맞춤과 겹치지 않게. */
+.mcr-calls {
+  overflow-anchor: none;
+}
+.mcr-row--pick {
+  display: block;
+  padding: 0;
+}
+.mcr-pick {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: calc(100% + 16px);
+  min-height: 44px;
+  margin: 0 -8px;
+  padding: 8px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  transition: background-color 0.12s ease-out;
+}
+.mcr-pick[aria-pressed="true"] {
+  background: color-mix(in oklab, var(--mcr-pri) 8%, #fff);
+}
+.mcr-pick:focus-visible,
+.mcr-flt button:focus-visible,
+.mcr-more:focus-visible {
+  outline: 2px solid var(--mcr-pri);
+  outline-offset: -2px;
+}
+.mcr-flt {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  min-width: 0;
+  color: var(--mcr-ink);
+  overflow-wrap: anywhere;
+}
+.mcr-flt button {
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--mcr-pri);
+  font: inherit;
+  font-weight: 700;
+  white-space: nowrap;
+}
+/* 호출 줄은 글자 크기 1.35배에서도 윗줄 · 아랫줄로 내려가게. */
+.mcr-call .mcr-row__t small,
+.mcr-group .mcr-row__t small {
+  font-variant-numeric: tabular-nums;
+}
+.mcr-bad {
+  color: var(--mcr-stop);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.mcr-gt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.mcr-gt em {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--mcr-pri) 8%, #fff);
+  color: var(--mcr-pri);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 700;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.mcr-gchev {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--mcr-muted);
+  transition: transform 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+}
+.mcr-pick[aria-expanded="true"] .mcr-gchev {
+  transform: rotate(180deg);
+}
+.mcr-gsub {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.22s cubic-bezier(0.23, 1, 0.32, 1);
+}
+.mcr-gsub.is-open {
+  grid-template-rows: 1fr;
+}
+.mcr-gsub__in {
+  min-height: 0;
+  margin: 0;
+  padding: 0 0 0 12px;
+  overflow: hidden;
+  list-style: none;
+}
+.mcr-gsub__in .mcr-row {
+  font-size: 13px;
+}
+.mcr-more {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 6px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--mcr-track);
+  color: var(--mcr-ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+}
+.mcr-more:disabled {
+  color: var(--mcr-muted);
+}
+
 /* 폴드 · 태블릿 — 자동화 칸은 두 칸(누가 · 어디에)으로 나란히 놓지 않고 폭만 키운다. 숫자 줄은 그대로. */
 @media (min-width: 600px) {
   .mcr-sec { padding: 20px 22px; }
@@ -311,4 +445,5 @@
   .mcr-fold { transition: none; }
   .mcr-loading i { animation: none; }
   .mcr-bar i { transition: none; }
+  .mcr-pick, .mcr-gsub, .mcr-gchev { transition: none; }
 }

@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
   enabled: false,
   loadDestinations: vi.fn(),
   writes: [] as string[],
+  jobUpserts: [] as Array<Record<string, unknown>>,
 }));
 
 vi.mock("@/lib/admin-session", () => ({
@@ -52,8 +53,9 @@ vi.mock("@/lib/supabase/service", () => {
   const chain = (table: string): Record<string, unknown> => {
     const node: Record<string, unknown> = {};
     for (const method of ["update", "upsert", "insert", "delete"]) {
-      node[method] = () => {
+      node[method] = (payload?: Record<string, unknown>) => {
         state.writes.push(`${table}.${method}`);
+        if (table === "automation_jobs" && method === "upsert" && payload) state.jobUpserts.push(payload);
         return node;
       };
     }
@@ -81,6 +83,7 @@ beforeEach(() => {
   state.destinations = [];
   state.enabled = false;
   state.writes = [];
+  state.jobUpserts = [];
   state.loadDestinations.mockClear();
 });
 
@@ -121,5 +124,10 @@ describe("saveAutomationJob — 켜져 있는 자동화를 받는 곳 0곳으로
   });
   it("꺼져 있으면 받는 곳 0곳으로도 저장된다", async () => {
     expect((await save([])).ok).toBe(true);
+  });
+  it("성공하면 이 저장이 쓴 설정 줄 버전(updated_at)을 돌려준다 — 화면 초안이 이보다 옛 그림을 버린다", async () => {
+    const result = await save([]);
+    expect(result).toEqual({ ok: true, version: state.jobUpserts[0]?.updated_at });
+    expect(typeof state.jobUpserts[0]?.updated_at).toBe("string");
   });
 });

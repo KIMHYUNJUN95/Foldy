@@ -60,6 +60,8 @@ import {
 import { canEnableAutomation, orphanDestinations } from "@/lib/automation/enable-guard";
 import { isScheduledSendDue } from "@/lib/automation/schedule";
 import type { Dictionary } from "@/lib/i18n";
+import { actionResult } from "@/lib/action-result";
+import { useAutomationDraft, useAutomationLive } from "./use-automation-live";
 import "./automation-white.css";
 
 /**
@@ -194,7 +196,7 @@ function AtwConfirm({
 }
 
 export function AutomationConsole({
-  data,
+  data: serverData,
   copy,
   creditCopy,
   shared,
@@ -209,6 +211,8 @@ export function AutomationConsole({
   localeTag: string;
 }) {
   const w = copy.white;
+  // 새로고침 없이 15초마다 · 탭 복귀 때 우리 DB 를 다시 읽는다 — 저장 뒤 서버 그림과 겨뤄 나중 값이 이긴다.
+  const data = useAutomationLive(serverData);
   const [selected, setSelected] = useState<AutomationJobKey>("daily_report");
   const [tab, setTab] = useState<Tab>("preview");
   const [toast, setToast] = useState<string | null>(null);
@@ -245,7 +249,7 @@ export function AutomationConsole({
       return;
     }
     startTransition(async () => {
-      const result = await setAutomationEnabled(job.jobKey, false);
+      const result = await actionResult(() => setAutomationEnabled(job.jobKey, false), "save_failed");
       if (!result.ok) return flash(errorText(result.error));
       flash(copy.toggleOffDone);
     });
@@ -253,7 +257,7 @@ export function AutomationConsole({
   const confirmEnable = () => {
     if (!enableGuard.ok) return;
     startTransition(async () => {
-      const result = await setAutomationEnabled(job.jobKey, true);
+      const result = await actionResult(() => setAutomationEnabled(job.jobKey, true), "save_failed");
       setConfirmOn(false);
       if (!result.ok) return flash(errorText(result.error));
       flash(copy.toggleOnDone);
@@ -417,7 +421,7 @@ export function AutomationConsole({
                 flash={flash}
                 job={job}
                 justSaved={justSaved === job.jobKey}
-                key={`settings-${job.jobKey}-${job.sendTime}-${job.retryUntil}`}
+                key={`settings-${job.jobKey}`}
                 onSaved={onSaved}
                 view={view}
               />
@@ -574,7 +578,7 @@ function PreviewPane({
   const sendNow = () => {
     setConfirmSend(false);
     startSend(async () => {
-      const result = await sendAutomationNow(asCorrection ? { correction: true, date, jobKey: job.jobKey } : { date, jobKey: job.jobKey });
+      const result = await actionResult(() => sendAutomationNow(asCorrection ? { correction: true, date, jobKey: job.jobKey } : { date, jobKey: job.jobKey }), "save_failed");
       if (!result.ok) return flash(errorText(result.error));
       flash(asCorrection ? copy.assign.correctionSent : fill(copy.preview.sentToast, { failed: result.failed, sent: result.sent }));
       setDone(true);
@@ -736,7 +740,8 @@ function AssignPane({
     setBoard((current) => (current ? { ...current, rooms: update(current.rooms) } : current));
 
   const reload = useCallback(() => {
-    loadAssigneeBoard(date, userLocale).then((result) => {
+    // 던져도(네트워크 끊김) 실패 결과와 같은 길 — 빈 명단 + 토스트.
+    actionResult(() => loadAssigneeBoard(date, userLocale), "save_failed").then((result) => {
       if (!result.ok) {
         flash(errorText(result.error));
         setBoard({ date, roomOptions: [], rooms: [], sent: false });
@@ -755,7 +760,7 @@ function AssignPane({
     const value = names[room.roomKey] ?? "";
     if (value === room.names) return;
     startBusy(async () => {
-      const result = await saveCleaningAssignee({ date, names: value, roomKey: room.roomKey });
+      const result = await actionResult(() => saveCleaningAssignee({ date, names: value, roomKey: room.roomKey }), "save_failed");
       if (!result.ok) return flash(errorText(result.error));
       setRooms((current) => current.map((item) => (item.roomKey === room.roomKey ? { ...item, names: value.trim() } : item)));
       flash(copy.assign.saved);
@@ -770,7 +775,7 @@ function AssignPane({
   const addRoom = () => {
     if (!addKey) return;
     startBusy(async () => {
-      const result = await addCleaningExtraRoom({ date, note: addNote, roomKey: addKey });
+      const result = await actionResult(() => addCleaningExtraRoom({ date, note: addNote, roomKey: addKey }), "save_failed");
       if (!result.ok) return flash(errorText(result.error));
       setAddKey("");
       setAddNote("");
@@ -780,7 +785,7 @@ function AssignPane({
   };
   const removeRoom = (room: AssigneeRoomView) => {
     startBusy(async () => {
-      const result = await removeCleaningExtraRoom({ date, roomKey: room.roomKey });
+      const result = await actionResult(() => removeCleaningExtraRoom({ date, roomKey: room.roomKey }), "save_failed");
       if (!result.ok) return flash(errorText(result.error));
       flash(copy.assign.extraRemoved);
       reload();
@@ -790,7 +795,7 @@ function AssignPane({
   const changed = (rooms ?? []).filter((room) => sent && room.sentNames !== null && (names[room.roomKey] ?? "").trim() !== (room.sentNames ?? ""));
   const sendCorrection = () => {
     startBusy(async () => {
-      const result = await sendAutomationNow({ correction: true, date, jobKey: "cleaning_list" });
+      const result = await actionResult(() => sendAutomationNow({ correction: true, date, jobKey: "cleaning_list" }), "save_failed");
       if (!result.ok) return flash(errorText(result.error));
       flash(copy.assign.correctionSent);
       reload();
@@ -974,7 +979,7 @@ function HistoryPane({
   const [message, setMessage] = useState<string | null>(null);
   const rawTitleId = useId();
   const open = (id: string) => {
-    loadAutomationRunMessage(id).then((result) => {
+    actionResult(() => loadAutomationRunMessage(id), "save_failed").then((result) => {
       if (!result.ok) return flash(errorText(result.error));
       setMessage(result.text || "—");
     });
@@ -1071,10 +1076,10 @@ function SettingsPane({
 }) {
   const w = copy.white;
   const original = useMemo(() => draftOf(job), [job]);
-  const [draft, setDraft] = useState<Draft>(original);
+  // 실시간 갱신으로 서버 값이 바뀌어도 손대던 초안은 덮지 않는다(`reconcileDraft`).
+  const { draft, setDraft, dirty, submit, settle, release } = useAutomationDraft<Draft>(original, job.version);
   const [saving, startSave] = useTransition();
   const [confirmSave, setConfirmSave] = useState(false);
-  const dirty = JSON.stringify(draft) !== JSON.stringify(original);
   const weekdayLabels = copy.settings.weekdayShort.split(",");
   const timed = job.kind === "scheduled";
 
@@ -1144,12 +1149,15 @@ function SettingsPane({
   };
   const doSave = () => {
     setConfirmSave(false);
+    const ticket = submit();
     startSave(async () => {
-      const result = await saveAutomationJob({ jobKey: job.jobKey, ...draft });
+      const result = await actionResult(() => saveAutomationJob({ jobKey: job.jobKey, ...draft }), "save_failed");
       if (!result.ok) {
+        release();
         setSaveError(errorText(result.error));
         return flash(errorText(result.error));
       }
+      settle(ticket, result.version);
       flash(copy.settings.saved);
       onSaved(job.jobKey);
     });

@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useAutomationDraft } from "@/components/admin/ops/use-automation-live";
 import { MobileConfirm } from "@/components/mobile/mobile-confirm";
 import { useRouter } from "next/navigation";
 import { Check, ChevronRight } from "lucide-react";
 import { saveAutomationJob } from "@/actions/ops-automation";
+import { actionResult } from "@/lib/action-result";
 import type { AutomationJobView, AutomationPageData } from "@/lib/automation/console-data";
 import {
   AUTOMATION_LOCALES,
@@ -234,20 +236,12 @@ export function MobileAutomationSettings({
   const m = copy.mobileForm;
   const s = copy.settings;
   const original = useMemo(() => draftOf(job), [job]);
-  const [draft, setDraft] = useState<Draft>(original);
+  // 실시간 갱신 · 저장 뒤 refresh 로 서버 값이 바뀌어도 손대던 초안은 덮지 않는다(`reconcileDraft`).
+  const { draft, setDraft, dirty, submit, settle, release } = useAutomationDraft<Draft>(original, job.version);
   const [saving, startSave] = useTransition();
   const [confirming, setConfirming] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-
-  // 서버에서 새 값이 오면(저장 뒤 refresh · 다른 자동화로 바꿈) 따라간다 — 손대던 중(같은 자동화 · 바뀐 곳 있음)이면 그대로 둔다.
-  const signature = JSON.stringify(original);
-  const [synced, setSynced] = useState({ jobKey: job.jobKey, signature });
-  if (synced.signature !== signature || synced.jobKey !== job.jobKey) {
-    const wasClean = JSON.stringify(draft) === synced.signature;
-    setSynced({ jobKey: job.jobKey, signature });
-    if (wasClean || synced.jobKey !== job.jobKey) setDraft(original);
-  }
 
   useEffect(() => {
     if (!justSaved) return;
@@ -255,7 +249,6 @@ export function MobileAutomationSettings({
     return () => window.clearTimeout(timer);
   }, [justSaved]);
 
-  const dirty = JSON.stringify(draft) !== signature;
   const weekdayLabels = s.weekdayShort.split(",");
   const timed = job.kind === "scheduled";
 
@@ -296,14 +289,17 @@ export function MobileAutomationSettings({
     setDraft((current) => ({ ...current, settings: { ...current.settings, resend: { ...current.settings.resend, ...patch } } }));
 
   const doSave = () => {
+    const ticket = submit();
     startSave(async () => {
-      const result = await saveAutomationJob({ jobKey: job.jobKey, ...draft });
+      const result = await actionResult(() => saveAutomationJob({ jobKey: job.jobKey, ...draft }), "save_failed");
       setConfirming(false);
       if (!result.ok) {
+        release();
         haptic("error");
         setSaveError(errorTextOf(copy, result.error));
         return flash(errorTextOf(copy, result.error));
       }
+      settle(ticket, result.version);
       flash(s.saved);
       setJustSaved(true);
       router.refresh();

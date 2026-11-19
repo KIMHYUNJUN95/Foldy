@@ -1465,7 +1465,7 @@ export function MobileOpsCalendar({
 
   return (
     <div aria-busy={navPending ? true : undefined} className={`mops${navPending ? " is-nav" : ""}`} ref={rootRef}>
-      {credit ? <MobileCreditNote copy={credit.copy} initial={credit.initial} serverNow={credit.serverNow} /> : null}
+      {credit ? <MobileCreditNote copy={credit.copy} initial={credit.initial} localeTag={copy.localeTag} serverNow={credit.serverNow} /> : null}
       {/* 건물 — 옅은 보라 선택 글자 탭(화이트 리디자인 2026-10-16). 모바일은 한 건물씩 — 누르면 그 건물**만** 본다
           (2026-10-05: 예전 「함께 보기」 동그라미가 칩 옆에 붙어 있어 잘못 누르면 이전 건물이 남았다). */}
       <div className="mops-pills" role="group" aria-label={copy.propertyGroupLabel}>

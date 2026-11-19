@@ -2627,6 +2627,15 @@ INSERT · UPDATE 신호만, DELETE 는 오지 않는다. 대신 `task_occurrence
 - 보존: 따로 지우는 작업 없음(대화 · 메시지 · 문구를 지우면 cascade 로 같이).
 - 타입: `src/types/database.ts` 손으로 맞춤(`embedding` 은 글 `"[…]"`).
 
+## 2026-11-18 과거 답장 후보 — `guest_reply_candidate_runs` · `guest_reply_candidates` (`202611180005_guest_reply_candidates.sql`, **운영 미적용**)
+
+기준 문서: `docs/product/49-guest-message-ai-reply-assist.md` §9.
+
+- `guest_reply_candidate_runs` — 「다시 찾기」 한 번. `id` · `organization_id`(cascade) · `status`(`running` · `done` · `failed`, 끝나면 `finished_at` 필수) · `started_by`(→ auth.users set null) · `started_at` · `source_count` · `source_since` · `source_until` · `model` · `input_tokens` · `output_tokens` · `cost_micro_usd`(시작 때 미리 잡은 값 → 실제 값, 한 달 공용 한도에 포함) · `error_key`(`unavailable` · `cap` · `failed` · `stale`) · `skip_notes jsonb`(`[{property, field, reason: few|filled, count}]`). 부분 고유 색인: 조직마다 `running` 하나.
+- `guest_reply_candidates` — 후보 하나. `kind`(`saved_reply` · `guest_info`) · `status`(`pending` · `added` · `dismissed`, `pending` 이면 `decided_at` null) · `title` · `question` · `bodies` · `note`(언어별 jsonb) · `ask_count` · `first_asked_at` · `last_asked_at` · `evidence jsonb`(가린 글 `[{at, property, lang, text}]`, 다른 손님 이름 · 연락처 가림) · `centroid vector(1024)`(빼기 · 넣기 기억 비교용, 화면에 안 보냄) · `similar_saved_reply_id` · `property_name` · `field`(6칸) · `options jsonb`(최신 순 최대 2개) · `value_hashes text[]` · `decided_by` · `decided_at` · `result_saved_reply_id` · `applied_previous jsonb`(되돌리기용) · `run_id`(set null). 모양 check: 문구 후보는 건물 · 칸 없음, 건물 후보는 둘 다 있음.
+- 함수(security invoker · `search_path = ''` · 실행 service_role 만): `guest_reply_candidate_run_start` · `guest_reply_cluster_stats` · `guest_reply_cluster_recent`, 그리고 `guest_reply_assist_cost_since` · `guest_reply_assist_reserve` 가 후보 실행 비용도 더한다.
+- 타입: `src/types/database.ts` 손으로 맞춤.
+
 ## 2026-11-18 `beds24_credit_usage` — Beds24 호출 한 번 = 한 줄 (크레딧 사용 기록)
 
 마이그레이션 `202611180003_beds24_credit_usage.sql` (**운영 적용 2026-11-18**) · 고침 `202611180004_beds24_credit_usage_fixes.sql`(**운영 적용 2026-11-18**: 읽기 정책에 `admin_web.access` 추가 · 판정표 3번 줄 · 창 집계 전체 순서). 설계: 01 → 「2026-11-18 크레딧 사용 기록」.

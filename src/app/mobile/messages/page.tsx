@@ -7,6 +7,7 @@ import { INBOX_STATUS_FILTERS, parseChannelFilter, type InboxStatusFilter } from
 import { getDictionary } from "@/lib/i18n";
 import { normalizeSearchQuery } from "@/lib/guest-messages/inbox-search";
 import { loadStallNotice } from "@/lib/guest-messages/channel-overview-server";
+import { countPendingCandidates } from "@/lib/guest-messages/reply-candidates-server";
 import { getMobileNavBadges } from "@/lib/nav-badges";
 import { getOnboardingState } from "@/lib/onboarding";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
@@ -38,10 +39,17 @@ export default async function MobileMessagesPage({
   const channel = parseChannelFilter(params.channel);
 
   const canManage = session.capabilities.includes("guest_messages.manage");
-  const [badges, list, stall] = await Promise.all([
+  // 과거 답장 후보 입구 — 볼 수 있는 종류는 서버 액션 판정과 같게(문서 49 §9-6).
+  const candidateKinds = [
+    ...(canManage ? (["saved_reply"] as const) : []),
+    ...(session.capabilities.includes("property_info.edit") ? (["guest_info"] as const) : []),
+  ];
+  const db = getSupabaseServiceClient();
+  const [badges, list, stall, candidates] = await Promise.all([
     getMobileNavBadges(),
     listGuestConversations({ status, building, channel }),
-    canManage ? loadStallNotice(getSupabaseServiceClient(), session.organization.id) : Promise.resolve(null),
+    canManage ? loadStallNotice(db, session.organization.id) : Promise.resolve(null),
+    candidateKinds.length > 0 ? countPendingCandidates(db, session.organization.id, candidateKinds).catch(() => null) : Promise.resolve(null),
   ]);
 
   return (
@@ -58,6 +66,7 @@ export default async function MobileMessagesPage({
           channel={channel}
           stall={stall}
           initialQuery={normalizeSearchQuery(params.q) ?? ""}
+          candidates={candidates}
         />
       </SplitList>
     </MobileShell>

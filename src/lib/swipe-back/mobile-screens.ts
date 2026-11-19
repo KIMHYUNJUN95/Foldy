@@ -47,6 +47,7 @@ export const MOBILE_SCREENS: readonly string[] = [
   "/mobile/maintenance/new",
   "/mobile/messages",
   "/mobile/messages/[id]",
+  "/mobile/messages/candidates",
   "/mobile/notifications",
   "/mobile/ops/automation",
   "/mobile/ops/calendar",

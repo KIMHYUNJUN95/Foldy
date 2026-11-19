@@ -554,6 +554,9 @@ html[data-pane] [data-shell-scroll]:has(.gm-mthread) { padding-bottom: 0 !import
 .adm .gm-console .adm-undo,
 .adm .gm-console .adm-toast { top: 148px; bottom: auto; }
 
+/* 답장 후보 화면 — 되돌리기(아래 32px · 높이 42)가 떠 있을 때 오류 토스트는 그 위로 올린다(둘이 겹치지 않게). */
+.adm .gm-cand:has(.adm-undo) .adm-toast { bottom: 84px; }
+
 /* 답장 칸 「번역해서 보낼 언어」 — 드롭다운 하나(칩 대신). 손가락 화면에선 도구 줄 안에서 줄어들지 않는다. */
 .gm-select--target { flex: none; max-width: 100%; }
 
@@ -643,6 +646,8 @@ html[data-pane] [data-shell-scroll]:has(.gm-mthread) { padding-bottom: 0 !import
 /* ── PC 탭 줄 (대화 · 정해 둔 문구 · 설정) — 탭이 둘 이상일 때만 그린다 ── */
 .gm-page { display: flex; flex-direction: column; height: calc(100dvh - 72px); margin: -28px -32px -60px; min-height: 520px; background: #fff; }
 .gm-page > .gm-console { margin: 0; height: auto; flex: 1; min-height: 0; }
+/* 관리 권한 없이 건물 칸만 고치는 사람의 첫 화면 — 건물 정보 후보 입구(49 §9-6) */
+.gm-page__entry { flex: none; padding: 12px 32px; box-shadow: inset 0 -0.5px 0 var(--gm-sep); }
 .gm-tabs { flex: none; display: flex; gap: 28px; padding: 0 32px; box-shadow: inset 0 -0.5px 0 var(--gm-sep); background: #fff; }
 .gm-tab {
   padding: 10px 0 12px;
@@ -1346,4 +1351,193 @@ button.gm-photo:focus-visible { outline: 2px solid var(--gm-primary); outline-of
 @media (prefers-reduced-motion: reduce) {
   .ax-fade { animation: none; }
   .ax-shimmer i { animation: none; }
+}
+
+/* ── 과거 답장에서 찾은 후보(49 §9, 2026-11-19 시안 pa3) ───────────────────────────────────────────
+   칩 · 세로 구분선 · 카드 테두리 · 왼쪽 막대 없음. 구분선은 공용 0.5px #E4E3E9, 고른 줄은 옅은 보라 바탕만. */
+.gm-root { --gm-pri-ink: #5a30cf; }
+.gm-cand-num { font-variant-numeric: tabular-nums; }
+
+/* 입구 띠 — PC 정해 둔 문구 위 · 폰 대화 목록 위 */
+.gm-cand-entry { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 14px; background: var(--gm-select); color: inherit; text-decoration: none; }
+.gm-cand-entry + .gm-cand-entry { margin-top: 6px; }
+.gm-replies__list > .gm-cand-entry { margin-bottom: 8px; }
+.gm-mlist-head + .gm-cand-entry { margin: 4px 0 6px; }
+.gm-cand-entry__icon { width: 32px; height: 32px; flex: none; border-radius: 10px; background: #fff; color: var(--gm-primary); display: inline-flex; align-items: center; justify-content: center; }
+.gm-cand-entry__txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.gm-cand-entry__txt b { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.gm-cand-entry__txt span { font-size: 12px; color: var(--gm-muted); }
+.gm-cand-entry__go { display: flex; align-items: center; gap: 8px; flex: none; }
+.gm-cand-entry__link { font-size: 13px; font-weight: 600; color: var(--gm-pri-ink); text-decoration: none; white-space: nowrap; }
+
+/* PC 둘로 나눈 칸 — 목록 · 편집기 각자 스크롤, 아래 버튼 줄은 늘 보인다 */
+.gm-cand { display: flex; height: calc(100vh - 117px); min-height: 480px; overflow: hidden; color: var(--gm-ink); }
+.gm-cand__list { flex: 1; min-width: 0; padding: 24px 40px; display: flex; flex-direction: column; gap: 10px; background: var(--gm-pane); overflow-y: auto; scrollbar-width: none; }
+.gm-cand__editor { width: 560px; flex: none; padding: 24px 32px; background: #fff; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; scrollbar-width: none; }
+@media (max-width: 1360px) { .gm-cand__editor { width: 480px; padding: 24px; } }
+.gm-cand__back { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; font-size: 13px; color: var(--gm-muted); text-decoration: none; border-radius: 6px; }
+.gm-cand__back:focus-visible { outline: 2px solid var(--gm-primary); outline-offset: 2px; }
+.gm-cand__titlerow { display: flex; align-items: center; gap: 12px; }
+.gm-cand__titlerow h1 { flex: 1; min-width: 0; margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.01em; }
+.gm-cand__intro { margin: 0; font-size: 13px; color: var(--gm-muted); line-height: 1.6; max-width: 62ch; }
+/* 지난 「다시 찾기」가 실패 · 한도 · 멈춤으로 끝났을 때 한 줄(옅게). */
+.gm-cand__note { margin: -4px 0 0; font-size: 12.5px; color: var(--gm-muted); line-height: 1.5; max-width: 62ch; }
+.gm-cand__kbd { display: flex; flex-wrap: wrap; gap: 14px; padding: 4px 12px; font-size: 12px; color: var(--gm-muted); }
+.gm-cand__kbd kbd { font: inherit; font-size: 11px; padding: 1px 6px; margin-right: 4px; border-radius: 5px; background: var(--gm-fill); color: var(--gm-ink); }
+.gm-cand__editor h2 { margin: 0; font-size: 20px; font-weight: 700; overflow-wrap: anywhere; }
+
+/* 거르기 — 글자 버튼, 고른 것만 옅은 바탕 */
+.gm-cand-filters { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
+.gm-cand-filter { min-height: 32px; padding: 0 10px; border: 0; border-radius: 9px; background: none; font: inherit; font-size: 13px; color: var(--gm-muted); white-space: nowrap; cursor: pointer; }
+.gm-cand-filter b { font-weight: 600; margin-left: 4px; font-variant-numeric: tabular-nums; }
+.gm-cand-filter[aria-pressed="true"] { background: var(--gm-select); color: var(--gm-pri-ink); font-weight: 600; }
+.gm-cand-filter:focus-visible { outline: 2px solid var(--gm-primary); outline-offset: 1px; }
+.gm-cand-sort { margin-left: auto; font-size: 13px; color: var(--gm-muted); white-space: nowrap; }
+
+/* 줄 */
+.gm-cand-rows { display: flex; flex-direction: column; }
+.gm-cand-row { position: relative; display: flex; align-items: center; gap: 12px; width: 100%; min-height: 60px; padding: 8px 12px; border: 0; border-radius: 12px; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.gm-cand-rows > .row-collapse + .row-collapse .gm-cand-row::before { content: ""; position: absolute; top: 0; left: 12px; right: 12px; height: 0.5px; background: var(--gm-sep); }
+.gm-cand-row[data-selected] { background: var(--gm-select); }
+.gm-cand-row[data-selected]::before,
+.gm-cand-rows > .row-collapse:has(.gm-cand-row[data-selected]) + .row-collapse .gm-cand-row::before { display: none; }
+.gm-cand-row:focus-visible { outline: 2px solid var(--gm-primary); outline-offset: -2px; }
+@media (hover: hover) and (pointer: fine) { .gm-cand-row:not([data-selected]):hover { background: var(--gm-fill); } }
+.gm-cand-row__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+/* 이름 줄바꿈 — 마지막 한 글자만 다음 줄로 넘어가지 않게(text-wrap: pretty · 일본어 금칙 strict). 한국어는 어절 단위.
+   overflow-wrap 은 넘칠 때만 끊는다(anywhere 는 아무 데서나 끊어 「…預かり」의 끝 글자가 혼자 남았다). */
+.gm-cand-row__main b { font-size: 14px; font-weight: 600; overflow-wrap: break-word; text-wrap: pretty; line-break: strict; }
+.gm-cand-row__main b:lang(ko) { word-break: keep-all; }
+.gm-cand-row__main span { font-size: 12px; color: var(--gm-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gm-cand-row__count { flex: none; font-size: 12px; color: var(--gm-muted); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.gm-cand-row__state { flex: none; font-size: 12px; font-weight: 600; color: var(--gm-pri-ink); white-space: nowrap; }
+.gm-cand-row > svg { flex: none; color: var(--gm-muted); }
+
+/* AI 줄 */
+.gm-cand-ai { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--gm-muted); }
+.gm-cand-ai > svg { flex: none; color: var(--gm-primary); }
+.gm-cand-ai b { font-weight: 600; color: var(--gm-ink); }
+.gm-cand-ai__pos { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* 글 칸(이름 · 본문) — 볼 때는 읽기 전용, 고치기에서 입력 */
+.gm-cand-notch { position: relative; display: block; }
+.gm-cand-notch__label { position: absolute; left: 12px; top: -8px; z-index: 1; padding: 0 4px; background: #fff; font-size: 12px; font-weight: 600; color: var(--gm-muted); }
+.gm-cand-notch[data-draft] .gm-cand-notch__label { color: var(--gm-pri-ink); }
+.gm-cand-notch__input { display: block; width: 100%; min-height: 44px; margin: 0; padding: 12px 14px; border: 1px solid var(--gm-input); border-radius: 12px; background: #fff; font: inherit; font-size: 14px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--gm-ink); }
+textarea.gm-cand-notch__input { resize: vertical; min-height: 160px; }
+.gm-cand-notch__input:focus { outline: none; border-color: var(--gm-primary); box-shadow: 0 0 0 3px #eee8fc; }
+.gm-cand-notch[data-draft] .gm-cand-notch__input { border-color: var(--gm-primary); box-shadow: 0 0 0 3px #eee8fc; }
+.gm-cand-notch__input[data-empty] { color: var(--gm-muted); }
+.gm-cand-var { display: inline-block; padding: 0 5px; border-radius: 6px; background: var(--gm-select); color: var(--gm-pri-ink); font-size: 13px; font-weight: 600; }
+.gm-cand-bodyhead { display: flex; align-items: center; gap: 12px; }
+.gm-cand-bodyhead > span { font-size: 13px; font-weight: 600; }
+.gm-cand-langseg { margin-left: auto; display: inline-flex; gap: 2px; padding: 3px; border-radius: 10px; background: var(--gm-fill); }
+.gm-cand-langseg button { min-height: 28px; padding: 0 10px; border: 0; border-radius: 8px; background: none; font: inherit; font-size: 12px; color: var(--gm-muted); white-space: nowrap; cursor: pointer; }
+.gm-cand-langseg button[aria-checked="true"] { background: #fff; box-shadow: 0 1px 2px rgba(22, 20, 31, 0.08); color: var(--gm-ink); font-weight: 600; }
+.gm-cand-langseg button:focus-visible { outline: 2px solid var(--gm-primary); outline-offset: 1px; }
+.gm-cand-note { display: flex; gap: 8px; align-items: flex-start; margin: 0; font-size: 12px; line-height: 1.6; color: var(--gm-muted); }
+.gm-cand-note > svg { flex: none; margin-top: 2px; }
+.gm-cand-notice { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; background: var(--gm-fill); font-size: 13px; line-height: 1.55; }
+.gm-cand-notice > svg { flex: none; margin-top: 3px; color: var(--gm-muted); }
+.gm-cand-notice > div { flex: 1; min-width: 0; }
+.gm-cand-link { border: 0; background: none; padding: 0; font: inherit; font-size: 13px; font-weight: 600; color: var(--gm-pri-ink); text-decoration: none; cursor: pointer; }
+
+/* 근거 */
+.gm-cand-ev { display: flex; flex-direction: column; padding-top: 12px; box-shadow: inset 0 0.5px 0 var(--gm-sep); }
+.gm-cand-ev__title { margin: 0 0 6px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; font-size: 13px; font-weight: 700; }
+.gm-cand-ev__title span { font-size: 12px; font-weight: 400; color: var(--gm-muted); }
+.gm-cand-sim { display: flex; flex-direction: column; gap: 3px; padding: 10px 0; }
+.gm-cand-sim + .gm-cand-sim { box-shadow: inset 0 0.5px 0 var(--gm-sep); }
+.gm-cand-sim__q { font-size: 12px; color: var(--gm-muted); }
+.gm-cand-sim__a { font-size: 13px; line-height: 1.55; overflow-wrap: anywhere; white-space: pre-wrap; }
+.gm-cand-sim__m { font-size: 11px; color: var(--gm-muted); }
+.gm-cand-mask { letter-spacing: 0.08em; color: var(--gm-muted); }
+
+/* 버튼 줄 */
+.gm-cand-foot { position: sticky; bottom: -24px; z-index: 2; margin-top: auto; margin-bottom: -24px; display: flex; align-items: center; gap: 8px; padding: 14px 0 24px; background: #fff; box-shadow: inset 0 0.5px 0 var(--gm-sep); }
+.gm-cand-foot > .gm-btn--primary { margin-left: auto; }
+.gm-btn--ghost { background: transparent; color: var(--gm-muted); }
+.gm-btn--ghost:hover:not(:disabled) { background: var(--gm-fill); }
+
+/* 상태(읽는 중 · 실패 · 다 봄 · 빈) */
+.gm-cand-state { margin: 60px auto 0; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 0 16px; text-align: center; }
+.gm-cand-state b { font-size: 17px; }
+.gm-cand-state p { margin: 0; font-size: 14px; line-height: 1.6; color: var(--gm-muted); max-width: 36ch; }
+.gm-cand-state__icon { width: 52px; height: 52px; border-radius: 16px; background: var(--gm-select); color: var(--gm-primary); display: inline-flex; align-items: center; justify-content: center; }
+.gm-cand-state__icon[data-tone="err"] { background: #fdf0f2; color: var(--gm-urgent); }
+.gm-cand-state__actions { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 300px; margin-top: 8px; }
+.gm-cand-state__actions > * { min-height: 44px; text-decoration: none; }
+.gm-cand-spin { width: 22px; height: 22px; border-radius: 50%; border: 2.5px solid #eee8fc; border-top-color: var(--gm-primary); animation: gm-cand-spin 0.7s linear infinite; }
+@keyframes gm-cand-spin { to { transform: rotate(360deg); } }
+.gm-cand-skel { display: flex; flex-direction: column; gap: 8px; }
+.gm-cand-skel > span { height: 60px; border-radius: 12px; background: var(--gm-fill); }
+.gm-cand-pick { margin: auto; font-size: 13px; color: var(--gm-muted); text-align: center; }
+
+/* 건물 정보 칸 */
+.gm-cand-bhead { display: flex; align-items: center; gap: 10px; }
+.gm-cand-bhead h2 { flex: 1; min-width: 0; }
+.gm-cand-fields { display: flex; flex-direction: column; margin-top: 4px; max-width: 640px; }
+.gm-cand-field { display: flex; flex-direction: column; gap: 6px; padding: 14px 0; }
+.gm-cand-fields > .row-collapse + .row-collapse .gm-cand-field { box-shadow: inset 0 0.5px 0 var(--gm-sep); }
+.gm-cand-field[data-hl] { padding: 14px 12px; border-radius: 12px; background: var(--gm-select); box-shadow: none !important; }
+.gm-cand-fields > .row-collapse:has(.gm-cand-field[data-hl]) + .row-collapse .gm-cand-field { box-shadow: none; }
+.gm-cand-field__top { display: flex; align-items: center; gap: 8px; }
+.gm-cand-field__top b { font-size: 13px; font-weight: 600; color: var(--gm-muted); }
+.gm-cand-field__tag { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--gm-pri-ink); text-align: right; }
+.gm-cand-field__val { font-size: 16px; font-weight: 600; white-space: pre-wrap; overflow-wrap: anywhere; }
+.gm-cand-field__src { font-size: 12px; color: var(--gm-muted); }
+.gm-cand-field__act { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+.gm-cand-field__edit { display: flex; flex-direction: column; gap: 14px; margin-top: 8px; }
+.gm-cand-field__edit textarea.gm-cand-notch__input { min-height: 72px; }
+.gm-cand-opts { display: flex; flex-direction: column; gap: 6px; }
+.gm-cand-opt { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 6px 12px; border: 0; border-radius: 12px; background: #fff; font: inherit; font-size: 14px; color: inherit; text-align: left; cursor: pointer; }
+.gm-cand-opt[aria-checked="true"] { font-weight: 600; }
+.gm-cand-opt:focus-visible { outline: 2px solid var(--gm-primary); outline-offset: 1px; }
+.gm-cand-opt__dot { width: 18px; height: 18px; flex: none; border-radius: 50%; border: 1.5px solid #b9b6c4; background: #fff; transition: border-width 160ms var(--gm-ease), border-color 160ms var(--gm-ease); }
+.gm-cand-opt[aria-checked="true"] .gm-cand-opt__dot { border: 5px solid var(--gm-primary); }
+.gm-cand-opt__v { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.gm-cand-opt__s { flex: none; max-width: 50%; font-size: 12px; font-weight: 400; color: var(--gm-muted); text-align: right; }
+.gm-cand-off { display: flex; gap: 6px; align-items: center; font-size: 13px; color: var(--gm-muted); }
+
+/* 모바일 */
+.gm-cand-m { display: flex; flex-direction: column; gap: 14px; }
+.gm-cand-m h1 { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.01em; }
+.gm-cand-m h2 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+.gm-cand-m .gm-cand-row { padding: 12px 8px; }
+.gm-cand-m .gm-cand-rows > .row-collapse + .row-collapse .gm-cand-row::before { left: 8px; right: 8px; }
+/* 폰 아래 고정 버튼 줄 — 탭 바(z-20) 밑에 깔고 아래 여백을 가운데 버튼 돌출(26px)만큼 더 둬서, 버튼은 그 위에 선다.
+   몸통 아래 여백 · 토스트 높이는 실제 막대 높이(`--gm-mbar-h`, 글자 1.35× · 줄바꿈 포함)를 따른다. */
+.gm-cand-m[data-bar] { padding-bottom: calc(var(--gm-mbar-h, 96px) + 12px); }
+.gm-cand-mbar { position: fixed; z-index: 15; left: 0; right: 0; bottom: var(--tabbar-h); display: flex; gap: 8px; padding: 10px 20px 36px; background: #fff; box-shadow: inset 0 0.5px 0 var(--gm-sep); }
+.gm-cand-mbar .gm-btn { flex: 1; min-width: 0; min-height: 46px; padding: 6px 10px; border-radius: 12px; font-size: 15px; white-space: normal; word-break: keep-all; overflow-wrap: anywhere; text-wrap: balance; text-align: center; }
+.gm-cand-mbar .gm-btn--primary { flex: 1.5; }
+body:has(.gm-cand-mbar) .toast-dock { bottom: calc(var(--tabbar-h) + var(--gm-mbar-h, 92px) + 8px); }
+/* 글 쓰는 중(폰 키보드)엔 막대를 내린다 — 키보드 위로 올라와 입력 칸을 가리지 않게. 칸을 벗어나면 다시 보인다. */
+@media (pointer: coarse) {
+  .gm-cand-m:has(.gm-cand-notch__input:focus) .gm-cand-mbar { visibility: hidden; }
+}
+/* 토스트 한국어가 한 글자만 다음 줄로 떨어지지 않게 — 낱말 단위로 끊는다. */
+body:has(.gm-cand-m) .toast-dock [role="status"],
+.gm-cand [role="status"] { word-break: keep-all; overflow-wrap: anywhere; }
+.gm-cand-inlinefoot { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 14px; box-shadow: inset 0 0.5px 0 var(--gm-sep); }
+.gm-cand-inlinefoot > .gm-btn--primary { margin-left: auto; }
+.gm-cand-inlinefoot .gm-btn { min-height: 44px; }
+/* 폴드 · 태블릿 — 버튼 줄은 화면 아래에 붙여 둔다(근거가 길어도 첫 화면에서 「그대로 추가」가 보이게 · 폴드 720×900 ja 에서 잘렸다). */
+.gm-cand-inlinefoot { position: sticky; bottom: 0; z-index: 2; padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); background: var(--background); }
+.gm-cand-split { display: grid; grid-template-columns: 236px minmax(0, 1fr); gap: 20px; align-items: start; }
+.gm-cand-split .gm-cand-row__main span { display: none; }
+.gm-cand-split__pane { display: flex; flex-direction: column; gap: 14px; padding-top: 6px; min-width: 0; }
+@media (min-width: 1000px) and (min-height: 600px) {
+  .gm-cand-split { grid-template-columns: 320px minmax(0, 1fr); gap: 32px; }
+  .gm-cand-split .gm-cand-row__main span { display: block; }
+  .gm-cand-split__pane { padding: 6px 0 0; max-width: 680px; }
+}
+@media (pointer: coarse) {
+  .gm-cand-filter { min-height: 40px; }
+  .gm-cand-langseg button { min-height: 34px; }
+  .gm-cand-field__act .gm-btn--sm { min-height: 40px; padding: 0 14px; font-size: 13px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gm-cand-spin { animation-duration: 1.6s; }
+  .gm-cand-opt__dot { transition: none; }
 }

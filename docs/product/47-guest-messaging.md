@@ -475,6 +475,11 @@ PC `/admin/messages` 목록 위 · 모바일 `/mobile/messages` 필터 줄 위(�
 - **코드**: `src/components/guest-messages/ai-assist.tsx`(`useReplyAssist` · `AssistLine` · `AssistFieldLayer` · `AssistSimilarSection`) · 순수 계산 `ai-assist-model.ts`(테스트 `__tests__/ai-assist-model.test.ts`) · `gm-parts.tsx` `Composer` · CSS `.ax-*`(`guest-messages.css`) · 문구 `dictionary.guestMessages.assist`(ko · ja · en).
 - **화면 확인**: 1440 · 1280 · 390 · 720 · 1180 × ko · ja · en(2026-11-18 로컬, 서버 연결 전 임시 가짜 응답으로 — 가짜 파일은 지움).
 
+### 5-12. 과거 답장에서 찾은 후보 (2026-11-18 서버 · 2026-11-19 화면, 커밋 전)
+
+- 정해 둔 문구 후보(자주 묻는 질문 묶음) · 건물 안내 후보(체크인 · 체크아웃 · 짐 · 주차 · 쓰레기 · 오는 길). 승인해야만 저장, 빼기는 영영 숨김 + 5초 되돌리기, 비밀번호 · 와이파이 · 문 코드는 뽑지 않음.
+- 서버 · 권한 · 표 · 시험: **문서 49 §9**. 화면: PC `/admin/messages?tab=replies&cand=phrase|info`(정해 둔 문구 탭 위 입구 줄) · 모바일 `/mobile/messages/candidates`(메시지 목록 머리 아래 입구 줄) — 49 §9-7.
+
 ## 6. 추가 기능 (D5)
 
 ### 6-1. 기다린 시간 표시

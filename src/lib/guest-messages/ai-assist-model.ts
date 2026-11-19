@@ -104,6 +104,34 @@ const AMOUNT_RE = /(?:[¥￥]|\bJPY\s?)\s?\d[\d,.]*|\d[\d,.]*\s?(?:円|엔|yen\b
 const PHONE_RE = /\+?\d[\d ()-]{7,}\d/g;
 const ROOM_RE = /(?:\broom|\brm\.?|部屋|房间|房)\s*#?\s*[A-Za-z]?\d{1,4}[A-Za-z]?|\b[A-Za-z]?\d{1,4}\s*(?:호실|호|号室|号|号房)/gi;
 const DIGITS_RE = /[0-9#*]{3,}/g;
+/** 띄어쓰기 · 하이픈이 섞인 숫자 3개 넘게(「12-34」 · 「1 2 3 4」) — 코드를 나눠 쓴 것. 줄은 넘지 않는다.
+ *  시간 · 거리(「15:00-22:00」 · 「10-15 minutes」)와 모양이 같아서 **비밀 낱말이 든 문장 안에서만** 쓴다. */
+const SPACED_DIGITS_RE = /\d(?:[^\S\n]?-?[^\S\n]?\d){2,}/g;
+/** 비밀 낱말(한 · 일 · 영) — 출입 코드 · 비밀번호를 말하는 문장 표지. 후보 걸러내기(`reply-candidates-model.ts`)도 같은 것을 쓴다. */
+export const SECRET_WORD_RE =
+  /(비밀\s*번호|비번|암호|패스\s*워드|현관\s*번호|도어\s*락|키\s*박스|password|passcode|pass\s*code|\bpin\b|door\s*code|entry\s*code|key\s*code|access\s*code|lock\s*code|keypad|key\s*box|keybox|lockbox|暗証|パスワード|キーボックス|キーナンバー|解錠|ロック番号)/i;
+export const WIFI_WORD_RE = /(wi-?fi|와이파이|ワイファイ|ssid)/i;
+/** 문장 끝 — 마침표는 뒤에 빈칸 · 끝이 올 때만(「15.00」 · 「wi-fi.net」 이 잘리지 않게). */
+export const SENTENCE_SPLIT_RE = /(?<=[!?。！？\n]|\.(?=\s|$))/;
+
+/** 비밀 낱말(와이파이 포함)이 든 문장 — 그리고 그 바로 다음 조각(「Door code:\n12 34」 처럼 줄을 바꿔 값을 쓴 것 · 빈 줄은 건너서)에서만
+ *  나눠 쓴 숫자를 가린다. */
+function maskSplitCodesInSecretSentences(text: string): string {
+  let previousSecret = false;
+  return text
+    .split(SENTENCE_SPLIT_RE)
+    .map((sentence) => {
+      // 빈칸 · 줄바꿈뿐인 조각(「Door code:\n\n12 34」 의 빈 줄 · 「Door code.\n12 34」 의 줄바꿈)은 건너뛴다 — 앞 문장의
+      // 비밀 상태를 다음 조각까지 넘긴다.
+      if (!sentence.trim()) return sentence;
+      const flat = sentence.normalize("NFKC");
+      const secret = SECRET_WORD_RE.test(flat) || WIFI_WORD_RE.test(flat);
+      const masked = secret || previousSecret ? sentence.replace(SPACED_DIGITS_RE, MASK) : sentence;
+      previousSecret = secret;
+      return masked;
+    })
+    .join("");
+}
 
 function collapseMasks(text: string): string {
   return text.replace(/\[…\](?:[\s,.:/-]*\[…\])+/g, MASK);
@@ -141,12 +169,13 @@ export function maskQuestion(text: string, codes: readonly string[], names: Read
   return collapseMasks(maskContacts(maskNames(masked, names))).slice(0, 4000);
 }
 
-/** 과거 답 가리기(§8-3) — 코드 · 이름 · URL · 메일 · 금액 · 전화 · 방 번호 · 3자리 이상 숫자 묶음 → `[…]`. */
+/** 과거 답 가리기(§8-3) — 코드 · 이름 · URL · 메일 · 금액 · 전화 · 방 번호 · 3자리 이상 숫자 묶음 → `[…]`.
+ *  띄어쓰기 · 하이픈으로 나눠 쓴 숫자(「1 2 3 4」 · 「12-34」)는 비밀 낱말이 든 문장 안에서만 가린다(시간 · 거리는 남김). */
 export function maskPastReply(text: string, codes: readonly string[], names: ReadonlyArray<string | null | undefined> = []): string {
   let out = maskEntryCodes(text, codes).split(MASKED_CODE).join(MASK);
   out = maskNames(out, names);
   out = out.replace(URL_RE, MASK).replace(EMAIL_RE, MASK).replace(AMOUNT_RE, MASK).replace(PHONE_RE, MASK);
-  out = out.replace(ROOM_RE, MASK).replace(DIGITS_RE, MASK);
+  out = maskSplitCodesInSecretSentences(out.replace(ROOM_RE, MASK)).replace(DIGITS_RE, MASK);
   return collapseMasks(out).slice(0, 4000);
 }
 

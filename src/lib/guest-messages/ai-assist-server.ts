@@ -109,7 +109,7 @@ export function secretsOf(building: BuildingGuestInfo | null): string[] {
 
 const hideSecrets = (text: string, secrets: readonly string[]) => maskEntryCodes(text, secrets).split(MASKED_CODE).join(MASK);
 
-function parseVector(raw: unknown): number[] | null {
+export function parseVector(raw: unknown): number[] | null {
   if (Array.isArray(raw)) return raw.every((value) => typeof value === "number") ? (raw as number[]) : null;
   if (typeof raw !== "string") return null;
   try {
@@ -256,7 +256,7 @@ function savedReplyHash(reply: SavedReply): string {
 }
 
 /** 문구 뜻 숫자 — 글이 바뀐 것(해시 다름) · 없는 것만 다시 만든다. 실패하면 있는 것만. */
-async function savedReplyVectors(db: Client, organizationId: string, replies: readonly SavedReply[]): Promise<Map<string, number[]>> {
+export async function savedReplyVectors(db: Client, organizationId: string, replies: readonly SavedReply[]): Promise<Map<string, number[]>> {
   const vectors = new Map<string, number[]>();
   if (replies.length === 0) return vectors;
   const { data, error } = await db
@@ -697,8 +697,17 @@ type ModelCall =
 
 const NO_USAGE: ModelUsage = { model: GUEST_AI_CONFIG.draftModel, inputTokens: 0, outputTokens: 0, costMicroUsd: 0 };
 
-async function callDraftModel(system: string, user: string, lang: GuestLang): Promise<ModelCall> {
-  if (isGuestAiFake()) return { ok: true, output: FAKE_DRAFTS[lang], model: FAKE_DRAFT_MODEL, inputTokens: 0, outputTokens: 0, costMicroUsd: 0 };
+/** 손님 메시지 AI 의 JSON 출력 호출 하나 — 초안(§8)과 과거 답 후보(§9)가 같이 쓴다. 키 없음 · 키 거절은 `unavailable`, 그 밖은 `failed`. */
+export type GuestJsonCall = ({ ok: true; parsed: unknown } | { ok: false; reason: "unavailable" | "failed" }) & ModelUsage;
+
+export async function callGuestJsonModel(request: {
+  system: string;
+  user: string;
+  schema: Record<string, unknown>;
+  maxTokens: number;
+  timeoutMs: number;
+  logTag: string;
+}): Promise<GuestJsonCall> {
   if (!process.env.ANTHROPIC_API_KEY?.trim()) return { ok: false, reason: "unavailable", ...NO_USAGE };
   const client = new Anthropic();
   let response: Anthropic.Message;
@@ -706,20 +715,20 @@ async function callDraftModel(system: string, user: string, lang: GuestLang): Pr
     response = await client.messages.create(
       {
         model: GUEST_AI_CONFIG.draftModel,
-        max_tokens: GUEST_AI_CONFIG.draftMaxTokens,
+        max_tokens: request.maxTokens,
         thinking: { type: "adaptive" },
-        output_config: { effort: "low", format: { type: "json_schema", schema: OUTPUT_SCHEMA } },
-        system,
-        messages: [{ role: "user", content: user }],
+        output_config: { effort: "low", format: { type: "json_schema", schema: request.schema } },
+        system: request.system,
+        messages: [{ role: "user", content: request.user }],
       },
-      { timeout: 60_000, maxRetries: 1 },
+      { timeout: request.timeoutMs, maxRetries: 1 },
     );
   } catch (error) {
     if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {
-      console.error("[guest-ai] Claude API key rejected");
+      console.error(`${request.logTag} Claude API key rejected`);
       return { ok: false, reason: "unavailable", ...NO_USAGE };
     }
-    console.error(error instanceof Anthropic.APIError ? `[guest-ai] Claude API error ${error.status}` : "[guest-ai] Claude request failed");
+    console.error(error instanceof Anthropic.APIError ? `${request.logTag} Claude API error ${error.status}` : `${request.logTag} Claude request failed`);
     return { ok: false, reason: "failed", ...NO_USAGE };
   }
   const usage = {
@@ -736,13 +745,27 @@ async function callDraftModel(system: string, user: string, lang: GuestLang): Pr
   };
   if (response.stop_reason === "refusal" || response.stop_reason === "max_tokens") return { ok: false, reason: "failed", ...base };
   const text = response.content.find((block): block is Anthropic.TextBlock => block.type === "text")?.text;
-  let parsed: unknown = null;
   try {
-    parsed = text ? JSON.parse(text) : null;
+    return { ok: true, parsed: text ? JSON.parse(text) : null, ...base };
   } catch {
-    parsed = null;
+    return { ok: false, reason: "failed", ...base };
   }
-  const output = validateDraftOutput(parsed);
+}
+
+async function callDraftModel(system: string, user: string, lang: GuestLang): Promise<ModelCall> {
+  if (isGuestAiFake()) return { ok: true, output: FAKE_DRAFTS[lang], model: FAKE_DRAFT_MODEL, inputTokens: 0, outputTokens: 0, costMicroUsd: 0 };
+  const call = await callGuestJsonModel({
+    system,
+    user,
+    schema: OUTPUT_SCHEMA,
+    maxTokens: GUEST_AI_CONFIG.draftMaxTokens,
+    timeoutMs: 60_000,
+    logTag: "[guest-ai]",
+  });
+  const { model, inputTokens, outputTokens, costMicroUsd: cost } = call;
+  const base: ModelUsage = { model, inputTokens, outputTokens, costMicroUsd: cost };
+  if (!call.ok) return { ok: false, reason: call.reason, ...base };
+  const output = validateDraftOutput(call.parsed);
   if (!output) return { ok: false, reason: "failed", ...base };
   return { ok: true, output, ...base };
 }

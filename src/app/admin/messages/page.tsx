@@ -5,6 +5,7 @@ import { AutoMessagesManager } from "@/components/admin/messages/auto-messages-m
 import { MessagesConsole } from "@/components/admin/messages/messages-console";
 import { MessagesSettings } from "@/components/admin/messages/messages-settings";
 import { SavedRepliesManager } from "@/components/admin/messages/saved-replies-manager";
+import { AdminReplyCandidates, ReplyCandidatesEntryBand } from "@/components/guest-messages/reply-candidates";
 import { AdminNoAccess } from "@/components/admin/shared/admin-no-access";
 import { AdminShell } from "@/components/shell/admin-shell";
 import { adminNavigation, getNavigationLabel } from "@/config/navigation";
@@ -15,6 +16,7 @@ import { INBOX_STATUS_FILTERS, UUID_RE, parseChannelFilter, type InboxStatusFilt
 import { loadAutoPreviewBookings, loadAutoRuleSummaries, loadUpcomingAutoRuns } from "@/lib/guest-messages/auto-rules-server";
 import { isGuestMessageSendEnabled } from "@/lib/guest-messages/outbox-runner";
 import { creatableKinds } from "@/lib/guest-messages/task-link-model";
+import { countPendingCandidates } from "@/lib/guest-messages/reply-candidates-server";
 import { loadSavedReplies } from "@/lib/guest-messages/saved-replies-server";
 import { loadResolvedSavedReply } from "@/lib/guest-messages/task-link-server";
 import { PROPERTY_MAP_META } from "@/lib/property-map-links";
@@ -37,7 +39,7 @@ type Tab = "conversations" | "auto" | "replies" | "settings";
 export default async function AdminMessagesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; building?: string; channel?: string; c?: string; tab?: string; q?: string }>;
+  searchParams: Promise<{ status?: string; building?: string; channel?: string; c?: string; tab?: string; q?: string; cand?: string; r?: string }>;
 }) {
   const [session, params] = await Promise.all([requireAdminPageSession({ nextPath: "/admin/messages" }), searchParams]);
   const locale = session.user.preferredLanguage;
@@ -55,7 +57,16 @@ export default async function AdminMessagesPage({
   }
 
   const canManage = session.capabilities.includes("guest_messages.manage");
-  const tab: Tab = canManage && (params.tab === "auto" || params.tab === "replies" || params.tab === "settings") ? params.tab : "conversations";
+  const canEditInfo = session.capabilities.includes("property_info.edit");
+  // 건물 손님용 칸만 고칠 수 있는 사람(관리 권한 없음)도 「건물 정보 후보」(`?tab=replies&cand=info`)는 연다 — 49 §9-6.
+  // 정해 둔 문구 목록 · 다른 탭은 그대로 관리 권한만.
+  const infoOnly = !canManage && canEditInfo && params.tab === "replies" && params.cand === "info";
+  const tab: Tab =
+    canManage && (params.tab === "auto" || params.tab === "replies" || params.tab === "settings")
+      ? params.tab
+      : infoOnly
+        ? "replies"
+        : "conversations";
   const tabs: Array<{ id: Tab; href: string; label: string }> = canManage
     ? [
         { id: "conversations", href: "/admin/messages", label: copy.tabConversations },
@@ -110,18 +121,43 @@ export default async function AdminMessagesPage({
       </div>
     );
   } else if (tab === "replies") {
-    const [replies, resolved] = await Promise.all([
+    // 과거 답장 후보 — 볼 수 있는 종류는 서버 액션 판정과 같게(정해 둔 문구 관리 · 건물 손님용 칸 고치기).
+    const candidateKinds = [
+      ...(session.capabilities.includes("guest_messages.manage") ? (["saved_reply"] as const) : []),
+      ...(session.capabilities.includes("property_info.edit") ? (["guest_info"] as const) : []),
+    ];
+    const candView = params.cand === "phrase" || params.cand === "info" ? params.cand : null;
+    const [replies, resolved, candCounts] = await Promise.all([
       loadSavedReplies(db, organizationId).catch((error) => {
         console.error("[guest-messages] saved replies read failed", error instanceof Error ? error.message : "unknown");
         return null;
       }),
-      loadResolvedSavedReply(db, organizationId).catch(() => null),
+      candView ? Promise.resolve(null) : loadResolvedSavedReply(db, organizationId).catch(() => null),
+      candView ? Promise.resolve({ replies: 0, info: 0 }) : countPendingCandidates(db, organizationId, candidateKinds).catch(() => ({ replies: 0, info: 0 })),
     ]);
-    content = (
-      <div className="gm-tabpage">
-        <SavedRepliesManager copy={copy} locale={locale} replies={replies} resolvedId={resolved?.id ?? null} />
-      </div>
-    );
+    if (candView) {
+      const similarTitles: Record<string, string> = {};
+      for (const reply of replies ?? []) similarTitles[reply.id] = reply.title;
+      content = (
+        <div className="gm-tabpage">
+          <AdminReplyCandidates copy={copy} locale={locale} view={candView} similarTitles={similarTitles} />
+        </div>
+      );
+    } else {
+      const openId = typeof params.r === "string" && UUID_RE.test(params.r) ? params.r : null;
+      content = (
+        <div className="gm-tabpage">
+          <SavedRepliesManager
+            copy={copy}
+            locale={locale}
+            replies={replies}
+            resolvedId={resolved?.id ?? null}
+            openId={openId}
+            entry={<ReplyCandidatesEntryBand key="cand-entry" copy={copy} replies={candCounts.replies} info={candCounts.info} />}
+          />
+        </div>
+      );
+    }
   } else {
     const status: InboxStatusFilter = (INBOX_STATUS_FILTERS as readonly string[]).includes(params.status ?? "")
       ? (params.status as InboxStatusFilter)
@@ -131,16 +167,20 @@ export default async function AdminMessagesPage({
     const requested = typeof params.c === "string" && UUID_RE.test(params.c) ? params.c : null;
 
     // 고른 대화가 주소에 있으면 목록과 같이 읽는다(기다림 줄이기). 없으면 목록 첫 줄을 이어서 읽는다.
-    const [list, requestedThread, stall] = await Promise.all([
+    // 관리 권한 없이 건물 칸만 고치는 사람 — 「정해 둔 문구」 탭이 없으니 첫 화면 위에 건물 정보 후보 입구를 둔다(49 §9-6).
+    const [list, requestedThread, stall, infoCounts] = await Promise.all([
       listGuestConversations({ status, building, channel }),
       requested ? getGuestConversation(requested) : Promise.resolve(null),
       canManage ? loadStallNotice(db, organizationId) : Promise.resolve(null),
+      !canManage && canEditInfo
+        ? countPendingCandidates(db, organizationId, ["guest_info"]).catch(() => ({ replies: 0, info: 0 }))
+        : Promise.resolve(null),
     ]);
     const data = list.ok ? list : null;
     const selectedId = requested ?? data?.rows[0]?.id ?? null;
     const threadResult = requested ? requestedThread : selectedId ? await getGuestConversation(selectedId) : null;
     const initialThread = threadResult && threadResult.ok ? threadResult.thread : null;
-    content = (
+    const console_ = (
       <MessagesConsole
         key={`${status}|${building ?? ""}|${channel}`}
         organizationId={organizationId}
@@ -161,6 +201,17 @@ export default async function AdminMessagesPage({
         initialQuery={normalizeSearchQuery(params.q) ?? ""}
       />
     );
+    content =
+      infoCounts && infoCounts.info > 0 ? (
+        <>
+          <div className="gm-page__entry">
+            <ReplyCandidatesEntryBand copy={copy} replies={0} info={infoCounts.info} />
+          </div>
+          {console_}
+        </>
+      ) : (
+        console_
+      );
   }
 
   return (

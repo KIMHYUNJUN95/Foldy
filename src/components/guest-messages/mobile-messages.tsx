@@ -18,6 +18,7 @@ import { AutoRunsList } from "@/components/guest-messages/auto-runs-list";
 import { useBuildingName } from "@/components/shared/building-names";
 import { TaskToast } from "@/components/tasks/task-toast";
 import { StallNoticeLine } from "@/components/guest-messages/stall-notice";
+import { MobileCandidatesEntry } from "@/components/guest-messages/reply-candidates";
 import type { StallNotice } from "@/lib/guest-messages/channel-overview-server";
 import {
   Composer,
@@ -128,6 +129,7 @@ export function MobileInbox({
   channel,
   stall = null,
   initialQuery = "",
+  candidates = null,
 }: {
   /** 실시간 구독 필터(조직) — 권한 · 조직 판정은 서버 액션이 다시 한다. */
   organizationId: string;
@@ -141,6 +143,8 @@ export function MobileInbox({
   stall?: StallNotice | null;
   /** 주소 `q` — 필터를 바꿔 다시 그려도 검색이 이어진다. */
   initialQuery?: string;
+  /** 과거 답장 후보 남은 수(서버가 권한 있는 종류만 센다) — 0 이면 입구 줄을 숨긴다. 문서 49 §9-6. */
+  candidates?: { replies: number; info: number } | null;
 }) {
   const router = useRouter();
   const { toast, show: notify, dismiss } = useMobileToast();
@@ -236,6 +240,7 @@ export function MobileInbox({
           />
         </div>
       </div>
+      {candidates && !search.active ? <MobileCandidatesEntry copy={copy} replies={candidates.replies} info={candidates.info} /> : null}
       {search.active ? (
         <>
           <InboxSearchState search={search} copy={copy} />

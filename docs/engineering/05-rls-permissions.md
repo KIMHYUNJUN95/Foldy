@@ -1938,6 +1938,13 @@ Supabase advisor `anon_security_definer_function_executable` 정리. 운영 `pg_
 - `sendGuestReply`: 채우지 않은 자리 표시(세 언어 + 날것 토큰)가 원문 · 보낼 글에 남아 있으면 `assistDraftId` 유무와 관계없이 `assist_placeholder`. `assistDraftId` 가 있으면 그 초안 기록은 세션 조직으로만 찾는다.
 - 확인(로컬 Postgres 17, 2026-11-18 — 로컬에 pgvector 가 없어 `vector` 를 `float8[]` + `<=>` 대역으로 바꿔 한 트랜잭션 안에서 적용 뒤 되돌림): 두 번 적용(멱등) · RLS 3표 · service_role 쓰기 · 같은 건물 보정 · 다른 조직 id 0줄 · 처음/끝 기록 중복 23505 · 잘못된 이유 23514 · 비용 합, authenticated · anon 의 세 표 읽기 · 두 함수 실행 모두 42501. 다시 확인(같은 날, 로컬에 pgvector 0.8.1 설치 뒤 **진짜 `vector` · HNSW** 로, 한 트랜잭션 안 적용 뒤 되돌림): 위 항목 전부 + `guest_reply_assist_reserve` 한도 안 `true`(pending 줄) · 넘으면 `false` · pending → failed 정산 · authenticated · anon 실행 42501, `guest_reply_similar` 정확 계산 길 · 색인 길(`iterative_scan = relaxed_order`) 둘 다 실행.
 
+## 2026-11-18 과거 답장 후보 (`202611180005_guest_reply_candidates`, 운영 미적용)
+
+- `guest_reply_candidate_runs` · `guest_reply_candidates`: RLS 켬 · **정책 없음** · public · anon · authenticated 권한 회수, `service_role` 만 SELECT/INSERT/UPDATE/DELETE.
+- 함수 6개(`guest_reply_candidate_run_start` · `guest_reply_cluster_stats` · `guest_reply_cluster_recent` · `guest_reply_assist_cost_since` · `guest_reply_assist_reserve` 포함): 실행 public · anon · authenticated 회수, service_role 만. 조직 id 는 언제나 인자 + 서버 세션에서.
+- 서버 액션 `src/actions/guest-message-candidates.ts`: 모두 `guest_messages.view` 필요. 문구 후보(보기 · 추가 · 빼기 · 되돌리기)와 「다시 찾기」는 `guest_messages.manage`(정해 둔 문구 관리와 같은 기준), 건물 안내 후보는 `property_info.edit`(`saveBuildingGuestInfoAction` 과 같은 기준). 둘 다 없으면 `forbidden`(redirect 없음). 다른 조직 후보 id 는 `not_found`.
+- 확인(로컬 작업 트리 전용 스택, 2026-11-18): authenticated · anon 두 표 모두 permission denied · 함수 실행 service_role 만 · `run_start` started → busy.
+
 ## 2026-11-18 `beds24_credit_usage` · `beds24_credit_usage_windows`
 
 마이그레이션 `202611180003_beds24_credit_usage.sql` (**운영 적용 2026-11-18**) · `202611180004_beds24_credit_usage_fixes.sql`(**운영 적용 2026-11-18**).

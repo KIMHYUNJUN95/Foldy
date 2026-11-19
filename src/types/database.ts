@@ -4314,6 +4314,141 @@ export type Database = {
         }
         Relationships: []
       }
+      guest_reply_candidate_runs: {
+        Row: {
+          cost_micro_usd: number
+          error_key: string | null
+          finished_at: string | null
+          id: string
+          input_tokens: number
+          model: string | null
+          organization_id: string
+          output_tokens: number
+          skip_notes: Json
+          source_count: number
+          source_since: string | null
+          source_until: string | null
+          started_at: string
+          started_by: string | null
+          status: string
+        }
+        Insert: {
+          cost_micro_usd?: number
+          error_key?: string | null
+          finished_at?: string | null
+          id?: string
+          input_tokens?: number
+          model?: string | null
+          organization_id: string
+          output_tokens?: number
+          skip_notes?: Json
+          source_count?: number
+          source_since?: string | null
+          source_until?: string | null
+          started_at?: string
+          started_by?: string | null
+          status?: string
+        }
+        Update: {
+          cost_micro_usd?: number
+          error_key?: string | null
+          finished_at?: string | null
+          id?: string
+          input_tokens?: number
+          model?: string | null
+          organization_id?: string
+          output_tokens?: number
+          skip_notes?: Json
+          source_count?: number
+          source_since?: string | null
+          source_until?: string | null
+          started_at?: string
+          started_by?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
+      guest_reply_candidates: {
+        Row: {
+          applied_previous: Json | null
+          ask_count: number
+          bodies: Json
+          centroid: string | null
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          evidence: Json
+          field: string | null
+          first_asked_at: string | null
+          id: string
+          kind: string
+          last_asked_at: string | null
+          note: Json
+          options: Json
+          organization_id: string
+          property_name: string | null
+          question: Json
+          result_saved_reply_id: string | null
+          run_id: string | null
+          similar_saved_reply_id: string | null
+          status: string
+          title: Json
+          value_hashes: string[]
+        }
+        Insert: {
+          applied_previous?: Json | null
+          ask_count?: number
+          bodies?: Json
+          centroid?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          evidence?: Json
+          field?: string | null
+          first_asked_at?: string | null
+          id?: string
+          kind: string
+          last_asked_at?: string | null
+          note?: Json
+          options?: Json
+          organization_id: string
+          property_name?: string | null
+          question?: Json
+          result_saved_reply_id?: string | null
+          run_id?: string | null
+          similar_saved_reply_id?: string | null
+          status?: string
+          title?: Json
+          value_hashes?: string[]
+        }
+        Update: {
+          applied_previous?: Json | null
+          ask_count?: number
+          bodies?: Json
+          centroid?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          evidence?: Json
+          field?: string | null
+          first_asked_at?: string | null
+          id?: string
+          kind?: string
+          last_asked_at?: string | null
+          note?: Json
+          options?: Json
+          organization_id?: string
+          property_name?: string | null
+          question?: Json
+          result_saved_reply_id?: string | null
+          run_id?: string | null
+          similar_saved_reply_id?: string | null
+          status?: string
+          title?: Json
+          value_hashes?: string[]
+        }
+        Relationships: []
+      }
       guest_message_channel_state: {
         Row: {
           created_at: string
@@ -8439,6 +8574,38 @@ export type Database = {
           p_reserve_micro_usd: number
         }
         Returns: boolean
+      }
+      guest_reply_candidate_run_start: {
+        Args: {
+          p_organization_id: string
+          p_user_id: string
+          p_since: string
+          p_cap_micro_usd: number
+          p_reserve_micro_usd: number
+        }
+        Returns: { outcome: string; run_id: string | null }[]
+      }
+      guest_reply_cluster_stats: {
+        Args: { p_organization_id: string; p_centroid: string; p_max_distance: number; p_since: string }
+        Returns: { ask_count: number; first_at: string | null; last_at: string | null }[]
+      }
+      guest_reply_cluster_recent: {
+        Args: {
+          p_organization_id: string
+          p_centroid: string
+          p_max_distance: number
+          p_since: string
+          p_property_name?: string
+          p_limit?: number
+        }
+        Returns: {
+          pair_id: string
+          conversation_id: string
+          property_name: string | null
+          asked_at: string
+          question_text: string
+          reply_text: string | null
+        }[]
       }
       translation_usage_since: {
         Args: { p_since: string }

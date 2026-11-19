@@ -9,7 +9,7 @@
 
 import { ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition, type ReactNode } from "react";
 import {
   deleteSavedReplyAction,
   reorderSavedRepliesAction,
@@ -68,12 +68,18 @@ export function SavedRepliesManager({
   locale,
   replies,
   resolvedId = null,
+  entry = null,
+  openId = null,
 }: {
   copy: GmCopy;
   locale: string;
   replies: SavedReply[] | null;
   /** 「해결 초안」으로 표시한 문구 id(조직마다 하나, 6단계). */
   resolvedId?: string | null;
+  /** 「과거 답장에서 찾은 후보」 입구 띠(49 §9) — 후보가 있을 때만 페이지가 넘긴다. */
+  entry?: ReactNode;
+  /** 처음 열 문구(`?r=` — 후보 화면 「비슷한 문구 열어 보기」). 없으면 첫 문구. */
+  openId?: string | null;
 }) {
   const router = useRouter();
   const { toast, showToast, dismiss } = useAdminToast();
@@ -90,7 +96,7 @@ export function SavedRepliesManager({
     setResolved(resolvedId);
   }
   const [editing, setEditing] = useState<Editing | null>(() => {
-    const first = replies?.[0];
+    const first = (openId ? replies?.find((reply) => reply.id === openId) : null) ?? replies?.[0];
     return first ? editingOf(first) : null;
   });
   const [lang, setLang] = useState<GuestLang>(GUEST_LANGS.includes(locale as GuestLang) ? (locale as GuestLang) : "en");
@@ -251,6 +257,7 @@ export function SavedRepliesManager({
             {copy.repliesAdd}
           </button>
         </div>
+        {entry}
         {list.length === 0 && editing?.id !== null ? (
           <div className="gm-empty">
             <b>{copy.repliesEmpty}</b>

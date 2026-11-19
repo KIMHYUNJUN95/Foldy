@@ -99,6 +99,23 @@ describe("가리기", () => {
     expect(out).not.toContain("1234");
   });
 
+  it("과거 답 가리기 — 비밀 낱말 줄 다음 줄의 띄어 쓴 숫자도 가린다", () => {
+    expect(maskPastReply("Door code:\n12 34", [], [])).not.toMatch(/12 34/);
+    expect(maskPastReply("비밀번호\n4 8 2 7", [], [])).not.toMatch(/4 8 2 7/);
+    // 비밀 낱말이 없으면 시간 · 거리는 남는다
+    expect(maskPastReply("Check-in:\n15 00", [], [])).toContain("15 00");
+  });
+
+  it("과거 답 가리기 — 빈 줄 · 마침표로 끊어도 비밀 낱말 다음 조각은 가린다", () => {
+    expect(maskPastReply("Door code:\n\n12 34", [], [])).not.toMatch(/12 34/);
+    expect(maskPastReply("Door code.\n12 34", [], [])).not.toMatch(/12 34/);
+    expect(maskPastReply("비밀번호\n\n4 8 2 7", [], [])).not.toMatch(/4 8 2 7/);
+    expect(maskPastReply("비밀번호입니다.\n4 8 2 7", [], [])).not.toMatch(/4 8 2 7/);
+    expect(maskPastReply("暗証番号:\n\n0 9 1 2", [], [])).not.toMatch(/0 9 1 2/);
+    expect(maskPastReply("暗証番号です。\n0 9 1 2", [], [])).not.toMatch(/0 9 1 2/);
+    expect(maskPastReply("Check-in:\n\n15 00 onward", [], [])).toContain("15 00");
+  });
+
   it("과거 답 — 금액 · 방 번호 · 숫자 묶음 · URL 까지", () => {
     const out = maskPastReply("Room 201 costs ¥3,000. Code 7788#. See https://x.example/a", ["7788#"], []);
     expect(out).not.toMatch(/201|3,000|7788|https/);

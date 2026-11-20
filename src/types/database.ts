@@ -3721,6 +3721,7 @@ export type Database = {
           created_at: string
           guest_language: string | null
           guest_name: string | null
+          guest_name_key: string | null
           id: string
           last_guest_at: string | null
           last_message_at: string | null

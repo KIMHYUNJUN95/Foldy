@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildGuestSearchPlan, matchesDigits, matchesGuestName } from "@/lib/guest-search";
+import { GUEST_NAME_CASES } from "@/lib/__tests__/guest-name-cases";
 
 /**
  * 어드민 상단 예약 검색 — 이름 · 번호 매칭.
@@ -65,8 +66,17 @@ describe("buildGuestSearchPlan", () => {
   });
 
   it("번호 · 예약번호를 알아본다", () => {
+    // 보조 평면 한 글자(UTF-16 으로는 2)는 한 글자로 센다 — DB(char_length)와 같게 이름으로 찾지 않는다.
+    expect(buildGuestSearchPlan("𠮷")?.nameFragments).toEqual([]);
+    expect(buildGuestSearchPlan("𠮷田")?.nameFragments.length).toBeGreaterThan(0);
     expect(buildGuestSearchPlan("090-1234-5678")?.digits).toBe("09012345678");
     expect(buildGuestSearchPlan("HMABC12345")?.reference).toBe("HMABC12345");
     expect(buildGuestSearchPlan("kim minsu")?.reference).toBeNull();
+  });
+});
+
+describe("이름 사례표 — DB 판정과 같은 표(guest-name-cases.ts)", () => {
+  it.each(GUEST_NAME_CASES.map((c) => [c.label, c] as const))("%s", (_label, c) => {
+    expect(matchesGuestName(c.query, c.name)).toBe(c.expected);
   });
 });

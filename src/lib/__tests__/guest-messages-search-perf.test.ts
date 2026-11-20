@@ -95,7 +95,7 @@ describe("검색 서버 — 건물 정보 한 번 · 뒤쪽 읽기는 한꺼번�
   it("코드를 못 보는 사람 — 건물 정보(property_operation_infos)는 한 번만 읽는다", async () => {
     const fake = createFakeSupabase({ guest_conversations: [conversation(CONV)], guest_message_outbox: [], property_operation_infos: [] }, rpc);
     const db = instrument(fake);
-    const result = await searchInbox(db.client, ORG, "kim", { status: "all", building: null }, NOW, { canSeeCodes: false, canManageAuto: false });
+    const result = await searchInbox(db.client, ORG, "kim", { building: null }, NOW, { canSeeCodes: false, canManageAuto: false });
     expect(result.results).toHaveLength(1);
     expect(db.counts.property_operation_infos).toBe(1);
   });
@@ -103,7 +103,7 @@ describe("검색 서버 — 건물 정보 한 번 · 뒤쪽 읽기는 한꺼번�
   it("코드를 보는 사람 — 건물 정보를 읽지 않고, 대화 줄 · 발송 줄은 동시에 읽는다", async () => {
     const fake = createFakeSupabase({ guest_conversations: [conversation(CONV)], guest_message_outbox: [] }, rpc);
     const db = instrument(fake);
-    const result = await searchInbox(db.client, ORG, "kim", { status: "all", building: null }, NOW);
+    const result = await searchInbox(db.client, ORG, "kim", { building: null }, NOW);
     expect(result.results).toHaveLength(1);
     expect(db.counts.property_operation_infos).toBeUndefined();
     expect(db.maxInFlight()).toBe(2);

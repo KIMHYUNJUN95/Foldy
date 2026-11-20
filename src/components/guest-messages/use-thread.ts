@@ -8,6 +8,7 @@ import { guestWriteFreshness } from "@/lib/guest-messages/write-freshness";
 import type { InboxRowState, InboxThread, SnoozeInput } from "@/lib/guest-messages/inbox-model";
 import { haptic } from "@/lib/haptics";
 import { createKeyedSingleFlight, mergeThread } from "@/lib/guest-messages/live-merge";
+import { settleWrite } from "@/lib/guest-messages/settle-write";
 
 /**
  * 대화 한 건 읽기 · 상태 바꾸기(처리 끝 · 나중에) — PC · 모바일 공용.
@@ -109,7 +110,8 @@ export function useThread(conversationId: string | null, initial: InboxThread | 
     ) => {
       startTransition(async () => {
         if (optimistic) setOptimisticState(optimistic);
-        const result = await work();
+        // 던져도(네트워크 오류) 실패 결과로 onDone — 접은 줄을 다시 펴고 오류를 알린다.
+        const result = await settleWrite(work);
         onDone(result);
         if (result.ok && conversationId) await load(conversationId);
       });

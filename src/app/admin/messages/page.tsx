@@ -11,7 +11,7 @@ import { AdminShell } from "@/components/shell/admin-shell";
 import { adminNavigation, getNavigationLabel } from "@/config/navigation";
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { loadChannelOverview, loadStallNotice } from "@/lib/guest-messages/channel-overview-server";
-import { normalizeSearchQuery } from "@/lib/guest-messages/inbox-search";
+import { inboxListKey, inboxSearchSlotKey, normalizeSearchQuery } from "@/lib/guest-messages/inbox-search";
 import { INBOX_STATUS_FILTERS, UUID_RE, parseChannelFilter, type InboxStatusFilter } from "@/lib/guest-messages/inbox-model";
 import { loadAutoPreviewBookings, loadAutoRuleSummaries, loadUpcomingAutoRuns } from "@/lib/guest-messages/auto-rules-server";
 import { isGuestMessageSendEnabled } from "@/lib/guest-messages/outbox-runner";
@@ -23,6 +23,7 @@ import { PROPERTY_MAP_META } from "@/lib/property-map-links";
 import { CANONICAL_TO_BUILDING_KEY, localizeBuildingName } from "@/lib/room-label-normalization";
 import { getDictionary } from "@/lib/i18n";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { InboxSearchProvider } from "@/components/guest-messages/inbox-search-provider";
 import "@/components/guest-messages/guest-messages.css";
 
 export const dynamic = "force-dynamic";
@@ -180,26 +181,33 @@ export default async function AdminMessagesPage({
     const selectedId = requested ?? data?.rows[0]?.id ?? null;
     const threadResult = requested ? requestedThread : selectedId ? await getGuestConversation(selectedId) : null;
     const initialThread = threadResult && threadResult.ok ? threadResult.thread : null;
+    // 검색은 상태 탭을 보지 않는다 — 검색 자리는 건물 · 채널로만 새로 만들고, 목록만 상태 탭으로 다시 그린다(47 §5-10).
     const console_ = (
-      <MessagesConsole
-        key={`${status}|${building ?? ""}|${channel}`}
-        organizationId={organizationId}
-        copy={copy}
-        shared={dict.admin.shared}
-        locale={locale}
-        data={data}
-        status={status}
+      <InboxSearchProvider
+        key={inboxSearchSlotKey({ building, channel })}
         building={building}
         channel={channel}
-        selectedId={selectedId}
-        initialThread={initialThread}
-        canReply={session.capabilities.includes("guest_messages.reply")}
-        canManage={canManage}
-        stall={stall}
-        taskKinds={creatableKinds(session.capabilities)}
-        taskCategoryCopy={{ maintenance: dict.maintenance.form.categories, lostFound: dict.lostFound.categoryLabels }}
         initialQuery={normalizeSearchQuery(params.q) ?? ""}
-      />
+      >
+        <MessagesConsole
+          key={inboxListKey(status)}
+          organizationId={organizationId}
+          copy={copy}
+          shared={dict.admin.shared}
+          locale={locale}
+          data={data}
+          status={status}
+          building={building}
+          channel={channel}
+          selectedId={selectedId}
+          initialThread={initialThread}
+          canReply={session.capabilities.includes("guest_messages.reply")}
+          canManage={canManage}
+          stall={stall}
+          taskKinds={creatableKinds(session.capabilities)}
+          taskCategoryCopy={{ maintenance: dict.maintenance.form.categories, lostFound: dict.lostFound.categoryLabels }}
+        />
+      </InboxSearchProvider>
     );
     content =
       infoCounts && infoCounts.info > 0 ? (

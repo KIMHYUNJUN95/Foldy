@@ -42,7 +42,7 @@ import {
 } from "@/components/guest-messages/gm-format";
 import { useThread } from "@/components/guest-messages/use-thread";
 import { useInboxLive } from "@/components/guest-messages/use-inbox-live";
-import { useInboxSearch } from "@/components/guest-messages/use-inbox-search";
+import { useInboxSearchContext } from "@/components/guest-messages/inbox-search-provider";
 import { InboxSearchBox, InboxSearchState, searchRows } from "@/components/guest-messages/inbox-search-view";
 import { NewMessagesPill, useThreadFollow } from "@/components/guest-messages/thread-follow";
 import { useLiveChanges } from "@/components/shared/live-refresh";
@@ -60,7 +60,8 @@ import {
   type SnoozeInput,
 } from "@/lib/guest-messages/inbox-model";
 import type { LinkTargetType } from "@/lib/guest-messages/task-link-model";
-import { createPaneMessageHandler, ROW_MESSAGE, type PaneMessage } from "@/lib/guest-messages/pane-messages";
+import { createPaneMessageHandler, postRowChange } from "@/lib/guest-messages/pane-messages";
+import { stateAfterAction, type RowNext } from "@/lib/guest-messages/row-leave";
 import { guestWriteFreshness } from "@/lib/guest-messages/write-freshness";
 import {
   TaskCreateForm,
@@ -71,10 +72,11 @@ import {
   type TaskCategoryCopy,
 } from "@/components/guest-messages/task-create";
 
-/** 칸(iframe) 안 대화 → 왼쪽 목록에 「이 줄이 빠진다 / 돌아온다」를 서버를 기다리기 전에 알린다(`pane-messages`). */
-function tellList(id: string, leaving: boolean) {
-  if (typeof window === "undefined" || window.parent === window) return;
-  window.parent.postMessage({ type: ROW_MESSAGE, id, leaving } satisfies PaneMessage, window.location.origin);
+/** 칸(iframe) 안 대화 → 왼쪽 목록에 「이 대화가 곧 `next` 가 된다」(`null` = 실패, 다시 편다)를 서버 답 전에 알린다(`pane-messages`).
+ *  접을지는 바깥 목록이 자기 탭 · 검색 상태로 정한다. 폰(칸이 아님)은 보내지 않는다. */
+function tellList(id: string, next: RowNext | null) {
+  if (typeof window === "undefined") return;
+  postRowChange(window, id, next);
 }
 
 type ToastState = {
@@ -123,7 +125,6 @@ export function MobileInbox({
   building,
   channel,
   stall = null,
-  initialQuery = "",
   candidates = null,
 }: {
   /** 실시간 구독 필터(조직) — 권한 · 조직 판정은 서버 액션이 다시 한다. */
@@ -136,8 +137,6 @@ export function MobileInbox({
   channel: InboxChannelFilter;
   /** `guest_messages.manage` 일 때만 서버가 채운다 — 받는 통로 멈춤 줄. */
   stall?: StallNotice | null;
-  /** 주소 `q` — 필터를 바꿔 다시 그려도 검색이 이어진다. */
-  initialQuery?: string;
   /** 과거 답장 후보 남은 수(서버가 권한 있는 종류만 센다) — 0 이면 입구 줄을 숨긴다. 문서 49 §9-6. */
   candidates?: { replies: number; info: number } | null;
 }) {
@@ -148,7 +147,7 @@ export function MobileInbox({
   const [leaving, setLeaving] = useState<ReadonlySet<string>>(new Set());
   const inbox = useInboxLive(data, { status, building, channel });
   const list = inbox.list;
-  const search = useInboxSearch({ status, building, channel }, initialQuery);
+  const search = useInboxSearchContext();
   const found = search.active ? searchRows(search) : null;
   const liveSources = useMemo(() => guestInboxLiveSources(organizationId), [organizationId]);
   // 검색 중에도 목록은 계속 합쳐 둔다(지우면 바로 맞는 목록). 결과는 같은 검색어로 다시 찾아 갈아 끼운다 — 줄을 하나씩 고치면 필터 · 순서가 어긋난다.
@@ -166,12 +165,19 @@ export function MobileInbox({
 
   // 칸 안 대화가 보낸 신호(`pane-messages`) — 「빠짐 / 되돌림」은 서버 응답 전에 줄을 접고 실패하면 다시 편다(16 「줄 접힘」).
   // 「썼다」는 이 창에도 쓰기 표시를 남기고 그 줄을 바로 다시 읽는다 — 메뉴 숫자(레일 · 사이드바)도 실시간 신호 없이 같이 고쳐진다.
+  // 검색 중이면 접지 않는다(`row-leave`) — 칸의 쓰기 뒤엔 검색 결과도 새 상태로 다시 찾는다(검색 줄 상태 표시가 따라오게).
   const applyIds = inbox.applyIds;
+  const searching = search.active;
+  const refreshSearch = search.refresh;
   useEffect(() => {
     const onMessage = createPaneMessageHandler({
       self: window,
       freshness: guestWriteFreshness,
-      applyIds,
+      applyIds: (ids) => {
+        refreshSearch();
+        return applyIds(ids);
+      },
+      rowRule: { searching, filter: status },
       setRowLeaving: (id, isLeaving) =>
         setLeaving((prev) => {
           const next = new Set(prev);
@@ -182,7 +188,7 @@ export function MobileInbox({
     });
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [applyIds]);
+  }, [applyIds, refreshSearch, searching, status]);
 
   // 먼저 접어 둔 줄은 서버 답이 올 때까지 접힌 채 — 다른 줄의 실시간 합치기로 펴지 않는다(16 「줄 접힘」: 실패할 때만 다시 편다).
   // 그 줄이 목록에서 빠지면 표시를 지운다(나중에 같은 대화가 다시 들어오면 펴진 채로 나타나게).
@@ -246,7 +252,8 @@ export function MobileInbox({
           {found && found.length > 0 ? (
             <div className="gm-mrows" data-stale={search.loading ? "" : undefined}>
               {found.map(({ row, match }) => (
-                <div className="row-collapse" key={row.id} data-leaving={leaving.has(row.id) ? "" : undefined}>
+                // 검색 줄은 접지 않는다(`row-leave`) — 결과는 refresh 로 새 상태를 받는다.
+                <div className="row-collapse" key={row.id}>
                   <div>
                     <Link className="gm-row" href={`/mobile/messages/${row.id}`}>
                       <ConversationRowBody row={row} copy={copy} locale={locale} now={now} withDates={false} match={match} />
@@ -345,10 +352,10 @@ export function MobileThreadScreen({
   };
 
   const setDone = (done: boolean) => {
-    tellList(conversationId, done);
+    tellList(conversationId, stateAfterAction(done ? "done" : "reopen"));
     controller.setDone(done, (result) => {
       if (!result.ok) {
-        tellList(conversationId, !done);
+        tellList(conversationId, null);
         notify(errorText(result.errorKey, copy));
         return;
       }
@@ -361,12 +368,24 @@ export function MobileThreadScreen({
     });
   };
 
+  // 「처리 끝」 · 「나중에」와 같은 길 — 칸이면 바깥 목록에 알리고(풀린 뒤 상태는 서버가 정함), 실패면 다시 편다.
+  const unsnooze = () => {
+    setSheet("none");
+    tellList(conversationId, stateAfterAction("unsnooze"));
+    controller.unsnooze((result) => {
+      if (!result.ok) {
+        tellList(conversationId, null);
+        notify(errorText(result.errorKey, copy));
+      }
+    });
+  };
+
   const snooze = (input: SnoozeInput) => {
     setSheet("none");
-    tellList(conversationId, true);
+    tellList(conversationId, stateAfterAction("snooze"));
     controller.snooze(input, (result) => {
       if (!result.ok) {
-        tellList(conversationId, false);
+        tellList(conversationId, null);
         notify(errorText(result.errorKey, copy));
         return;
       }
@@ -553,12 +572,7 @@ export function MobileThreadScreen({
                 <button
                   type="button"
                   className="gm-sheet__item"
-                  onClick={() => {
-                    setSheet("none");
-                    controller.unsnooze((r) => {
-                      if (!r.ok) notify(errorText(r.errorKey, copy));
-                    });
-                  }}
+                  onClick={() => unsnooze()}
                 >
                   {copy.unsnooze}
                 </button>

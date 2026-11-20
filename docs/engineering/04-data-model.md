@@ -2608,7 +2608,7 @@ INSERT · UPDATE 신호만, DELETE 는 오지 않는다. 대신 `task_occurrence
   예전 통로 첨부 줄 `{ name, mimeType, url, inline }`(kind 없음)과 섞일 수 있고 `kind` 로 가른다. 복사 작업만 덧붙인다(웹훅 다시 받기는 `ignoreDuplicates` 라 덮지 않음).
 - 저장소: 비공개 버킷 `guest-message-media`(10MB, jpeg · png · webp · gif). 경로 `<organization_id>/<conversation_id>/<message_id>/<사진 번호>.<ext>`(1200 폭) + `<사진 번호>-t.<ext>`(480 폭 작은 사진). 지우기 작업 없음(보관 기준 Q7 과 함께 정한다 — 메시지 · 대화가 지워져도 파일은 남으므로 그때 같이).
 
-## 2026-11-17 손님 메시지 검색 — `guest_conversation_search` · 메시지 내용 trigram 색인 (`202611180001_guest_message_search.sql`, **운영 적용 전**)
+## 2026-11-17 손님 메시지 검색 — `guest_conversation_search` · 메시지 내용 trigram 색인 (`202611180001_guest_message_search.sql`, 운영 적용)
 
 기준 문서: `docs/product/47-guest-messaging.md` §5-10. 표 · 칸은 늘지 않는다.
 
@@ -2622,7 +2622,7 @@ INSERT · UPDATE 신호만, DELETE 는 오지 않는다. 대신 `task_occurrence
   - 실행 권한: public · anon · authenticated 회수, `service_role` 만(05).
 - 서버 쓰는 곳: `searchInbox`(`src/lib/guest-messages/inbox-server.ts`, service_role + 세션 조직). 타입은 `src/types/database.ts` 손으로 맞춤.
 - **운영 적용 메모**: 이 파일의 `create index` 는 만드는 동안 `guest_messages` 에 쓰기 잠금(SHARE)을 건다 — 웹훅이 넣는 메시지가 기다린다(로컬 2.4초 · 운영 12만 줄 비슷한 크기라 몇 초 예상). 잠금 없이 하려면 SQL 편집기에서 먼저 한 문장만(트랜잭션 밖) `create index concurrently if not exists guest_messages_body_trgm_idx on public.guest_messages using gin (body extensions.gin_trgm_ops) where direction in ('guest', 'host');` 를 돌린 뒤 이 파일을 적용한다(`if not exists` 라 그 줄은 건너뛴다).
-- **2026-11-20 `202611200001_guest_message_search_perf.sql`(운영 적용 전)**: 같은 이름 · 인자 · 돌려주는 열 · 권한(security invoker · `search_path ''` · service_role 만)으로 본문만 다시 만든다. 표 · 칸 · 색인 변화 없음(함수만 — 표 잠금 없음, 멱등). 순서: ① 필터에 드는 대화 마지막 메시지 최신순 앞 400개에서 맞는 것(대화마다 자기 메시지) — `p_limit` 개가 차면 끝 ② 못 채우고 400개가 전체가 아니면 전체에서 대화 id 만 모음(본문 정렬 없음) ③ 고른 id 에만 예약 붙이기 · 맞은 말(`sent_at desc, id desc` 첫 줄) · 맞은 곳 열. 코드 가림은 `body !~ 코드 or regexp_replace(…) ilike` 로 코드가 든 글에만 정규식을 돌린다. 결과는 예전과 같다(로컬 운영 규모에서 588가지 줄 단위 비교). 되돌리기: `202611180001` 의 함수 부분을 다시 돌린다. 예약 쪽 jsonb(`apiReference` · 전화 · 이메일) trigram 색인은 넣지 않았다(드문 말 검색이 예약 표를 통째로 읽는 비용은 남음 — 47 §5-10).
+- **2026-11-20 `202611200001_guest_message_search_perf.sql`(운영 적용 2026-11-20)**: 같은 이름 · 인자 · 돌려주는 열 · 권한(security invoker · `search_path ''` · service_role 만)으로 본문만 다시 만든다. 표 · 칸 · 색인 변화 없음(함수만 — 표 잠금 없음, 멱등). 순서: ① 필터에 드는 대화 마지막 메시지 최신순 앞 400개에서 맞는 것(대화마다 자기 메시지) — `p_limit` 개가 차면 끝 ② 못 채우고 400개가 전체가 아니면 전체에서 대화 id 만 모음(본문 정렬 없음) ③ 고른 id 에만 예약 붙이기 · 맞은 말(`sent_at desc, id desc` 첫 줄) · 맞은 곳 열. 코드 가림은 `body !~ 코드 or regexp_replace(…) ilike` 로 코드가 든 글에만 정규식을 돌린다. 결과는 예전과 같다(로컬 운영 규모에서 588가지 줄 단위 비교). 되돌리기: `202611180001` 의 함수 부분을 다시 돌린다. 예약 쪽 jsonb(`apiReference` · 전화 · 이메일) trigram 색인은 넣지 않았다(드문 말 검색이 예약 표를 통째로 읽는 비용은 남음 — 47 §5-10).
 
 ## 2026-11-18 손님 메시지 AI 답장 도우미 — `guest_reply_pairs` · `guest_saved_reply_embeddings` · `guest_reply_assist_events` (`202611180002_guest_reply_assist.sql`, **운영 미적용**)
 
@@ -2659,6 +2659,22 @@ INSERT · UPDATE 신호만, DELETE 는 오지 않는다. 대신 `task_occurrence
   `language sql` · `stable` · security invoker · `search_path = ''`. 계산은 `src/lib/beds24/credit-usage-model.ts`.
 - 보관 30일: pg_cron `beds24-credit-usage-purge`(`35 15 * * *` UTC = 도쿄 0:35), 하드 삭제.
 - 쓰는 곳: `src/lib/beds24/credit-ledger.ts`(service role). 읽는 곳: `src/lib/beds24/credit-usage-read.ts`. 타입은 `src/types/database.ts` 손으로 맞춤.
+
+## 2026-11-20 손님 메시지 이름 검색 — 이름 정리 · 열쇠 함수 · 저장 칸 `guest_name_key` + trigram 색인 (`202611200002_guest_name_search.sql`, **운영 적용 완료 2026-11-20**)
+
+- 함수(모두 `immutable` · `parallel safe` · `search_path ''`, 표를 읽지 않는 순수 글 함수):
+  - `guest_search_normalize(text)` — 앱 `normalizeGuestText` 와 글자까지 같은 정리(앞 200글자만 → NFKC → `lower` → `ς`→`σ` → NFD → U+0300–036F 제거 → NFC → `. , · ・ ' ’ " ( ) - _ /` 공백 → JS `\s` 공백 목록을 공백 하나로 → 앞뒤 제거).
+  - `guest_name_search_key(text)` — 이름 단어의 순서들을 붙여 쓴 글을 공백으로 이은 것(원래 순서 먼저). 단어 5개 · 붙인 글자 40자까지는 모든 순서, 넘으면 원래 · 거꾸로만 — `matchesGuestName` 과 같은 범위(`GUEST_PERMUTE_MAX_COMPACT_CHARS`). 상한은 열쇠 크기 때문(실측 최대 3,119자 · 평균 60자, 이론상 최대 약 4,900자).
+  - `guest_name_search_patterns(text) → text[]` — 검색어 단어마다 `%단어%`(`\ % _` 막음), 붙인 글자 2자 미만이면 빈 배열(예: `J.` 은 이름 단계를 돌지 않는다).
+  - `guest_name_search_match(query, name) → boolean` — 검사 · 점검용(검색 함수 A 단계와 같은 조건 = 앱 `matchesGuestName` 과 같은 판정: 열쇠 첫 덩이 `split_part(key,' ',1) like all(조각)` 또는 `key like '%붙인 검색어%'`).
+  - 실행 권한: 4개 모두 `public` · `anon` 에서 회수. 조각 · 판정은 service_role 만, 정리 · 열쇠는 authenticated · service_role — BEFORE UPDATE 트리거 때문에 직원이 `status` · `snooze_until` 만 바꿔도 저장 칸이 그 사용자 권한으로 다시 계산된다(05 · PGlite 실제 역할 테스트).
+- 칸 `guest_conversations.guest_name_key text generated always as (guest_name_search_key(guest_name)) stored` — 이름이 바뀌면 같이 다시 계산된다. 색인 `guest_conversations_name_key_trgm_idx` — `gin (guest_name_key extensions.gin_trgm_ops)`. 처음 만든 표현식 색인(`guest_conversations_name_search_trgm_idx`)은 drop — 표현식 색인은 짧은 검색어에서 플래너가 줄마다 열쇠를 다시 계산해 느려졌다(`sm` 16.8 → 418.9ms, 칸으로 바꾼 뒤 4.7ms).
+- ⚠ **정리 · 열쇠 함수를 바꾸면(또는 Postgres 메이저 판 · glibc/ICU 판을 올리면) 저장 칸을 다시 계산해야 한다** — 한 트랜잭션에서 `set local lock_timeout = '3s'` → `drop column guest_name_key`(색인도 지워짐) → `add column … generated … stored` → 색인 다시 만들기(마이그레이션 머리에 그대로). `update … set guest_name = guest_name` 은 쓰지 않는다(모든 줄 updated_at · 실시간 트리거 202611160001 · 줄 잠금). 앱 `src/lib/guest-search.ts` 와 같이 바꾼다(사례표 `guest-name-cases.ts` 가 양쪽을 같이 검사).
+- 잠금 · 시간(9,200줄 PGlite 실측 — 숫자는 예시, 환경마다 다름): 칸 추가는 표를 다시 쓴다(ACCESS EXCLUSIVE, 그 문장만 예 505ms). 파일 전체가 한 트랜잭션이라 이 잠금은 **커밋까지** 쥔 채 — 읽기 · 쓰기가 파일 전체 시간(예 0.6~0.8초)만큼 기다린다. 색인은 그 안에서 50ms(632~728kB). 맨 위 `set lock_timeout = '3s'`(못 얻으면 통째로 되돌려짐 — 대시보드가 한 트랜잭션으로 돌린다는 것은 가정) · 끝에 `reset lock_timeout`(그 세션에서 먼저 손으로 set 한 값도 지움 — 트랜잭션 밖이면 `set local` 은 효과가 없어 쓰지 않음) 다음 `analyze`.
+- `guest_conversation_search` 다시 정의 — 같은 이름 · 15개 인자 · 13개 열 · security invoker · service_role 만. 이름 단어는 `p_like` 에서 꺼낸다(없으면 `p_name_fragments`). A 이름(`c.guest_name_key like`, 최신순 `p_limit`) → 다 차면 끝(메시지 내용 안 찾음) → B 남는 칸만 예약번호 · 건물 · 방 · 전화 · 이메일 · 메시지 내용(최근 400 → 전체) → C 열 만들기(A 먼저). `name_hit` = A 에 들었거나 예약 이름(대화 이름과 다를 때만)이 같은 판정에 맞음 — 예약 이름으로만 맞는 대화는 B 에서 나와 이름 히트 뒤에 붙는다(80칸이 차면 빠짐). 예약 이름은 열쇠 전에 글자 거름(붙인 검색어 글자가 모두 있나)을 먼저 본다. 동적 SQL 인자 `$19` 붙인 검색어 like 조각 · `$20` 붙인 검색어 날것.
+- 앱은 검색 때 `p_status` 를 늘 `'all'` 로 보낸다(상태 탭 무관, 앱은 상태를 받지도 않는다 — 47 §5-10).
+- 순서: **DB 먼저, 그다음 앱 배포**(새 앱은 새 함수의 이름 우선 순서를 기대한다). 멱등(다시 돌려도 오류 없음 — 실측).
+- 되돌리기(실측): ① 202611200001 을 다시 돌린다 ② `drop index if exists guest_conversations_name_key_trgm_idx` · `alter table guest_conversations drop column if exists guest_name_key` ③ 함수 4개 drop(**이 순서 · CASCADE 없이** — 정리 함수를 칸보다 먼저 지우면 오류 없이 지워지고 그 뒤 대화 표 쓰기가 모두 실패한다). 칸 drop 은 표를 다시 쓰지 않는다.
 
 ## 2026-11-19 손님 메시지 성능 — 인덱스 4개 · 마지막 한 줄 함수 (`202611190001_guest_messages_perf.sql`, 운영 적용 2026-11-19)
 

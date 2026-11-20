@@ -410,13 +410,15 @@ const BUILDING_LABEL_SETS = Object.values(dictionaries).map((dictionary) => dict
 
 /**
  * 검색 — 그 조직의 대화 전체에서(목록 창 500 · 200 과 무관) 이름 · 예약번호 · 건물 · 방 · 전화 · 이메일 · 메시지 내용. 47 §5-10.
- * `query` 는 `normalizeSearchQuery` 를 거친 값. 결과는 마지막 메시지 최신순 50개, 줄 모양은 목록과 같다(코드 가리기 포함).
+ * `query` 는 `normalizeSearchQuery` 를 거친 값. 결과는 이름이 맞은 대화 먼저, 그다음 나머지(각각 마지막 메시지 최신순) 50개,
+ * 줄 모양은 목록과 같다(코드 가리기 포함). **상태 탭은 보지 않는다**(전체 상태에서 — 줄의 상태 표시로 구분), 건물 · 채널 필터는 건다.
  */
 export async function searchInbox(
   db: Client,
   organizationId: string,
   query: string,
-  filter: InboxFilter,
+  // 상태 탭은 받지 않는다 — 검색은 늘 전체 상태(47 §5-10). 건물 · 채널만.
+  filter: Pick<InboxFilter, "building" | "channel">,
   now: Date = new Date(),
   visibility: CodeVisibility = { canSeeCodes: true, canManageAuto: true },
 ): Promise<InboxSearchResult> {
@@ -438,7 +440,8 @@ export async function searchInbox(
     p_email: args.p_email ?? undefined,
     p_body_since: args.p_body_since ?? undefined,
     p_code_mask: args.p_code_mask ?? undefined,
-    p_status: filter.status,
+    // 검색은 상태 탭과 무관 — 처리 끝 · 나중에 대화도 찾는다(2026-11-20). 건물 · 채널은 그대로.
+    p_status: "all",
     p_building: filter.building ?? undefined,
     p_channel: filter.channel ?? "all",
     p_now: now.toISOString(),

@@ -161,6 +161,53 @@ describe("결과 다시 보기 · 순서 · 개수", () => {
     expect(picked[49].id).toBe("r49");
     expect(new Set(picked.map((p) => p.id)).size).toBe(50);
   });
+  it("이름이 맞은 대화가 먼저 — 더 최근의 내용 · 예약번호 히트가 50개를 넘게 앞에 있어도 이름 히트를 밀어내지 않는다", () => {
+    const rows = [
+      ...Array.from({ length: 60 }, (_, i) =>
+        rpcRow(`body${i}`, { body_message_id: `m${i}`, body_direction: "guest", body: "kimura station is near?" }),
+      ),
+      rpcRow("ref", { reference_hit: true }),
+      rpcRow("old-name", { name_hit: true, guest_name: "Taro Kimura", last_message_at: "2025-01-01T00:00:00Z" }),
+      rpcRow("old-name-2", { name_hit: true, guest_name: "Kimura Hanako", last_message_at: "2024-06-01T00:00:00Z" }),
+    ];
+    const picked = pickSearchMatches(rows, "kimura", { canSeeCodes: true, codes: [] });
+    expect(picked.slice(0, 2).map((p) => p.id)).toEqual(["old-name", "old-name-2"]);
+    expect(picked[2].id).toBe("body0");
+    expect(picked).toHaveLength(50);
+  });
+  it("이름 히트가 limit 개에 닿으면 바로 멈춘다 — 그 뒤 이름 히트 · 다른 히트는 넣지 않는다", () => {
+    const rows = [
+      rpcRow("ref-first", { reference_hit: true }),
+      rpcRow("n1", { name_hit: true, guest_name: "Taro Kimura" }),
+      rpcRow("n2", { name_hit: true, guest_name: "Kimura Hanako" }),
+      rpcRow("n3", { name_hit: true, guest_name: "Kimura Jiro" }),
+    ];
+    const picked = pickSearchMatches(rows, "kimura", { canSeeCodes: true, codes: [], limit: 2 });
+    expect(picked.map((p) => p.id)).toEqual(["n1", "n2"]);
+  });
+  it("DB 가 이름 히트라 했지만 앱 판정이 아니면 이름으로 치지 않고 다른 맞은 곳 묶음으로 간다", () => {
+    const rows = [
+      rpcRow("fake-name", { name_hit: true, guest_name: "Park Jisoo", reference_hit: true }),
+      rpcRow("real-name", { name_hit: true, guest_name: "Kim Minsu" }),
+      rpcRow("only-fake", { name_hit: true, guest_name: "Park Jisoo" }),
+    ];
+    const picked = pickSearchMatches(rows, "kim", { canSeeCodes: true, codes: [] });
+    expect(picked.map((p) => [p.id, p.match.hits])).toEqual([
+      ["real-name", ["name"]],
+      ["fake-name", ["booking"]],
+    ]);
+  });
+  it("이름과 메시지가 함께 맞으면 이름 묶음(앞)으로 간다", () => {
+    const rows = [
+      rpcRow("body-only", { body_message_id: "m1", body_direction: "guest", body: "kim said hi" }),
+      rpcRow("both", { name_hit: true, guest_name: "Kim Minsu", body_message_id: "m2", body_direction: "host", body: "Hello kim" }),
+    ];
+    const picked = pickSearchMatches(rows, "kim", { canSeeCodes: true, codes: [] });
+    expect(picked.map((p) => [p.id, p.match.hits])).toEqual([
+      ["both", ["name", "message"]],
+      ["body-only", ["message"]],
+    ]);
+  });
   it("내부 메모 · 시스템 줄은 맞은 곳이 되지 않는다", () => {
     const rows = [rpcRow("n", { body_message_id: "m", body_direction: "note" as never, body: "parking" })];
     expect(pickSearchMatches(rows, "parking", { canSeeCodes: true, codes: [] })).toEqual([]);
@@ -211,7 +258,7 @@ describe("searchInbox — 조직 범위", () => {
 
   it("검색 함수와 줄 다시 읽기에 언제나 세션 조직을 건다", async () => {
     const { db, calls } = fakeDb([rpcRow("11111111-1111-4111-8111-111111111111", { reference_hit: true })]);
-    await searchInbox(db as never, "org-1", "HM1234", { status: "all", building: null, channel: "all" });
+    await searchInbox(db as never, "org-1", "HM1234", { building: null, channel: "all" });
     const search = calls.rpc.find((c) => c.name === "guest_conversation_search")!;
     expect(search.args.p_organization_id).toBe("org-1");
     expect(search.args.p_limit).toBe(SEARCH_FETCH_LIMIT);
@@ -221,23 +268,31 @@ describe("searchInbox — 조직 범위", () => {
   });
   it("코드를 못 보는 사람은 가리기 정규식을 넘긴다(코드를 못 읽으면 숫자 묶음 전체)", async () => {
     const { db, calls } = fakeDb([], { failBuildingInfo: true });
-    await searchInbox(db as never, "org-1", "482913", { status: "all", building: null, channel: "all" }, new Date(), {
+    await searchInbox(db as never, "org-1", "482913", { building: null, channel: "all" }, new Date(), {
       canSeeCodes: false,
       canManageAuto: false,
     });
     const args = calls.rpc.find((c) => c.name === "guest_conversation_search")!.args;
     expect(args.p_code_mask).toBe("[0-9#*]{3,}");
     const seen = fakeDb([]);
-    await searchInbox(seen.db as never, "org-1", "482913", { status: "all", building: null, channel: "all" });
+    await searchInbox(seen.db as never, "org-1", "482913", { building: null, channel: "all" });
     expect(seen.calls.rpc.find((c) => c.name === "guest_conversation_search")!.args.p_code_mask).toBeUndefined();
+  });
+  it("검색은 상태 탭을 받지 않고 늘 전체 상태에서 — 건물 · 채널 필터는 그대로 건다", async () => {
+    const { db, calls } = fakeDb([]);
+    await searchInbox(db as never, "org-1", "kimura", { building: "아라키초A", channel: "airbnb" }, NOW);
+    const args = calls.rpc.find((c) => c.name === "guest_conversation_search")!.args;
+    expect(args.p_status).toBe("all");
+    expect(args.p_building).toBe("아라키초A");
+    expect(args.p_channel).toBe("airbnb");
   });
   it("2글자면 메시지 내용은 최근 90일(searchInbox 의 now 기준)만 · 결과에 표시", async () => {
     const short = fakeDb([]);
-    const result = await searchInbox(short.db as never, "org-1", "鍵穴", { status: "all", building: null, channel: "all" }, NOW);
+    const result = await searchInbox(short.db as never, "org-1", "鍵穴", { building: null, channel: "all" }, NOW);
     expect(short.calls.rpc.find((c) => c.name === "guest_conversation_search")!.args.p_body_since).toBe("2026-08-20T03:00:00.000Z");
     expect(result.bodyRecentOnly).toBe(true);
     const long = fakeDb([]);
-    const full = await searchInbox(long.db as never, "org-1", "umbrella", { status: "all", building: null, channel: "all" }, NOW);
+    const full = await searchInbox(long.db as never, "org-1", "umbrella", { building: null, channel: "all" }, NOW);
     expect(long.calls.rpc.find((c) => c.name === "guest_conversation_search")!.args.p_body_since).toBeUndefined();
     expect(full.bodyRecentOnly).toBe(false);
   });

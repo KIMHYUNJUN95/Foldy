@@ -14,11 +14,26 @@ const MAX_QUERY_LENGTH = 60;
 
 const CJK = /[぀-ヿ㐀-鿿가-힯]/;
 
-/** 비교용 정규화 — NFKC(전각→반각) + 소문자 + 악센트 제거 + 공백 하나로. */
+/**
+ * 정리할 글의 최대 길이(글자 수, 정리 전). DB `guest_search_normalize` 의 `left(p, 200)` 과 같다 — 바꾸면 양쪽을 같이.
+ * 이름 · 검색어가 이보다 긴 일은 없지만, 열쇠(저장 칸) 크기가 끝없이 커지지 않게 막는다.
+ */
+export const GUEST_NORMALIZE_MAX_CHARS = 200;
+/** 모든 순서를 만드는 이름의 최대 길이(단어를 붙인 글자 수). 넘으면 원래 순서 · 거꾸로만 — DB 열쇠와 같다. */
+export const GUEST_PERMUTE_MAX_COMPACT_CHARS = 40;
+
+/**
+ * 비교용 정규화 — NFKC(전각→반각) + 소문자(그리스 끝 시그마 ς 는 σ 로) + 악센트 제거 + 공백 하나로.
+ * DB `guest_search_normalize`(202611200002)와 글자까지 같아야 한다 — 바꾸면 SQL · 저장 칸 다시 계산까지 같이.
+ */
 export function normalizeGuestText(value: string): string {
-  return value
+  const capped = value.length > GUEST_NORMALIZE_MAX_CHARS
+    ? Array.from(value).slice(0, GUEST_NORMALIZE_MAX_CHARS).join("")
+    : value;
+  return capped
     .normalize("NFKC")
     .toLowerCase()
+    .replace(/ς/g, "σ")
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
     .normalize("NFC")
@@ -32,14 +47,20 @@ function tokensOf(value: string): string[] {
   return normalized ? normalized.split(" ") : [];
 }
 
-/** 토큰 순열(최대 5개까지 — 그보다 길면 원래 순서와 역순만). */
+/** 토큰 순열(5개 · 붙인 글자 40자까지 — 그보다 길면 원래 순서와 역순만). DB `guest_name_search_key` 와 같다. */
 function permutations(tokens: string[]): string[][] {
-  if (tokens.length > 5) return [tokens, [...tokens].reverse()];
+  if (tokens.length > 5 || Array.from(tokens.join("")).length > GUEST_PERMUTE_MAX_COMPACT_CHARS) {
+    return [tokens, [...tokens].reverse()];
+  }
+  return allOrders(tokens);
+}
+
+function allOrders(tokens: string[]): string[][] {
   if (tokens.length <= 1) return [tokens];
   const result: string[][] = [];
   tokens.forEach((token, index) => {
     const rest = [...tokens.slice(0, index), ...tokens.slice(index + 1)];
-    for (const tail of permutations(rest)) result.push([token, ...tail]);
+    for (const tail of allOrders(rest)) result.push([token, ...tail]);
   });
   return result;
 }
@@ -115,7 +136,8 @@ export function buildGuestSearchPlan(rawQuery: string): GuestSearchPlan | null {
     fragments.add(token.slice(-edge));
   }
   // 한 글자짜리만으로는 너무 넓다 — 한글·한자 한 글자 이름은 드물다. 두 글자부터 이름으로 찾는다.
-  const compactLength = tokens.join("").length;
+  // 글자 수는 코드 포인트로 센다(DB char_length 와 같게 — 「𠮷」 같은 한 글자를 2로 세지 않는다).
+  const compactLength = Array.from(tokens.join("")).length;
   const nameFragments = compactLength >= 2 ? [...fragments] : [];
 
   const digits = digitsOf(query);

@@ -41,12 +41,14 @@ import {
 } from "@/components/guest-messages/gm-format";
 import { useThread } from "@/components/guest-messages/use-thread";
 import { useInboxLive } from "@/components/guest-messages/use-inbox-live";
-import { useInboxSearch } from "@/components/guest-messages/use-inbox-search";
+import { useInboxSearchContext } from "@/components/guest-messages/inbox-search-provider";
 import { InboxSearchBox, InboxSearchState, searchRows } from "@/components/guest-messages/inbox-search-view";
 import { NewMessagesPill, useThreadFollow } from "@/components/guest-messages/thread-follow";
 import { useLiveChanges } from "@/components/shared/live-refresh";
 import { guestInboxLiveSources, guestThreadLiveSources } from "@/lib/live-sources";
 import { idsOfKind, liveKeysOf, pruneLocalLeaving, touchesThread } from "@/lib/guest-messages/live-merge";
+import { leavesStatusList, stateAfterAction } from "@/lib/guest-messages/row-leave";
+import { settleWrite } from "@/lib/guest-messages/settle-write";
 import { StallNoticeLine } from "@/components/guest-messages/stall-notice";
 import { BuildingGuestInfoPanel } from "@/components/admin/messages/building-guest-info-panel";
 import type { StallNotice } from "@/lib/guest-messages/channel-overview-server";
@@ -87,7 +89,6 @@ export function MessagesConsole({
   stall = null,
   taskKinds = [],
   taskCategoryCopy,
-  initialQuery = "",
 }: {
   /** 실시간 구독 필터(조직) — 권한 · 조직 판정은 서버 액션이 다시 한다. */
   organizationId: string;
@@ -107,15 +108,13 @@ export function MessagesConsole({
   /** 이 사람이 메시지에서 만들 수 있는 업무(6단계 — 서버 `creatableKinds`). */
   taskKinds?: LinkTargetType[];
   taskCategoryCopy: TaskCategoryCopy;
-  /** 주소 `q` — 필터를 바꿔 다시 그려도 검색이 이어진다. */
-  initialQuery?: string;
 }) {
   const router = useRouter();
   const now = useNow();
   const buildingName = useBuildingName();
   const inbox = useInboxLive(data, { status, building, channel });
   const list = inbox.list;
-  const search = useInboxSearch({ status, building, channel }, initialQuery);
+  const search = useInboxSearchContext();
   const found = search.active ? searchRows(search) : null;
   const [selected, setSelected] = useState<string | null>(selectedId ?? data?.rows[0]?.id ?? null);
   const [leaving, setLeaving] = useState<ReadonlySet<string>>(new Set());
@@ -251,7 +250,8 @@ export function MessagesConsole({
   const markDone = (done: boolean) => {
     const id = selected;
     if (!id) return;
-    const willLeave = (status === "awaiting" && done) || (status === "done" && !done);
+    // 검색 중엔 접지 않는다 — 검색은 상태 탭을 보지 않아 바뀐 줄도 결과에 남는다(`row-leave`, 47 §5-10).
+    const willLeave = leavesStatusList({ searching: search.active, filter: status, next: stateAfterAction(done ? "done" : "reopen") });
     if (willLeave) setLeaving((prev) => new Set(prev).add(id));
     controller.setDone(done, (result) => {
       if (result.ok) {
@@ -273,7 +273,8 @@ export function MessagesConsole({
   const applySnooze = (input: SnoozeInput) => {
     const id = selected;
     if (!id) return;
-    if (status === "awaiting") setLeaving((prev) => new Set(prev).add(id));
+    if (leavesStatusList({ searching: search.active, filter: status, next: stateAfterAction("snooze") }))
+      setLeaving((prev) => new Set(prev).add(id));
     setSnoozeOpen(false);
     controller.snooze(input, (result) => {
       if (result.ok) {
@@ -282,6 +283,27 @@ export function MessagesConsole({
             time: result.snoozeUntil ? formatWhen(result.snoozeUntil, locale, new Date()) : "",
           }),
         );
+        void inbox.applyIds([id]);
+        search.refresh();
+      } else {
+        setLeaving((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+        showToast(errorText(result.errorKey, copy));
+      }
+    });
+  };
+
+  const applyUnsnooze = () => {
+    const id = selected;
+    if (!id) return;
+    // 풀린 뒤 상태는 서버가 정한다 — 나중에 탭에서만 빠진다(`row-leave`, 47 §5-10).
+    if (leavesStatusList({ searching: search.active, filter: status, next: stateAfterAction("unsnooze") }))
+      setLeaving((prev) => new Set(prev).add(id));
+    controller.unsnooze((result) => {
+      if (result.ok) {
         void inbox.applyIds([id]);
         search.refresh();
       } else {
@@ -329,7 +351,8 @@ export function MessagesConsole({
               {found && found.length > 0 ? (
                 <div data-stale={search.loading ? "" : undefined}>
                   {found.map(({ row, match }) => (
-                    <div className="row-collapse" key={row.id} data-leaving={leaving.has(row.id) ? "" : undefined}>
+                    // 검색 줄은 접지 않는다(`row-leave`) — 결과는 refresh 로 새 상태를 받는다.
+                    <div className="row-collapse" key={row.id}>
                       <div>
                         <button
                           type="button"
@@ -408,13 +431,7 @@ export function MessagesConsole({
                         type="button"
                         className="gm-btn"
                         disabled={controller.pending}
-                        onClick={() => {
-                          const id = selected;
-                          controller.unsnooze((r) => {
-                            if (!r.ok) showToast(errorText(r.errorKey, copy));
-                            else if (id) void inbox.applyIds([id]);
-                          });
-                        }}
+                        onClick={applyUnsnooze}
                       >
                         {copy.unsnooze}
                       </button>
@@ -563,9 +580,11 @@ export function MessagesConsole({
               return;
             }
             // 다른 대화로 옮긴 뒤 되돌리기 — 그 대화만 다시 답장 기다림으로.
-            void guestWrites.setDone(id, false).then((result) => {
-              if (result.ok) void inbox.applyIds([id]);
-              else showToast(errorText(result.errorKey, copy));
+            void settleWrite(() => guestWrites.setDone(id, false)).then((result) => {
+              if (result.ok) {
+                void inbox.applyIds([id]);
+                search.refresh();
+              } else showToast(errorText(result.errorKey, copy));
             });
           }}
         />

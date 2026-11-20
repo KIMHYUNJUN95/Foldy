@@ -49,6 +49,17 @@ export type InboxSearchMatch = {
   snippet: { direction: GuestMessageDirection; text: string } | null;
 };
 
+/**
+ * 페이지 key 두 개(47 §5-10) — 검색 자리(`InboxSearchProvider`)는 건물 · 채널로만 새로 만들고, 목록은 상태 탭으로 다시 그린다.
+ * 검색은 상태 탭을 보지 않으므로(서버 액션도 상태를 받지 않음) 탭을 바꿔도 검색 자리는 그대로 산다.
+ */
+export function inboxSearchSlotKey(filter: { building: string | null; channel: string }): string {
+  return `${filter.building ?? ""}|${filter.channel}`;
+}
+export function inboxListKey(status: string): string {
+  return status;
+}
+
 /** 검색어 다듬기 — 앞뒤 공백 · 겹친 공백 · 길이(60자). 2글자 미만이면 null(찾지 않음). */
 export function normalizeSearchQuery(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
@@ -181,14 +192,17 @@ export function snippetAround(body: string, query: string): string {
 
 /**
  * DB 후보 → 맞은 곳 목록. 이름 · 전화번호는 기존 예약 검색 판정으로 다시 보고, 맞은 곳이 하나도 안 남은 줄은 뺀다.
- * DB 순서(마지막 메시지 최신순)를 지키고 `limit` 개까지.
+ * **이름이 맞은 대화가 먼저**, 그다음 나머지 — 각 묶음 안에서는 DB 순서(마지막 메시지 최신순)를 지키고 `limit` 개까지(47 §5-10).
+ * DB(202611200002)도 이름 히트를 먼저 주지만, 예전 함수와 섞여 돌 때도 같은 순서가 되게 여기서 한 번 더 맞춘다.
  */
 export function pickSearchMatches(
   rows: readonly SearchRpcRow[],
   query: string,
   options: { canSeeCodes: boolean; codes: readonly string[] | null; limit?: number },
 ): Array<{ id: string; match: InboxSearchMatch }> {
-  const out: Array<{ id: string; match: InboxSearchMatch }> = [];
+  const named: Array<{ id: string; match: InboxSearchMatch }> = [];
+  const others: Array<{ id: string; match: InboxSearchMatch }> = [];
+  const limit = options.limit ?? SEARCH_RESULT_LIMIT;
   const seen = new Set<string>();
   for (const row of rows) {
     if (seen.has(row.conversation_id)) continue;
@@ -206,8 +220,8 @@ export function pickSearchMatches(
     }
     if (hits.length === 0) continue;
     seen.add(row.conversation_id);
-    out.push({ id: row.conversation_id, match: { hits, snippet } });
-    if (out.length >= (options.limit ?? SEARCH_RESULT_LIMIT)) break;
+    (hits[0] === "name" ? named : others).push({ id: row.conversation_id, match: { hits, snippet } });
+    if (named.length >= limit) break;
   }
-  return out;
+  return [...named, ...others].slice(0, limit);
 }

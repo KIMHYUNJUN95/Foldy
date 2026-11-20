@@ -163,6 +163,7 @@ describe("pane-messages — 태블릿 칸이 보낸 신호를 바깥 목록이 �
       applyIds: (ids: string[]) => {
         calls.applied.push(ids);
       },
+      rowRule: { searching: false, filter: "awaiting" },
       setRowLeaving: (id: string, leaving: boolean) => calls.rows.push([id, leaving]),
     });
     return { calls, handle };
@@ -178,8 +179,8 @@ describe("pane-messages — 태블릿 칸이 보낸 신호를 바깥 목록이 �
 
   it("줄 접힘(gm-row)은 접기 · 펴기만", () => {
     const { calls, handle } = setup();
-    handle(event({ type: ROW_MESSAGE, id: C1, leaving: true }));
-    handle(event({ type: ROW_MESSAGE, id: C1, leaving: false }));
+    handle(event({ type: ROW_MESSAGE, id: C1, next: "done" }));
+    handle(event({ type: ROW_MESSAGE, id: C1, next: null }));
     expect(calls.rows).toEqual([
       [C1, true],
       [C1, false],
@@ -196,7 +197,8 @@ describe("pane-messages — 태블릿 칸이 보낸 신호를 바깥 목록이 �
     handle(event(write, { ...pane, parent: {} }));
     handle(event(write, null));
     handle(event({ type: GUEST_WRITE_MESSAGE, id: 3 }));
-    handle(event({ type: ROW_MESSAGE, id: C1, leaving: "yes" }));
+    handle(event({ type: ROW_MESSAGE, id: C1, next: "yes" }));
+    handle(event({ type: ROW_MESSAGE, id: C1, leaving: true }));
     expect(calls).toEqual({ marked: [], applied: [], rows: [] });
   });
 });

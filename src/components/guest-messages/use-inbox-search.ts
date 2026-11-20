@@ -2,7 +2,7 @@
 
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from "react";
 import { searchGuestConversations } from "@/actions/guest-messages";
-import type { InboxChannelFilter, InboxConversationRow, InboxStatusFilter } from "@/lib/guest-messages/inbox-model";
+import type { InboxChannelFilter, InboxConversationRow } from "@/lib/guest-messages/inbox-model";
 import {
   answerOnRunStart,
   normalizeSearchQuery,
@@ -31,9 +31,11 @@ function writeQueryToUrl(query: string) {
  * - `active` — 검색어가 2글자 이상이면 목록 대신 결과를 그린다.
  * - `refresh()` — 내 손으로 바꾼 뒤 같은 검색어로 바로 다시 찾는다(보이던 결과는 그대로 두고 갈아 끼운다).
  * - `live()` — 실시간 신호. 신호마다 찾지 않고 간격을 두고 모아서 한 번(입력 중이면 건너뜀).
+ * 검색은 상태 탭을 보지 않는다(받지도 않는다). 그래서 이 훅은 상태 탭 `key` 바깥(`InboxSearchProvider`)에 둔다 — 탭을 바꿔도
+ * 러너 · 결과가 그대로 살아 있어 다시 묻지도 · 깜빡이지도 않고, 바꾸기 직전에 보낸 refresh 의 답도 버려지지 않는다.
  */
 export function useInboxSearch(
-  filter: { status: InboxStatusFilter; building: string | null; channel: InboxChannelFilter },
+  filter: { building: string | null; channel: InboxChannelFilter },
   initialQuery: string,
 ) {
   const [input, setInput] = useState(initialQuery);
@@ -68,7 +70,7 @@ export function useInboxSearch(
     const flushBeforeLeave = () => instance.flush();
     document.addEventListener("click", flushBeforeLeave, true);
     window.addEventListener("pagehide", flushBeforeLeave);
-    // 처음 한 번 — 주소에 검색어가 있으면 바로 찾는다(필터를 바꿔 다시 그린 경우 포함).
+    // 처음 한 번 — 주소에 검색어가 있으면 바로 찾는다.
     const first = normalizeSearchQuery(initialQuery);
     if (first) instance.submit(first);
     return () => {

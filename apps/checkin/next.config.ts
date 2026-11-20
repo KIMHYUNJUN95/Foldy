@@ -23,6 +23,8 @@ const nextConfig: NextConfig = process.env.VERCEL
   ? { headers }
   : {
       headers,
+      // `next dev` 가 AGENTS.md 를 자동으로 만들지 않게 한다(Next.js 16.4).
+      agentRules: false,
       turbopack: { root: path.resolve(__dirname) },
       outputFileTracingRoot: path.resolve(__dirname),
     };

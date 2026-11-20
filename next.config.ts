@@ -37,6 +37,8 @@ const nextConfig: NextConfig = {
   // state 하나만 바뀌어도 본문 전체가 다시 실행된다. 그 둘을 손으로 쪼개는 것은 상태 결합도가
   // 높아 회귀 위험이 크다 — 컴파일러가 같은 문제를 훨씬 안전하게 푼다.
   reactCompiler: true,
+  // Next.js 16.4 의 `next dev` 가 AGENTS.md 끝에 안내 문단을 자동으로 붙인다 — 이 저장소는 AGENTS.md 를 직접 관리하므로 끈다.
+  agentRules: false,
   // 지금 기기에서 도는 빌드를 진단 표시(화면 스와이프 — `src/lib/swipe-back/debug.ts`)에 띄우려는 것. 홈 화면 앱은 옛
   // 빌드가 캐시에서 한 번 더 뜨므로 「고친 코드가 실제로 돌고 있는가」부터 확인해야 한다(2026-10-09).
   env: { NEXT_PUBLIC_BUILD_SHA: (process.env.VERCEL_GIT_COMMIT_SHA ?? "dev").slice(0, 7), FOLDY_DEPLOY_ID: DEPLOY_ID },

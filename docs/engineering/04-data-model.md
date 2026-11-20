@@ -1277,6 +1277,7 @@ mentioned_user_ids uuid[] not null default '{}'  -- 멘션된 멤버 UUID 배열
 mention_all boolean not null default false       -- true = @ALL 전체 멘션
 created_at timestamptz not null default now()
 deleted_at timestamptz
+deleted_by_user_id uuid references profiles(id) on delete set null  -- 지운 사람(202611200004). 되돌리기는 이 사람만 60초 안, 되돌리면 null
 
 -- board_reactions  (복합 PK: post_id + user_id + emoji)
 post_id uuid not null references board_posts(id) on delete cascade

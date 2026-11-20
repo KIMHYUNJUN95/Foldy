@@ -6,7 +6,7 @@
    사진 누름 · 버튼 누름(.97). prefers-reduced-motion 이면 모두 끈다. */
 
 .bdw { color: #16141f; }
-.bdw .num, .bdw-rx b { font-variant-numeric: tabular-nums; }
+.bdw .num, .bdw-rx b, .bdw-who__m, .bdw-foot__meta, .bdw-tiles__n, .bdw-rep__top, .bdw-rep__r { font-variant-numeric: tabular-nums; }
 .bdw a, .bdw button, .bdw label, .bdw-sheet button, .bdw-sheet label {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
@@ -19,8 +19,8 @@
 /* ── 피드 머리 ── */
 .bdw-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin: 2px 0 12px; }
 .bdw-head__l { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.bdw-head h1 { margin: 0; font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: -0.02em; }
-.bdw-head__rep { display: inline-flex; align-items: center; gap: 2px; align-self: flex-start; font-size: 13px; font-weight: 600; color: #c5282e; text-decoration: none; }
+.bdw-head h1 { margin: 0; font-size: 34px; line-height: 41px; font-weight: 600; letter-spacing: -0.01em; text-wrap: balance; }
+.bdw-head__rep { display: inline-flex; align-items: center; gap: 2px; align-self: flex-start; font-size: 13px; font-weight: 500; color: var(--primary-ink); text-decoration: none; font-variant-numeric: tabular-nums; }
 .bdw-head__rep svg { width: 12px; height: 12px; }
 .bdw-compose { display: inline-flex; align-items: center; gap: 4px; height: 44px; padding: 0 2px; flex: none; font-size: 14px; font-weight: 600; color: #7a52e6; text-decoration: none; transition: transform 140ms ease; }
 .bdw-compose svg { width: 15px; height: 15px; }
@@ -30,34 +30,29 @@
 .bdw-tabs { display: flex; gap: 18px; margin: 0 -20px 6px; padding: 0 20px; overflow-x: auto; scrollbar-width: none; }
 .bdw-tabs::-webkit-scrollbar { display: none; }
 .bdw-tab { height: 36px; padding: 0 2px; flex: none; border: 0; background: transparent; font: inherit; font-size: 14px; color: var(--text-3); white-space: nowrap; cursor: pointer; transition: color 150ms ease; }
-.bdw-tab.is-on { color: #16141f; font-weight: 700; }
+.bdw-tab.is-on { color: #16141f; font-weight: 600; }
 .bdw-list.is-pending { opacity: .6; transition: opacity 150ms ease; }
 
 /* ── 글 줄 ── */
-.bdw-row { display: flex; flex-direction: column; gap: 10px; padding: 18px 0; border-top: 0.5px solid var(--separator); animation: bdw-in 320ms cubic-bezier(.23, 1, .32, 1) both; transition: background 150ms ease; }
+.bdw-row { display: flex; flex-direction: column; gap: 10px; padding: 18px 0; border-top: 0.5px solid var(--separator); transition: background 150ms ease; }
 .bdw-row:first-child { border-top: 0; padding-top: 6px; }
-.bdw-row:nth-child(2) { animation-delay: 40ms; }
-.bdw-row:nth-child(3) { animation-delay: 80ms; }
-.bdw-row:nth-child(4) { animation-delay: 110ms; }
-.bdw-row:nth-child(n + 5) { animation-delay: 140ms; }
-@keyframes bdw-in { from { opacity: 0; transform: translateY(6px); } }
 .bdw-row__link { display: flex; flex-direction: column; gap: 8px; color: inherit; text-decoration: none; }
 .split-list .bdw-row a[data-split-active] { outline: none; }
 .split-list .bdw-row:has(> .bdw-row__link[data-split-active]) { margin: 0 -12px; padding: 16px 12px; border-radius: 14px; border-top-color: transparent; background: #f4f1fd; }
 .split-list .bdw-row:has(> .bdw-row__link[data-split-active]) + .bdw-row { border-top-color: transparent; }
 
 .bdw-who { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.bdw-av { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; flex: none; border-radius: 50%; background: #f1ecfd; color: #5a30cf; font-size: 13px; font-weight: 700; }
+.bdw-av { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; flex: none; border-radius: 50%; background: #f1ecfd; color: #5a30cf; font-size: 13px; font-weight: 600; }
 .bdw-av.is-lg { width: 40px; height: 40px; font-size: 15px; }
 .bdw-av.is-sm { width: 30px; height: 30px; background: #f2f2f5; color: #6b6878; font-size: 12px; }
 .bdw-who__b { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .bdw-who__n { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bdw-who__m { font-size: 12px; color: var(--text-3); min-height: 16px; }
-.bdw-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: #7a52e6; transform: scale(0); opacity: 0; transition: transform 220ms cubic-bezier(.23, 1, .32, 1), opacity 180ms ease; }
+.bdw-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: #7a52e6; transform: scale(.9); opacity: 0; transition: transform 220ms cubic-bezier(.23, 1, .32, 1), opacity 180ms ease; }
 .bdw-row.is-unread .bdw-dot { transform: scale(1); opacity: 1; }
 .bdw-pin { font-size: 12px; font-weight: 600; color: #5a30cf; }
 .bdw-title { font-size: 16px; line-height: 1.4; font-weight: 600; overflow-wrap: anywhere; }
-.bdw-row.is-unread .bdw-title { font-weight: 700; }
+.bdw-row.is-unread .bdw-title { font-weight: 600; }
 .bdw-title.is-solo { white-space: pre-line; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .bdw-body { margin: 0; font-size: 14px; line-height: 1.55; color: #4c4958; white-space: pre-line; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
@@ -65,18 +60,18 @@
 .bdw-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .bdw-ph { position: relative; aspect-ratio: 1; overflow: hidden; border-radius: 10px; background: #f2f2f5; transition: transform 140ms ease; }
 .bdw-row__link:active .bdw-ph { transform: scale(.985); }
-.bdw-ph img { object-fit: cover; }
+.bdw-ph img { object-fit: cover; outline: 1px solid rgba(0, 0, 0, .08); outline-offset: -1px; }
 .bdw-ph__more { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(22, 20, 31, .42); color: #fff; font-size: 15px; font-weight: 600; }
 
 /* 반응 칩 + 오른쪽 회색 요약 */
 .bdw-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.bdw-rx { display: inline-flex; align-items: center; gap: 5px; height: 34px; padding: 0 12px; border: 0; border-radius: 17px; background: #f4f4f7; font: inherit; font-size: 14px; color: #4c4958; cursor: pointer; transition: transform 140ms cubic-bezier(.23, 1, .32, 1), background 150ms ease, color 150ms ease; }
+.bdw-rx { display: inline-flex; align-items: center; gap: 5px; height: 36px; padding: 0 12px; border: 0; border-radius: 18px; background: #f4f4f7; font: inherit; font-size: 14px; color: #4c4958; cursor: pointer; transition: transform 140ms cubic-bezier(.23, 1, .32, 1), background 150ms ease, color 150ms ease; }
 .bdw-rx b { display: inline-block; font-weight: 600; color: #3a3746; }
 .bdw-rx.is-mine { background: #f1ecfd; color: #5a30cf; }
 .bdw-rx.is-mine b { color: #5a30cf; }
 .bdw-rx:active { transform: scale(.92); }
 .bdw-rx:disabled { cursor: default; }
-.bdw-rx.is-add { width: 34px; padding: 0; justify-content: center; color: var(--text-3); font-size: 17px; }
+.bdw-rx.is-add { width: 44px; padding: 0; justify-content: center; color: var(--text-3); font-size: 17px; }
 .bdw-rx.is-add svg { width: 16px; height: 16px; transition: transform 200ms cubic-bezier(.23, 1, .32, 1); }
 .bdw-rx.is-add[aria-expanded="true"] svg { transform: rotate(45deg); }
 .bdw-rx.is-new { animation: bdw-pop 220ms cubic-bezier(.23, 1, .32, 1) both; }
@@ -102,7 +97,7 @@
 .bdw-icon:active { background: #f4f4f7; }
 .bdw-icon svg { width: 20px; height: 20px; }
 .bdw-d__main { display: flex; flex-direction: column; gap: 10px; }
-.bdw-d h1 { margin: 0; font-size: 21px; font-weight: 700; line-height: 1.35; letter-spacing: -0.03em; overflow-wrap: anywhere; }
+.bdw-d h1 { margin: 0; font-size: 21px; font-weight: 600; line-height: 1.35; letter-spacing: -0.01em; text-wrap: balance; overflow-wrap: anywhere; }
 .bdw-d__body { margin: 0; font-size: 15px; line-height: 1.7; color: #3a3746; white-space: pre-line; overflow-wrap: anywhere; }
 .bdw-d__tags { display: flex; flex-wrap: wrap; gap: 8px; font-size: 13px; color: var(--text-3); }
 .bdw-d__files { display: flex; flex-direction: column; gap: 8px; }
@@ -111,7 +106,7 @@
 .bdw-gal { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .bdw-gal__ph { position: relative; aspect-ratio: 1; overflow: hidden; padding: 0; border: 0; border-radius: 10px; background: #f2f2f5; cursor: zoom-in; transition: transform 140ms ease; }
 .bdw-gal__ph.is-hero { grid-column: span 2; aspect-ratio: 16 / 9; }
-.bdw-gal__ph img { object-fit: cover; }
+.bdw-gal__ph img { object-fit: cover; outline: 1px solid rgba(0, 0, 0, .08); outline-offset: -1px; }
 .bdw-gal__ph:active { transform: scale(.98); }
 
 /* 첨부 파일 — 회색 둥근 줄(상자 테두리 없음) */
@@ -120,7 +115,7 @@
 .bdw-file:disabled { opacity: .6; }
 .bdw-file.is-static { cursor: default; }
 .bdw-file.is-static:active { background: #f7f7f9; transform: none; }
-.bdw-file__ty { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; flex: none; border-radius: 9px; background: #fff; font-size: 10px; font-weight: 700; color: #6b6878; }
+.bdw-file__ty { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; flex: none; border-radius: 9px; background: #fff; font-size: 10px; font-weight: 600; color: #6b6878; }
 .bdw-file__ty.is-pdf { color: #c5282e; }
 .bdw-file__ty.is-xls { color: #1f7a4d; }
 .bdw-file__ty.is-doc { color: #2b5fb4; }
@@ -128,7 +123,7 @@
 .bdw-file__n { font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bdw-file__s { font-size: 12px; color: var(--text-3); }
 .bdw-file__i { width: 18px; height: 18px; flex: none; color: #6b6878; }
-.bdw-file__x { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; margin-right: -8px; flex: none; border: 0; border-radius: 10px; background: transparent; color: #6b6878; cursor: pointer; }
+.bdw-file__x { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin-right: -12px; flex: none; border: 0; border-radius: 10px; background: transparent; color: #6b6878; cursor: pointer; }
 .bdw-file__x svg { width: 18px; height: 18px; }
 .bdw-spin { animation: bdw-spin 800ms linear infinite; }
 @keyframes bdw-spin { to { transform: rotate(360deg); } }
@@ -138,22 +133,22 @@
 
 /* 댓글 */
 .bdw-cm { display: flex; flex-direction: column; padding-top: 18px; border-top: 0.5px solid var(--separator); }
-.bdw-cm > b { margin-bottom: 4px; font-size: 15px; font-weight: 700; }
+.bdw-cm > b { margin-bottom: 4px; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .bdw-cm__empty { padding: 18px 0 6px; font-size: 13px; color: var(--text-3); }
-.bdw-c { display: flex; gap: 10px; padding: 12px 0; border-top: 0.5px solid var(--separator); animation: bdw-fade 220ms ease both; }
+.bdw-c { display: flex; gap: 10px; padding: 12px 0; border-top: 0.5px solid var(--separator); }
 .bdw-cm > b + .bdw-c { border-top: 0; }
 .bdw-c__b { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .bdw-c__h { display: flex; align-items: baseline; gap: 6px; font-size: 13px; }
 .bdw-c__h b { font-weight: 600; }
 .bdw-c__h span { color: var(--text-3); }
-.bdw-c__del { margin-left: auto; padding: 0 2px; border: 0; background: transparent; font: inherit; font-size: 12px; color: #c5282e; cursor: pointer; }
+.bdw-c__del { display: inline-flex; align-items: center; min-height: 44px; margin: -12px 0 -8px auto; padding: 0 8px; border: 0; background: transparent; font: inherit; font-size: 12px; color: var(--text-3); cursor: pointer; }
 .bdw-c__t { font-size: 14px; line-height: 1.55; color: #3a3746; white-space: pre-line; overflow-wrap: anywhere; }
 .bdw-c__t .is-at { font-weight: 600; color: #5a30cf; }
 .bdw-c__pics { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .bdw-c__pic { position: relative; width: 64px; height: 64px; overflow: hidden; padding: 0; border: 0; border-radius: 10px; background: #f2f2f5; cursor: zoom-in; transition: transform 140ms ease; }
 .bdw-c__pic img { object-fit: cover; }
 .bdw-c__pic:active { transform: scale(.96); }
-.bdw-c .bdw-icon { width: 32px; height: 32px; margin: -6px -8px 0 0; color: #b4b1bf; }
+.bdw-c .bdw-icon { width: 44px; height: 44px; margin: -12px -12px -8px 0; color: #b4b1bf; }
 .bdw-c .bdw-icon svg { width: 16px; height: 16px; }
 
 /* 댓글 입력 — 화면 아래에 붙는다(셸 스크롤 안 sticky). 셸 좌우 여백만큼 넓혀 끝까지 흰 바탕. */
@@ -182,7 +177,7 @@
 
 /* ── 바닥 시트(신고 · 동작) — BottomSheet 안 ── */
 .bdw-sheet { display: flex; flex-direction: column; gap: 14px; padding-top: 2px; color: #16141f; }
-.bdw-sheet h2 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+.bdw-sheet h2 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
 .bdw-sheet__sub { margin: 4px 0 0; font-size: 13px; line-height: 1.5; color: var(--text-3); }
 .bdw-rs { display: flex; flex-direction: column; }
 .bdw-rs button { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 50px; padding: 0; border: 0; border-top: 0.5px solid var(--separator); background: transparent; font: inherit; font-size: 15px; color: #16141f; text-align: left; cursor: pointer; }
@@ -195,8 +190,8 @@
 .bdw-nf { position: relative; display: block; min-width: 0; }
 .bdw-nf__l { position: absolute; top: -8px; left: 11px; z-index: 1; padding: 0 5px; background: #fff; font-size: 12px; line-height: 16px; font-weight: 600; color: #6b6878; white-space: nowrap; pointer-events: none; transition: color 150ms ease; }
 .bdw-nf:focus-within > .bdw-nf__l { color: #5a30cf; }
-.bdw-nf__in { display: block; width: 100%; box-sizing: border-box; border: 1px solid #e0e0e6; border-radius: 12px; background: #fff; font: inherit; color: #16141f; outline: none; resize: none; -webkit-appearance: none; appearance: none; transition: border-color 150ms ease, box-shadow 150ms ease; }
-.bdw-nf__in:focus { border-color: #7a52e6; box-shadow: 0 0 0 4px #eee8fc; }
+.bdw-nf__in { display: block; width: 100%; box-sizing: border-box; border: 0.5px solid #E4E3E9; border-radius: 12px; background: #fff; font: inherit; color: #16141f; outline: none; resize: none; -webkit-appearance: none; appearance: none; transition: border-color 150ms ease, box-shadow 150ms ease; }
+.bdw-nf__in:focus { border-color: var(--primary); box-shadow: 0 0 0 4px var(--primary-ring); }
 .bdw-nf__in::placeholder { color: #8b8898; }
 .bdw-nf__in.is-ta { padding: 12px 14px; font-size: 14px; line-height: 1.5; }
 
@@ -221,42 +216,50 @@
 .bdw-cf { position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center; padding: 0 32px; background: rgb(2 6 23 / .45); animation: bdw-fade 160ms ease both; }
 .bdw-cf__card { width: 100%; max-width: 320px; padding: 22px 20px 18px; border-radius: 20px; background: #fff; text-align: center; color: #16141f; animation: bdw-rise 220ms cubic-bezier(.23, 1, .32, 1) both; }
 @keyframes bdw-rise { from { opacity: 0; transform: scale(.96); } }
-.bdw-cf__card p { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
+.bdw-cf__card p { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
 .bdw-cf__card span { display: block; margin-top: 6px; font-size: 13px; line-height: 1.5; color: #6b6878; }
 .bdw-cf__btns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 18px; }
 .bdw-cf__btns .bdw-btn { height: 46px; font-size: 14px; }
 
 .bdw-toast { position: fixed; left: 0; right: 0; bottom: 96px; z-index: 95; display: flex; justify-content: center; padding: 0 24px; pointer-events: none; }
 .bdw-toast span { padding: 10px 18px; border-radius: 999px; background: rgb(22 20 31 / .92); color: #fff; font-size: 13px; font-weight: 500; animation: bdw-rise 200ms cubic-bezier(.23, 1, .32, 1) both; }
+/* 실행 취소 알림 — 글 + 보라 글자 버튼 하나(댓글 지우기, unslop 2026-11-20). */
+.bdw-toast.is-undo { left: 16px; right: 16px; bottom: calc(96px + env(safe-area-inset-bottom)); width: fit-content; max-width: calc(100% - 32px); margin: 0 auto; gap: 16px; align-items: center; padding: 12px 16px; border-radius: 14px; background: #16141f; pointer-events: auto; animation: bdw-rise 200ms cubic-bezier(.23, 1, .32, 1) both; }
+/* 상세 화면: 댓글 입력 칸 위로(값은 board-detail-client 가 잰다 — 못 쟀을 때만 96px). */
+.bdw-dwrap .bdw-toast, .bdw-dwrap .bdw-toast.is-undo { bottom: var(--bdw-toast-bottom, calc(96px + env(safe-area-inset-bottom))); }
+.bdw-toast.is-undo span { padding: 0; border-radius: 0; background: transparent; font-size: 14px; animation: none; }
+.bdw-toast__act { min-height: 44px; margin: -12px -8px; padding: 0 8px; border: 0; background: transparent; color: #c9b8ff; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
 
 /* ── 글쓰기 · 수정 ── */
 .bdw-form { display: flex; flex-direction: column; gap: 18px; max-width: 560px; margin: 0 auto; padding: 2px 0 28px; animation: bdw-fade 220ms ease both; }
 .bdw-form__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.bdw-form__head h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.03em; }
+.bdw-form__head h1 { margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.01em; }
 .bdw-form__head span { font-size: 13px; color: var(--text-3); text-align: right; }
-.bdw-form__err { margin: 0; padding: 10px 14px; border-radius: 12px; background: #fdecec; font-size: 13px; color: #c5282e; }
+.bdw-form__err { margin: -6px 0 0; font-size: 13px; line-height: 1.45; color: #c5282e; }
 .bdw-form .bdw-nf__in.is-title { height: 52px; padding: 0 16px; font-size: 17px; font-weight: 600; }
 .bdw-form .bdw-nf__in.is-body { min-height: 180px; padding: 14px 16px; font-size: 15px; line-height: 1.65; }
 .bdw-sec { display: flex; flex-direction: column; gap: 8px; }
 .bdw-sec__l { font-size: 12px; font-weight: 600; color: #6b6878; }
 .bdw-tiles { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
 .bdw-tile { position: relative; width: 76px; height: 76px; flex: none; }
-.bdw-tile img { width: 100%; height: 100%; border-radius: 10px; object-fit: cover; background: #f2f2f5; }
-.bdw-tile__x { position: absolute; top: -6px; right: -6px; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border: 2px solid #fff; border-radius: 50%; background: #16141f; color: #fff; cursor: pointer; }
+.bdw-tile img { width: 100%; height: 100%; border-radius: 10px; object-fit: cover; background: #f2f2f5; outline: 1px solid rgba(0, 0, 0, .08); outline-offset: -1px; }
+.bdw-tile__x { position: absolute; top: -6px; right: -6px; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 2px solid #fff; border-radius: 50%; background: #16141f; color: #fff; cursor: pointer; }
 .bdw-tile__x svg { width: 11px; height: 11px; }
+.bdw-tile__x::after { content: ""; position: absolute; inset: -8px; }
 .bdw-tile.is-add { display: flex; align-items: center; justify-content: center; border: 0; border-radius: 10px; background: #f4f4f7; color: #7a52e6; cursor: pointer; transition: transform 140ms ease; }
 .bdw-tile.is-add:active { transform: scale(.96); }
 .bdw-tile.is-add svg { width: 20px; height: 20px; }
 .bdw-tiles__n { padding-bottom: 2px; font-size: 12px; color: var(--text-3); }
-.bdw-linkbtn { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; height: 36px; padding: 0 2px; border: 0; background: transparent; font: inherit; font-size: 14px; font-weight: 600; color: #5a30cf; cursor: pointer; }
+.bdw-linkbtn { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; height: 44px; padding: 0 2px; border: 0; background: transparent; font: inherit; font-size: 14px; font-weight: 600; color: #5a30cf; cursor: pointer; }
 .bdw-linkbtn svg { width: 16px; height: 16px; }
 .bdw-tags { display: flex; flex-wrap: wrap; gap: 6px; }
-.bdw-tg { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border: 0; border-radius: 8px; background: #f4f4f7; font: inherit; font-size: 13px; color: #4c4958; cursor: pointer; transition: background 150ms ease, color 150ms ease, transform 140ms ease; }
+.bdw-tg { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border: 0; border-radius: 8px; background: #f4f4f7; font: inherit; font-size: 13px; color: #4c4958; cursor: pointer; transition: background 150ms ease, color 150ms ease, transform 140ms ease; }
+.bdw-tg::after { content: ""; position: absolute; inset: -4px 0; }
 .bdw-tg:active { transform: scale(.96); }
 .bdw-tg.is-on { background: #f1ecfd; color: #5a30cf; font-weight: 600; }
 .bdw-tg.is-on svg { width: 12px; height: 12px; }
 .bdw-tg.is-ghost { color: var(--text-3); }
-.bdw-tg__in { width: 120px; height: 32px; padding: 0 12px; box-sizing: border-box; border: 1px solid #7a52e6; border-radius: 8px; background: #fff; font: inherit; font-size: 13px; color: #16141f; outline: none; }
+.bdw-tg__in { width: 120px; height: 36px; padding: 0 12px; box-sizing: border-box; border: 0.5px solid var(--primary); border-radius: 8px; background: #fff; font: inherit; font-size: 13px; color: #16141f; outline: none; }
 .bdw-sw-row { display: flex; align-items: center; gap: 12px; min-height: 56px; border-top: 0.5px solid var(--separator); cursor: pointer; }
 .bdw-sw-row__b { flex: 1; display: flex; flex-direction: column; gap: 2px; }
 .bdw-sw-row__b b { font-size: 14px; font-weight: 500; }
@@ -269,12 +272,10 @@
 /* ── 신고 처리(관리자) ── */
 .bdw-rep { animation: bdw-fade 220ms ease both; }
 .bdw-rep__head { display: flex; flex-direction: column; gap: 6px; margin: 2px 0 8px; }
-.bdw-rep__head h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.03em; }
+.bdw-rep__head h1 { margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.01em; }
 .bdw-rep__head span { font-size: 13px; color: #6b6878; }
 .bdw-rep__list { display: grid; grid-template-columns: minmax(0, 1fr); column-gap: 28px; }
-.bdw-rep__g { display: flex; flex-direction: column; gap: 8px; padding: 16px 0; border-top: 0.5px solid var(--separator); animation: bdw-in 320ms cubic-bezier(.23, 1, .32, 1) both; }
-.bdw-rep__g:nth-child(2) { animation-delay: 40ms; }
-.bdw-rep__g:nth-child(n + 3) { animation-delay: 80ms; }
+.bdw-rep__g { display: flex; flex-direction: column; gap: 8px; padding: 16px 0; border-top: 0.5px solid var(--separator); }
 .bdw-rep__top { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #6b6878; min-width: 0; }
 .bdw-rep__top b { font-weight: 600; color: #c5282e; }
 .bdw-rep__top i { font-style: normal; color: #c9c6d3; }
@@ -284,9 +285,9 @@
 .bdw-rep__r { font-size: 13px; color: #4c4958; }
 .bdw-rep__q { font-size: 13px; color: #6b6878; overflow-wrap: anywhere; }
 .bdw-rep__btns { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; margin-top: 4px; }
-.bdw-rep__btns .bdw-btn { height: 40px; border-radius: 10px; font-size: 14px; }
+.bdw-rep__btns .bdw-btn { min-height: 44px; height: auto; padding-top: 6px; padding-bottom: 6px; border-radius: 12px; font-size: 14px; line-height: 1.25; text-align: center; white-space: normal; text-wrap: balance; }
 .bdw-btn.is-soft { background: #f4f1fd; color: #5a30cf; }
-.bdw-btn.is-trash { width: 40px; padding: 0; background: #fdecec; color: #c5282e; }
+.bdw-btn.is-trash { width: 44px; padding: 0; background: #fdecec; color: #c5282e; }
 .bdw-btn.is-trash svg { width: 18px; height: 18px; }
 
 /* HIG 다듬기 2차(2026-10-20, HIG 캔버스 A2Board-*) — 글 줄은 아바타 · 글이 모두 왼쪽 끝(0)에서 시작하므로 끝까지 긋는 선이
@@ -324,7 +325,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bdw-row, .bdw-d, .bdw-c, .bdw-form, .bdw-rep, .bdw-rep__g, .bdw-rx.is-new, .bdw-rx b.is-tick, .bdw-cf, .bdw-cf__card, .bdw-toast span { animation: none; }
+  .bdw-row, .bdw-d, .bdw-c, .bdw-form, .bdw-rep, .bdw-rep__g, .bdw-rx.is-new, .bdw-rx b.is-tick, .bdw-cf, .bdw-cf__card, .bdw-toast span, .bdw-toast.is-undo { animation: none; }
   .bdw-row, .bdw-dot, .bdw-ph, .bdw-rx, .bdw-rx.is-add svg, .bdw-gal__ph, .bdw-file, .bdw-btn, .bdw-compose, .bdw-more, .bdw-rd, .bdw-sw, .bdw-sw i, .bdw-tg, .bdw-tile.is-add, .bdw-cmp__btn, .bdw-cmp__in { transition: none; }
   .bdw-spin { animation-duration: 2s; }
 }

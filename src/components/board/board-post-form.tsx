@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import type { ReactNode } from "react";
 import { Paperclip, Plus, X } from "lucide-react";
 import { haptic } from "@/lib/haptics";
@@ -24,7 +24,9 @@ export function BoardPostForm({
   onTitle,
   onContent,
   submitLabel,
+  busyLabel,
   canSubmit,
+  busy = false,
   onSubmit,
   children,
 }: {
@@ -36,23 +38,23 @@ export function BoardPostForm({
   onTitle: (v: string) => void;
   onContent: (v: string) => void;
   submitLabel: string;
+  /** 저장 중 버튼 글자 — 새 글은 「올리는 중…」(기본), 수정은 「저장하는 중…」. */
+  busyLabel?: string;
   canSubmit: boolean;
+  /** 저장 중 — 버튼을 잠그고 「올리는 중」 을 보인다. 실패하면 부모가 false 로 돌려 다시 누를 수 있다. */
+  busy?: boolean;
   onSubmit: () => void;
   children: ReactNode;
 }) {
+  const errorId = useId();
   return (
     <div className="bdw bdw-form">
       <header className="bdw-form__head">
         <h1>{heading}</h1>
         <span>{copy.composeAudience}</span>
       </header>
-      {error ? (
-        <p className="bdw-form__err" role="alert">
-          {error}
-        </p>
-      ) : null}
       <label className="bdw-nf">
-        <span className="bdw-nf__l">{copy.titlePlaceholder}</span>
+        <span className="bdw-nf__l">{copy.titleLabel}</span>
         <input className="bdw-nf__in is-title" onChange={(e) => onTitle(e.target.value)} type="text" value={title} />
       </label>
       <label className="bdw-nf">
@@ -65,17 +67,24 @@ export function BoardPostForm({
           value={content}
         />
       </label>
+      {/* 오류는 본문 칸 바로 아래 — 맨 위에 두면 아래쪽 버튼을 누른 사람 눈에 안 들어온다(unslop 2026-11-20). */}
+      {error ? (
+        <p className="bdw-form__err" id={errorId} role="alert">
+          {error}
+        </p>
+      ) : null}
       {children}
       <button
+        aria-busy={busy || undefined}
         className="bdw-btn is-pri is-lg"
-        disabled={!canSubmit}
+        disabled={!canSubmit || busy}
         onClick={() => {
           haptic("light");
           onSubmit();
         }}
         type="button"
       >
-        {submitLabel}
+        {busy ? (busyLabel ?? copy.postSubmitting) : submitLabel}
       </button>
     </div>
   );

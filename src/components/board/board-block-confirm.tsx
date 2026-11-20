@@ -8,12 +8,14 @@ export function BoardBlockConfirm({
   name,
   copy,
   pending,
+  fallbackFocus,
   onCancel,
   onConfirm,
 }: {
   name: string;
   copy: Pick<Dictionary["board"], "blockConfirmTitle" | "blockConfirmBody" | "blockConfirmCta" | "actionCancel">;
   pending: boolean;
+  fallbackFocus?: () => HTMLElement | null;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
@@ -22,6 +24,7 @@ export function BoardBlockConfirm({
       body={copy.blockConfirmBody}
       cancelLabel={copy.actionCancel}
       confirmLabel={copy.blockConfirmCta}
+      fallbackFocus={fallbackFocus}
       onCancel={onCancel}
       onConfirm={onConfirm}
       pending={pending}

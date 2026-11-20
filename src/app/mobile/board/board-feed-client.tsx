@@ -98,10 +98,10 @@ export function BoardFeedClient({
         setExtraPosts((prev) => [...prev, ...result.posts]);
         setCursor(result.nextCursor);
       } else {
-        setLoadError(copy.errSaveFailed);
+        setLoadError(copy.errLoadMoreFailed);
       }
     } catch {
-      setLoadError(copy.errSaveFailed);
+      setLoadError(copy.errLoadMoreFailed);
     } finally {
       setLoadingMore(false);
     }

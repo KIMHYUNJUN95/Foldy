@@ -1,5 +1,6 @@
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import type { FileAttachment } from "@/components/board/board-types";
+import { boardImageStoragePath } from "@/lib/board-upload-paths";
 
 const IMAGES_BUCKET = "request-images";
 const FILES_BUCKET = "board-attachments";
@@ -100,4 +101,21 @@ export async function uploadBoardAttachment(params: {
     sizeBytes: file.size,
     mimeType: file.type,
   };
+}
+
+/**
+ * 글 저장이 서버에서 `{error}` 로 실패했을 때 방금 올린 사진 · 파일 지우기를 **시도한다**(게시판 unslop 2026-11-20).
+ * 저장소 정책이 허락할 때만 지워지고, 아니면 그대로 남는다(고아 파일). 2026-11-20 기준 `board-attachments` 는
+ * 올린 사람 지우기를 허락하지만(202606250001), `request-images` 지우기 정책(202611100002)의 폴더 목록에는
+ * `board-posts` 가 없어 사진은 남는다 — 마이그레이션 없이 둔다. 실패해도 화면 오류를 덮지 않게 조용히 넘긴다.
+ */
+export async function removeBoardUploads(params: { imageUrls: string[]; attachmentPaths: string[] }): Promise<void> {
+  const supabase = getSupabaseBrowserClient();
+  const imagePaths = params.imageUrls
+    .map((u) => boardImageStoragePath(u))
+    .filter((p): p is string => Boolean(p));
+  await Promise.all([
+    imagePaths.length ? supabase.storage.from(IMAGES_BUCKET).remove(imagePaths) : null,
+    params.attachmentPaths.length ? supabase.storage.from(FILES_BUCKET).remove(params.attachmentPaths) : null,
+  ]).catch(() => undefined);
 }

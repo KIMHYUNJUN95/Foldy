@@ -10,6 +10,7 @@ import { compressImageFile } from "@/components/announcements/announcement-image
 import {
   BOARD_MAX_FILES,
   BOARD_MAX_IMAGES,
+  removeBoardUploads,
   uploadBoardImage,
   uploadBoardAttachment,
   validateBoardFileList,
@@ -30,7 +31,8 @@ import type { Dictionary } from "@/lib/i18n";
  * 2. **고정 토글은 권한이 있을 때만 보인다.** 작성 경로가 owner/전무/office_admin 에게만 고정을
  *    허용하므로 수정도 같아야 한다(서버도 다시 검사한다).
  *
- * 스토리지 정리는 하지 않는다 — 사진을 지워도 버킷의 원본 파일은 남는다. 글 삭제도 같은 방식이라
+ * 저장이 실패하면 이번에 새로 올린 사진 · 파일만 지운다(게시판 unslop 2026-11-20). 그 밖의 스토리지 정리는
+ * 하지 않는다 — 사진을 지워도 버킷의 원본 파일은 남는다. 글 삭제도 같은 방식이라
  * 여기서만 다르게 하면 규약이 갈린다. 정리는 별도 작업으로 다뤄야 한다.
  */
 type ExistingImage = { kind: "existing"; id: string; url: string };
@@ -171,29 +173,46 @@ export function BoardEditClient({
 
     // 남긴 기존 항목의 순서를 유지한 채, 신규만 업로드해 같은 자리에 채운다.
     const imageUrls: string[] = [];
+    const fileAttachments: FileAttachment[] = [];
+    // 이번에 새로 올린 것 — 저장이 실패하면 이것만 지운다(기존 항목은 글에 그대로 남아 있다).
+    const uploadedImageUrls: string[] = [];
+    const uploadedFilePaths: string[] = [];
+
+    // `cleanup` 이 false 면 올린 것을 지우지 않는다 — 저장 요청이 던졌을 때(네트워크 · 시간 초과)는 서버에서
+    // 저장됐을 수도 있어서, 지우면 글이 깨진 사진을 가리킬 수 있다.
+    async function fail(message: string, cleanup = true) {
+      haptic("error");
+      setError(message);
+      setIsSubmitting(false);
+      if (!cleanup) return;
+      await removeBoardUploads({ imageUrls: uploadedImageUrls, attachmentPaths: uploadedFilePaths });
+    }
+
     try {
       for (const img of images) {
         if (img.kind === "existing") imageUrls.push(img.url);
-        else imageUrls.push(await uploadBoardImage({ file: img.file, organizationId: orgId, postId }));
+        else {
+          const url = await uploadBoardImage({ file: img.file, organizationId: orgId, postId });
+          uploadedImageUrls.push(url);
+          imageUrls.push(url);
+        }
       }
     } catch {
-      setError(copy.errImageUploadFailed);
-      setIsSubmitting(false);
+      await fail(copy.errImageUploadFailed);
       return;
     }
 
-    const fileAttachments: FileAttachment[] = [];
     try {
       for (const f of files) {
         if (f.kind === "existing") fileAttachments.push(f.attachment);
-        else
-          fileAttachments.push(
-            await uploadBoardAttachment({ file: f.file, organizationId: orgId, postId }),
-          );
+        else {
+          const att = await uploadBoardAttachment({ file: f.file, organizationId: orgId, postId });
+          uploadedFilePaths.push(att.url);
+          fileAttachments.push(att);
+        }
       }
     } catch {
-      setError(copy.errFileUploadFailed);
-      setIsSubmitting(false);
+      await fail(copy.errFileUploadFailed);
       return;
     }
 
@@ -205,12 +224,14 @@ export function BoardEditClient({
       fileAttachments,
       // 권한이 없으면 아예 보내지 않는다 — 서버가 «바뀌지 않은 값»도 거절하지 않도록.
       ...(canPin ? { isPinned } : {}),
-    });
+    }).catch(() => null);
 
+    if (result === null) {
+      await fail(copy.errSaveFailed, false);
+      return;
+    }
     if ("error" in result) {
-      haptic("error");
-      setError(copy.errSaveFailed);
-      setIsSubmitting(false);
+      await fail(copy.errSaveFailed);
       return;
     }
     haptic("success");
@@ -221,6 +242,7 @@ export function BoardEditClient({
 
   return (
     <BoardPostForm
+      busy={isSubmitting}
       canSubmit={canSave}
       content={content}
       copy={copy}
@@ -229,6 +251,7 @@ export function BoardEditClient({
       onContent={setContent}
       onSubmit={handleSubmit}
       onTitle={setTitle}
+      busyLabel={copy.editSaving}
       submitLabel={copy.submitEdit}
       title={title}
     >

@@ -1,7 +1,8 @@
 "use client";
 import "./board-white.css";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { nextRadioIndex } from "./board-radio-keys";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { haptic } from "@/lib/haptics";
 import type { Dictionary } from "@/lib/i18n";
@@ -47,6 +48,22 @@ export function BoardReportSheet({
   const [reason, setReason] = useState<BoardReportReasonCode | null>(null);
   const [note, setNote] = useState("");
   const title = targetType === "post" ? copy.reportAskPost : copy.reportAskComment;
+  const radioRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const selectedIndex = reason ? REASONS.indexOf(reason) : -1;
+
+  function pick(code: BoardReportReasonCode) {
+    if (reason !== code) haptic("light");
+    setReason(code);
+  }
+
+  // 라디오 묶음 키보드 — Tab 은 묶음에 한 번만 들어오고, 화살표 · Home · End 로 옮기며 고른다(unslop 2026-11-20).
+  function onRadioKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    const next = nextRadioIndex(selectedIndex, e.key, REASONS.length);
+    if (next === null) return;
+    e.preventDefault();
+    pick(REASONS[next]);
+    radioRefs.current[next]?.focus();
+  }
 
   return (
     <BottomSheet ariaLabel={title} onClose={onClose}>
@@ -55,16 +72,17 @@ export function BoardReportSheet({
           <h2>{title}</h2>
           <p className="bdw-sheet__sub">{copy.reportSub}</p>
         </div>
-        <div aria-label={title} className="bdw-rs" role="radiogroup">
-          {REASONS.map((code) => (
+        <div aria-label={title} className="bdw-rs" onKeyDown={onRadioKeyDown} role="radiogroup">
+          {REASONS.map((code, i) => (
             <button
               aria-checked={reason === code}
               key={code}
-              onClick={() => {
-                if (reason !== code) haptic("light");
-                setReason(code);
+              onClick={() => pick(code)}
+              ref={(el) => {
+                radioRefs.current[i] = el;
               }}
               role="radio"
+              tabIndex={i === (selectedIndex < 0 ? 0 : selectedIndex) ? 0 : -1}
               type="button"
             >
               <span>{boardReasonLabel(copy, code)}</span>

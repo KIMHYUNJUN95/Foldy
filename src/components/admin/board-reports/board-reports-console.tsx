@@ -5,35 +5,22 @@
 // (원문 · 사진 · 태그 · 사유별 수 · 메모 · 「문제없음으로 닫기」, 삭제는 위 휴지통 → 확인 창).
 // 흰 바탕 · 상자 · 세로선 없음 · 선택은 옅은 보라 바탕만. docs/product/23-board-workflow.md §12-C
 import "./board-reports-white.css";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { Trash2, X } from "lucide-react";
 import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
 import { useAdminPanelA11y } from "@/components/admin/shared/use-admin-panel-a11y";
 import { resolveBoardReport } from "@/actions/board-moderation";
 import { boardReasonLabel } from "@/lib/board-report-reasons";
 import { haptic } from "@/lib/haptics";
+import { boardDateTime } from "@/components/board/board-time";
 import type { PendingBoardReport } from "@/lib/board-moderation";
 import type { Dictionary } from "@/lib/i18n";
 
 type Copy = Dictionary["board"];
 type W = Dictionary["boardReportsWhite"];
 
-const TOKYO_PARTS = new Intl.DateTimeFormat("en-US", {
-  timeZone: "Asia/Tokyo",
-  month: "numeric",
-  day: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-  hourCycle: "h23",
-});
-
-/** 도쿄 기준 「10/8 21:14」. */
-function stamp(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "—";
-  const parts = Object.fromEntries(TOKYO_PARTS.formatToParts(date).map((p) => [p.type, p.value]));
-  return `${parts.month}/${parts.day} ${parts.hour}:${parts.minute}`;
-}
+/** 날짜 표기는 게시판 하나로 — 도쿄 기준 「2026.11.19 14:05」(unslop 2026-11-20). */
+const stamp = boardDateTime;
 
 function rowTitle(r: PendingBoardReport): string {
   return (r.preview || r.body).replace(/\s+/g, " ").trim();
@@ -117,7 +104,8 @@ export function BoardReportsConsole({ reports, copy, w }: { reports: PendingBoar
   );
 }
 
-function ReportPanel({
+/** 신고 상세 패널 — 렌더 시험(`board-reports-panel-render.test.tsx`)이 바로 그리려고 내보낸다. */
+export function ReportPanel({
   report,
   copy,
   w,
@@ -131,6 +119,7 @@ function ReportPanel({
   onDone: (message: string, ok: boolean) => void;
 }) {
   const [confirm, setConfirm] = useState(false);
+  const trashRef = useRef<HTMLButtonElement>(null);
   const [pending, setPending] = useState(false);
   const [photo, setPhoto] = useState<string | null>(null);
   const panelRef = useAdminPanelA11y<HTMLElement>(onClose, { disabled: confirm || photo !== null || pending });
@@ -184,6 +173,7 @@ function ReportPanel({
             aria-label={isPost ? w.deletePost : w.deleteComment}
             onClick={() => setConfirm(true)}
             disabled={pending}
+            ref={trashRef}
           >
             <Trash2 aria-hidden="true" />
           </button>
@@ -231,11 +221,12 @@ function ReportPanel({
             </ul>
           </section>
 
-          {report.noteItems.length > 0 ? (
+          {/* 빈 메모(공백만)는 빼고, 남는 게 없으면 「신고 메모」 제목도 숨긴다. */}
+          {report.noteItems.some((n) => n.note.trim()) ? (
             <section className="brw-sec">
               <span className="brw-k">{w.notesTitle}</span>
               <ul className="brw-notes">
-                {report.noteItems.map((n, i) => (
+                {report.noteItems.filter((n) => n.note.trim()).map((n, i) => (
                   <li key={i}>
                     <q>{n.note}</q>
                     <span className="num"> · {stamp(n.at)}</span>
@@ -261,6 +252,7 @@ function ReportPanel({
           pending={pending}
           onCancel={() => setConfirm(false)}
           onConfirm={() => void resolve("remove")}
+          returnFocusRef={trashRef}
         />
       ) : null}
 
@@ -300,13 +292,27 @@ function ConfirmModal({
   pending,
   onCancel,
   onConfirm,
+  returnFocusRef,
 }: {
   w: W;
   isPost: boolean;
   pending: boolean;
   onCancel: () => void;
   onConfirm: () => void;
+  /** 닫히면 초점을 돌릴 곳(휴지통 단추) — 없으면 초점이 <body> 로 빠진다. */
+  returnFocusRef: RefObject<HTMLElement | null>;
 }) {
+  const keepRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const target = returnFocusRef.current;
+    // 첫 초점은 「그대로 두기」 — autoFocus 만으로는 창 자체로 가서(2026-11-20 화면 확인) 직접 옮긴다.
+    keepRef.current?.focus();
+    const frame = requestAnimationFrame(() => keepRef.current?.focus());
+    return () => {
+      cancelAnimationFrame(frame);
+      if (target?.isConnected) target.focus();
+    };
+  }, [returnFocusRef]);
   return (
     <>
       <EscapeKey open={!pending} onClose={onCancel} />
@@ -316,7 +322,7 @@ function ConfirmModal({
         <p id="brw-confirm-b">{w.confirmBody}</p>
         <div className="brw-modal__f">
           {/* 첫 초점은 「그대로 두기」 — Enter 한 번에 되돌릴 수 없는 삭제가 일어나지 않게. */}
-          <button type="button" className="brw-btn is-gray" disabled={pending} onClick={onCancel} autoFocus>
+          <button type="button" className="brw-btn is-gray" disabled={pending} onClick={onCancel} ref={keepRef}>
             {w.keep}
           </button>
           <button type="button" className="brw-btn is-danger" disabled={pending} aria-busy={pending} onClick={onConfirm}>

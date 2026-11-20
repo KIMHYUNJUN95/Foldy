@@ -5,6 +5,7 @@ import { useState } from "react";
 import { haptic } from "@/lib/haptics";
 import { toggleBoardReaction } from "@/app/mobile/board/[id]/actions";
 import { BoardReactionBar, toggleReactionIn } from "./board-reaction-bar";
+import { boardSummaryText } from "./board-time";
 import type { BoardPost, BoardReaction } from "./board-types";
 
 export type BoardFeedRowCopy = {
@@ -80,10 +81,10 @@ export function BoardListRow({
         {post.title ? (
           <>
             <span className="bdw-title">{post.title}</span>
-            {post.content ? <p className="bdw-body">{post.content}</p> : null}
+            {post.content ? <p className="bdw-body">{boardSummaryText(post.content)}</p> : null}
           </>
         ) : (
-          <span className="bdw-title is-solo">{post.content}</span>
+          <span className="bdw-title is-solo">{boardSummaryText(post.content)}</span>
         )}
         {photos.length > 0 ? (
           <span className="bdw-strip">

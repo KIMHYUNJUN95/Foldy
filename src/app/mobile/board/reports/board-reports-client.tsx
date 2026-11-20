@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import { BoardConfirm } from "@/components/board/board-confirm";
@@ -10,8 +10,9 @@ import { haptic } from "@/lib/haptics";
 import "@/components/board/board-white.css";
 import { resolveBoardReport } from "@/actions/board-moderation";
 import type { PendingBoardReport } from "@/lib/board-moderation";
-import type { Dictionary, Locale } from "@/lib/i18n";
+import type { Dictionary } from "@/lib/i18n";
 import { BoardToast } from "@/components/board/board-toast";
+import { boardDateTime } from "@/components/board/board-time";
 
 /**
  * 게시판 신고 처리(모바일, owner · office_admin) — 화이트 리디자인(2026-10-15, 시안 BoardReports-Phone).
@@ -23,7 +24,6 @@ export function BoardReportsClient({
   copy,
   hint,
   reasonN,
-  locale,
 }: {
   reports: PendingBoardReport[];
   copy: Dictionary["board"];
@@ -31,23 +31,45 @@ export function BoardReportsClient({
   hint: string;
   /** 「{reason} {n}」 */
   reasonN: string;
-  locale: Locale;
 }) {
   const router = useRouter();
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<PendingBoardReport | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const dateFmt = new Intl.DateTimeFormat(locale, {
-    timeZone: "Asia/Tokyo",
-    month: "numeric",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  });
+  // 처리한 묶음은 서버를 기다리지 않고 바로 접는다(줄 접힘 공용 `.row-collapse`). 실패하면 다시 펴고 알린다(unslop 2026-11-20).
+  // "pending" = 서버 처리 중 · "done" = 처리 끝. 새 목록(reports)이 오면 "done" 은 지운다 — 같은 대상에 새 신고가
+  // 들어와 다시 목록에 올라온 줄이 접힌 채로 숨지 않게.
+  const [leaving, setLeaving] = useState<ReadonlyMap<string, "pending" | "done">>(() => new Map());
+  const [seenReports, setSeenReports] = useState(reports);
+  if (seenReports !== reports) {
+    setSeenReports(reports);
+    setLeaving((prev) => {
+      if (![...prev.values()].includes("done")) return prev;
+      return new Map([...prev].filter(([, state]) => state === "pending"));
+    });
+  }
+
+  const toastTimer = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (toastTimer.current) window.clearTimeout(toastTimer.current);
+    },
+    [],
+  );
+  function dismissToast() {
+    if (toastTimer.current) window.clearTimeout(toastTimer.current);
+    setToast(null);
+  }
+  function showToast(text: string) {
+    if (toastTimer.current) window.clearTimeout(toastTimer.current);
+    setToast(text);
+    toastTimer.current = window.setTimeout(() => setToast(null), 1800);
+  }
 
   async function resolve(report: PendingBoardReport, action: "remove" | "dismiss") {
     setPendingKey(report.key);
+    setLeaving((prev) => new Map(prev).set(report.key, "pending"));
+    let ok = false;
     try {
       const result = await resolveBoardReport({
         targetType: report.targetType,
@@ -55,15 +77,26 @@ export function BoardReportsClient({
         commentId: report.commentId,
         action,
       });
-      haptic("error" in result ? "error" : "success");
-      setToast(
-        "error" in result ? copy.errSaveFailed : action === "remove" ? copy.reportsRemoved : copy.reportsDismissed,
-      );
-      window.setTimeout(() => setToast(null), 1800);
-      router.refresh();
+      ok = !("error" in result);
+    } catch {
+      ok = false;
     } finally {
       setPendingKey(null);
     }
+    if (!ok) {
+      setLeaving((prev) => {
+        const next = new Map(prev);
+        next.delete(report.key);
+        return next;
+      });
+      haptic("error");
+      showToast(copy.reportsFailed);
+      return;
+    }
+    setLeaving((prev) => new Map(prev).set(report.key, "done"));
+    haptic("success");
+    showToast(action === "remove" ? copy.reportsRemoved : copy.reportsDismissed);
+    router.refresh();
   }
 
   return (
@@ -86,7 +119,13 @@ export function BoardReportsClient({
             const headline = r.targetType === "post" ? r.postTitle || r.preview : r.preview;
             const busy = pendingKey === r.key;
             return (
-              <article className="bdw-rep__g" key={r.key}>
+              <div
+                className="row-collapse"
+                data-leaving={leaving.has(r.key) ? "" : undefined}
+                inert={leaving.has(r.key) || undefined}
+                key={r.key}
+              >
+              <article className="bdw-rep__g">
                 <div className="bdw-rep__top">
                   <b className="num">{copy.reportsCount.replace("{count}", String(r.count))}</b>
                   <i aria-hidden="true">·</i>
@@ -94,7 +133,7 @@ export function BoardReportsClient({
                   <i aria-hidden="true">·</i>
                   <span className="is-who">{r.authorName || copy.reportsAuthorUnknown}</span>
                   <time className="num" dateTime={r.latestAt}>
-                    {dateFmt.format(new Date(r.latestAt))}
+                    {boardDateTime(r.latestAt)}
                   </time>
                 </div>
                 <span className="bdw-rep__t">{headline}</span>
@@ -126,6 +165,7 @@ export function BoardReportsClient({
                   </button>
                 </div>
               </article>
+              </div>
             );
           })}
         </div>
@@ -147,7 +187,7 @@ export function BoardReportsClient({
         />
       ) : null}
 
-      {toast ? <BoardToast text={toast} /> : null}
+      {toast ? <BoardToast onDismiss={dismissToast} text={toast} /> : null}
     </div>
   );
 }

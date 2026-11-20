@@ -2555,6 +2555,7 @@ export type Database = {
           created_at: string
           created_by_user_id: string
           deleted_at: string | null
+          deleted_by_user_id: string | null
           id: string
           image_urls: string[]
           mention_all: boolean
@@ -2567,6 +2568,7 @@ export type Database = {
           created_at?: string
           created_by_user_id: string
           deleted_at?: string | null
+          deleted_by_user_id?: string | null
           id?: string
           image_urls?: string[]
           mention_all?: boolean
@@ -2579,6 +2581,7 @@ export type Database = {
           created_at?: string
           created_by_user_id?: string
           deleted_at?: string | null
+          deleted_by_user_id?: string | null
           id?: string
           image_urls?: string[]
           mention_all?: boolean
@@ -2590,6 +2593,13 @@ export type Database = {
           {
             foreignKeyName: "board_comments_created_by_user_id_fkey"
             columns: ["created_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "board_comments_deleted_by_user_id_fkey"
+            columns: ["deleted_by_user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]

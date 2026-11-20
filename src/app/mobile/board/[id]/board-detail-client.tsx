@@ -12,7 +12,7 @@ import { BoardMentionSheet } from "@/components/board/board-mention-sheet";
 import { BoardReportSheet, type BoardReportReasonCode } from "@/components/board/board-report-sheet";
 import { BoardBlockConfirm } from "@/components/board/board-block-confirm";
 import { BoardConfirm } from "@/components/board/board-confirm";
-import { boardMetaLine, boardRelativeTime } from "@/components/board/board-time";
+import { boardDateTime, boardMetaLine, boardRelativeTime } from "@/components/board/board-time";
 import { haptic } from "@/lib/haptics";
 import "@/components/board/board-white.css";
 import { blockBoardUser, reportBoardContent } from "@/actions/board-moderation";
@@ -25,6 +25,7 @@ import type { Dictionary, Locale } from "@/lib/i18n";
 import {
   toggleBoardReaction,
   deleteBoardComment,
+  restoreBoardComment,
   pinBoardPost,
   unpinBoardPost,
   deleteBoardPost,
@@ -33,6 +34,12 @@ import {
   getBoardAttachmentDownloadUrl,
 } from "./actions";
 import { BoardToast } from "@/components/board/board-toast";
+
+/** 댓글 지우기 실행 취소를 누를 수 있는 시간 — 이 시간이 지나야 서버로 지우기를 보낸다. */
+// 「실행 취소」 알림이 떠 있는 시간. 서버 쪽 되돌리기 한도(BOARD_COMMENT_UNDO_MS, 60초)보다 짧다.
+const COMMENT_UNDO_MS = 4000;
+// 줄 접힘(.row-collapse 260ms)이 끝난 뒤에 빈 상태 문구를 띄운다.
+const COMMENT_COLLAPSE_MS = 280;
 
 export function BoardDetailClient({
   post,
@@ -56,7 +63,7 @@ export function BoardDetailClient({
   const [, startTransition] = useTransition();
   const [showActionSheet, setShowActionSheet] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ text: string; action?: { label: string; onClick: () => void } } | null>(null);
   const [downloadingPath, setDownloadingPath] = useState<string | null>(null);
 
   // 신고 · 차단(2026-10-06). 대상은 글 자체 또는 남의 댓글 하나.
@@ -66,6 +73,9 @@ export function BoardDetailClient({
   const [blockTarget, setBlockTarget] = useState<ModTarget | null>(null);
   const [modPending, setModPending] = useState(false);
   const toastTimer = useRef<number | null>(null);
+  // 시트 안 줄에서 연 확인 창이 닫힐 때 초점이 돌아갈 「⋯」 단추(시트는 이미 사라졌다).
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
+  const focusMoreButton = () => moreButtonRef.current;
 
   // 멘션 상태 (composer → 시트 → 여기서 통합 관리)
   const [showMentionSheet, setShowMentionSheet] = useState(false);
@@ -97,14 +107,61 @@ export function BoardDetailClient({
     if (toastTimer.current) window.clearTimeout(toastTimer.current);
   }, []);
 
+  // 접힘이 끝난 댓글(빈 상태 판정용) — 타이머는 화면을 떠날 때 정리한다.
+  const collapseTimers = useRef(new Map<string, number>());
+  useEffect(() => {
+    const timers = collapseTimers.current;
+    return () => {
+      for (const t of timers.values()) window.clearTimeout(t);
+      timers.clear();
+    };
+  }, []);
+
+  // 알림은 댓글 입력 칸 바로 위에 — 입력 칸은 sticky 라 댓글이 적으면 화면 중간에 있고, 길면 바닥(안전 영역 포함)에
+  // 붙는다. 고정 `bottom: 96px` 로는 폰에서 입력 칸을 덮었다(2026-11-20). 알림이 떠 있는 동안 입력 칸 위 끝을 재서
+  // `--bdw-toast-bottom` 으로 넘긴다 — 위치는 bottom 으로만(움직임은 useToastMotion 의 transform).
+  // 지운 줄이 접히는 동안(280ms) 입력 칸이 위로 올라가므로 한 번 재고 끝내면 겹친다 — 알림이 떠 있는 동안만 매 프레임
+  // 다시 재고(값이 바뀔 때만 씀), 알림이 닫히면 멈춘다.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const toastShown = toast !== null;
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!toastShown || !root) return;
+    let frame = 0;
+    let last = "";
+    function place() {
+      const composer = root!.querySelector<HTMLElement>(".bdw-cmp");
+      if (composer) {
+        const fromBottom = window.innerHeight - composer.getBoundingClientRect().top;
+        const next = `${Math.max(16, Math.round(fromBottom + 12))}px`;
+        if (next !== last) {
+          last = next;
+          root!.style.setProperty("--bdw-toast-bottom", next);
+        }
+      }
+      frame = requestAnimationFrame(place);
+    }
+    place();
+    return () => cancelAnimationFrame(frame);
+  }, [toastShown]);
+
   const isOwn = viewerId === post.authorId;
   const reactionTotal = post.reactionTotal;
-  const commentCount = post.comments.length;
 
-  function flashToast(message: string) {
+  // 지금 떠 있는 「되돌리기」 알림이 어느 댓글 것인지 — 다른 알림이 덮으면 비운다.
+  const undoToastFor = useRef<string | null>(null);
+
+  function dismissToast() {
     if (toastTimer.current) window.clearTimeout(toastTimer.current);
-    setToast(message);
-    toastTimer.current = window.setTimeout(() => setToast(null), 1800);
+    undoToastFor.current = null;
+    setToast(null);
+  }
+
+  function flashToast(message: string, action?: { label: string; onClick: () => void }, ms = 1800) {
+    if (toastTimer.current) window.clearTimeout(toastTimer.current);
+    undoToastFor.current = null;
+    setToast({ text: message, action });
+    toastTimer.current = window.setTimeout(() => setToast(null), ms);
   }
 
   function onToggleReaction(emoji: string) {
@@ -115,24 +172,80 @@ export function BoardDetailClient({
     });
   }
 
-  // 지우는 댓글은 서버를 기다리지 않고 바로 접는다(줄 접힘 공용 `.row-collapse`, 2026-10-26). 실패하면 다시 펴고 알린다.
+  // 지우는 댓글은 확인 없이 바로 접고 바로 지운다(`deleted_at`). 「실행 취소」는 restoreBoardComment 로 되돌린다
+  // (서버 한도 60초, unslop 2026-11-20). 알림은 하나라 마지막으로 지운 댓글만 되돌릴 수 있다. 실패하면 다시 펴고 알린다.
   const [leavingCommentIds, setLeavingCommentIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [collapsedCommentIds, setCollapsedCommentIds] = useState<ReadonlySet<string>>(() => new Set());
+  const commentCount = post.comments.filter((c) => !leavingCommentIds.has(c.id)).length;
+  const showCommentEmpty = post.comments.every((c) => collapsedCommentIds.has(c.id));
+
+  function unhideComment(commentId: string) {
+    const t = collapseTimers.current.get(commentId);
+    if (t) window.clearTimeout(t);
+    collapseTimers.current.delete(commentId);
+    const drop = (prev: ReadonlySet<string>) => {
+      if (!prev.has(commentId)) return prev;
+      const next = new Set(prev);
+      next.delete(commentId);
+      return next;
+    };
+    setLeavingCommentIds(drop);
+    setCollapsedCommentIds(drop);
+  }
 
   function onDeleteComment(commentId: string) {
     haptic("light");
     setLeavingCommentIds((prev) => new Set(prev).add(commentId));
-    startTransition(async () => {
-      const result = await deleteBoardComment(commentId).catch(() => ({ error: "save_failed" }));
-      if ("error" in result) {
-        setLeavingCommentIds((prev) => {
-          const next = new Set(prev);
-          next.delete(commentId);
-          return next;
-        });
-        haptic("error");
-        flashToast(copy.errSaveFailed);
+    collapseTimers.current.set(
+      commentId,
+      window.setTimeout(() => {
+        collapseTimers.current.delete(commentId);
+        setCollapsedCommentIds((prev) => new Set(prev).add(commentId));
+      }, COMMENT_COLLAPSE_MS),
+    );
+
+    // "deleted" = 내가 지움 · "gone" = 다른 사람이 먼저 지움(성공으로 본다, 되돌리지 않는다) · "failed" = 실패
+    const deleting: Promise<"deleted" | "gone" | "failed"> = deleteBoardComment(commentId)
+      .then((r) => ("error" in r ? (r.error === "not_found" ? "gone" : "failed") : "deleted"))
+      .catch(() => "failed" as const);
+    void deleting.then((outcome) => {
+      if (outcome === "gone") {
+        // 이미 다른 사람이 지운 댓글 — 되돌릴 것이 없으니 「되돌리기」 알림을 거둔다.
+        if (undoToastFor.current === commentId) {
+          haptic("light");
+          dismissToast();
+        }
+        return;
       }
+      if (outcome !== "failed") return;
+      unhideComment(commentId);
+      haptic("error");
+      flashToast(copy.commentDeleteFailed);
     });
+
+    flashToast(
+      copy.commentDeletedToast,
+      {
+        label: copy.undo,
+        onClick: () => {
+          dismissToast();
+          void (async () => {
+            if ((await deleting) !== "deleted") return;
+            const restored = await restoreBoardComment(commentId).catch(() => ({ error: "save_failed" }));
+            if ("error" in restored) {
+              haptic("error");
+              flashToast(copy.commentRestoreFailed);
+              return;
+            }
+            haptic("light");
+            // 되돌린 댓글은 restoreBoardComment 의 재검증으로 새 props 에 다시 들어온다.
+            unhideComment(commentId);
+          })();
+        },
+      },
+      COMMENT_UNDO_MS,
+    );
+    undoToastFor.current = commentId;
   }
 
   async function onDownloadFile(path: string) {
@@ -311,7 +424,7 @@ export function BoardDetailClient({
   // 셸 스크롤 안에서 그린다 — 댓글 입력은 `.bdw-cmp`(sticky)로 화면 바닥에 붙고, `.bdw-dwrap` 이 셸의 아래 여백을 지운다.
   // (예전에는 이 화면이 100dvh 짜리 자기 스크롤러를 가지려고 셸 여백을 음수로 지웠는데, 폴드 · 태블릿의 다른 여백과 맞지 않았다.)
   return (
-    <div className="bdw bdw-dwrap">
+    <div className="bdw bdw-dwrap" ref={rootRef}>
       <article className="bdw-d">
         <div className="bdw-who">
           <span aria-hidden="true" className="bdw-av is-lg">
@@ -320,10 +433,20 @@ export function BoardDetailClient({
           <span className="bdw-who__b">
             <span className="bdw-who__n">{post.authorName}</span>
             <span className="bdw-who__m">
-              {boardMetaLine(post.authorRole, hydrated ? boardRelativeTime(post.createdAt, locale) : "")}
+              {boardMetaLine(
+                post.authorRole,
+                hydrated ? boardRelativeTime(post.createdAt, locale) : "",
+                boardDateTime(post.createdAt),
+              )}
             </span>
           </span>
-          <button aria-label={copy.postMore} className="bdw-icon" onClick={() => setShowActionSheet(true)} type="button">
+          <button
+            aria-label={copy.postMore}
+            className="bdw-icon"
+            onClick={() => setShowActionSheet(true)}
+            ref={moreButtonRef}
+            type="button"
+          >
             <MoreHorizontal aria-hidden="true" />
           </button>
         </div>
@@ -374,11 +497,14 @@ export function BoardDetailClient({
 
         <section aria-label={copy.commentLabel} className="bdw-cm">
           <b className="num">{copy.commentsN.replace("{n}", String(commentCount))}</b>
-          {commentCount === 0 ? (
-            <p className="bdw-cm__empty">{copy.commentEmpty}</p>
-          ) : (
-            post.comments.map((c) => (
-              <div className="row-collapse" data-leaving={leavingCommentIds.has(c.id) ? "" : undefined} key={c.id}>
+          {showCommentEmpty ? <p className="bdw-cm__empty">{copy.commentEmpty}</p> : null}
+          {post.comments.map((c) => (
+              <div
+                className="row-collapse"
+                data-leaving={leavingCommentIds.has(c.id) ? "" : undefined}
+                inert={leavingCommentIds.has(c.id) || undefined}
+                key={c.id}
+              >
                 <BoardComment
                   allLabel={copy.mentionAll}
                   comment={{
@@ -401,8 +527,7 @@ export function BoardDetailClient({
                   onMore={onOpenCommentMenu}
                 />
               </div>
-            ))
-          )}
+            ))}
         </section>
       </article>
 
@@ -507,6 +632,7 @@ export function BoardDetailClient({
           name={blockTarget.authorName}
           copy={copy}
           pending={modPending}
+          fallbackFocus={focusMoreButton}
           onCancel={() => setBlockTarget(null)}
           onConfirm={onConfirmBlock}
         />
@@ -518,13 +644,16 @@ export function BoardDetailClient({
           body={copy.deleteConfirmBody}
           cancelLabel={copy.actionCancel}
           confirmLabel={copy.deleteConfirmCta}
+          fallbackFocus={focusMoreButton}
           onCancel={() => setShowDeleteConfirm(false)}
           onConfirm={onConfirmDelete}
           title={copy.deleteConfirmTitle}
         />
       ) : null}
 
-      {toast ? <BoardToast text={toast} /> : null}
+      {toast ? (
+        <BoardToast action={toast.action} key={toast.text} onDismiss={dismissToast} text={toast.text} />
+      ) : null}
     </div>
   );
 }

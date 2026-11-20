@@ -7,6 +7,7 @@
 import { cache } from "react";
 import type { AppSession } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { goneReportAction } from "@/lib/board-comment-restore";
 
 export const BOARD_REPORT_REASONS = ["spam", "harassment", "inappropriate", "privacy", "other"] as const;
 export type BoardReportReason = (typeof BOARD_REPORT_REASONS)[number];
@@ -192,6 +193,7 @@ export async function listPendingBoardReports(session: AppSession): Promise<Pend
 
   const groups = new Map<string, PendingBoardReport>();
   const goneReportIds: string[] = [];
+  const nowMs = Date.now();
 
   for (const r of data) {
     const targetType = r.target_type === "comment" ? "comment" : "post";
@@ -200,7 +202,17 @@ export async function listPendingBoardReports(session: AppSession): Promise<Pend
     const gone =
       !post || post.deleted_at || (targetType === "comment" && (!comment || comment.deleted_at));
     if (gone) {
-      goneReportIds.push(r.id);
+      // 글 대상 · 글이 지워진 것은 그대로 닫는다. 방금(60초 안) 지운 댓글은 숨기기만 — 되돌리기가 막히지 않게.
+      const action =
+        targetType === "post"
+          ? "close"
+          : goneReportAction({
+              postGone: !post || Boolean(post.deleted_at),
+              commentDeletedAt: comment?.deleted_at,
+              commentMissing: !comment,
+              nowMs,
+            });
+      if (action === "close") goneReportIds.push(r.id);
       continue;
     }
 

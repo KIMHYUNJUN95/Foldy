@@ -263,7 +263,7 @@ Electron 은 쓰지 않는다(설치 파일이 크다).
 - Reservations / Calendar (예약)
 - Announcements / Board (공지·게시판)
 - **Board reports (게시판 신고)** — `/admin/board-reports`, 권한 키 `board.moderate`(2026-10-06). 대기 신고 표(내용 — 글/댓글 테두리 태그 + 한 줄 미리보기 + 작성자 ·
-  사유 칩 · 신고 수 · 최근 신고(도쿄, 24시간제, 고정폭 글꼴 아님)) + 우측 상세 패널(제목 「○○님의 글」, 본문 상자, 사유, 신고 메모, 신고 수 · 최근 신고)에서
+  사유 칩 · 신고 수 · 최근 신고(도쿄 「2026.11.19 14:05」 — 2026-11-20 unslop 부터 `boardDateTime` 하나, 패널 · 신고 메모 시각도 같은 모양, 숫자 `tabular-nums`)) + 우측 상세 패널(제목 「○○님의 글」, 본문 상자, 사유, 신고 메모, 신고 수 · 최근 신고)에서
   「문제없음」 / 「삭제」(확인 모달에 본문 미리보기). 공용 `.qtbl` · `.panel` · `.modal` · `.pill` · `.kv` · `.adm-toast` 위에 화면 고유 스타일만
   `board-reports-console.css`(`.brp-*`)로 얹는다. 아이콘은 항상 `.ic` 래퍼 안에(크기 1em).
   게시판 본문 콘솔은 아직 없다(사용자 결정 — 신고 처리만 먼저). docs/product/23-board-workflow.md §12-C

@@ -17,6 +17,7 @@ import { BOARD_MAX_FILES, BOARD_MAX_IMAGES } from "@/lib/board";
 import type { AvatarColor, FileAttachment } from "@/components/board/board-types";
 import type { Database, Json } from "@/types/database";
 import { bestEffortWrite } from "@/lib/db-write-guard";
+import { checkBoardCommentRestore } from "@/lib/board-comment-restore";
 import {
   areOwnBoardImageUrls,
   isOwnBoardAttachmentPath,
@@ -64,6 +65,13 @@ async function loadPostMeta(postId: string, orgId: string): Promise<PostMeta | n
 function revalidateBoard(postId: string) {
   revalidatePath(`/mobile/board/${postId}`);
   revalidatePath("/mobile/board");
+}
+
+/** 댓글 지우기 · 되돌리기 뒤 — 신고 처리 화면(폰 · PC)의 「지워진 댓글」 표시도 새로 그린다. */
+function revalidateBoardComment(postId: string) {
+  revalidateBoard(postId);
+  revalidatePath("/mobile/board/reports");
+  revalidatePath("/admin/board-reports");
 }
 
 /** 멱등한 읽음 처리. 반복 호출해도 안전하다. */
@@ -291,13 +299,83 @@ export async function deleteBoardComment(commentId: string): Promise<ActionResul
   const canManage = session.capabilities.includes("board.manage");
   if (!isAuthor && !canManage) return { error: "forbidden" };
 
-  const { error: delError } = await service
+  // 아직 안 지워진 줄만 — 쓴 사람과 관리자가 동시에 지우면 나중 쪽이 지운 사람 · 시각을 덮어써 남이 지운 것을 되살리거나
+  // 60초 창을 다시 여는 것을 막는다. 0줄이면 이미 지워진 것(화면은 not_found 를 성공 · 되돌리기 알림 없음으로 다룬다).
+  const { data: deleted, error: delError } = await service
     .from("board_comments")
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("id", commentId);
+    .update({ deleted_at: new Date().toISOString(), deleted_by_user_id: session.user.id })
+    .eq("id", commentId)
+    .eq("organization_id", session.organization.id)
+    .is("deleted_at", null)
+    .select("id");
   if (delError) return { error: "save_failed" };
+  if (!deleted || deleted.length === 0) return { error: "not_found" };
 
-  revalidateBoard(comment.post_id);
+  revalidateBoardComment(comment.post_id);
+  return { ok: true };
+}
+
+/**
+ * 댓글 지우기 되돌리기(게시판 unslop 2026-11-20). `deleted_at` · `deleted_by_user_id` 를 비운다. **지운 사람만**
+ * (`deleted_by_user_id === 나`) · 같은 조직 · 지운 지 60초 안 · 글이 살아 있을 때 · 신고 처리로 지운 댓글이 아닐 때만 —
+ * 판정은 `checkBoardCommentRestore`. 읽은 `deleted_at` 이 그대로일 때만 쓴다(그 사이 다시 지워졌거나 되돌려졌으면 not_found).
+ */
+export async function restoreBoardComment(commentId: string): Promise<ActionResult> {
+  const session = await getCurrentAppSession();
+  if (!session || !hasOrganizationContext(session)) return { error: "no_org" };
+
+  const service = getSupabaseServiceClient();
+  const { data, error } = await service
+    .from("board_comments")
+    .select("post_id, organization_id, deleted_by_user_id, deleted_at")
+    .eq("id", commentId)
+    .maybeSingle();
+  if (error) return { error: "not_found" };
+  const comment = (data ?? null) as unknown as {
+    post_id: string;
+    organization_id: string;
+    deleted_by_user_id: string | null;
+    deleted_at: string | null;
+  } | null;
+
+  let postAlive = false;
+  let removedByReport = false;
+  if (comment && comment.organization_id === session.organization.id) {
+    const [post, reports] = await Promise.all([
+      loadPostMeta(comment.post_id, session.organization.id),
+      service
+        .from("board_reports")
+        .select("id")
+        .eq("organization_id", session.organization.id)
+        .eq("comment_id", commentId)
+        .eq("status", "removed")
+        .limit(1),
+    ]);
+    if (reports.error) return { error: "save_failed" };
+    postAlive = post !== null;
+    removedByReport = (reports.data ?? []).length > 0;
+  }
+  const check = checkBoardCommentRestore({
+    comment,
+    postAlive,
+    removedByReport,
+    viewer: { organizationId: session.organization.id, userId: session.user.id },
+    nowMs: Date.now(),
+  });
+  if ("error" in check) return check;
+
+  const { data: restored, error: restoreError } = await service
+    .from("board_comments")
+    .update({ deleted_at: null, deleted_by_user_id: null })
+    .eq("id", commentId)
+    .eq("organization_id", session.organization.id)
+    .eq("deleted_at", comment!.deleted_at!)
+    .eq("deleted_by_user_id", session.user.id)
+    .select("id");
+  if (restoreError) return { error: "save_failed" };
+  if (!restored || restored.length === 0) return { error: "not_found" };
+
+  revalidateBoardComment(comment!.post_id);
   return { ok: true };
 }
 

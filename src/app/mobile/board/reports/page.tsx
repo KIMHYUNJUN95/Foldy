@@ -30,7 +30,6 @@ export default async function BoardReportsPage() {
       <BoardReportsClient
         copy={copy}
         hint={dictionary.boardReportsWhite.hint}
-        locale={session.user.preferredLanguage}
         reasonN={dictionary.boardReportsWhite.reasonN}
         reports={reports}
       />

@@ -10,6 +10,7 @@ import { compressImageFile } from "@/components/announcements/announcement-image
 import {
   BOARD_MAX_FILES,
   BOARD_MAX_IMAGES,
+  removeBoardUploads,
   uploadBoardImage,
   uploadBoardAttachment,
   validateBoardFileList,
@@ -141,28 +142,35 @@ export function BoardComposeClient({
     setIsSubmitting(true);
 
     const postId = crypto.randomUUID();
-
     const imageUrls: string[] = [];
+    const fileAttachments: Awaited<ReturnType<typeof uploadBoardAttachment>>[] = [];
+
+    // 실패하면 어떤 경우든 오류를 보이고 버튼을 다시 켠다. 저장 전에 올린 사진 · 파일은 지운다(게시판 unslop 2026-11-20).
+    // `cleanup` 이 false 면 올린 것을 지우지 않는다 — 저장 요청이 던졌을 때(네트워크 · 시간 초과)는 서버에서
+    // 저장됐을 수도 있어서, 지우면 글이 깨진 사진을 가리킬 수 있다.
+    async function fail(message: string, cleanup = true) {
+      haptic("error");
+      setError(message);
+      setIsSubmitting(false);
+      if (!cleanup) return;
+      await removeBoardUploads({ imageUrls, attachmentPaths: fileAttachments.map((a) => a.url) });
+    }
+
     try {
       for (const img of images) {
-        const url = await uploadBoardImage({ file: img.file, organizationId: orgId, postId });
-        imageUrls.push(url);
+        imageUrls.push(await uploadBoardImage({ file: img.file, organizationId: orgId, postId }));
       }
     } catch {
-      setError(copy.errImageUploadFailed);
-      setIsSubmitting(false);
+      await fail(copy.errImageUploadFailed);
       return;
     }
 
-    const fileAttachments = [];
     try {
       for (const f of files) {
-        const att = await uploadBoardAttachment({ file: f.file, organizationId: orgId, postId });
-        fileAttachments.push(att);
+        fileAttachments.push(await uploadBoardAttachment({ file: f.file, organizationId: orgId, postId }));
       }
     } catch {
-      setError(copy.errFileUploadFailed);
-      setIsSubmitting(false);
+      await fail(copy.errFileUploadFailed);
       return;
     }
 
@@ -175,12 +183,14 @@ export function BoardComposeClient({
       fileAttachments,
       isPinned,
       allowComments: true,
-    });
+    }).catch(() => null);
 
+    if (result === null) {
+      await fail(copy.errSaveFailed, false);
+      return;
+    }
     if ("error" in result) {
-      haptic("error");
-      setError(copy.errSaveFailed);
-      setIsSubmitting(false);
+      await fail(copy.errSaveFailed);
       return;
     }
 
@@ -190,6 +200,7 @@ export function BoardComposeClient({
 
   return (
     <BoardPostForm
+      busy={isSubmitting}
       canSubmit={canPost}
       content={content}
       copy={copy}

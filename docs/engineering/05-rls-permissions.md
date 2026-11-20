@@ -1122,15 +1122,23 @@ Update/delete:
 **board_posts**
 - SELECT: `deleted_at is null AND has_active_membership(organization_id)`
 - INSERT: `created_by_user_id = auth.uid() AND has_active_membership(organization_id)` — part_time_staff 포함 전체 활성 멤버
-- UPDATE: `created_by_user_id = auth.uid() OR has_org_role(org_id, [owner, office_admin])`
-- DELETE: `created_by_user_id = auth.uid() OR has_org_role(org_id, [owner, office_admin])`
+- UPDATE: `deleted_at is null AND (created_by_user_id = auth.uid() OR has_capability(org_id, auth.uid(), 'board.manage'))`(`202610210007`)
+- DELETE: `created_by_user_id = auth.uid() OR has_capability(org_id, auth.uid(), 'board.manage')`(`202610210007`)
 
 **board_post_reads** — 자기 row 만 read/insert/update (user_id = auth.uid())
 
 **board_comments**
 - SELECT: `deleted_at is null AND has_active_membership(organization_id)`
 - INSERT: `created_by_user_id = auth.uid() AND has_active_membership(organization_id)` — `allow_comments` 체크는 서버 액션 레벨에서 수행 (RLS 정책에 포함되지 않음)
-- DELETE: `created_by_user_id = auth.uid() OR has_org_role(org_id, [owner, office_admin])`
+- UPDATE: **정책 없음(서버 키만)** — 표 단위 grant 는 있지만 UPDATE 정책이 없어 authenticated 는 어떤 줄도 바꿀 수 없다(`202606250001_board.sql:156-177`).
+- DELETE: `created_by_user_id = auth.uid() OR has_capability(org_id, auth.uid(), 'board.manage')`(`202610210007` 에서 역할 목록 → 권한 키로 바뀜)
+- 앱의 댓글 지우기 · 되돌리기는 서버 액션(service role)이 `deleted_at` · `deleted_by_user_id`(202611200004) 를 쓰고 비운다 —
+  `deleteBoardComment`(같은 조직 + 쓴 사람 또는 `board.manage`) · 신고 처리 `resolveBoardReport(remove)` 가 지운 사람을 남긴다.
+  **`restoreBoardComment`(2026-11-20): 지운 사람만(`deleted_by_user_id = 나`) · 60초 안** · 같은 조직 · 글이 살아 있을 때 · 그 댓글에
+  `board_reports.status='removed'` 가 없을 때만(`checkBoardCommentRestore`, `src/lib/board-comment-restore.ts`). 지운 사람이 비어 있으면 못 되돌린다.
+  지우기 UPDATE 는 `deleted_at is null` + 조직 조건(동시에 지우면 나중 쪽은 0줄 → `not_found`, 덮어쓰지 않음), 되돌리기 UPDATE 는 읽은 `deleted_at` · 지운 사람 조건을 같이 걸어 0줄이면 `not_found`.
+  신고 처리 remove 에서 신고 닫기가 실패하면 그 댓글의 지운 사람을 비운다(지움은 그대로 — 아무도 되돌리지 못함). 새 RLS 정책 없음 — authenticated 는 `board_comments` UPDATE 정책이
+  없어 이 칸을 쓸 수 없다(서버 키만).
 
 > **@멘션 보안**: `mentioned_user_ids`의 각 UUID가 같은 org 활성 멤버인지는 **서버 액션 레벨**에서 검증 (RLS만으로 배열 원소 단위 검증 불가). 클라이언트가 임의 UUID를 삽입해도 서버에서 거부.
 

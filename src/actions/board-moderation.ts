@@ -200,19 +200,30 @@ export async function resolveBoardReport(
   const orgId = session.organization.id;
   const now = new Date().toISOString();
 
+  // 이 처리로 댓글을 지웠으면 그 id — 신고 닫기가 실패했을 때 지운 사람을 비우는 데 쓴다.
+  let removedCommentId: string | null = null;
   if (input.action === "remove") {
     const target = await loadTarget(input, orgId);
     if (target) {
-      const write =
-        input.targetType === "post"
-          ? service.from("board_posts").update({ deleted_at: now }).eq("id", input.postId).eq("organization_id", orgId)
-          : service
-              .from("board_comments")
-              .update({ deleted_at: now })
-              .eq("id", input.commentId ?? "")
-              .eq("organization_id", orgId);
-      const { error } = await write;
-      if (error) return { error: "save_failed" };
+      if (input.targetType === "post") {
+        const { error } = await service
+          .from("board_posts")
+          .update({ deleted_at: now })
+          .eq("id", input.postId)
+          .eq("organization_id", orgId);
+        if (error) return { error: "save_failed" };
+      } else {
+        // 아직 안 지워진 댓글만 — 이미 쓴 사람이 지웠으면 그 기록(지운 사람 · 시각)을 덮어쓰지 않는다.
+        const { data, error } = await service
+          .from("board_comments")
+          .update({ deleted_at: now, deleted_by_user_id: session.user.id })
+          .eq("id", input.commentId ?? "")
+          .eq("organization_id", orgId)
+          .is("deleted_at", null)
+          .select("id");
+        if (error) return { error: "save_failed" };
+        if (data && data.length > 0) removedCommentId = input.commentId ?? null;
+      }
     }
   }
 
@@ -229,7 +240,18 @@ export async function resolveBoardReport(
     .eq("post_id", input.postId);
   if (input.targetType === "comment") close = close.eq("comment_id", input.commentId ?? "");
   const { error } = await close;
-  if (error) return { error: "save_failed" };
+  if (error) {
+    // 댓글은 관리자 이름으로 지워졌는데 removed 신고가 없으면 그 관리자가 60초 안에 되살릴 수 있다 —
+    // 지운 사람을 비워 아무도 되돌리지 못하게 한다(지움은 그대로, 되돌릴 수 없는 쪽).
+    if (removedCommentId) {
+      await service
+        .from("board_comments")
+        .update({ deleted_by_user_id: null })
+        .eq("id", removedCommentId)
+        .eq("organization_id", orgId);
+    }
+    return { error: "save_failed" };
+  }
 
   revalidateBoard(input.postId);
   return { ok: true };

@@ -107,6 +107,8 @@ describe("getGuestConversationRows — 실시간 목록 줄 다시 읽기", () =
     expect(result.updates[0].matches).toBe(false);
     expect(result.missing).toEqual([THEIRS]);
     expect(result.awaitingCount).toBe(1);
+    // 메뉴 숫자 — 못 세면(이 가짜 DB 는 `.or` 가 없다) 싣지 않는다: 화면이 0 으로 메뉴 숫자를 덮지 않게(2026-11-20).
+    expect(result).not.toHaveProperty("navAwaitingCount");
   });
 });
 

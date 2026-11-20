@@ -225,8 +225,12 @@ export async function loadInboxList(
   const visible = all.filter((row) => matchesInboxFilter(row, { ...filter, channel: channelFilter }, now));
 
   const ids = visible.map((row) => row.id);
-  const [lastLines, outbox] = await Promise.all([loadLastLines(db, organizationId, ids), loadOpenOutbox(db, organizationId, ids)]);
-  if (!visibility.canSeeCodes) await maskHostLines(db, organizationId, visible, lastLines);
+  const [lastLines, outbox, buildingMap] = await Promise.all([
+    loadLastLines(db, organizationId, ids),
+    loadOpenOutbox(db, organizationId, ids),
+    visibility.canSeeCodes ? null : loadBuildingMap(db, organizationId),
+  ]);
+  if (!visibility.canSeeCodes) maskHostLines(buildingMap, visible, lastLines);
   const rows = sortInboxRows(
     visible.map((row) =>
       toInboxRow(
@@ -296,19 +300,23 @@ function headerCounts(
   return { awaitingCount };
 }
 
+type BuildingMap = Map<string, BuildingGuestInfo>;
+
+/** 코드 가리기에 쓸 건물 정보 — 한 요청에 **한 번만** 읽는다. 못 읽으면 null(그때는 코드처럼 보이는 숫자를 모두 가린다). */
+async function loadBuildingMap(db: Client, organizationId: string): Promise<BuildingMap | null> {
+  try {
+    return new Map((await loadBuildingGuestInfos(db, organizationId)).map((building) => [building.canonicalName, building]));
+  } catch {
+    return null;
+  }
+}
+
 /** 목록 한 줄은 자동 안내인지 알 수 없다 — 우리 쪽 말(host)은 모두 그 건물 코드를 가린다. */
-async function maskHostLines(
-  db: Client,
-  organizationId: string,
-  rows: readonly ConversationDbRow[],
+export function maskHostLines(
+  buildings: BuildingMap | null,
+  rows: ReadonlyArray<Pick<ConversationDbRow, "id" | "property_name">>,
   lastLines: Map<string, { direction: GuestMessageDirection; body: string }>,
 ) {
-  let buildings: Map<string, BuildingGuestInfo> | null = null;
-  try {
-    buildings = new Map((await loadBuildingGuestInfos(db, organizationId)).map((building) => [building.canonicalName, building]));
-  } catch {
-    buildings = null;
-  }
   for (const row of rows) {
     const line = lastLines.get(row.id);
     if (!line || line.direction !== "host") continue;
@@ -373,11 +381,12 @@ export async function loadInboxRowsByIds(
     row.status === "done" ? !edge || compareWindowKey(row, edge) <= 0 : openIds.has(row.id);
   const rows = (found.data ?? []) as ConversationDbRow[];
   const foundIds = rows.map((row) => row.id);
-  const [lastLines, outbox] = await Promise.all([
+  const [lastLines, outbox, buildings] = await Promise.all([
     loadLastLines(db, organizationId, foundIds),
     loadOpenOutbox(db, organizationId, foundIds),
+    visibility.canSeeCodes ? null : loadBuildingMap(db, organizationId),
   ]);
-  if (!visibility.canSeeCodes) await maskHostLines(db, organizationId, rows, lastLines);
+  if (!visibility.canSeeCodes) maskHostLines(buildings, rows, lastLines);
   const seen = new Set(foundIds);
   return {
     updates: rows.map((row) => ({
@@ -412,14 +421,13 @@ export async function searchInbox(
   visibility: CodeVisibility = { canSeeCodes: true, canManageAuto: true },
 ): Promise<InboxSearchResult> {
   // 코드를 못 보는 사람 — 조직의 모든 건물 코드를 모아 우리 쪽 말에서 가린 뒤에 맞춘다(코드 숫자로 찾아 코드를 알아내지 못하게).
-  let codes: string[] | null = [];
-  if (!visibility.canSeeCodes) {
-    try {
-      codes = (await loadBuildingGuestInfos(db, organizationId)).flatMap((building) => codesOf(building));
-    } catch {
-      codes = null;
-    }
-  }
+  // 건물 정보는 여기서 한 번만 읽어 검색 조건과 목록 한 줄 가리기에 같이 쓴다(2026-11-20 — 예전엔 두 번 읽었다).
+  const buildings = visibility.canSeeCodes ? null : await loadBuildingMap(db, organizationId);
+  const codes: string[] | null = visibility.canSeeCodes
+    ? []
+    : buildings
+      ? [...buildings.values()].flatMap((building) => codesOf(building))
+      : null;
   const args = buildSearchArgs(query, { labelSets: BUILDING_LABEL_SETS, canSeeCodes: visibility.canSeeCodes, codes, now });
   const bodyRecentOnly = args.p_body_since !== null;
   const { data, error } = await db.rpc("guest_conversation_search", {
@@ -442,12 +450,16 @@ export async function searchInbox(
   const truncated = candidates.length >= SEARCH_FETCH_LIMIT || picked.length >= SEARCH_RESULT_LIMIT;
   if (picked.length === 0) return { results: [], truncated, bodyRecentOnly };
 
+  // 줄 모양 · 마지막 한 줄 · 보내는 중인 답장 — 서로 기다릴 일이 없어 한꺼번에 읽는다(2026-11-20 — 예전엔 대화 읽기 뒤에 나머지).
   const ids = picked.map((item) => item.id);
-  const found = await db.from("guest_conversations").select(CONVERSATION_COLUMNS).eq("organization_id", organizationId).in("id", ids);
+  const [found, lastLines, outbox] = await Promise.all([
+    db.from("guest_conversations").select(CONVERSATION_COLUMNS).eq("organization_id", organizationId).in("id", ids),
+    loadLastLines(db, organizationId, ids),
+    loadOpenOutbox(db, organizationId, ids),
+  ]);
   if (found.error) throw new Error(`conversation read failed: ${found.error.message}`);
   const rows = (found.data ?? []) as ConversationDbRow[];
-  const [lastLines, outbox] = await Promise.all([loadLastLines(db, organizationId, ids), loadOpenOutbox(db, organizationId, ids)]);
-  if (!visibility.canSeeCodes) await maskHostLines(db, organizationId, rows, lastLines);
+  if (!visibility.canSeeCodes) maskHostLines(buildings, rows, lastLines);
   const byId = new Map(rows.map((row) => [row.id, row]));
   const results: InboxSearchResult["results"] = [];
   for (const item of picked) {
@@ -463,15 +475,23 @@ export async function searchInbox(
 
 /** 메뉴 · 탭 숫자 — 답장 기다림(끝난 「나중에」 포함). 실패하면 0. */
 export async function countAwaitingConversations(db: Client, organizationId: string, now: Date = new Date()): Promise<number> {
+  return (await countAwaitingOrNull(db, organizationId, now)) ?? 0;
+}
+
+/**
+ * 메뉴 숫자와 같은 세기 — 못 세면 null(2026-11-20). 손님 메시지 읽기 액션이 같이 돌려주는 `navAwaitingCount` 가 이것이다:
+ * 화면이 이 값으로 메뉴 숫자를 덮으므로 0 으로 바꿔 덮지 않게 실패는 null 로 둔다(47 §5-9).
+ */
+export async function countAwaitingOrNull(db: Client, organizationId: string, now: Date = new Date()): Promise<number | null> {
   try {
     const { count, error } = await db
       .from("guest_conversations")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
       .or(`status.eq.awaiting,and(status.eq.snoozed,snooze_until.lte.${now.toISOString()})`);
-    return error ? 0 : (count ?? 0);
+    return error || typeof count !== "number" ? null : count;
   } catch {
-    return 0;
+    return null;
   }
 }
 

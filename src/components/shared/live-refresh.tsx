@@ -9,6 +9,7 @@ import {
   liveChangeFromBroadcast,
   liveChangeMatches,
   liveSourcesKey,
+  liveSubscriptionKey,
   parseLiveSourcesKey,
   pickLiveIds,
   type LiveChange,
@@ -49,14 +50,20 @@ export function useLiveChannel(sources: readonly LiveSource[], handlers: Channel
   useEffect(() => {
     handlersRef.current = handlers;
   });
-  // 배열은 렌더마다 새로 만들어지니 내용으로 구독을 다시 할지 정한다.
+  // 배열은 렌더마다 새로 만들어지니 내용으로 구독을 다시 할지 정한다. 토픽 줄은 토픽 이름만 본다(`liveSubscriptionKey`) —
+  // 필터는 신호가 올 때 지금 값으로 거르니 필터만 바뀌어도 채널을 떠나지 않는다(틈도 따라잡기도 없음).
+  const subscriptionKey = liveSubscriptionKey(sources);
   const sourcesKey = liveSourcesKey(sources);
+  const topicSources = useRef<LiveSource[]>([]);
+  useEffect(() => {
+    topicSources.current = parseLiveSourcesKey(sourcesKey).filter((s) => s.topic);
+  }, [sourcesKey]);
   // 앞 채널을 닫고 새로 붙는 것(구독 묶음이 바뀜)도 틈이다 — 그사이 신호를 놓쳤을 수 있어 새로 붙으면 따라잡기.
   const hadChannel = useRef(false);
 
   useEffect(() => {
-    if (!sourcesKey) return;
-    const parsed = parseLiveSourcesKey(sourcesKey);
+    if (!subscriptionKey) return;
+    const parsed = parseLiveSourcesKey(subscriptionKey);
     const supabase = getSupabaseBrowserClient();
     const visible = () => document.visibilityState === "visible";
     const onVisibility = () => (visible() ? handlersRef.current.onVisible?.() : handlersRef.current.onHidden?.());
@@ -107,16 +114,14 @@ export function useLiveChannel(sources: readonly LiveSource[], handlers: Channel
       }
 
       // private 토픽 — 토픽마다 한 번 듣고, 이 화면의 구독 줄 중 하나라도 맞으면 한 번 넘긴다.
-      const topics = new Map<string, LiveSource[]>();
-      for (const source of parsed) {
-        if (source.topic) topics.set(source.topic, [...(topics.get(source.topic) ?? []), source]);
-      }
-      for (const [topic, sources] of topics) {
+      const topics = parsed.flatMap((source) => (source.topic ? [source.topic] : []));
+      for (const topic of topics) {
         leaves.push(
           privateTopicHub().join(topic, {
             onMessage: (payload) => {
               const change = liveChangeFromBroadcast(payload);
-              if (change && sources.some((source) => liveChangeMatches(source, change))) handlersRef.current.onChange(change);
+              const lines = topicSources.current.filter((source) => source.topic === topic);
+              if (change && lines.some((source) => liveChangeMatches(source, change))) handlersRef.current.onChange(change);
             },
             onStatus: trackStatus(),
           }),
@@ -134,7 +139,7 @@ export function useLiveChannel(sources: readonly LiveSource[], handlers: Channel
       if (channel) void supabase.removeChannel(channel);
       for (const leave of leaves.splice(0)) leave();
     };
-  }, [sourcesKey, id]);
+  }, [subscriptionKey, id]);
 }
 
 /** 브라우저 클라이언트 하나에 허브 하나(클라이언트도 하나다). 처음 쓸 때 만든다. */

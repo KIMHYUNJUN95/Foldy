@@ -44,6 +44,17 @@ export function liveSourcesKey(sources: readonly LiveSource[]): string {
   return sources.map((s) => `${s.table}|${s.filter}|${s.event ?? ""}|${s.topic ?? ""}`).join(",");
 }
 
+/**
+ * 구독을 다시 맺을지 정하는 열쇠 — `postgres_changes` 줄은 필터가 서버 쪽이라 통째로, private 토픽 줄은 **토픽 이름만**.
+ * 토픽 줄의 필터는 브라우저가 신호마다 거르므로(`liveChangeMatches`) 필터만 바뀌면(PC 에서 다른 대화를 고름) 채널을 떠났다
+ * 다시 들어올 까닭이 없다 — 다시 들어오면 「다시 붙음 → 따라잡기」가 돌아 방금 읽은 대화를 한 번 더 읽었다(2026-11-20).
+ * `parseLiveSourcesKey` 로 되읽으면 토픽 줄은 `{ table: "", filter: "", topic }` 하나씩이다.
+ */
+export function liveSubscriptionKey(sources: readonly LiveSource[]): string {
+  const topics = [...new Set(sources.filter((s) => s.topic).map((s) => s.topic as string))].sort();
+  return liveSourcesKey([...sources.filter((s) => !s.topic), ...topics.map((topic) => ({ table: "", filter: "", topic }))]);
+}
+
 export function parseLiveSourcesKey(key: string): LiveSource[] {
   if (!key) return [];
   return key.split(",").map((entry) => {

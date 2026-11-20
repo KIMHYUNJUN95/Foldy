@@ -20,13 +20,11 @@ import {
   type RefObject,
 } from "react";
 import {
-  addGuestInternalNote,
   previewReplyTranslation,
-  retryGuestOutbox,
-  sendGuestReply,
   translateGuestMessage,
   type GuestMessageErrorKey,
 } from "@/actions/guest-messages";
+import { guestWrites } from "@/components/guest-messages/guest-writes";
 import {
   useBuildingName,
   useRoomPlaceLabel,
@@ -552,6 +550,7 @@ export function ThreadMessages({
             return (
               <HostMessage
                 key={m.id}
+                conversationId={thread.conversation.id}
                 message={m}
                 copy={copy}
                 locale={locale}
@@ -625,6 +624,7 @@ function AlertGlyph() {
 }
 
 function HostMessage({
+  conversationId,
   message,
   copy,
   locale,
@@ -634,6 +634,7 @@ function HostMessage({
   notify,
   onChanged,
 }: {
+  conversationId: string;
   message: InboxMessage;
   copy: GmCopy;
   locale: string;
@@ -747,7 +748,7 @@ function HostMessage({
                 onClick={() =>
                   status === "uncertain"
                     ? setConfirmRetry(true)
-                    : run(() => retryGuestOutbox(outbox.id), copy.retryToast)
+                    : run(() => guestWrites.retry(conversationId, outbox.id), copy.retryToast)
                 }
               >
                 {copy.retry}
@@ -766,7 +767,7 @@ function HostMessage({
           onConfirm={() => {
             setConfirmRetry(false);
             run(
-              () => retryGuestOutbox(outbox.id, { confirmUncertain: true }),
+              () => guestWrites.retry(conversationId, outbox.id, { confirmUncertain: true }),
               copy.retryToast,
             );
           }}
@@ -1024,7 +1025,7 @@ export function Composer({
       keyRef.current = newIdempotencyKey();
     keyBodyRef.current = body;
     startTransition(async () => {
-      const result = await sendGuestReply({
+      const result = await guestWrites.sendReply({
         conversationId: row.id,
         body,
         idempotencyKey: keyRef.current,
@@ -1066,7 +1067,7 @@ export function Composer({
     if (mode === "reply" && slotsLeft.length > 0) return;
     if (mode === "note") {
       startTransition(async () => {
-        const result = await addGuestInternalNote({
+        const result = await guestWrites.addNote({
           conversationId: row.id,
           body,
         });

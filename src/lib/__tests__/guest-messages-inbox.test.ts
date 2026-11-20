@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { revalidatePath } from "next/cache";
+
 import { createFakeSupabase } from "@/lib/__tests__/fake-supabase";
 
 /**
@@ -320,6 +322,20 @@ describe("처리 끝 · 나중에", () => {
     expect(resolveSnoozeUntil({ date: "2027-01-30", time: "09:00" }, now)).toBeNull();
     expect(resolveSnoozeUntil({ date: "2026-11-31", time: "09:00" }, now)).toBeNull();
     expect(resolveSnoozeUntil({ date: "2026-11-13", time: "24:00" }, now)).toBeNull();
+  });
+});
+
+describe("쓰기 뒤 서버 렌더 없음 — 2026-11-20", () => {
+  it("답장 · 메모 · 처리 끝 · 나중에 · 풀기 · 다시 보내기는 revalidatePath 를 부르지 않는다(화면이 줄 · 대화만 다시 읽는다, 47 §5-9)", async () => {
+    vi.mocked(revalidatePath).mockClear();
+    const outboxId = await sendOne();
+    expect(await addGuestInternalNote({ conversationId: AIRBNB, body: "memo" })).toEqual({ ok: true });
+    expect(await setGuestConversationDone(AIRBNB, true)).toEqual({ ok: true });
+    expect((await snoozeGuestConversation(AIRBNB, { preset: "3h" })).ok).toBe(true);
+    expect(await unsnoozeGuestConversation(AIRBNB)).toEqual({ ok: true });
+    fake.tables.guest_message_outbox[0].status = "failed";
+    expect(await retryGuestOutbox(outboxId)).toEqual({ ok: true });
+    expect(revalidatePath).not.toHaveBeenCalled();
   });
 });
 

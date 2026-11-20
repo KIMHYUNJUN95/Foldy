@@ -13,7 +13,6 @@
  * - 조직 id 는 언제나 세션에서 온다(클라이언트가 보낸 값을 쓰지 않는다).
  */
 
-import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import type { Capability } from "@/config/capabilities";
 import {
@@ -44,6 +43,7 @@ import {
   searchInbox,
   type InboxRowsResult,
   type InboxSearchResult,
+  countAwaitingOrNull,
 } from "@/lib/guest-messages/inbox-server";
 import { normalizeSearchQuery } from "@/lib/guest-messages/inbox-search";
 import { isGuestMessageSendEnabled, runGuestOutbox } from "@/lib/guest-messages/outbox-runner";
@@ -121,9 +121,19 @@ function db() {
   return getSupabaseServiceClient();
 }
 
-function revalidateInbox() {
-  revalidatePath("/admin/messages");
-  revalidatePath("/mobile/messages");
+/*
+ * 이 파일의 쓰기(답장 · 메모 · 처리 끝 · 나중에 · 다시 보내기)는 `revalidatePath` 를 부르지 않는다(2026-11-20, 47 §5-9).
+ * 부르면 응답에 페이지 전체가 실리고(PC 28kB) 브라우저 라우터 캐시가 비워져 메뉴 링크 미리 받기가 전부 다시 나갔다.
+ * 화면이 쓰기 뒤 스스로 고친다 — 대화는 `useThread` 다시 읽기, 목록 줄은 `applyIds`. 캐시에서 되살아난 목록 · 대화는
+ * 이 창에서 쓴 뒤면 나타날 때 다시 읽는다(`write-freshness`). 메뉴 숫자는 읽기 액션의 `navAwaitingCount`(`nav-badge-overrides`).
+ */
+
+/** 메뉴 숫자 — 레이아웃과 같은 세기(`countAwaitingOrNull`). 못 세면 싣지 않는다(화면이 메뉴 숫자를 덮지 않게). */
+export type NavAwaitingCount = { navAwaitingCount?: number };
+
+async function withNavCount<T extends object>(organizationId: string, work: Promise<T>): Promise<T & NavAwaitingCount> {
+  const [result, navAwaitingCount] = await Promise.all([work, countAwaitingOrNull(db(), organizationId)]);
+  return navAwaitingCount === null ? result : { ...result, navAwaitingCount };
 }
 
 /** 보낼 차례인 줄을 응답 뒤에 보낸다(발송이 꺼져 있으면 아무것도 안 함). 실패는 로그만 — 줄은 큐에 남는다. */
@@ -144,7 +154,7 @@ function logFailure(where: string, error: unknown) {
 
 // ── 읽기 ─────────────────────────────────────────────────────────────────────
 
-export type ListGuestConversationsResult = ({ ok: true } & InboxListData) | Failure;
+export type ListGuestConversationsResult = ({ ok: true } & InboxListData & NavAwaitingCount) | Failure;
 
 export async function listGuestConversations(
   input: {
@@ -160,11 +170,11 @@ export async function listGuestConversations(
     : "all";
   const building = typeof input.building === "string" && input.building.trim() ? input.building.trim().slice(0, 120) : null;
   try {
-    const data = await loadInboxList(db(), auth.organizationId, {
+    const data = await withNavCount(auth.organizationId, loadInboxList(db(), auth.organizationId, {
       status,
       building,
       channel: parseChannelFilter(input.channel),
-    }, new Date(), visibilityOf(auth.capabilities));
+    }, new Date(), visibilityOf(auth.capabilities)));
     // 읽기에는 부작용이 없다 — 밀린 줄(429 뒤 등)은 다음 보내기 · 발송 작업 경로(/api/guest-messages/outbox)가 보낸다.
     return { ok: true, ...data };
   } catch (error) {
@@ -176,7 +186,7 @@ export async function listGuestConversations(
 /** 실시간 줄 다시 읽기 한 번에 받는 대화 수 상한 — 넘는 신호는 화면이 목록 전체 다시 읽기로 바꾼다(`LIVE_CHANGE_MAX_KEYS`). */
 const LIVE_ROWS_LIMIT = 50;
 
-export type GetGuestConversationRowsResult = ({ ok: true } & InboxRowsResult) | Failure;
+export type GetGuestConversationRowsResult = ({ ok: true } & InboxRowsResult & NavAwaitingCount) | Failure;
 
 /**
  * 실시간 — 신호가 온 대화 몇 개만 목록 줄로 다시 읽는다(47 §5-9). 권한 · 조직은 목록 읽기와 같다(`guest_messages.view`, 조직은 세션).
@@ -199,13 +209,16 @@ export async function getGuestConversationRows(input: {
     : "all";
   const building = typeof input.building === "string" && input.building.trim() ? input.building.trim().slice(0, 120) : null;
   try {
-    const result = await loadInboxRowsByIds(
-      db(),
+    const result = await withNavCount(
       auth.organizationId,
-      ids.map((id) => id.toLowerCase()),
-      { status, building, channel: parseChannelFilter(input.channel) },
-      new Date(),
-      visibilityOf(auth.capabilities),
+      loadInboxRowsByIds(
+        db(),
+        auth.organizationId,
+        ids.map((id) => id.toLowerCase()),
+        { status, building, channel: parseChannelFilter(input.channel) },
+        new Date(),
+        visibilityOf(auth.capabilities),
+      ),
     );
     return { ok: true, ...result };
   } catch (error) {
@@ -247,21 +260,25 @@ export async function searchGuestConversations(input: {
   }
 }
 
-export type GetGuestConversationResult = { ok: true; thread: InboxThread } | Failure;
+export type GetGuestConversationResult = ({ ok: true; thread: InboxThread } & NavAwaitingCount) | Failure;
 
 export async function getGuestConversation(conversationId: string): Promise<GetGuestConversationResult> {
   const auth = await gate(false);
   if (!auth.ok) return auth;
   if (typeof conversationId !== "string" || !UUID_RE.test(conversationId)) return { ok: false, errorKey: "invalid" };
   try {
-    const thread = await loadInboxThread(db(), auth.organizationId, conversationId, {
-      sendEnabled: isGuestMessageSendEnabled(),
-      locale: auth.locale,
-      visibility: visibilityOf(auth.capabilities),
-      viewerUserId: auth.userId,
-    });
+    // 메뉴 숫자도 같이 — 대화 화면에서 처리 끝 · 나중에 · 답장 뒤 다시 읽을 때 탭바 · 서랍 · 레일 숫자를 고친다(47 §5-9).
+    const { thread, navAwaitingCount } = await withNavCount(
+      auth.organizationId,
+      loadInboxThread(db(), auth.organizationId, conversationId, {
+        sendEnabled: isGuestMessageSendEnabled(),
+        locale: auth.locale,
+        visibility: visibilityOf(auth.capabilities),
+        viewerUserId: auth.userId,
+      }).then((thread) => ({ thread })),
+    );
     if (!thread) return { ok: false, errorKey: "not_found" };
-    return { ok: true, thread };
+    return navAwaitingCount === undefined ? { ok: true, thread } : { ok: true, thread, navAwaitingCount };
   } catch (error) {
     logFailure("thread", error);
     return { ok: false, errorKey: "failed" };
@@ -359,7 +376,6 @@ export async function sendGuestReply(input: {
       });
     }
     kickOutbox(auth.organizationId);
-    revalidateInbox();
     return { ok: true, outboxId, duplicate: false, sendEnabled };
   } catch (error) {
     logFailure("send", error);
@@ -389,7 +405,6 @@ export async function addGuestInternalNote(input: { conversationId: string; body
       author_user_id: auth.userId,
     });
     if (inserted.error) throw new Error(inserted.error.message);
-    revalidateInbox();
     return { ok: true };
   } catch (error) {
     logFailure("note", error);
@@ -417,7 +432,6 @@ async function updateConversationStatus(
       .select("id");
     if (updated.error) throw new Error(updated.error.message);
     if ((updated.data ?? []).length === 0) return { ok: false, errorKey: "not_found" };
-    revalidateInbox();
     return { ok: true };
   } catch (error) {
     logFailure("status", error);
@@ -651,7 +665,6 @@ export async function retryGuestOutbox(outboxId: string, options: { confirmUncer
     if (updated.error) throw new Error(updated.error.message);
     if ((updated.data ?? []).length === 0) return { ok: false, errorKey: "stale" };
     kickOutbox(auth.organizationId);
-    revalidateInbox();
     return { ok: true };
   } catch (error) {
     logFailure("retry outbox", error);

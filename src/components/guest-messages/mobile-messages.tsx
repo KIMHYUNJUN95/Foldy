@@ -60,6 +60,8 @@ import {
   type SnoozeInput,
 } from "@/lib/guest-messages/inbox-model";
 import type { LinkTargetType } from "@/lib/guest-messages/task-link-model";
+import { createPaneMessageHandler, ROW_MESSAGE, type PaneMessage } from "@/lib/guest-messages/pane-messages";
+import { guestWriteFreshness } from "@/lib/guest-messages/write-freshness";
 import {
   TaskCreateForm,
   type TaskFormDraft,
@@ -69,17 +71,10 @@ import {
   type TaskCategoryCopy,
 } from "@/components/guest-messages/task-create";
 
-/** 칸(iframe) 안 대화 → 왼쪽 목록에 「이 줄이 빠진다 / 돌아온다」를 서버를 기다리기 전에 알린다. */
-const ROW_MESSAGE = "gm-row";
-type RowMessage = { type: typeof ROW_MESSAGE; id: string; leaving: boolean };
-
-function isRowMessage(data: unknown): data is RowMessage {
-  return Boolean(data && typeof data === "object" && (data as { type?: unknown }).type === ROW_MESSAGE);
-}
-
+/** 칸(iframe) 안 대화 → 왼쪽 목록에 「이 줄이 빠진다 / 돌아온다」를 서버를 기다리기 전에 알린다(`pane-messages`). */
 function tellList(id: string, leaving: boolean) {
   if (typeof window === "undefined" || window.parent === window) return;
-  window.parent.postMessage({ type: ROW_MESSAGE, id, leaving } satisfies RowMessage, window.location.origin);
+  window.parent.postMessage({ type: ROW_MESSAGE, id, leaving } satisfies PaneMessage, window.location.origin);
 }
 
 type ToastState = {
@@ -161,29 +156,33 @@ export function MobileInbox({
     toKeys: (change) => liveKeysOf(change).filter((key) => key.startsWith("c:")),
     onFlush: (keys) => {
       void inbox.applyIds(idsOfKind(keys, "c"));
-      search.refresh();
+      search.live();
     },
     onCatchUp: () => {
       void inbox.reload();
-      search.refresh();
+      search.live();
     },
   });
 
-  // 칸 안 대화가 보낸 「빠짐 / 되돌림」 — 서버 응답 전에 줄을 접고, 실패하면 다시 편다(16 「줄 접힘」).
+  // 칸 안 대화가 보낸 신호(`pane-messages`) — 「빠짐 / 되돌림」은 서버 응답 전에 줄을 접고 실패하면 다시 편다(16 「줄 접힘」).
+  // 「썼다」는 이 창에도 쓰기 표시를 남기고 그 줄을 바로 다시 읽는다 — 메뉴 숫자(레일 · 사이드바)도 실시간 신호 없이 같이 고쳐진다.
+  const applyIds = inbox.applyIds;
   useEffect(() => {
-    const onMessage = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin || !isRowMessage(event.data)) return;
-      const { id, leaving: isLeaving } = event.data;
-      setLeaving((prev) => {
-        const next = new Set(prev);
-        if (isLeaving) next.add(id);
-        else next.delete(id);
-        return next;
-      });
-    };
+    const onMessage = createPaneMessageHandler({
+      self: window,
+      freshness: guestWriteFreshness,
+      applyIds,
+      setRowLeaving: (id, isLeaving) =>
+        setLeaving((prev) => {
+          const next = new Set(prev);
+          if (isLeaving) next.add(id);
+          else next.delete(id);
+          return next;
+        }),
+    });
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, []);
+  }, [applyIds]);
 
   // 먼저 접어 둔 줄은 서버 답이 올 때까지 접힌 채 — 다른 줄의 실시간 합치기로 펴지 않는다(16 「줄 접힘」: 실패할 때만 다시 편다).
   // 그 줄이 목록에서 빠지면 표시를 지운다(나중에 같은 대화가 다시 들어오면 펴진 채로 나타나게).

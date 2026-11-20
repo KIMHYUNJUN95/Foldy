@@ -50,7 +50,7 @@ import { idsOfKind, liveKeysOf, pruneLocalLeaving, touchesThread } from "@/lib/g
 import { StallNoticeLine } from "@/components/guest-messages/stall-notice";
 import { BuildingGuestInfoPanel } from "@/components/admin/messages/building-guest-info-panel";
 import type { StallNotice } from "@/lib/guest-messages/channel-overview-server";
-import { setGuestConversationDone } from "@/actions/guest-messages";
+import { guestWrites } from "@/components/guest-messages/guest-writes";
 import type { Dictionary } from "@/lib/i18n";
 import {
   INBOX_CHANNEL_FILTERS,
@@ -149,17 +149,18 @@ export function MessagesConsole({
   const listSources = useMemo(() => guestInboxLiveSources(organizationId), [organizationId]);
   useLiveChanges(listSources, {
     toKeys: (change) => liveKeysOf(change).filter((key) => key.startsWith("c:")),
-    // 검색 중이면 결과는 같은 검색어로 다시 찾아 갈아 끼운다(줄을 하나씩 고치면 필터 · 순서가 어긋난다).
+    // 검색 중이면 결과는 같은 검색어로 다시 찾아 갈아 끼운다(줄을 하나씩 고치면 필터 · 순서가 어긋난다). 신호마다 찾지 않고 5초에 한 번까지(`live`).
     onFlush: (keys) => {
       void inbox.applyIds(idsOfKind(keys, "c"));
-      search.refresh();
+      search.live();
     },
     onCatchUp: () => {
       void inbox.reload();
-      search.refresh();
+      search.live();
     },
   });
-  // 열린 대화 채널 — 대화를 바꾸면 이것만 다시 구독하고, 다시 붙으면 따라잡기(그 대화 다시 읽기).
+  // 열린 대화 구독 — 대화를 바꿔도 같은 조직 토픽 채널을 그대로 쓰고(필터는 신호가 올 때 지금 대화로 거른다, `liveSubscriptionKey`),
+  // 소켓이 다시 붙으면 따라잡기(그 대화 다시 읽기).
   const threadSources = useMemo(
     () => (selected ? guestThreadLiveSources(organizationId, selected) : []),
     [organizationId, selected],
@@ -562,7 +563,7 @@ export function MessagesConsole({
               return;
             }
             // 다른 대화로 옮긴 뒤 되돌리기 — 그 대화만 다시 답장 기다림으로.
-            void setGuestConversationDone(id, false).then((result) => {
+            void guestWrites.setDone(id, false).then((result) => {
               if (result.ok) void inbox.applyIds([id]);
               else showToast(errorText(result.errorKey, copy));
             });

@@ -2614,6 +2614,7 @@ INSERT · UPDATE 신호만, DELETE 는 오지 않는다. 대신 `task_occurrence
   - 실행 권한: public · anon · authenticated 회수, `service_role` 만(05).
 - 서버 쓰는 곳: `searchInbox`(`src/lib/guest-messages/inbox-server.ts`, service_role + 세션 조직). 타입은 `src/types/database.ts` 손으로 맞춤.
 - **운영 적용 메모**: 이 파일의 `create index` 는 만드는 동안 `guest_messages` 에 쓰기 잠금(SHARE)을 건다 — 웹훅이 넣는 메시지가 기다린다(로컬 2.4초 · 운영 12만 줄 비슷한 크기라 몇 초 예상). 잠금 없이 하려면 SQL 편집기에서 먼저 한 문장만(트랜잭션 밖) `create index concurrently if not exists guest_messages_body_trgm_idx on public.guest_messages using gin (body extensions.gin_trgm_ops) where direction in ('guest', 'host');` 를 돌린 뒤 이 파일을 적용한다(`if not exists` 라 그 줄은 건너뛴다).
+- **2026-11-20 `202611200001_guest_message_search_perf.sql`(운영 적용 전)**: 같은 이름 · 인자 · 돌려주는 열 · 권한(security invoker · `search_path ''` · service_role 만)으로 본문만 다시 만든다. 표 · 칸 · 색인 변화 없음(함수만 — 표 잠금 없음, 멱등). 순서: ① 필터에 드는 대화 마지막 메시지 최신순 앞 400개에서 맞는 것(대화마다 자기 메시지) — `p_limit` 개가 차면 끝 ② 못 채우고 400개가 전체가 아니면 전체에서 대화 id 만 모음(본문 정렬 없음) ③ 고른 id 에만 예약 붙이기 · 맞은 말(`sent_at desc, id desc` 첫 줄) · 맞은 곳 열. 코드 가림은 `body !~ 코드 or regexp_replace(…) ilike` 로 코드가 든 글에만 정규식을 돌린다. 결과는 예전과 같다(로컬 운영 규모에서 588가지 줄 단위 비교). 되돌리기: `202611180001` 의 함수 부분을 다시 돌린다. 예약 쪽 jsonb(`apiReference` · 전화 · 이메일) trigram 색인은 넣지 않았다(드문 말 검색이 예약 표를 통째로 읽는 비용은 남음 — 47 §5-10).
 
 ## 2026-11-18 손님 메시지 AI 답장 도우미 — `guest_reply_pairs` · `guest_saved_reply_embeddings` · `guest_reply_assist_events` (`202611180002_guest_reply_assist.sql`, **운영 미적용**)
 

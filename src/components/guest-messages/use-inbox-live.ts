@@ -4,6 +4,8 @@ import { useCallback, useEffect, useReducer, useRef } from "react";
 import { getGuestConversationRows, listGuestConversations } from "@/actions/guest-messages";
 import { inboxLiveReducer, initialInboxLive } from "@/lib/guest-messages/live-merge";
 import { LIVE_CHANGE_MAX_KEYS } from "@/lib/live-refresh-schedule";
+import { beginNavBadgeRead, reportNavBadge } from "@/components/shared/nav-badge-overrides";
+import { guestWriteFreshness } from "@/lib/guest-messages/write-freshness";
 import type { InboxChannelFilter, InboxListData, InboxStatusFilter } from "@/lib/guest-messages/inbox-model";
 
 /** 줄 접힘(`.row-collapse` 260ms)이 끝난 뒤 목록에서 뺀다. */
@@ -13,7 +15,9 @@ const ENTER_MS = 600;
 
 /**
  * 손님 메시지 목록 — 서버가 처음 준 목록을 손에 들고, 실시간 신호의 대화만 다시 읽어 그 자리에서 합친다(47 §5-9).
- * 서버 렌더를 다시 받지 않는다(`router.refresh()` 없음). 서버가 새 목록을 주면(필터 이동 · 내 쓰기 뒤 다시 그림) 그것으로 갈아 끼운다.
+ * 서버 렌더를 다시 받지 않는다(`router.refresh()` 없음). 서버가 새 목록을 주면(필터 이동) 그것으로 갈아 끼운다.
+ * 내 쓰기도 서버 렌더 없이(2026-11-20) — PC 는 쓴 뒤 `applyIds`. 캐시에서 되살아난 목록이면(이 창에서 그 뒤 썼다) 나타날 때
+ * 목록을 한 번 다시 읽는다(`write-freshness` — 남이 바꾼 다른 줄도 맞게, 돌아올 때마다).
  * 응답 순서 · 접힘 · 나타남은 순수 리듀서 `inboxLiveReducer`(id 마다 요청 번호), 빼는 시각만 여기 타이머.
  * - `applyIds(ids)` — 그 대화들만 목록 줄로 다시 읽기(권한 · 조직 · 필터 판정은 서버). 너무 많으면 `reload()`.
  * - `reload()` — 보는 필터 그대로 목록 한 번(따라잡기 · 다시 해 보기).
@@ -36,7 +40,7 @@ export function useInboxLive(
     filterRef.current = filter;
   });
 
-  // 서버가 새 목록을 줬다(내 쓰기 뒤 revalidatePath 등) — 통째 읽기와 같은 길로 합친다.
+  // 서버가 새 목록을 줬다(필터 이동 등 서버 렌더) — 통째 읽기와 같은 길로 합친다. 내 쓰기는 서버 렌더를 부르지 않는다(`applyIds`).
   const seenData = useRef(data);
   useEffect(() => {
     if (seenData.current === data) return;
@@ -58,16 +62,28 @@ export function useInboxLive(
     return () => window.clearTimeout(timer);
   }, [state.entered]);
 
+  // 메뉴 숫자는 서버 렌더를 다시 받지 않으니 읽기가 같이 가져온 수(`navAwaitingCount`)로 고친다 — 순서는 읽기를 시작한 때로(`beginNavBadgeRead`).
   const reload = useCallback(async () => {
     const mine = ++seq.current;
+    const at = beginNavBadgeRead();
     const result = await listGuestConversations(filterRef.current).catch(() => null);
-    if (!alive.current || !result?.ok) return;
+    if (!result?.ok) return;
+    reportNavBadge("messages", result.navAwaitingCount, at);
+    if (!alive.current) return;
     dispatch({
       type: "replace",
       seq: mine,
       data: { rows: result.rows, awaitingCount: result.awaitingCount, buildings: result.buildings },
     });
   }, []);
+
+  // 받은 목록에 번호를 붙이고(처음일 때만), 받은 뒤 이 창에서 쓴 것이 있으면(캐시에서 되살아남) 한 번 통째로 다시 읽는다. 새 서버 렌더면 요청 없음.
+  useEffect(() => {
+    if (!data) return;
+    const stale = guestWriteFreshness.isStale(data, { kind: "list" });
+    guestWriteFreshness.observe(data);
+    if (stale) void reload();
+  }, [data, reload]);
 
   const applyIds = useCallback(
     async (ids: readonly string[]) => {
@@ -78,8 +94,11 @@ export function useInboxLive(
       }
       const mine = ++seq.current;
       dispatch({ type: "claim", ids, seq: mine });
+      const at = beginNavBadgeRead();
       const result = await getGuestConversationRows({ ids, ...filterRef.current }).catch(() => null);
-      if (!alive.current || !result?.ok) return;
+      if (!result?.ok) return;
+      reportNavBadge("messages", result.navAwaitingCount, at);
+      if (!alive.current) return;
       dispatch({ type: "rows", seq: mine, result });
     },
     [reload],

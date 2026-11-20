@@ -36,6 +36,7 @@ import "@/components/shell/pull-refresh.css";
 import { useDrawerDragClose } from "@/components/shell/use-drawer-drag-close";
 import { OfflinePill } from "@/components/shell/offline-pill";
 import { useToastMotion } from "@/components/shell/use-toast-motion";
+import { useNavBadges } from "@/components/shared/nav-badge-overrides";
 
 type MobileShellProps = {
   // 버그 신고는 사이드바 내비 목록에 없지만(로그아웃 옆 푸터에 있다)
@@ -180,12 +181,14 @@ export function MobileShell({
   appearance = "default",
   children,
   title,
-  badges = {},
+  badges: serverBadges,
   hideBottomNav = false,
   wide = false,
   split = false,
   placeholder = false,
 }: MobileShellProps) {
+  // 서버 숫자 + 그 뒤 화면이 서버 액션으로 읽은 더 새 숫자(손님 메시지 — 라우터 캐시로 돌아온 옛 목록의 숫자를 덮는다).
+  const badges = useNavBadges(serverBadges);
   const lastScrollYRef = useRef(0);
   const hideAccumRef = useRef(0);
   const showAccumRef = useRef(0);

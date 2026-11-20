@@ -10,7 +10,7 @@ This file records important project decisions.
 - 모바일 2분할 빈 칸 공용 문구 「목록에서 고르면 여기에 열려요」. 상세: `docs/product/11-announcement-workflow.md` → 「공지 unslop」.
 - 2차(리드 결정): 작성 화면 「받는 사람 n명」 도 쓴 사람을 뺀다(`announcementRecipientCount`, 서버와 같은 함수). PC 패널은 관리자 본인 읽음을 남기지 않는다. 댓글 화면 · 서버 액션은 지운 채로 두고 `announcement_comments` 표 · `allow_comments` 열은 마이그레이션 없이 남긴다. 콘솔 패널은 주소 `?id` 를 따라간다.
 
-## 2026-11-20 예약 원본은 서버 전용 · 알림은 서버 키로만 만든다 (보안 점검, `202611200003` 운영 적용 대기)
+## 2026-11-20 예약 원본은 서버 전용 · 알림은 서버 키로만 만든다 (보안 점검, `202611200003` 운영 적용 완료 2026-11-20)
 
 - `reservations` 는 `authenticated` 에 **칸 단위 select** 만 준다(13칸). `raw_payload`(Beds24 원본 — 손님 연락처 · 금액 · 메모) · `last_known_amount` 는 service_role 만 읽는다. 원본이 필요한 화면 조회는 서버 키 + `organization_id` 조건으로 읽는다(external_reviews 2026-11-10 과 같은 방식).
 - 새 칸을 이 표에 더하면 사용자 클라이언트가 읽어야 할 때 그 칸 grant 를 따로 준다 — 회귀 테스트가 타입 칸 목록과 대조해 알려 준다.

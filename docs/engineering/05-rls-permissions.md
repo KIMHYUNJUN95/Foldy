@@ -281,7 +281,7 @@ Delete:
 Read:
 
 - Active organization members.
-- **칸 단위 (2026-11-20, `202611200003` — 운영 적용 대기).** `authenticated` 는 표 전체가 아니라 아래 13칸만 읽는다:
+- **칸 단위 (2026-11-20, `202611200003` — 운영 적용 완료 2026-11-20).** `authenticated` 는 표 전체가 아니라 아래 13칸만 읽는다:
   `id · organization_id · source · source_reservation_id · original_reservation_id · property_name · room_label · guest_name ·
   check_in_date · check_out_date · status · created_at · updated_at`. **`raw_payload`(Beds24 원본 — 손님 연락처 · 금액 · 메모)와
   `last_known_amount` 는 service_role 만** 읽는다. 예전엔 알바를 포함한 조직 구성원 누구나 브라우저에서 원본을 통째로 꺼낼 수 있었다.
@@ -610,7 +610,7 @@ Update:
 Create:
 
 - Server functions/system.
-- **서버 키만 (2026-11-20, `202611200003` — 운영 적용 대기).** 일반 사용자 INSERT 정책 「org members can create notifications for
+- **서버 키만 (2026-11-20, `202611200003` — 운영 적용 완료 2026-11-20).** 일반 사용자 INSERT 정책 「org members can create notifications for
   org recipients」 를 없애고 `authenticated` 의 INSERT 권한도 거뒀다(TRUNCATE · REFERENCES · TRIGGER 도, `anon` 은 전부).
   예전엔 조직 구성원이 PostgREST 로 다른 직원에게 아무 제목 · 링크의 알림을 넣을 수 있었다. 앱은 `createNotification`
   (`src/lib/notifications/create.ts`) 에 **service-role 클라이언트**를 넘기고, 체크인 호출은 `checkin.notify_staff`(SECURITY DEFINER)다.

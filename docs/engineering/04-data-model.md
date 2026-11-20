@@ -476,7 +476,7 @@ unique (organization_id, source, source_reservation_id)
 -- original_reservation_id text generated always as (split_part(source_reservation_id, '::room::', 1)) stored  (2026-10-16)
 ```
 
-**칸 권한 (2026-11-20, `202611200003` — 운영 적용 대기).** `authenticated` 는 칸 단위 select 만 갖는다 — `raw_payload` 와
+**칸 권한 (2026-11-20, `202611200003` — 운영 적용 완료 2026-11-20).** `authenticated` 는 칸 단위 select 만 갖는다 — `raw_payload` 와
 `last_known_amount` 는 **서버 전용**(service_role)이다. `raw_payload` 를 고르거나 `excludePendingInquiries()` 로 거르는 조회는 서버 키 +
 `organization_id` 조건으로 읽는다. **새 칸을 더하면** 사용자 클라이언트가 읽어야 할 때 `grant select (새칸) on public.reservations to authenticated;`
 를 같은 마이그레이션에 넣는다(안 주면 그 칸을 고르는 사용자 조회가 permission denied). 칸 목록 · 경로: `docs/engineering/05-rls-permissions.md` → reservations.

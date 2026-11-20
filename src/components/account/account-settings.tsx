@@ -58,7 +58,7 @@ export function AccountSettings({
                  rounded-full, 활성은 네이비 채움 — `tasks-workspace` 탭 스트립과 동일).
                  sm 이상 = 관리 콘솔의 좌측 레일이라 사각 항목 + 연한 네이비 배경으로 바뀐다. */
               className={cn(
-                "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-2 text-[13px] font-bold transition-colors",
+                "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-2 text-[13px] font-semibold transition-colors",
                 "@2xl:w-full @2xl:justify-start @2xl:gap-2 @2xl:rounded-xl @2xl:border-transparent @2xl:px-3 @2xl:py-2.5",
                 tab === key
                   ? "border-primary bg-primary text-primary-foreground @2xl:bg-primary/[0.08] @2xl:text-primary"

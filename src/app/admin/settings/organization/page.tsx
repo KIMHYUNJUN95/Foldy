@@ -11,6 +11,9 @@ import { getDictionary } from "@/lib/i18n";
 import { getPayrollSettingsCopy } from "@/lib/payroll-settings-i18n";
 import { requireAdminSession } from "@/lib/admin-session";
 import { hasOrganizationContext } from "@/lib/session";
+import { pickSettingsOrganization } from "@/lib/settings-display";
+// 만든 날 — 도쿄 기준 「2026.11.20」(사용자 관리 · 출퇴근 QR 과 같은 표기).
+import { dotDateOfIso } from "@/lib/users-display";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import type { Database } from "@/types/database";
 
@@ -23,18 +26,6 @@ type OrganizationStatus = Database["public"]["Enums"]["organization_status"];
 
 function firstParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
-}
-
-/** 만든 날 — 도쿄 기준 YYYY.MM.DD. */
-function tokyoDot(iso: string) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Tokyo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  })
-    .format(new Date(iso))
-    .replaceAll("-", ".");
 }
 
 // Admin · 조직 설정 — 마스터·디테일 (2026-07-31 리디자인 → 2026-10-15 화이트 리디자인,
@@ -71,12 +62,11 @@ export default async function AdminOrganizationSettingsPage({ searchParams }: Pa
 
   const selectedOrgId = firstParam(params.org) ?? "";
   const creating = selectedOrgId === "new";
-  const selected =
-    organizations.find((org) => org.id === selectedOrgId) ??
-    (selectedOrgId ? null : organizations[0] ?? null);
+  const currentOrgId = hasOrganizationContext(session) ? session.organization.id : null;
+  // `?org` 가 없으면 지금 보고 있는 조직부터(목록에 없을 때만 첫 조직) — 2026-11-20 unslop.
+  const selected = pickSettingsOrganization(organizations, selectedOrgId, currentOrgId);
   const w = settings.white;
   const selectedMembers = selected ? (memberCounts.get(selected.id) ?? 0) : 0;
-  const currentOrgId = hasOrganizationContext(session) ? session.organization.id : null;
 
   const created = firstParam(params.created) === "1";
   const updated = firstParam(params.updated) === "1";
@@ -155,7 +145,7 @@ export default async function AdminOrganizationSettingsPage({ searchParams }: Pa
                         </span>
                       </span>
                       <span className="r num">{w.membersN.replace("{n}", String(memberCounts.get(org.id) ?? 0))}</span>
-                      <span className="r num is-soft">{tokyoDot(org.created_at)}</span>
+                      <span className="r num is-soft">{dotDateOfIso(org.created_at)}</span>
                     </Link>
                   ))}
                 </div>
@@ -206,7 +196,7 @@ export default async function AdminOrganizationSettingsPage({ searchParams }: Pa
                 <div className="stw-hd__t">
                   <div className="stw-meta">
                     <span>{statusLabels[selected.status] ?? selected.status}</span>
-                    <span className="num">{w.createdOn.replace("{date}", tokyoDot(selected.created_at))}</span>
+                    <span className="num">{w.createdOn.replace("{date}", dotDateOfIso(selected.created_at))}</span>
                   </div>
                   <h2>{selected.name}</h2>
                 </div>
@@ -219,6 +209,7 @@ export default async function AdminOrganizationSettingsPage({ searchParams }: Pa
                     confirm: settings.orgDeleteConfirm,
                     keep: w.keep,
                     ok: w.deleteOk,
+                    deleting: w.progressDeleting,
                   }}
                   organizationId={selected.id}
                 />
@@ -239,7 +230,7 @@ export default async function AdminOrganizationSettingsPage({ searchParams }: Pa
               <div className="stw-info">
                 <div className="stw-info__r">
                   <span className="stw-info__k">{w.slug}</span>
-                  <span className={selected.slug ? "mono" : "stw-none"}>{selected.slug || "—"}</span>
+                  <span className={selected.slug ? "mono" : "stw-none"}>{selected.slug || w.slugEmpty}</span>
                   {selected.slug ? (
                     <span className="stw-info__a">
                       <CopyTextButton text={selected.slug} labels={{ copy: w.slugCopy, copied: w.copied, failed: w.copyFailed }} />

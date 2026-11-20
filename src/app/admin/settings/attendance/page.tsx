@@ -29,6 +29,8 @@ import { hasOrganizationContext } from "@/lib/session";
 import type { AttendanceSiteRow } from "@/lib/attendance";
 import { readSiteDraft } from "@/lib/attendance-site-form";
 import { distinctPrintName } from "@/lib/attendance-site-panel";
+// 목록 · 이력 날짜는 도쿄 기준 「2026.11.20」 — 사용자 관리 · 조직 설정과 같은 표기(2026-11-20 unslop).
+import { dotDateOfIso } from "@/lib/users-display";
 
 type PageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -41,16 +43,6 @@ function firstParam(value: string | string[] | undefined) {
 function formatField(site: AttendanceSiteRow | null, key: "latitude" | "longitude") {
   if (!site) return "";
   return typeof site[key] === "number" ? String(site[key]) : String(site[key] ?? "");
-}
-
-/** 목록·이력의 날짜는 도쿄 기준으로 짧게. */
-function tokyoDate(iso: string) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Tokyo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date(iso));
 }
 
 // Admin · 출퇴근 QR — 마스터·디테일 (2026-07-31 리디자인 → 2026-10-15 화이트 리디자인, 시안 Settings-PC).
@@ -272,19 +264,20 @@ export default async function AdminAttendanceSettingsPage({ searchParams }: Page
                           <b>{device.userName}</b>
                           <span>{device.deviceLabel ?? settings.attendanceDeviceUnknown}</span>
                         </span>
-                        <span className="num is-soft">{tokyoDate(device.lastUsedAt)}</span>
-                        <span className="num is-soft">{tokyoDate(device.expiresAt)}</span>
+                        <span className="num is-soft">{dotDateOfIso(device.lastUsedAt)}</span>
+                        <span className="num is-soft">{dotDateOfIso(device.expiresAt)}</span>
                         {/* 해제는 되돌릴 수 없다 — 공용 확인 창으로 한 번 묻는다(2026-11-11). */}
                         <span className="r">
                           <SettingsConfirm
                             action={revokeAttendanceTrustedDevice}
                             fields={{ deviceId: device.id, siteId: selectedSite?.id ?? "" }}
                             trigger={settings.attendanceDeviceRevoke}
-                            triggerClassName="stw-link is-red"
+                            triggerClassName="stw-link"
                             title={w.revokeDeviceTitle}
                             body={w.revokeDeviceBody.replace("{name}", device.userName)}
                             keep={w.keep}
                             ok={w.revokeDeviceOk}
+                            pendingLabel={w.progressRevoking}
                             danger
                           />
                         </span>
@@ -357,7 +350,7 @@ export default async function AdminAttendanceSettingsPage({ searchParams }: Page
                         ? settings.attendanceQrWarnLocal
                         : settings.attendanceQrWarnMissing}
                   </p>
-                  <small className="num">{w.qrIssuedOn.replace("{date}", tokyoDate(activeQr.issued_at))}</small>
+                  <small className="num">{w.qrIssuedOn.replace("{date}", dotDateOfIso(activeQr.issued_at))}</small>
                   <div className="stw-qr__acts">
                     <SettingsConfirm
                       action={issueAttendanceSiteQr}
@@ -368,6 +361,7 @@ export default async function AdminAttendanceSettingsPage({ searchParams }: Page
                       body={w.reissueBody}
                       keep={w.keep}
                       ok={w.reissueOk}
+                      pendingLabel={w.progressIssuing}
                     />
                   </div>
                 </div>
@@ -384,7 +378,7 @@ export default async function AdminAttendanceSettingsPage({ searchParams }: Page
                       <span className={token.is_active ? "is-green" : undefined}>
                         {token.is_active ? settings.attendanceQrActive : settings.attendanceQrRevoked}
                       </span>
-                      <span className="num">{tokyoDate(token.issued_at)}</span>
+                      <span className="num">{dotDateOfIso(token.issued_at)}</span>
                     </li>
                   ))}
                 </ul>
@@ -466,6 +460,7 @@ export default async function AdminAttendanceSettingsPage({ searchParams }: Page
                       deleteTitle: w.deleteSiteTitle,
                       deleteConfirm: settings.attendanceSiteDeleteConfirm,
                       deleteOk: w.deleteOk,
+                      deleting: w.progressDeleting,
                       keep: w.keep,
                     }}
                     siteId={selectedSite.id}

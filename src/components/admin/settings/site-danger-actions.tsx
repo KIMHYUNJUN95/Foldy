@@ -18,6 +18,8 @@ type Labels = {
   deleteTitle: string;
   deleteConfirm: string;
   deleteOk: string;
+  /** 누른 뒤 「지우는 중」. */
+  deleting: string;
   keep: string;
   deactivate: string;
   activate: string;
@@ -54,6 +56,7 @@ export function SiteDangerActions({
             body={labels.deleteConfirm}
             keep={labels.keep}
             ok={labels.deleteOk}
+            pendingLabel={labels.deleting}
             danger
           />
         )}

@@ -30,6 +30,8 @@ type AdmDropdownProps = {
   rich?: boolean;
   wide?: boolean;
   ariaLabel?: string;
+  /** 칸 아래 오류 · 안내 줄의 id — 단추에 `aria-describedby` 로 붙는다(설정 › 급여, 2026-11-20). 단추 역할은 aria-invalid 를 받지 않아 오류 표시는 그 줄(role="alert")이 한다. */
+  ariaDescribedBy?: string;
   disabled?: boolean;
   /**
    * 메뉴 안에 검색 입력을 넣는다. 등록자/담당자처럼 옵션이 수십 개로 늘어날 수 있는 필터용.
@@ -143,6 +145,7 @@ export function AdmDropdown({
   rich = false,
   wide = false,
   ariaLabel,
+  ariaDescribedBy,
   disabled = false,
   searchable = false,
   searchPlaceholder,
@@ -275,6 +278,7 @@ export function AdmDropdown({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={ariaLabel}
+        aria-describedby={ariaDescribedBy}
       >
         <span className={`dd__val${current ? "" : " ph"}`}>{label}</span>
         <span className="ic dd__chev">

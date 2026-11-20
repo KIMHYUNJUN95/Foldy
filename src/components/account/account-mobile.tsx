@@ -38,6 +38,8 @@ import {
 } from "@/lib/identity-names";
 import type { Locale } from "@/lib/i18n";
 import { getNativeAppInfo } from "@/lib/native-app";
+// 생년월일은 「2026.11.20」 — 사용자 관리 · 설정과 같은 표기(2026-11-20 unslop).
+import { dotDateKey } from "@/lib/users-display";
 import { clearSwipeSnapshots } from "@/lib/swipe-back/snapshot-store";
 import "./account-white.css";
 
@@ -98,11 +100,6 @@ const CHEVRON = (
   </svg>
 );
 
-function formatBirth(value: string, locale: Locale) {
-  const d = new Date(`${value}T00:00:00Z`);
-  if (Number.isNaN(d.getTime())) return value;
-  return new Intl.DateTimeFormat(locale, { year: "numeric", month: "numeric", day: "numeric", timeZone: "UTC" }).format(d);
-}
 
 /** 이 화면이 보내는 모든 값 — 고치는 칸 하나만 빼고 숨은 칸으로. */
 function HiddenProfile({ user, except, language }: { user: Props["user"]; except?: Field; language?: Locale }) {
@@ -294,7 +291,7 @@ export function AccountMobile({ user, organization, bottomTabsLabel, blockedUser
           empty={!user.birthDate}
           label={copy.birthDate}
           onClick={() => setEditing("birthDate")}
-          value={user.birthDate ? formatBirth(user.birthDate, locale) : w.notSet}
+          value={user.birthDate ? dotDateKey(user.birthDate) : w.notSet}
         />
         <Row
           empty={!user.phoneNumber}

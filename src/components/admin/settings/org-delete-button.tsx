@@ -8,7 +8,7 @@ type OrgDeleteButtonProps = {
   organizationId: string;
   /** 멤버가 남아 있으면 휴지통을 끈다 — 액션도 비어 있는 조직만 지운다. */
   disabled: boolean;
-  labels: { delete: string; blocked: string; title: string; confirm: string; keep: string; ok: string };
+  labels: { delete: string; blocked: string; title: string; confirm: string; keep: string; ok: string; deleting: string };
 };
 
 /**
@@ -29,6 +29,7 @@ export function OrgDeleteButton({ organizationId, disabled, labels }: OrgDeleteB
       body={labels.confirm}
       keep={labels.keep}
       ok={labels.ok}
+      pendingLabel={labels.deleting}
       danger
     />
   );

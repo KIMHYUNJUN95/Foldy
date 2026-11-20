@@ -102,7 +102,6 @@ export type PayrollSettingsCopy = {
   weekdaysShort: string; // "일,월,화,수,목,금,토"
   save: string;
   cancel: string;
-  saved: string;
   holidays: Record<JapanHolidayKey, string>;
 };
 
@@ -200,7 +199,6 @@ const ko: PayrollSettingsCopy = {
   weekdaysShort: "일,월,화,수,목,금,토",
   save: "저장",
   cancel: "취소",
-  saved: "저장했어요",
   holidays: {
     newYear: "새해 첫날",
     comingOfAge: "성인의 날",
@@ -317,7 +315,6 @@ const ja: PayrollSettingsCopy = {
   weekdaysShort: "日,月,火,水,木,金,土",
   save: "保存",
   cancel: "キャンセル",
-  saved: "保存しました",
   holidays: {
     newYear: "元日",
     comingOfAge: "成人の日",
@@ -434,7 +431,6 @@ const en: PayrollSettingsCopy = {
   weekdaysShort: "Sun,Mon,Tue,Wed,Thu,Fri,Sat",
   save: "Save",
   cancel: "Cancel",
-  saved: "Saved",
   holidays: {
     newYear: "New Year’s Day",
     comingOfAge: "Coming of Age Day",

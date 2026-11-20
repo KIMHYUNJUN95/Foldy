@@ -1,20 +1,40 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, Check } from "lucide-react";
 import { saveOrgPayrollSettings, type OrgPayrollSettingsPatch } from "@/actions/payroll-settings";
 import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
-import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
 import type { Locale } from "@/lib/i18n";
 import { fillCopy, type PayrollSettingsCopy } from "@/lib/payroll-settings-i18n";
 import { daysBetweenKeys, upcomingPaydaysFrom } from "@/lib/payroll-settings-rules";
 import type { OrgPayrollSettings } from "@/lib/payroll-settings-server";
+import {
+  beginSave,
+  dismissError,
+  expireSaved,
+  initSave,
+  isValidPayDay,
+  needsResave,
+  pickedValueAfter,
+  settleSaveResponse,
+  shouldResavePayDay,
+  touchSave,
+  type SaveState,
+} from "@/lib/settings-display";
 
-// 설정 › 급여 — 시안 SettingsPay-PC → 2026-11-12 다듬기(PayNew). 고르거나 칸을 벗어나면 바로 저장, 성공은 작은 토스트
-// (지급일만 칸 옆 「✓ 저장됨」 — 서버가 저장을 확인한 뒤에만).
+// 설정 › 급여 — 시안 SettingsPay-PC → 2026-11-12 다듬기(PayNew) → 2026-11-20 unslop.
+// 고르거나 칸을 벗어나면 바로 저장(그대로). 저장되면 **그 칸 옆**에 「✓ 저장됨」(서버가 확인한 뒤에만, 3초 뒤 사라짐),
+// 오류는 **그 칸 아래** 한 줄 + `aria-describedby` · `aria-invalid` — 위쪽 알림 · 토스트는 없앴다(같은 말을 두 번 하지 않게).
+// 저장 값 · 검증 규칙은 바꾸지 않았다.
 // 지급일이 쉬는 날이면 늘 앞 평일로 옮긴다(2026-10-25 결정 — 「앞/뒤 평일」 고르기 없음).
 
 type Member = { id: string; name: string };
+/** 저장 · 오류를 붙일 칸. 결재는 단계마다, 고용보험 요율은 해마다 따로. */
+type Field = "company" | "payDay" | "senmu" | "president" | `rate-${number}`;
+type FieldValue = string | number | null;
+
+/** 「✓ 저장됨」을 보여 두는 시간 — 칸마다 따로 지난 뒤 사라진다. */
+const SAVED_MS = 3000;
 
 const LOCALE_TAG: Record<Locale, string> = { ko: "ko-KR", ja: "ja-JP", en: "en-US" };
 
@@ -44,19 +64,13 @@ export function PayrollSettingsClient({
   thisYear: number;
   locale: Locale;
 }) {
-  const { toast, showToast, dismiss } = useAdminToast();
-  const [error, setError] = useState<string | null>(null);
-
   const [companyName, setCompanyName] = useState(initial.companyName);
-  const savedCompany = useRef(initial.companyName);
+  const companyInput = useRef<HTMLInputElement>(null);
 
   const [payDayText, setPayDayText] = useState(String(initial.payDay));
   const [payDay, setPayDay] = useState(initial.payDay);
   const [payDayError, setPayDayError] = useState(false);
-  const [payDaySaved, setPayDaySaved] = useState(false);
-  const savedPayDay = useRef(initial.payDay);
-  // 마지막으로 친 글자 — 저장 응답이 왔을 때 그사이 고쳤는지 본다(onChange 에서만 갱신).
-  const payDayTextRef = useRef(String(initial.payDay));
+  const payDayInput = useRef<HTMLInputElement>(null);
 
   const [senmu, setSenmu] = useState(initial.senmuApproverId ?? "");
   const [president, setPresident] = useState(initial.presidentApproverId ?? "");
@@ -67,40 +81,107 @@ export function PayrollSettingsClient({
   const [editText, setEditText] = useState("");
   const [editError, setEditError] = useState(false);
 
-  async function persist(patch: OrgPayrollSettingsPatch, quiet = false): Promise<boolean> {
-    setError(null);
+  // 칸마다 저장 상태(서버 확인 값 · 요청 번호 · 「저장됨」 · 오류) — 판정은 settings-display.ts 의 순수 함수(2026-11-20).
+  // 비동기 응답이 최신 상태를 읽어야 해서 ref 에 두고(처리용), 그릴 때는 같은 내용의 state 복사본(fieldView)을 읽는다.
+  const [fieldView, setFieldView] = useState(
+    () =>
+      new Map<Field, SaveState<FieldValue>>([
+        ["company", initSave<FieldValue>(initial.companyName)],
+        ["payDay", initSave<FieldValue>(initial.payDay)],
+        ["senmu", initSave<FieldValue>(initial.senmuApproverId ?? "")],
+        ["president", initSave<FieldValue>(initial.presidentApproverId ?? "")],
+      ]),
+  );
+  const fields = useRef(fieldView);
+  const savedTimers = useRef(new Map<Field, ReturnType<typeof setTimeout>>());
+  // 화면을 떠난 뒤 오는 응답이 새 3초 타이머를 만들지 않게.
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    const timers = savedTimers.current;
+    return () => {
+      mounted.current = false;
+      timers.forEach((t) => clearTimeout(t));
+    };
+  }, []);
+
+  // 요율 칸은 처음 쓸 때 만든다 — 서버 확인 값은 처음 받은 표의 값.
+  const fieldIn = (map: Map<Field, SaveState<FieldValue>>, field: Field): SaveState<FieldValue> =>
+    map.get(field) ??
+    initSave<FieldValue>(initial.employmentInsuranceRates[field.startsWith("rate-") ? field.slice(5) : ""] ?? null);
+  /** 처리용(응답 · 타이머 안에서 최신 상태). */
+  const fieldOf = (field: Field) => fieldIn(fields.current, field);
+  /** 그리기용. */
+  const viewOf = (field: Field) => fieldIn(fieldView, field);
+  const putField = (field: Field, next: SaveState<FieldValue>) => {
+    const map = new Map(fields.current);
+    map.set(field, next);
+    fields.current = map;
+    setFieldView(map);
+  };
+
+  /** 저장 한 번 — 결과(최신 응답인지 · 더 새 요청이 기다리는지)와 갱신된 칸 상태를 돌려준다. */
+  async function persist(field: Field, patch: OrgPayrollSettingsPatch, value: FieldValue) {
+    const { state, ticket } = beginSave(fieldOf(field));
+    putField(field, state);
     const res = await saveOrgPayrollSettings(patch);
-    if (res.ok) {
-      if (!quiet) showToast(copy.saved);
-      return true;
+    const settled = settleSaveResponse(
+      fieldOf(field),
+      ticket,
+      res.ok
+        ? { ok: true, value }
+        : {
+            ok: false,
+            message:
+              res.reason === "forbidden"
+                ? copy.errorForbidden
+                : res.reason === "same_approver"
+                  ? copy.sameApproverError
+                  : copy.errorSave,
+          },
+    );
+    putField(field, settled.state);
+    if (mounted.current && settled.state.savedSeq !== null && settled.latest) {
+      const seq = settled.state.savedSeq;
+      clearTimeout(savedTimers.current.get(field));
+      savedTimers.current.set(
+        field,
+        setTimeout(() => putField(field, expireSaved(fieldOf(field), seq)), SAVED_MS),
+      );
     }
-    if (res.reason === "forbidden") setError(copy.errorForbidden);
-    else if (res.reason === "same_approver") setError(copy.sameApproverError);
-    else setError(copy.errorSave);
-    return false;
+    return { ok: res.ok, ...settled };
   }
 
+  /** 그 칸을 다시 고치기 시작하면 「저장됨」 · 오류를 지우고, 기다리던 응답의 표시는 버린다(서버 확인 값은 그대로 받는다). */
+  function touch(field: Field) {
+    putField(field, touchSave(fieldOf(field)));
+  }
+
+  const isEditing = (el: HTMLInputElement | null) => el !== null && el === document.activeElement;
+
   async function commitCompany() {
-    const next = companyName.trim();
-    if (next === savedCompany.current) return;
-    if (await persist({ companyName: next })) savedCompany.current = next;
+    const next = (companyInput.current?.value ?? companyName).trim();
+    if (next === fieldOf("company").confirmed) return;
+    await persist("company", { companyName: next }, next);
+    // 늦은 성공으로 서버 값이 화면과 달라졌으면(되돌린 뒤 벗어남 등) 화면 값을 다시 저장한다.
+    const display = (companyInput.current?.value ?? next).trim();
+    if (needsResave(fieldOf("company"), display, isEditing(companyInput.current))) void commitCompany();
   }
 
   async function commitPayDay() {
-    const n = Number(payDayText);
-    if (!Number.isInteger(n) || n < 1 || n > 28) {
+    const text = payDayInput.current?.value ?? payDayText;
+    const n = Number(text);
+    if (!isValidPayDay(n)) {
       setPayDayError(true);
       return;
     }
     setPayDayError(false);
     setPayDay(n);
     setPayDayText(String(n));
-    payDayTextRef.current = String(n);
-    if (n === savedPayDay.current) return;
-    if (await persist({ payDay: n }, true)) {
-      savedPayDay.current = n;
-      // 응답을 기다리는 사이 칸을 다시 고쳤으면 「저장됨」을 띄우지 않는다(다음 blur 때 새 값이 저장된다).
-      if (payDayTextRef.current === String(n)) setPayDaySaved(true);
+    if (n === fieldOf("payDay").confirmed) return;
+    await persist("payDay", { payDay: n }, n);
+    if (shouldResavePayDay(fieldOf("payDay"), payDayInput.current?.value ?? String(n), isEditing(payDayInput.current))) {
+      void commitPayDay();
     }
   }
 
@@ -111,16 +192,23 @@ export function PayrollSettingsClient({
       return;
     }
     setApproverError(false);
-    const prev = which === "senmu" ? senmu : president;
-    (which === "senmu" ? setSenmu : setPresident)(id);
-    const ok = await persist(which === "senmu" ? { senmuApproverId: id || null } : { presidentApproverId: id || null });
-    if (!ok) (which === "senmu" ? setSenmu : setPresident)(prev);
+    const setShown = which === "senmu" ? setSenmu : setPresident;
+    setShown(id);
+    const settled = await persist(
+      which,
+      which === "senmu" ? { senmuApproverId: id || null } : { presidentApproverId: id || null },
+      id,
+    );
+    // 실패(낡은 실패 포함) · 늦은 성공 뒤에는 더 새 요청이 없으면 화면을 서버가 확인한 값에 맞춘다.
+    setShown((shown) => String(pickedValueAfter(settled.state, shown, settled.newerPending) ?? ""));
   }
 
   function startEdit(year: number) {
     setEditYear(year);
     setEditText(rates[String(year)] !== undefined ? formatRate(rates[String(year)]) : "");
     setEditError(false);
+    // 규칙: 닫힌 줄에 남은 서버 오류는 「수정」으로 다시 열면 지운다(새로 고치기 시작).
+    putField(`rate-${year}`, dismissError(fieldOf(`rate-${year}`)));
   }
 
   async function saveRate(year: number, permille: number | null) {
@@ -128,15 +216,18 @@ export function PayrollSettingsClient({
       setEditError(true);
       return;
     }
-    if (await persist({ employmentInsuranceRate: { year, permille } })) {
-      setRates((cur) => {
-        const next = { ...cur };
-        if (permille === null) delete next[String(year)];
-        else next[String(year)] = Math.round(permille * 100) / 100;
-        return next;
-      });
-      setEditYear(null);
-    }
+    const value = permille === null ? null : Math.round(permille * 100) / 100;
+    const settled = await persist(`rate-${year}`, { employmentInsuranceRate: { year, permille } }, value);
+    if (!settled.ok) return;
+    // 서버에 들어간 값은 낡은 응답이어도 표에 반영한다.
+    setRates((cur) => {
+      const next = { ...cur };
+      if (value === null) delete next[String(year)];
+      else next[String(year)] = value;
+      return next;
+    });
+    // 그해 편집 칸만 닫는다 — 그사이 다른 해를 열었거나 다시 고치고 있으면 그대로.
+    if (settled.latest) setEditYear((cur) => (cur === year ? null : cur));
   }
 
   const years = useMemo(() => {
@@ -161,6 +252,25 @@ export function PayrollSettingsClient({
   const dayOf = (ymd: string) => Number(ymd.slice(8, 10));
   const weekdayOf = (ymd: string) => weekdays[new Date(`${ymd}T00:00:00Z`).getUTCDay()] ?? "";
   const dayLabel = (d: number) => (locale === "en" ? ordinal(d) : String(d));
+
+  // 칸 옆 「✓ 저장됨」 — 자리는 늘 두고(role=status) 저장이 확인된 칸에만 글자를 채운다.
+  const savedMark = (field: Field, extra = "", alsoField?: Field) => (
+    <span className={`stwp-saved${extra}`} role="status">
+      {viewOf(field).savedSeq !== null || (alsoField !== undefined && viewOf(alsoField).savedSeq !== null) ? (
+        <>
+          <Check aria-hidden="true" />
+          {copy.savedInline}
+        </>
+      ) : null}
+    </span>
+  );
+  const companyError = viewOf("company").error;
+  const payDayErrorText = payDayError ? copy.payDayRange : viewOf("payDay").error;
+  const approverErrorText = approverError
+    ? copy.sameApproverError
+    : (viewOf("senmu").error ?? viewOf("president").error);
+  const rateErrorText =
+    editYear === null ? null : editError ? copy.insuranceRateInvalid : viewOf(`rate-${editYear}`).error;
 
   const paydays = useMemo(() => upcomingPaydaysFrom(today, payDay, 12), [today, payDay]);
   const [next, ...later] = paydays;
@@ -189,6 +299,7 @@ export function PayrollSettingsClient({
           value={value}
           onChange={(id) => void pickApprover(which, id)}
           ariaLabel={label}
+          ariaDescribedBy={approverErrorText ? "stwp-approver-err" : undefined}
           placeholder={copy.approverNone}
         />
       </div>
@@ -197,29 +308,38 @@ export function PayrollSettingsClient({
 
   return (
     <>
-      {error ? (
-        <p className="stw-flash is-red" role="alert">
-          {error}
-        </p>
-      ) : null}
       <div className="stwp">
         <div className="stwp-main">
           <section className="stwp-sec">
             <h2>{copy.secPayslip}</h2>
-            <label className="stw-nf">
-              <span>{copy.companyName}</span>
-              <input
-                className="stwp-jp"
-                value={companyName}
-                maxLength={80}
-                placeholder={copy.companyNamePlaceholder}
-                onChange={(e) => setCompanyName(e.target.value)}
-                onBlur={() => void commitCompany()}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") e.currentTarget.blur();
-                }}
-              />
-            </label>
+            <div className="stwp-cowrap">
+              <label className={`stw-nf stwp-co${companyError ? " is-bad" : ""}`}>
+                <span>{copy.companyName}</span>
+                <input
+                  ref={companyInput}
+                  className="stwp-jp"
+                  value={companyName}
+                  maxLength={80}
+                  placeholder={copy.companyNamePlaceholder}
+                  aria-invalid={Boolean(companyError)}
+                  aria-describedby={companyError ? "stwp-company-err" : undefined}
+                  onChange={(e) => {
+                    setCompanyName(e.target.value);
+                    touch("company");
+                  }}
+                  onBlur={() => void commitCompany()}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") e.currentTarget.blur();
+                  }}
+                />
+              </label>
+              {savedMark("company", " is-in")}
+            </div>
+            {companyError ? (
+              <p className="stwp-note is-red" id="stwp-company-err" role="alert">
+                {companyError}
+              </p>
+            ) : null}
             <p className="stwp-note">{copy.companyNameNote}</p>
           </section>
 
@@ -232,15 +352,17 @@ export function PayrollSettingsClient({
               </label>
               <input
                 id="stwp-payday"
-                className={`stwp-day num${payDayError ? " is-bad" : ""}`}
+                ref={payDayInput}
+                className={`stwp-day num${payDayErrorText ? " is-bad" : ""}`}
                 inputMode="numeric"
                 value={payDayText}
-                aria-invalid={payDayError}
+                aria-invalid={Boolean(payDayErrorText)}
+                aria-describedby={payDayErrorText ? "stwp-payday-err" : undefined}
                 onChange={(e) => {
                   const next = e.target.value.replace(/\D/g, "").slice(0, 2);
-                  payDayTextRef.current = next;
                   setPayDayText(next);
-                  setPayDaySaved(false);
+                  setPayDayError(false);
+                  touch("payDay");
                 }}
                 onBlur={() => void commitPayDay()}
                 onKeyDown={(e) => {
@@ -248,16 +370,13 @@ export function PayrollSettingsClient({
                 }}
               />
               {copy.payDaySuffix ? <span aria-hidden="true">{copy.payDaySuffix}</span> : null}
-              <span className="stwp-saved" role="status">
-                {payDaySaved ? (
-                  <>
-                    <Check aria-hidden="true" />
-                    {copy.savedInline}
-                  </>
-                ) : null}
-              </span>
+              {savedMark("payDay")}
             </div>
-            {payDayError ? <p className="stwp-note is-red">{copy.payDayRange}</p> : null}
+            {payDayErrorText ? (
+              <p className="stwp-note is-red" id="stwp-payday-err" role="alert">
+                {payDayErrorText}
+              </p>
+            ) : null}
             <p className="stwp-note">{copy.holidayRule}</p>
           </section>
 
@@ -267,8 +386,13 @@ export function PayrollSettingsClient({
               {approverStep("senmu", senmu, copy.approverStep1, copy.senmuApprover)}
               <ArrowRight className="stwp-steps__arrow" aria-hidden="true" />
               {approverStep("president", president, copy.approverStep2, copy.presidentApprover)}
+              {savedMark("senmu", " is-step", "president")}
             </div>
-            {approverError ? <p className="stwp-note is-red">{copy.sameApproverError}</p> : null}
+            {approverErrorText ? (
+              <p className="stwp-note is-red" id="stwp-approver-err" role="alert">
+                {approverErrorText}
+              </p>
+            ) : null}
             <p className="stwp-note">{copy.approvalNote}</p>
           </section>
 
@@ -278,6 +402,9 @@ export function PayrollSettingsClient({
               {years.map((year) => {
                 const value = rates[String(year)];
                 const editing = editYear === year;
+                // 편집 중이면 입력 검사 오류까지, 닫힌 줄이면 그 해의 서버 오류만(늦게 온 실패도 그 줄에 보인다).
+                const rowError = editing ? rateErrorText : viewOf(`rate-${year}`).error;
+                const rowErrorId = `stwp-rate-err-${year}`;
                 return (
                   <div className="stwp-yr" key={year}>
                     <span className="num">{fillCopy(copy.yearLabel, { y: year })}</span>
@@ -292,15 +419,17 @@ export function PayrollSettingsClient({
                       >
                         {locale !== "en" ? <span>{copy.insuranceRatePrefix}</span> : null}
                         <input
-                          className={`stwp-rate num${editError ? " is-bad" : ""}`}
+                          className={`stwp-rate num${rowError ? " is-bad" : ""}`}
                           inputMode="decimal"
                           autoFocus
                           value={editText}
-                          aria-invalid={editError}
+                          aria-invalid={Boolean(rowError)}
+                          aria-describedby={rowError ? rowErrorId : undefined}
                           aria-label={fillCopy(copy.yearLabel, { y: year })}
                           onChange={(e) => {
                             setEditText(e.target.value);
                             setEditError(false);
+                            touch(`rate-${year}`);
                           }}
                           onKeyDown={(e) => {
                             if (e.key === "Escape") setEditYear(null);
@@ -323,17 +452,27 @@ export function PayrollSettingsClient({
                       <>
                         <span className={value === undefined ? "stwp-dim" : "num"}>
                           {value === undefined ? copy.insuranceRateMissing : fillCopy(copy.insuranceRateValue, { n: formatRate(value) })}
+                          {savedMark(`rate-${year}`)}
                         </span>
-                        <button type="button" className="stw-link stwp-act" onClick={() => startEdit(year)}>
+                        <button
+                          type="button"
+                          className="stw-link stwp-act"
+                          onClick={() => startEdit(year)}
+                          aria-describedby={rowError ? rowErrorId : undefined}
+                        >
                           {value === undefined ? copy.insuranceRateEnter : copy.edit}
                         </button>
                       </>
                     )}
+                    {rowError ? (
+                      <p className="stwp-note is-red stwp-rowerr" id={rowErrorId} role="alert">
+                        {rowError}
+                      </p>
+                    ) : null}
                   </div>
                 );
               })}
             </div>
-            {editError ? <p className="stwp-note is-red">{copy.insuranceRateInvalid}</p> : null}
           </section>
         </div>
 
@@ -361,7 +500,6 @@ export function PayrollSettingsClient({
           </ol>
         </aside>
       </div>
-      {toast ? <AdminToast message={toast.message} onDismiss={dismiss} /> : null}
     </>
   );
 }

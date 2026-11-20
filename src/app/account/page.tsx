@@ -99,7 +99,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
       )}
       {profileIncomplete && (
         <div className="rounded-2xl border border-amber-200 bg-amber-50/90 px-4 py-4 shadow-sm">
-          <p className="text-sm font-bold text-amber-900">{ap.completionTitle}</p>
+          <p className="text-sm font-semibold text-amber-900">{ap.completionTitle}</p>
           <p className="mt-1 text-sm leading-6 text-amber-800">
             {!session.user.birthDate && !session.user.gender
               ? ap.missingBirthDateAndGenderBody
@@ -115,7 +115,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
   const profilePanel = (
     <div className={panelCard}>
       <div className="border-b-[0.5px] border-[var(--separator)] px-5 py-3.5">
-        <span className="text-[11px] font-black uppercase tracking-[0.05em] text-muted-foreground">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
           {ap.tabProfile}
         </span>
       </div>
@@ -123,11 +123,11 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
         <input name="mode" type="hidden" value={shellMode} />
         {/* 신원 행 — 폼 맨 위에서 "누구의 계정을 고치는 중인지"를 먼저 보여준다. */}
         <div className="flex items-center gap-3 border-b-[0.5px] border-[var(--separator)] pb-4">
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-[15px] bg-primary text-[17px] font-extrabold text-primary-foreground">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-[15px] bg-primary text-[17px] font-semibold text-primary-foreground">
             {session.user.name.slice(0, 1)}
           </span>
           <div className="min-w-0">
-            <p className="truncate text-[14.5px] font-extrabold tracking-[-0.02em] text-foreground">
+            <p className="truncate text-[14.5px] font-semibold tracking-[-0.02em] text-foreground">
               {session.user.name}
             </p>
             <p className="mt-0.5 truncate text-[11.5px] font-semibold text-muted-foreground">
@@ -241,7 +241,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
   const organizationPanel = (
     <div className={panelCard}>
       <div className="border-b-[0.5px] border-[var(--separator)] px-5 py-3.5">
-        <span className="text-[11px] font-black uppercase tracking-[0.05em] text-muted-foreground">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
           {ap.tabOrganization}
         </span>
       </div>
@@ -250,13 +250,13 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           <span className="text-sm font-semibold text-muted-foreground">
             {dictionary.admin.settings.organizationName}
           </span>
-          <span className="text-sm font-bold">{session.organization.name}</span>
+          <span className="text-sm font-semibold">{session.organization.name}</span>
         </div>
         <div className="flex items-center justify-between gap-4">
           <span className="text-sm font-semibold text-muted-foreground">
             {dictionary.admin.users.role}
           </span>
-          <span className="text-sm font-bold">
+          <span className="text-sm font-semibold">
             {dictionary.roles[session.user.role] ?? session.user.role}
           </span>
         </div>
@@ -270,7 +270,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
       <p className="px-0.5 text-[13px] leading-6 text-muted-foreground">{ap.securityIntro}</p>
       <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-muted/20 px-4 py-3">
         <div className="min-w-0">
-          <p className="text-sm font-bold">{dictionary.common.logout}</p>
+          <p className="text-sm font-semibold">{dictionary.common.logout}</p>
           <p className="mt-0.5 truncate text-xs text-muted-foreground">{session.user.email}</p>
         </div>
         <form action={signOut}>
@@ -281,7 +281,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
       </div>
       <div className="flex items-center justify-between gap-4 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3">
         <div className="min-w-0">
-          <p className="text-sm font-bold text-destructive">{dictionary.common.deleteAccount}</p>
+          <p className="text-sm font-semibold text-destructive">{dictionary.common.deleteAccount}</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {dictionary.common.deleteAccountWarning}
           </p>
@@ -333,7 +333,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
       {/* 약관 · 개인정보처리방침 · 고객지원 — App Store 심사는 앱 안에서도 이 문서들에 닿을 수
           있기를 요구한다. 공개 페이지(`/legal/*`, `/support`)라 같은 탭에서 연다. */}
       <div className="rounded-xl border border-border px-4 py-3">
-        <p className="text-sm font-bold">{dictionary.legal.accountSectionTitle}</p>
+        <p className="text-sm font-semibold">{dictionary.legal.accountSectionTitle}</p>
         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5 text-[13px] font-semibold">
           {(
             [

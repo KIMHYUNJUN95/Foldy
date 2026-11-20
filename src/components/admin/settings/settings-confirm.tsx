@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { haptic } from "@/lib/haptics";
+import { confirmOkLabel } from "@/lib/settings-display";
 
 // 설정 화면의 확인 창(2026-10-15 화이트 리디자인) — QR 다시 발급 · 현장 삭제 · 조직 삭제.
 // 「그대로 두기 / 실행」 두 버튼, 첫 초점은 「그대로 두기」(Enter 한 번에 되돌리기 어려운 일이 일어나지 않게).
@@ -21,19 +22,21 @@ type Props = {
   body: string;
   keep: string;
   ok: string;
+  /** 누른 뒤 서버 응답을 기다리는 동안의 글자(「지우는 중」 · 「해제하는 중」 · 「발급하는 중」). */
+  pendingLabel?: string;
   danger?: boolean;
 };
 
-function OkButton({ label, danger }: { label: string; danger?: boolean }) {
+function OkButton({ label, pendingLabel, danger }: { label: string; pendingLabel?: string; danger?: boolean }) {
   const { pending } = useFormStatus();
   return (
     <button type="submit" className={`stw-btn ${danger ? "is-danger" : "is-pri"}`} disabled={pending} aria-busy={pending}>
-      {label}
+      {confirmOkLabel(label, pendingLabel, pending)}
     </button>
   );
 }
 
-export function SettingsConfirm({ action, fields, trigger, triggerClassName, triggerAriaLabel, triggerDisabled, title, body, keep, ok, danger }: Props) {
+export function SettingsConfirm({ action, fields, trigger, triggerClassName, triggerAriaLabel, triggerDisabled, title, body, keep, ok, pendingLabel, danger }: Props) {
   const [open, setOpen] = useState(false);
   const [shown, setShown] = useState(false);
 
@@ -83,7 +86,7 @@ export function SettingsConfirm({ action, fields, trigger, triggerClassName, tri
               <button type="button" className="stw-btn is-gray" onClick={() => setOpen(false)} autoFocus>
                 {keep}
               </button>
-              <OkButton label={ok} danger={danger} />
+              <OkButton label={ok} pendingLabel={pendingLabel} danger={danger} />
             </form>
           </div>
         </>

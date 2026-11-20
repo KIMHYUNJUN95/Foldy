@@ -16,6 +16,7 @@ import {
   resolveReservationCanonicalRoomLabel,
 } from "@/lib/rooms";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import type { Database } from "@/types/database";
 
 type ReservationStatus = Database["public"]["Enums"]["reservation_status"];
@@ -90,11 +91,11 @@ export async function getHomeCheckInOutCounts(
 ): Promise<HomeResult<HomeCheckInOutCounts>> {
   if (session.organization.id === "platform") return { status: "empty" };
   try {
-    const supabase = await getSupabaseServerClient();
     const today = getCleaningOperatingDateKey();
     // 문의 · 예약 요청은 오늘 체크인 · 체크아웃 수에 넣지 않는다(2026-11-19).
+    // 서버 키 + 조직 칸 — 문의 거르기가 `raw_payload` 를 읽는데, 이 칸은 일반 사용자 칸 권한에서 빠진다(202611200003).
     const { data, error } = await excludePendingInquiries(
-      supabase
+      getSupabaseServiceClient()
         .from("reservations")
         .select("check_in_date, check_out_date, status")
         .eq("organization_id", session.organization.id)
@@ -135,8 +136,9 @@ export async function getHomeCheckInOutReservations(
     // 캘린더와 똑같이 정식 방으로 해석한다 (카탈로그가
     // 권위 있는 방 축이며, `raw_payload.roomId` 로 계정 2개짜리 방을 구분한다).
     const [{ data, error }, catalog] = await Promise.all([
+      // 서버 키 + 조직 칸 — `raw_payload` 는 일반 사용자 칸 권한에서 빠진다(202611200003, 05 → reservations).
       excludePendingInquiries(
-        supabase
+        getSupabaseServiceClient()
           .from("reservations")
           .select(
             "id, guest_name, property_name, room_label, source, check_in_date, check_out_date, status, raw_payload",

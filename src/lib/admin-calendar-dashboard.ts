@@ -24,6 +24,7 @@ import {
 } from "@/lib/rooms";
 import type { AppSession } from "@/lib/session";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { readAllPages } from "@/lib/supabase/read-all-pages";
 import type { Database } from "@/types/database";
 import { getReservationGuests, type ReservationGuests } from "@/lib/reservation-guests";
@@ -233,8 +234,9 @@ export async function getAdminCalendarDashboardData(
     // `raw_payload` 는 쓰는 키만(`reservation-payload-slim.ts`) — 통째면 954행에 약 2MB 였다.
     readAllPages<Record<string, unknown>>((from, to) =>
       // 문의 · 예약 요청은 캘린더에 그리지 않는다(2026-11-19) — 확정되면 웹훅이 원본을 고쳐 저절로 나타난다.
+      // 예약은 서버 키 + 조직 칸 — `raw_payload` 는 일반 사용자 칸 권한에서 빠진다(202611200003, 05 → reservations).
       excludePendingInquiries(
-        supabase
+        getSupabaseServiceClient()
           .from("reservations")
           .select(RESERVATION_SELECT)
           .eq("organization_id", session.organization.id)

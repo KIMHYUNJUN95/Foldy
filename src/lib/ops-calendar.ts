@@ -688,8 +688,9 @@ export async function getOpsCalendarData(
     .not("external_property_id", "is", null));
   // 쪽을 나눠 읽으므로 **정렬이 유일해야 한다** — 같은 값이 여럿이면 쪽 경계에서 어떤 행은
   // 두 번, 어떤 행은 한 번도 안 온다. `id` 를 마지막 기준으로 붙여 순서를 못 박는다.
+  // 예약은 서버 키로 읽는다(조직 칸으로 거른다) — `raw_payload` 는 일반 사용자 칸 권한에서 빠진다(202611200003, 05 → reservations).
   const reservationsPromise = readAllPages<Record<string, unknown>>((from, to) =>
-    supabase
+    getSupabaseServiceClient()
       .from("reservations")
       .select(RESERVATION_SELECT)
       .eq("organization_id", session.organization.id)
@@ -1560,8 +1561,9 @@ export async function getOpsPriceConversions(
   // 원본 `status` 도 읽는다 — 문의 · 차단(원본 `inquiry` · `request` · `black` …)은 우리 표에 `confirmed` 로 적혀도 예약이
   // 아니다(2026-10-28 — 최근 예약 · 매출 요약과 같은 `isSalesCountedReservation`). 예전엔 이 거르기가 없어 가격을 바꾼 뒤
   // 들어온 문의가 「성공」으로 잡히거나, 그 날짜를 「이미 차 있었다」로 만들어 진짜 성공을 놓칠 수 있었다.
+  // 서버 키 + 조직 칸 — `raw_payload` 는 일반 사용자 칸 권한에서 빠진다(202611200003).
   const bookingsResult = await readAllPages<Record<string, unknown>>((from, to) =>
-    supabase
+    getSupabaseServiceClient()
       .from("reservations")
       .select(`${RESERVATION_SELECT}, sp_status:raw_payload->status`)
       .eq("organization_id", session.organization.id)
@@ -1680,8 +1682,9 @@ export async function getOpsRecentBookings(
   const endExclusive = addDays(filters.end, 1);
   const [roomRowsResult, bookingsResult, conversions] = await Promise.all([
     fetchRoomCatalogRows(session.organization.id, supabase),
+    // 서버 키 + 조직 칸 — `raw_payload` 는 일반 사용자 칸 권한에서 빠진다(202611200003).
     readAllPages<Record<string, unknown>>((from, to) =>
-      supabase
+      getSupabaseServiceClient()
         .from("reservations")
         .select(SALES_RESERVATION_SELECT)
         .eq("organization_id", session.organization.id)

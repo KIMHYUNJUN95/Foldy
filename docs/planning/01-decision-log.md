@@ -10,6 +10,19 @@ This file records important project decisions.
 - 모바일 2분할 빈 칸 공용 문구 「목록에서 고르면 여기에 열려요」. 상세: `docs/product/11-announcement-workflow.md` → 「공지 unslop」.
 - 2차(리드 결정): 작성 화면 「받는 사람 n명」 도 쓴 사람을 뺀다(`announcementRecipientCount`, 서버와 같은 함수). PC 패널은 관리자 본인 읽음을 남기지 않는다. 댓글 화면 · 서버 액션은 지운 채로 두고 `announcement_comments` 표 · `allow_comments` 열은 마이그레이션 없이 남긴다. 콘솔 패널은 주소 `?id` 를 따라간다.
 
+## 2026-11-20 예약 원본은 서버 전용 · 알림은 서버 키로만 만든다 (보안 점검, `202611200003` 운영 적용 대기)
+
+- `reservations` 는 `authenticated` 에 **칸 단위 select** 만 준다(13칸). `raw_payload`(Beds24 원본 — 손님 연락처 · 금액 · 메모) · `last_known_amount` 는 service_role 만 읽는다. 원본이 필요한 화면 조회는 서버 키 + `organization_id` 조건으로 읽는다(external_reviews 2026-11-10 과 같은 방식).
+- 새 칸을 이 표에 더하면 사용자 클라이언트가 읽어야 할 때 그 칸 grant 를 따로 준다 — 회귀 테스트가 타입 칸 목록과 대조해 알려 준다.
+- `notifications` 의 일반 사용자 INSERT 정책 · 권한을 없앴다. 알림은 `createNotification` 에 service-role 클라이언트를 넘겨서만 만든다(발주 알림 두 곳을 같이 고침). 읽기 · 읽음 표시(`read_at`) · 지우기는 그대로.
+- 두 표 모두 anon 권한 없음, authenticated 의 TRUNCATE · REFERENCES · TRIGGER 회수. 되돌리기 SQL 은 마이그레이션 머리말.
+
+## 2026-11-20 Next.js 16.2.6 → 16.4.6 (보안 권고, 같은 16 대 안의 올림)
+
+- 권고 GHSA-m99w-x7hq-7vfj · GHSA-p3m5-59mp-jv5r · GHSA-955p-x3mx-jcvp 때문에 `next` 와 짝인 `eslint-config-next` 를 **정확히 16.4.6** 으로 올렸다(루트 · `apps/checkin` 둘 다 같은 버전). react · react-dom 등 다른 패키지는 그대로. 스택 방향(Next 16 · App Router · Turbopack 개발/로컬 빌드, 체크인 앱 Vercel 은 webpack)은 바뀌지 않았다.
+- 올리기 전 `npm audit --omit=dev` 는 치명 1(next) · 높음 6 · 보통 3 = 10건, 올린 뒤 next 와 그 하위(nanoid · postcss · sharp)가 사라져 6건(높음 3 · 보통 3). 남은 것은 brace-expansion · source-map-js · zod · uuid(exceljs) · baseline-browser-mapping 이며 이번에는 올리지 않았다.
+- 새 린트 경고 3건(`@next/next/no-location-assign-relative-destination`, 안쪽 주소로 `window.location.assign`)은 16.4 의 새 규칙이며 동작 문제는 아니다. 고치는 것은 따로 정한다.
+
 ## 2026-11-19 직원 목록 표시 규칙 — 날짜 한 모양 · 재류자격 번역 + 원문 · 빼기는 맨 아래 (직원 목록 unslop, 사용자 결정 5개)
 
 - 사용자 관리(PC `/admin/users*` · 모바일 `/mobile/users*` · `/account/id-card`)의 날짜는 「2026.11.19」 하나(`dotDateKey` · `dotDateOfIso`, 도쿄 날짜). 저장 · 서버로 보내는 값은 `YYYY-MM-DD` 그대로.

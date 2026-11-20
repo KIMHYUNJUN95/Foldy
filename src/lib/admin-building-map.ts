@@ -95,11 +95,13 @@ const FEED_LIMIT = 8;
 /** 오늘에 걸친 예약(오늘 체크인 · 체크아웃 · 묵는 중)과 오늘 들어온 예약 + 객실 마스터. */
 export async function fetchBuildingMapSource(session: AppSession, today: string): Promise<BuildingMapSource> {
   const supabase = await getSupabaseServerClient();
+  // 예약은 서버 키 + 조직 칸으로 읽는다 — `raw_payload` 는 일반 사용자 칸 권한에서 빠진다(202611200003, 05 → reservations).
+  const reservationsDb = getSupabaseServiceClient();
   const columns = "id, property_name, room_label, source, check_in_date, check_out_date, status, created_at, raw_payload";
   const [around, fresh, catalog] = await Promise.all([
     // 문의 · 예약 요청은 방 상태 · 새 예약 소식에서 뺀다(2026-11-19). 소식은 `limit` 이 있어 DB 에서 거른다.
     excludePendingInquiries(
-      supabase
+      reservationsDb
         .from("reservations")
         .select(columns)
         .eq("organization_id", session.organization.id)
@@ -107,7 +109,7 @@ export async function fetchBuildingMapSource(session: AppSession, today: string)
         .gte("check_out_date", today),
     ),
     excludePendingInquiries(
-      supabase
+      reservationsDb
         .from("reservations")
         .select(columns)
         .eq("organization_id", session.organization.id)

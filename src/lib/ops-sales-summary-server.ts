@@ -9,6 +9,7 @@ import { shiftDateYear, type SalesYoyPrevious } from "@/lib/ops-sales-yoy";
 import { getCanonicalPropertyName } from "@/lib/room-label-normalization";
 import type { AppSession } from "@/lib/session";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getSupabaseServiceClient } from "@/lib/supabase/service";
 
 type SupabaseServer = Awaited<ReturnType<typeof getSupabaseServerClient>>;
 
@@ -31,8 +32,11 @@ export async function getOpsSalesSummary(
   const window = opsCalendarWindow(filters);
   const previousWindow = { endExclusive: shiftDateYear(window.endExclusive, -1), start: shiftDateYear(window.start, -1) };
   const supabase = await getSupabaseServerClient();
+  // 예약(`raw_payload` 의 금액 키)은 서버 키 + 조직 칸으로 읽는다 — `raw_payload` 는 일반 사용자 칸 권한에서 빠진다(202611200003).
+  // 첫 체크인(`readFirstStays`)은 남은 칸(건물 · 날짜 · 상태)만 쓰므로 로그인 사용자 클라이언트 그대로다.
+  const service = getSupabaseServiceClient();
   const read = (target: { start: string; endExclusive: string }) =>
-    readOpsSalesInputs({ organizationId: session.organization.id, properties: filters.properties, supabase, window: target });
+    readOpsSalesInputs({ organizationId: session.organization.id, properties: filters.properties, supabase: service, window: target });
   const [inputs, previousInputs, firstStayRaw] = await Promise.all([
     read(window),
     read(previousWindow),

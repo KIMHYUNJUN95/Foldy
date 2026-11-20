@@ -11,7 +11,7 @@ import { getCleaningOperatingDateKey } from "@/lib/cleaning";
 import { excludePendingInquiries } from "@/lib/beds24/reservation-status";
 import { getReservationGuests } from "@/lib/reservation-guests";
 import { GUEST_PAYLOAD_KEYS, slimPayloadOf, slimPayloadSelect } from "@/lib/reservation-payload-slim";
-import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 
@@ -103,13 +103,15 @@ export type CleaningTargetsResult = {
 export async function getCleaningTargets(
   organizationId: string,
   date?: string,
-  /** 세션이 없는 곳(자동화 틱)은 service-role 클라이언트를 넘긴다. 없으면 로그인 사용자 클라이언트. */
+  /** 넘기지 않으면 service-role 클라이언트. 두 조회 모두 `organization_id` 로 거른다. */
   client?: SupabaseClient<Database>,
 ): Promise<CleaningTargetsResult> {
   const targetDate = date ?? getCleaningOperatingDateKey();
   const windowEnd = addCalendarDays(targetDate, 30);
 
-  const supabase = client ?? (await getSupabaseServerClient());
+  // 기본은 서버 키다(2026-11-20) — 문의 거르기(`excludePendingInquiries`)가 `raw_payload` 를 읽는데, 이 칸은 일반 사용자 칸 권한에서
+  // 빠진다(202611200003, 05 → reservations). 호출자(청소 화면 · 관리자 청소 · 배정)는 모두 세션의 조직 id 를 넘긴다.
+  const supabase = client ?? getSupabaseServiceClient();
 
   const [depResult, arrResult] = await Promise.all([
     // 문의 · 예약 요청은 청소 · 셋팅 · 다음 체크인에서 뺀다(2026-11-19, `excludePendingInquiries`).

@@ -281,6 +281,25 @@ Delete:
 Read:
 
 - Active organization members.
+- **칸 단위 (2026-11-20, `202611200003` — 운영 적용 대기).** `authenticated` 는 표 전체가 아니라 아래 13칸만 읽는다:
+  `id · organization_id · source · source_reservation_id · original_reservation_id · property_name · room_label · guest_name ·
+  check_in_date · check_out_date · status · created_at · updated_at`. **`raw_payload`(Beds24 원본 — 손님 연락처 · 금액 · 메모)와
+  `last_known_amount` 는 service_role 만** 읽는다. 예전엔 알바를 포함한 조직 구성원 누구나 브라우저에서 원본을 통째로 꺼낼 수 있었다.
+  - `raw_payload` 를 고르거나(`raw_payload->키`) 거르는(`excludePendingInquiries`) 조회는 모두 **서버 키 + `organization_id` 조건**
+    으로 읽는다: `src/lib/ops-calendar.ts`(캘린더 · 가격 전환 · 최근 예약) · `ops-sales-summary-server.ts` · `src/app/mobile/calendar/page.tsx`
+    · `admin-building-map.ts` · `admin-calendar-dashboard.ts` · `cleaning-targets.ts`(클라이언트를 안 넘기면 서버 키) · `home.ts`.
+    로그인 사용자 클라이언트로는 위 13칸만 고른다(분실물 · 수리 등록, 할 일 예약 연결, 내부 메모 등).
+  - **규칙: 이 표에 칸을 더하면 grant 마이그레이션을 같이 넣어야 테스트가 통과한다.** 사용자 클라이언트가 읽을 칸이면 같은 작업에서
+    `grant select (새칸) on public.reservations to authenticated;` 를 새 마이그레이션으로 주고, 서버 전용이면 시험의 `SERVER_ONLY_COLUMNS` 에
+    더한다. 회귀 테스트 `src/lib/__tests__/reservations-notifications-privileges.test.ts` 가 타입의 칸 = 준 칸 + 서버 전용 칸인지,
+    사용자 클라이언트 예약 조회가 준 칸만 쓰는지(`select("*")` · 상수 select · 문의 거르기 금지), 그리고 클라이언트를 인자로 받아 예약을
+    읽는 helper(자동으로 찾는다 — `readOpsSalesInputs` · `readOpsMoveTargets` · `readOpsRoomUnavailableNights` · `getCleaningTargets` ·
+    cleaning-assign 로더 등)에 사용자 클라이언트를 넘기지 않는지 본다. 남은 칸만 읽는 helper 는 시험의 `USER_CLIENT_OK_HELPERS` 에 이유와 함께 적는다.
+  - Realtime(postgres_changes)은 구독자마다 `has_column_privilege` 로 칸을 걸러 보낸다(supabase/walrus `apply_rls`). 기본 키 `id` 가
+    남아 있어 구독이 끊기지 않는다. 앱은 이 표를 postgres_changes 로 구독하지 않는다(`beds24-live:<org>` private broadcast).
+  - `anon` 은 아무 권한 없음. `authenticated` 의 쓰기 · TRUNCATE · REFERENCES · TRIGGER 도 거뒀다 — 「platform admins can manage
+    reservations」 정책은 남아 있지만 권한이 없어 쓰이지 않는다(쓰기는 처음부터 서버 키만).
+  - 되돌리기: `grant select on public.reservations to authenticated;`(마이그레이션 머리말에 전체 되돌리기 · 확인 SQL).
 
 Create/update:
 
@@ -591,6 +610,16 @@ Update:
 Create:
 
 - Server functions/system.
+- **서버 키만 (2026-11-20, `202611200003` — 운영 적용 대기).** 일반 사용자 INSERT 정책 「org members can create notifications for
+  org recipients」 를 없애고 `authenticated` 의 INSERT 권한도 거뒀다(TRUNCATE · REFERENCES · TRIGGER 도, `anon` 은 전부).
+  예전엔 조직 구성원이 PostgREST 로 다른 직원에게 아무 제목 · 링크의 알림을 넣을 수 있었다. 앱은 `createNotification`
+  (`src/lib/notifications/create.ts`) 에 **service-role 클라이언트**를 넘기고, 체크인 호출은 `checkin.notify_staff`(SECURITY DEFINER)다.
+  같은 날 발주 처리 · 배송일 변경 알림(`src/actions/orders.ts`)이 로그인 사용자 클라이언트로 만들던 것을 서버 키로 바꿨다 —
+  그 경로는 `insert … returning`(`.select("id")`) 이 받는 사람 본인만 읽는 SELECT 정책에 걸려 **처리한 사람이 받는 사람이 아니면
+  조용히 실패**했을 가능성이 높다(PGlite 에서 같은 모양 확인). 예전 INSERT 정책이 보던 「받는 사람이 같은 조직의 active 멤버」 조건은
+  `orders.ts` 가 서버 키로 `memberships`(organization_id · user_id · status = 'active')를 먼저 확인해 지킨다 — 아니거나 조회가 실패하면 알림만
+  건너뛰고 처리는 성공한다(시험 `order-notification-recipient.test.ts`). 공용 `createNotification` 은 호출자가 많아 이번엔 바꾸지 않았다. 남는 권한: SELECT · DELETE(정책: 받는 사람 본인) · UPDATE(read_at).
+  회귀 테스트: `src/lib/__tests__/reservations-notifications-privileges.test.ts`(사용자 클라이언트로 알림을 만드는 코드가 없는지).
 
 ## recurring_work_templates / recurring_work_occurrences
 
@@ -1770,7 +1799,7 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 - `checkin.staff_calls`: RLS 켬 · 정책 없음 · service_role 만(다른 `checkin` 표와 같음). 직원은 이 표를 JWT 로 읽지 못하고, 신호는 `public.notifications` 실시간으로 받는다.
 - 태블릿 라우트(`/api/kiosk/call/**`)는 기기 토큰을 확인하고 모든 쿼리를 그 기기의 `organization_id` · `device_id` 로 거른다. 다른 기기 · 다른 조직의 통화는 404. `stay_id` 는 기기 입력이 아니라 `openProvenKioskStay` 를 통과한 세션의 stay 만 넣는다.
 - `checkin.member_can_receive` · `checkin.notify_staff` · `checkin.can_take_call`: `security definer`(`auth.users.banned_until` 을 읽으려고) · `search_path=''` · 실행 권한 service_role 만. 받는 사람은 앱의 `memberIdsWithCapability` 에 계정 정지 제외를 더한 것이다 — 활성 멤버 중 (활성 개인 부여 또는 역할 기본값, 전무는 owner 를 물려받음)에서 활성 개인 차단(대표 · 전무는 면역)과 Auth 정지 계정을 뺀다. 기한 지난 · 회수된 부여와 차단은 보지 않는다. 플랫폼 개발자 통과는 받는 사람에 넣지 않는다(`has_capability` 를 쓰지 않는 이유). `can_take_call` 만 활성 멤버십이 있는 활성 플랫폼 개발자도 통과시킨다 — `checkinGate` 를 지나 받을 수 있기 때문이다.
-- `public.notifications` INSERT 정책 「org members can create notifications for org recipients」: 본문은 그대로이고 `type::text not in ('checkin_staff_call','checkin_call_missed','checkin_staff_check')` 를 더했다. 조직 멤버가 가짜 전화 알림을 넣지 못한다. 이 세 종류는 service_role 함수로만 들어간다.
+- `public.notifications` INSERT 정책 「org members can create notifications for org recipients」: 본문은 그대로이고 `type::text not in ('checkin_staff_call','checkin_call_missed','checkin_staff_check')` 를 더했다. 조직 멤버가 가짜 전화 알림을 넣지 못한다. 이 세 종류는 service_role 함수로만 들어간다. (2026-11-20 `202611200003` 에서 이 INSERT 정책 자체를 없앴다 — 모든 알림을 서버 키로만 만든다. 위 notifications 절 참고.)
 - `public.notifications` UPDATE 칸 권한: `revoke update ... from public, anon, authenticated` + `grant update (read_at) ... to authenticated`. 정책은 수신자만 보기 때문에, 칸 권한이 없으면 수신자가 자기 알림의 `type` 을 전화 알림으로 바꿀 수 있었다. 모든 알림 종류에 적용되고, `service_role` 은 그대로다.
 - 확인(칸 권한): 2026-11-06 로컬 Postgres 17 + PostgREST 로 전체 마이그레이션 213개를 새 DB 에 적용한 뒤 실제 JWT 로 확인했다. authenticated 는 `read_at` 만 update 가능(204), `type` · `payload` · `href` · `recipient_user_id` · `organization_id` · `source_type` · `source_id` · `dedupe_key` · `created_at` · `id` 와 묶음은 403 42501, 남의 알림은 0행, anon 은 401, service_role 은 모든 칸 200. 운영은 미확인.
 - 통화 중 권한 회수 · 정지: `GET /api/kiosk/call/[id]` 가 `can_take_call` 이 거짓이면 `ended`(`system`) + 방 삭제 + 기록. 판정 실패(DB 오류)는 통화를 끊지 않는다. 태블릿이 30초마다 부르므로 최대 약 30초 안에 닫힌다.

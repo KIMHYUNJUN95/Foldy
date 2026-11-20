@@ -9,8 +9,34 @@ import {
 import type { Database } from "@/types/database";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getSupabaseServiceClient } from "@/lib/supabase/service";
 
 type OrderStatus = Database["public"]["Enums"]["order_request_status"];
+
+/**
+ * 알림 받는 사람이 이 조직의 active 멤버인가(2026-11-20). 알림을 서버 키로 만들면서 사라진 예전 INSERT 정책의 조건
+ * (`memberships` 에 organization_id · user_id · status = 'active')을 여기서 다시 본다. 조회가 실패하거나 예외가 나도
+ * false — 알림만 건너뛰고 발주 처리는 그대로 성공한다. 공용 `createNotification` 은 다른 호출자가 많아 건드리지 않는다.
+ */
+async function isActiveOrgMember(
+  service: ReturnType<typeof getSupabaseServiceClient>,
+  organizationId: string,
+  userId: string | null | undefined,
+): Promise<boolean> {
+  if (!userId) return false;
+  try {
+    const { data, error } = await service
+      .from("memberships")
+      .select("user_id")
+      .eq("organization_id", organizationId)
+      .eq("user_id", userId)
+      .eq("status", "active")
+      .limit(1);
+    return !error && Array.isArray(data) && data.length > 0;
+  } catch {
+    return false;
+  }
+}
 
 type UpdateOrderStatusInput = {
   orderId: string;
@@ -198,13 +224,18 @@ export async function updateOrderRequestStatus(
           : current.delivery_end_date,
     };
 
-    await createOrderProcessedNotification({
-      supabase,
-      organizationId: session.organization.id,
-      recipientUserId: current.reported_by_user_id,
-      processedByUserId: session.user.id,
-      order: orderForNotification,
-    });
+    // 알림은 서버 키로 만든다 — 일반 사용자는 notifications 에 쓰지 못한다(202611200003, 05 → notifications).
+    // 받는 사람이 이 조직의 active 멤버일 때만(예전 INSERT 정책이 보던 조건). 아니면 알림만 건너뛰고 처리는 그대로 성공.
+    const service = getSupabaseServiceClient();
+    if (await isActiveOrgMember(service, session.organization.id, current.reported_by_user_id)) {
+      await createOrderProcessedNotification({
+        supabase: service,
+        organizationId: session.organization.id,
+        recipientUserId: current.reported_by_user_id,
+        processedByUserId: session.user.id,
+        order: orderForNotification,
+      });
+    }
     revalidatePath("/mobile/notifications");
   }
 
@@ -309,21 +340,25 @@ export async function updateOrderDeliveryDate(
   }
 
   // 요청자에게 배송일이 바뀐 것을 알린다(수정한 본인에게는 알리지 않음).
-  await createOrderDeliveryUpdatedNotification({
-    supabase,
-    organizationId: session.organization.id,
-    recipientUserId: current.reported_by_user_id,
-    editedByUserId: session.user.id,
-    order: {
-      id: current.id,
-      title: current.title,
-      building_name: current.building_name,
-      room_label: current.room_label,
-      delivery_date: (updatePayload.delivery_date as string | null) ?? null,
-      delivery_start_date: (updatePayload.delivery_start_date as string | null) ?? null,
-      delivery_end_date: (updatePayload.delivery_end_date as string | null) ?? null,
-    },
-  });
+  // 알림은 서버 키로 만든다(202611200003). 받는 사람이 이 조직의 active 멤버가 아니면 알림만 건너뛴다.
+  const service = getSupabaseServiceClient();
+  if (await isActiveOrgMember(service, session.organization.id, current.reported_by_user_id)) {
+    await createOrderDeliveryUpdatedNotification({
+      supabase: service,
+      organizationId: session.organization.id,
+      recipientUserId: current.reported_by_user_id,
+      editedByUserId: session.user.id,
+      order: {
+        id: current.id,
+        title: current.title,
+        building_name: current.building_name,
+        room_label: current.room_label,
+        delivery_date: (updatePayload.delivery_date as string | null) ?? null,
+        delivery_start_date: (updatePayload.delivery_start_date as string | null) ?? null,
+        delivery_end_date: (updatePayload.delivery_end_date as string | null) ?? null,
+      },
+    });
+  }
 
   revalidatePath("/mobile/requests");
   revalidatePath(`/mobile/requests/orders/${input.orderId}`);

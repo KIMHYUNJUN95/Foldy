@@ -33,6 +33,7 @@ import {
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { type CalendarDeepLinkNotice, decideCalendarDeepLink } from "@/lib/calendar-deep-link";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { readAllPages } from "@/lib/supabase/read-all-pages";
 import type { Database } from "@/types/database";
 import { getReservationGuests, type ReservationGuests } from "@/lib/reservation-guests";
@@ -206,8 +207,9 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
   let deepLinkNotice: CalendarDeepLinkNotice | null = null;
   let deepLinkReservationId: string | null = null;
   if (initialReservationId) {
+    // 예약은 서버 키 + 조직 칸으로 읽는다 — `raw_payload` 는 일반 사용자 칸 권한에서 빠진다(202611200003, 05 → reservations).
     const found = UUID_PATTERN.test(initialReservationId)
-      ? await supabase
+      ? await getSupabaseServiceClient()
           .from("reservations")
           .select("id, check_in_date, check_out_date, property_name, room_label, status, rp_status:raw_payload->status")
           .eq("organization_id", session.organization.id)
@@ -278,8 +280,9 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
       // 1,000행 상한을 넘으면 조용히 잘린다 — 페이지로 끝까지 읽는다(`read-all-pages.ts`).
       readAllPages<Record<string, unknown>>((from, to) =>
         // 문의 · 예약 요청은 캘린더에 그리지 않는다(2026-11-19).
+        // 서버 키 + 조직 칸 — 원본 키 · 문의 거르기가 `raw_payload` 를 읽는다(202611200003).
         excludePendingInquiries(
-          supabase
+          getSupabaseServiceClient()
             .from("reservations")
             .select(RESERVATION_SELECT)
             .eq("organization_id", session.organization.id)

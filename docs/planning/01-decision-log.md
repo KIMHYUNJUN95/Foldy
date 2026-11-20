@@ -2,6 +2,14 @@
 
 This file records important project decisions.
 
+## 2026-11-20 공지 표시 규칙 — 날짜 한 모양 · 쓴 사람은 읽음 집계 밖 · 예전 상세는 콘솔 패널로 (공지 unslop, 사용자 「구현시작」 · 미정 5개는 추천안)
+
+- 공지 날짜는 PC · 모바일 · 팝업 모두 「2026.11.18」(시각은 「2026.11.18 09:05」), 도쿄 기준 — `src/lib/announcement-display.ts` 한 곳.
+- 쓴 사람은 「안 읽음」 명단 · 읽음 분모 · 목록 숫자에서 빠진다. 새 공지 조직은 지금 조직, 없으면 비워 두고 고르기 필수.
+- `/admin/announcements/[id]` 는 `?id=` 패널로 넘기기만 한다(관리자 본인 읽음 기록은 하지 않음). 쓰이지 않던 댓글 화면 · 서버 액션을 지웠다(DB 표는 그대로). 줄 차례 등장 모션은 뺐다.
+- 모바일 2분할 빈 칸 공용 문구 「목록에서 고르면 여기에 열려요」. 상세: `docs/product/11-announcement-workflow.md` → 「공지 unslop」.
+- 2차(리드 결정): 작성 화면 「받는 사람 n명」 도 쓴 사람을 뺀다(`announcementRecipientCount`, 서버와 같은 함수). PC 패널은 관리자 본인 읽음을 남기지 않는다. 댓글 화면 · 서버 액션은 지운 채로 두고 `announcement_comments` 표 · `allow_comments` 열은 마이그레이션 없이 남긴다. 콘솔 패널은 주소 `?id` 를 따라간다.
+
 ## 2026-11-19 직원 목록 표시 규칙 — 날짜 한 모양 · 재류자격 번역 + 원문 · 빼기는 맨 아래 (직원 목록 unslop, 사용자 결정 5개)
 
 - 사용자 관리(PC `/admin/users*` · 모바일 `/mobile/users*` · `/account/id-card`)의 날짜는 「2026.11.19」 하나(`dotDateKey` · `dotDateOfIso`, 도쿄 날짜). 저장 · 서버로 보내는 값은 `YYYY-MM-DD` 그대로.

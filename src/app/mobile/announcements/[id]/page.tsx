@@ -13,6 +13,7 @@ import {
 import { getOnboardingState } from "@/lib/onboarding";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import type { OrganizationRole } from "@/config/roles";
+import { annDateTime } from "@/lib/announcement-display";
 
 type PageProps = {
   params: Promise<{
@@ -20,14 +21,6 @@ type PageProps = {
   }>;
 };
 
-/** 「10월 8일 18:20」 — 도쿄 기준. */
-function formatDateTime(value: string | null, locale: string): string {
-  if (!value) return "";
-  const tag = locale === "ko" ? "ko-KR" : locale === "ja" ? "ja-JP" : "en-US";
-  return new Intl.DateTimeFormat(tag, {
-    month: "long", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "Asia/Tokyo",
-  }).format(new Date(value));
-}
 
 function targetLabel(
   scope: string,
@@ -82,7 +75,6 @@ export default async function MobileAnnouncementDetailPage({
   const navBadges = existingReadAt
     ? rawNavBadges
     : { ...rawNavBadges, announcements: Math.max(0, (rawNavBadges.announcements ?? 0) - 1) };
-  const locale = session.user.preferredLanguage;
 
   return (
     <MobileShell
@@ -101,7 +93,7 @@ export default async function MobileAnnouncementDetailPage({
         <h1>{announcement.title}</h1>
         <p className="ntw-d__meta">
           {[
-            formatDateTime(announcement.published_at, locale),
+            annDateTime(announcement.published_at),
             targetLabel(announcement.target_scope, announcement.target_roles as string[], copy),
             announcement.author_name || null,
           ]

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { AnnouncementImageGrid } from "@/components/announcements/announcement-image-grid";
 import type { Locale } from "@/lib/i18n";
+import { annDate } from "@/lib/announcement-display";
 import { getAnnouncementDictionary } from "@/lib/announcement-i18n";
 import { dismissPopupForWeek } from "@/app/announcements/popup-actions";
 import "./announcements-mobile.css";
@@ -99,13 +100,6 @@ function subscribeHydration(callback: () => void) {
   return () => window.cancelAnimationFrame(id);
 }
 
-// 연도 없이 월+일만 표시
-function formatPopupDate(value: string, locale: string): string {
-  const tag = locale === "ko" ? "ko-KR" : locale === "ja" ? "ja-JP" : "en-US";
-  return new Intl.DateTimeFormat(tag, {
-    month: "long", day: "numeric", timeZone: "Asia/Tokyo",
-  }).format(new Date(value));
-}
 
 export type PopupAnnouncement = {
   content: string;
@@ -213,7 +207,7 @@ export function AnnouncementPopup({
         <div className="ntw ntw-pop">
           <div className="ntw-pop__top">
             {announcement.isImportant ? <span className="is-red">{copy.white.important}</span> : null}
-            {announcement.publishedAt ? <span>{formatPopupDate(announcement.publishedAt, locale)}</span> : null}
+            {announcement.publishedAt ? <span>{annDate(announcement.publishedAt)}</span> : null}
             {queue.length > 1 ? (
               <span className="ntw-pop__n num">{copy.white.mPopupCount.replace("{i}", String(position)).replace("{n}", String(queue.length))}</span>
             ) : null}

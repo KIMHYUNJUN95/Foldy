@@ -53,7 +53,7 @@ Historical: Retained for decision history but superseded by a newer document or 
 | [Maintenance Workflow](./product/08-maintenance-workflow.md) | Confirmed | Maintenance request workflow |
 | [Lost and Found Workflow](./product/09-lost-found-workflow.md) | Confirmed | Lost item lifecycle |
 | [Order Request Workflow](./product/10-order-request-workflow.md) | Confirmed | Order/supply request workflow |
-| [Announcement Workflow](./product/11-announcement-workflow.md) | Confirmed | Announcements and comments |
+| [Announcement Workflow](./product/11-announcement-workflow.md) | Confirmed | Announcements (comments deleted 2026-11-20) |
 | [Recurring Work Scheduler](./product/12-recurring-work-scheduler.md) | Confirmed | Periodic work management |
 | [Inventory Future Module](./product/13-inventory-future-module.md) | Future | Inventory later |
 | [Notification Design](./product/14-notification-design.md) | Living | Implemented and planned notification triggers |

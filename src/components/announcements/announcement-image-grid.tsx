@@ -18,6 +18,8 @@ export function AnnouncementImageGrid({
   imageAltLabel,
   variant = "grid",
 }: AnnouncementImageGridProps) {
+  // 사진 <Image> 마다 suppressHydrationWarning — 모바일 공용 `ImageFadeIn` 이 받아진 사진에 `data-loaded` 를 붙이는데,
+  // 문서째 새로 받는 상세(태블릿 2분할 칸)에서는 그게 이 부분 수화보다 먼저라 경고가 났다(2026-11-20, 공지 unslop B5).
   // `target="_blank"` 는 설치된 독립 실행형 PWA 를 사진 하나 보려고 별도 Safari 탭으로 내보내므로,
   // 그 대신 앱 안 라이트박스로 사진을 연다.
   const [openIndex, setOpenIndex] = useState<number | null>(null);
@@ -40,7 +42,7 @@ export function AnnouncementImageGrid({
       <div className={`ntw-shots${imageUrls.length === 1 ? " is-one" : ""}`}>
         {imageUrls.map((url, index) => (
           <button className="ntw-shot" key={url} onClick={() => setOpenIndex(index)} type="button" aria-label={`${imageAltLabel} ${index + 1}`}>
-            <Image alt="" fill sizes={imageUrls.length === 1 ? "(max-width: 640px) 100vw, 640px" : "(max-width: 640px) 50vw, 320px"} src={url} />
+            <Image alt="" fill sizes={imageUrls.length === 1 ? "(max-width: 640px) 100vw, 640px" : "(max-width: 640px) 50vw, 320px"} src={url} suppressHydrationWarning />
           </button>
         ))}
         {lightbox}
@@ -65,6 +67,7 @@ export function AnnouncementImageGrid({
               height={480}
               sizes={isSingle ? "(max-width: 640px) 100vw, 460px" : "(max-width: 640px) 50vw, 230px"}
               src={url}
+              suppressHydrationWarning
               width={960}
             />
           </button>
@@ -89,6 +92,7 @@ export function AnnouncementImageGrid({
             height={900}
             sizes="(max-width: 640px) 50vw, 220px"
             src={url}
+            suppressHydrationWarning
             width={1200}
           />
         </button>

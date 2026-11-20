@@ -1,6 +1,6 @@
 import "server-only";
 import { memberCapabilities } from "@/lib/capabilities-server";
-
+import { announcementRecipientCount, countsTowardRead } from "@/lib/announcement-display";
 import type { AppSession } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import type { OrganizationRole } from "@/config/roles";
@@ -29,6 +29,8 @@ export type AdminAnnouncementVM = {
   body: string[];
   authorId: string;
   authorName: string;
+  /** 쓴 사람의 이 조직 활성 역할 — 구성원이 아니면 null(받는 사람 수 계산용). */
+  authorRole: OrganizationRole | null;
   status: "draft" | "published" | "archived";
   isImportant: boolean;
   isPinned: boolean;
@@ -64,6 +66,8 @@ export type AdminAnnouncementsData = {
   /** 조직별 전체 활성 구성원 수("전체" 수신자 수용). */
   orgMemberTotal: Record<string, number>;
   me: { id: string; name: string; role: string };
+  /** 내 조직별 활성 역할 — 새 공지 「받는 사람 n명」에서 나를 뺄 때 쓴다. */
+  myRoleByOrg: Record<string, OrganizationRole>;
   isPlatformAdmin: boolean;
   /**
    * 이 사용자가 공지를 만들 수 있는 조직 — 즉 서버 액션이
@@ -112,6 +116,7 @@ export async function getAdminAnnouncements(
     roleCountsByOrg: {},
     orgMemberTotal: {},
     me,
+    myRoleByOrg: {},
     isPlatformAdmin,
     creatableOrganizationIds: [],
     loadError: false,
@@ -242,6 +247,10 @@ export async function getAdminAnnouncements(
     for (const m of allMemberships) {
       memberRoleByOrgUser.set(`${m.organization_id}:${m.user_id}`, m.role as OrganizationRole);
     }
+    const myRoleByOrg: Record<string, OrganizationRole> = {};
+    for (const m of allMemberships) {
+      if (m.user_id === me.id) myRoleByOrg[m.organization_id] = m.role as OrganizationRole;
+    }
     const rowById = new Map(rows.map((r) => [r.id, r]));
     const dismissCountById = new Map<string, number>();
     if (announcementIds.length > 0) {
@@ -258,6 +267,8 @@ export async function getAdminAnnouncements(
       for (const read of (readData ?? []) as { announcement_id: string; user_id: string }[]) {
         const ann = rowById.get(read.announcement_id);
         if (!ann) continue;
+        // 쓴 사람은 읽음 집계에서 빠진다(2026-11-20, countsTowardRead).
+        if (!countsTowardRead(read.user_id, ann.created_by_user_id)) continue;
         const role = memberRoleByOrgUser.get(`${ann.organization_id}:${read.user_id}`);
         if (!role) continue;
         if (ann.target_scope === "roles" && !((ann.target_roles ?? []) as string[]).includes(role)) {
@@ -283,13 +294,15 @@ export async function getAdminAnnouncements(
     const announcements: AdminAnnouncementVM[] = rows.map((row) => {
       const targetRoles = (row.target_roles ?? []) as OrganizationRole[];
       const org = row.organization_id;
-      const targetTotal =
-        row.target_scope === "roles"
-          ? targetRoles.reduce((sum, role) => {
-              const perOrg = roleCountMap.get(org);
-              return sum + (perOrg?.get(role) ?? 0);
-            }, 0)
-          : (orgMemberTotal[org] ?? 0);
+      // 쓴 사람이 지금 대상 구성원이면 분모에서 뺀다 — 상세(getAnnouncementReadSummary) · 작성 창 「받는 사람」과 같은 함수.
+      const authorRole = memberRoleByOrgUser.get(`${org}:${row.created_by_user_id}`) ?? null;
+      const targetTotal = announcementRecipientCount({
+        scope: row.target_scope,
+        roles: targetRoles,
+        roleCounts: Object.fromEntries(roleCountMap.get(org) ?? []),
+        orgTotal: orgMemberTotal[org] ?? 0,
+        authorRole,
+      });
       const readCount = Math.min(readCountById.get(row.id) ?? 0, targetTotal);
       const isAuthor = row.created_by_user_id === me.id;
       const caps = capsByOrg.get(org) ?? [];
@@ -305,6 +318,7 @@ export async function getAdminAnnouncements(
         body: splitBody(row.content),
         authorId: row.created_by_user_id,
         authorName: authorNames.get(row.created_by_user_id) ?? "",
+        authorRole,
         status: row.status,
         isImportant: row.is_important,
         isPinned: row.is_pinned,
@@ -336,6 +350,7 @@ export async function getAdminAnnouncements(
       roleCountsByOrg,
       orgMemberTotal,
       me,
+      myRoleByOrg,
       isPlatformAdmin,
       creatableOrganizationIds,
       loadError: false,

@@ -909,7 +909,8 @@ Claude Design 핸드오프(`Foldy 청소 (admin)/청소 현황 (admin).html`)를
   존재하지 않아 `.in("role", ...)` 쿼리 자체가 Postgres에서 enum 캐스팅 에러로 거부됐다. 그 에러가
   `getAdminCleaningToday`의 `.catch(() => [])`에 조용히 삼켜지면서 담당자 목록이 항상 빈 배열이
   됐다. 쿼리 직전에 `developer_super_admin`을 필터링해서 제외하도록 수정(기존
-  `admin/announcements/[id]/page.tsx`의 `orgAdminWebRoles` 패턴과 동일).
+  `admin/announcements/[id]/page.tsx`의 `orgAdminWebRoles` 패턴과 동일). 그 페이지는 2026-11-20 콘솔로 넘기기만 하게 바뀌었고,
+  지금 같은 처리는 `src/config/capabilities.ts` 의 `rolesWithCapability()`(개발자 역할을 빼고 돌려준다)가 한다 — `src/lib/cleaning.ts` `getCleaningStaffOptions` 가 그걸 쓴다.
 - **문서 감사 후속 구현 (2026-07-14): 데이터 로드 실패 시 KPI "-" 표시.**
   `getAdminCleaningToday`(`src/lib/admin-cleaning.ts`)가 `getCleaningTargets`/
   `getOrgTodayCleaningSessions`/`getCleaningStaffOptions` 중 하나라도 실패하면 `loadError: true`를

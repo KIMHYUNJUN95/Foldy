@@ -7,7 +7,7 @@
 import { LiveWash } from "@/components/shared/live-wash";
 import Image from "next/image";
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Check, Pin, Plus, Trash2, X } from "lucide-react";
 import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
 import { useAdminPanelA11y } from "@/components/admin/shared/use-admin-panel-a11y";
@@ -22,19 +22,17 @@ import {
   getAnnouncementReadStatusConsole,
   setAnnouncementStatusConsole,
 } from "@/app/admin/announcements/actions";
-import { type AnnCopy, type RoleLabel, initial, tokyoDateKey, tokyoTimeHm } from "./announcements-console-shared";
+import { type AnnCopy, type RoleLabel, initial } from "./announcements-console-shared";
+import { annDate, annDateTime, announcementPanelHref, readAnnouncementPanelId } from "@/lib/announcement-display";
 import { AnnouncementComposer } from "./announcement-composer";
 import "./announcements-white.css";
 
 type Tab = "published" | "draft" | "archived";
 type ConfirmKind = "publish" | "republish" | "archive" | "revert" | "del";
 
-/** 도쿄 기준 「10/8」. */
+/** 도쿄 기준 「2026.11.18」 — 날짜 표기는 lib/announcement-display 하나로(2026-11-20). */
 function shortDate(iso: string | null): string {
-  const key = tokyoDateKey(iso);
-  if (!key) return "—";
-  const [, m, d] = key.split("-");
-  return `${Number(m)}/${Number(d)}`;
+  return annDate(iso) || "—";
 }
 
 function listDate(a: AdminAnnouncementVM): string | null {
@@ -51,8 +49,19 @@ function popupText(a: AdminAnnouncementVM, w: AnnouncementWhiteCopy): string | n
   return a.popupUntil ? w.popupUntil.replace("{date}", shortDate(a.popupUntil)) : w.popupOn;
 }
 
-export function AnnouncementsConsole({ locale, data }: { locale: Locale; data: AdminAnnouncementsData }) {
+export function AnnouncementsConsole({
+  locale,
+  data,
+  currentOrgId,
+}: {
+  locale: Locale;
+  data: AdminAnnouncementsData;
+  /** 지금 보고 있는 조직(플랫폼 관리자는 null) — 새 공지의 처음 조직. */
+  currentOrgId: string | null;
+}) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const dictionary = getAnnouncementDictionary(locale);
   const t = dictionary.console;
   const w = dictionary.white;
@@ -66,8 +75,20 @@ export function AnnouncementsConsole({ locale, data }: { locale: Locale; data: A
   const canCreate = creatableOrganizations.length > 0;
   const multiOrg = data.organizations.length > 1;
 
-  const [tab, setTab] = useState<Tab>("published");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // 열린 패널은 주소 `?id=` 가 정한다(2026-11-20, 2차) — 알림 · 예전 상세 주소로 들어오거나, 화면 안에서 주소만 바뀌거나
+  // (같은 화면 이동), 뒤로 · 앞으로 가도 패널이 주소를 따라간다. 패널이 열려 있으면 그 공지가 있는 탭을 보여 준다.
+  const rawPanelId = searchParams.get("id");
+  const panelId = readAnnouncementPanelId(rawPanelId ?? undefined);
+  const selected = panelId ? (announcements.find((a) => a.id === panelId) ?? null) : null;
+  const selectedId = selected?.id ?? null;
+  const [tabChoice, setTab] = useState<Tab>("published");
+  const tab: Tab = selected?.status ?? tabChoice;
+  // 목록에 없는 `?id=`(지운 공지 · 볼 수 없는 공지 · 꼴이 틀린 값)는 주소에서 뺀다. 기록을 남기지 않는 replaceState 는
+  // App Router 와 맞물려 useSearchParams 가 따라오고 서버를 다시 부르지 않는다.
+  const stalePanelId = rawPanelId !== null && !selected;
+  useEffect(() => {
+    if (stalePanelId) window.history.replaceState(null, "", pathname);
+  }, [stalePanelId, pathname]);
   // null = 목록, "new" = 새 공지, 그 밖 = 수정할 공지 id
   const [composer, setComposer] = useState<string | null>(null);
 
@@ -104,7 +125,13 @@ export function AnnouncementsConsole({ locale, data }: { locale: Locale; data: A
     [announcements, tab],
   );
 
-  const selected = selectedId ? (announcements.find((a) => a.id === selectedId) ?? null) : null;
+  // 줄을 고르거나 패널을 닫으면 주소만 바꾼다(기록 없이) — 새로 고침해도 지금 보던 패널이 그대로 열린다.
+  // 닫을 때는 보던 공지의 탭에 머문다.
+  const selectPanel = (id: string | null) => {
+    if (selected) setTab(selected.status);
+    window.history.replaceState(null, "", id ? announcementPanelHref(id) : pathname);
+  };
+  const closePanel = () => selectPanel(null);
   const editing = composer && composer !== "new" ? (announcements.find((a) => a.id === composer) ?? null) : null;
 
   if (composer) {
@@ -118,13 +145,16 @@ export function AnnouncementsConsole({ locale, data }: { locale: Locale; data: A
           localeTag={adminLocaleTag(locale)}
           roleLabel={roleLabel}
           organizations={editing ? data.organizations : creatableOrganizations}
+          currentOrgId={currentOrgId}
           roleCountsByOrg={data.roleCountsByOrg}
           orgMemberTotal={data.orgMemberTotal}
+          myRoleByOrg={data.myRoleByOrg}
           onClose={() => setComposer(null)}
           onSaved={(published) => {
             setComposer(null);
             setTab(published ? "published" : "draft");
-            showToast(published ? t.tPublished : t.tSaved);
+            // 게시 중인 공지를 고쳐 저장하면 「저장했어요」 — 「게시했어요」는 새로 게시할 때만(2026-11-20, 2차).
+            showToast(editing?.status === "published" && published ? t.tSaved : published ? t.tPublished : t.tDraftSaved);
             router.refresh();
           }}
         />
@@ -152,8 +182,8 @@ export function AnnouncementsConsole({ locale, data }: { locale: Locale; data: A
               aria-selected={tab === item.key}
               className={tab === item.key ? "on" : ""}
               onClick={() => {
+                closePanel();
                 setTab(item.key);
-                setSelectedId(null);
               }}
             >
               {item.label}
@@ -228,7 +258,7 @@ export function AnnouncementsConsole({ locale, data }: { locale: Locale; data: A
                   key={a.id} data-live={a.id}
                   type="button"
                   className={`anw-tr${selectedId === a.id ? " on" : ""}`}
-                  onClick={() => setSelectedId(a.id)}
+                  onClick={() => selectPanel(a.id)}
                   aria-current={selectedId === a.id ? "true" : undefined}
                 >
                   <span className="anw-ttl">
@@ -274,10 +304,10 @@ export function AnnouncementsConsole({ locale, data }: { locale: Locale; data: A
           t={t}
           roleLabel={roleLabel}
           showOrg={multiOrg}
-          onClose={() => setSelectedId(null)}
+          onClose={closePanel}
           onEdit={() => setComposer(selected.id)}
           onToast={showToast}
-          onDeleted={() => setSelectedId(null)}
+          onDeleted={closePanel}
         />
       ) : null}
       {toast ? <AdminToast message={toast.message} onDismiss={dismiss} /> : null}
@@ -342,11 +372,7 @@ function NoticePanel({
   const pct = total > 0 ? Math.round((readCount / total) * 100) : 0;
   const list = readers ? (listTab === "unread" ? readers.unread : readers.read) : [];
 
-  const stamp = (iso: string | null) => {
-    if (!iso) return "—";
-    const [, m, d] = tokyoDateKey(iso).split("-");
-    return `${Number(m)}/${Number(d)} ${tokyoTimeHm(iso)}`;
-  };
+  const stamp = (iso: string | null) => annDateTime(iso) || "—";
   const statusText = item.status === "published" ? w.stPublished : item.status === "draft" ? w.stDraft : w.stArchived;
   const pop = popupText(item, w);
   const roleName = (role: string) => roleLabel(role as OrganizationRole) ?? role;

@@ -900,6 +900,8 @@ read_at timestamptz not null
 
 Announcement comments.
 
+> 2026-11-20 부터 이 표를 쓰는 화면 · 서버 액션은 없다(공지 댓글 화면 · 댓글 서버 액션을 지웠다). 표와 `announcements.allow_comments` 열은 그대로 둔다 — 마이그레이션 없음. `docs/product/11-announcement-workflow.md` 「공지 unslop」.
+
 Fields:
 
 ```txt

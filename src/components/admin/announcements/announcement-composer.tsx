@@ -17,9 +17,15 @@ import { compressImageFile } from "@/components/announcements/announcement-image
 import { organizationRoles, type OrganizationRole } from "@/config/roles";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { haptic } from "@/lib/haptics";
+import {
+  announcementRecipientCount,
+  pickInitialAnnouncementOrg,
+  tokyoDateKey,
+  tokyoTimeHm,
+} from "@/lib/announcement-display";
 import type { AnnouncementWhiteCopy } from "@/lib/announcement-i18n";
 import type { AdminAnnouncementRoleCount, AdminAnnouncementVM } from "@/lib/admin-announcements";
-import { type AnnCopy, type RoleLabel, tokyoDateKey, tokyoTimeHm } from "./announcements-console-shared";
+import type { AnnCopy, RoleLabel } from "./announcements-console-shared";
 
 const BUCKET = "announcement-images";
 const MAX_IMAGES = 5;
@@ -41,8 +47,10 @@ export function AnnouncementComposer({
   localeTag,
   roleLabel,
   organizations,
+  currentOrgId,
   roleCountsByOrg,
   orgMemberTotal,
+  myRoleByOrg,
   onClose,
   onSaved,
 }: {
@@ -53,15 +61,20 @@ export function AnnouncementComposer({
   localeTag: string;
   roleLabel: RoleLabel;
   organizations: { id: string; name: string }[];
+  /** 지금 보고 있는 조직(플랫폼 관리자는 null) — 새 공지의 처음 조직. */
+  currentOrgId: string | null;
   roleCountsByOrg: Record<string, AdminAnnouncementRoleCount[]>;
   orgMemberTotal: Record<string, number>;
+  /** 내 조직별 활성 역할 — 새 공지 「받는 사람」에서 나(쓴 사람)를 뺀다. */
+  myRoleByOrg: Record<string, OrganizationRole>;
   onClose: () => void;
   onSaved: (published: boolean) => void;
 }) {
   const isNew = item === null;
   // 게시 중인 공지를 고칠 때는 게시 상태 그대로 「저장」만 — 초안으로 내리는 건 패널의 「초안으로」가 맡는다.
   const editingLive = item?.status === "published";
-  const [org, setOrg] = useState(() => item?.organizationId ?? organizations[0]?.id ?? "");
+  // 새 공지는 지금 보고 있는 조직에서 시작한다. 지금 조직이 없으면(플랫폼 관리자) 비워 두고 고르게 한다(2026-11-20).
+  const [org, setOrg] = useState(() => item?.organizationId ?? pickInitialAnnouncementOrg(organizations, currentOrgId));
   const [title, setTitle] = useState(item?.title ?? "");
   const [body, setBody] = useState(item?.content ?? "");
   const [scope, setScope] = useState<"everyone" | "roles">(item?.targetScope ?? "everyone");
@@ -75,6 +88,13 @@ export function AnnouncementComposer({
   const [existingImages, setExistingImages] = useState<string[]>(item?.images ?? []);
   const [newImages, setNewImages] = useState<NewImage[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // 칸 하나의 문제면 그 칸 바로 아래에 보여 주고 칸을 빨갛게 — 화면 맨 아래 한 줄은 놓치기 쉬웠다(2026-11-20).
+  const [errorField, setErrorField] = useState<"org" | "title" | "body" | null>(null);
+  const fail = (message: string, field: "org" | "title" | "body" | null = null) => {
+    setErrorField(message ? field : null);
+    setError(message || null);
+  };
+  const clearError = () => fail("");
   const [savingAs, setSavingAs] = useState<"draft" | "published" | null>(null);
   const [uploading, setUploading] = useState(false);
   const [pending, startServerTransition] = useTransition();
@@ -117,9 +137,19 @@ export function AnnouncementComposer({
   }, [newImages]);
   useEffect(() => () => previewsRef.current.forEach((image) => URL.revokeObjectURL(image.previewUrl)), []);
 
-  const roleCounts = useMemo(() => new Map((roleCountsByOrg[org] ?? []).map((r) => [r.role, r.count])), [org, roleCountsByOrg]);
-  const recipients =
-    scope === "everyone" ? (orgMemberTotal[org] ?? 0) : roles.reduce((sum, role) => sum + (roleCounts.get(role) ?? 0), 0);
+  const roleCounts = useMemo(
+    () => Object.fromEntries((roleCountsByOrg[org] ?? []).map((r) => [r.role, r.count])) as Partial<Record<OrganizationRole, number>>,
+    [org, roleCountsByOrg],
+  );
+  // 「받는 사람 n명」은 쓴 사람을 뺀 수 — 게시 뒤 패널 분모(targetTotal)와 같은 함수(2026-11-20, 2차).
+  const authorRole = item ? (org === item.organizationId ? item.authorRole : null) : (myRoleByOrg[org] ?? null);
+  const recipients = announcementRecipientCount({
+    scope,
+    roles,
+    roleCounts,
+    orgTotal: orgMemberTotal[org] ?? 0,
+    authorRole,
+  });
 
   const orgOptions: AdmOption[] = organizations.map((o) => ({ value: o.id, label: o.name }));
 
@@ -131,10 +161,10 @@ export function AnnouncementComposer({
     const picked = Array.from(event.target.files ?? []);
     event.target.value = "";
     if (picked.length === 0) return;
-    if (picked.some((f) => !ALLOWED_TYPES.includes(f.type))) return setError(t.fImgBadType);
-    if (totalImages + picked.length > MAX_IMAGES) return setError(t.fImgTooMany);
-    if (picked.some((f) => f.size > MAX_BYTES)) return setError(t.fImgTooLarge);
-    setError(null);
+    if (picked.some((f) => !ALLOWED_TYPES.includes(f.type))) return fail(t.fImgBadType);
+    if (totalImages + picked.length > MAX_IMAGES) return fail(t.fImgTooMany);
+    if (picked.some((f) => f.size > MAX_BYTES)) return fail(t.fImgTooLarge);
+    clearError();
     void Promise.all(
       picked.map(async (file) => {
         const compressed = await compressImageFile(file);
@@ -154,17 +184,17 @@ export function AnnouncementComposer({
   async function submit(status: "draft" | "published") {
     const trimmedTitle = title.trim();
     const trimmedBody = body.trim();
+    if (isNew && !org) return fail(t.vOrgRequired, "org");
     if (!trimmedTitle) {
       titleRef.current?.focus();
-      return setError(t.vTitleRequired);
+      return fail(t.vTitleRequired, "title");
     }
     if (!trimmedBody) {
       bodyRef.current?.focus();
-      return setError(t.vBodyRequired);
+      return fail(t.vBodyRequired, "body");
     }
-    if (scope === "roles" && roles.length === 0) return setError(t.vRolesRequired);
-    if (isNew && !org) return setError(t.errProcess);
-    setError(null);
+    if (scope === "roles" && roles.length === 0) return fail(t.vRolesRequired);
+    clearError();
     setSavingAs(status);
 
     const announcementId = item?.id ?? crypto.randomUUID();
@@ -195,7 +225,7 @@ export function AnnouncementComposer({
       } catch {
         cleanup();
         haptic("error");
-        setError(t.errProcess);
+        fail(t.errProcess);
         setUploading(false);
         setSavingAs(null);
         return;
@@ -227,7 +257,7 @@ export function AnnouncementComposer({
         onSaved(status === "published");
       } else {
         haptic("error");
-        setError(t.errProcess);
+        fail(t.errProcess);
       }
     });
   }
@@ -245,6 +275,12 @@ export function AnnouncementComposer({
   );
 
   const busyLabel = uploading ? w.uploading : w.saving;
+  const fieldError = (field: "org" | "title" | "body") =>
+    error && errorField === field ? (
+      <span className="anw-err" id={`anw-err-${field}`} role="alert">
+        {error}
+      </span>
+    ) : null;
 
   return (
     <div className="anw-cmp">
@@ -258,7 +294,18 @@ export function AnnouncementComposer({
         {isNew && organizations.length > 1 ? (
           <div className="anw-cmp__org">
             <span className="anw-k">{w.org}</span>
-            <AdmDropdown options={orgOptions} value={org} onChange={setOrg} ariaLabel={w.org} />
+            <AdmDropdown
+              options={orgOptions}
+              value={org}
+              onChange={(next) => {
+                setOrg(next);
+                if (errorField === "org") clearError();
+              }}
+              ariaLabel={w.org}
+              ariaDescribedBy={errorField === "org" ? "anw-err-org" : undefined}
+              disabled={busy}
+            />
+            {fieldError("org")}
           </div>
         ) : null}
 
@@ -269,16 +316,37 @@ export function AnnouncementComposer({
             name="title"
             autoComplete="off"
             value={title}
-            onChange={(event) => setTitle(event.target.value)}
+            onChange={(event) => {
+              setTitle(event.target.value);
+              if (errorField === "title") clearError();
+            }}
             placeholder={w.fTitlePh}
             maxLength={200}
             disabled={busy}
+            aria-invalid={errorField === "title" || undefined}
+            aria-describedby={errorField === "title" ? "anw-err-title" : undefined}
           />
         </label>
+        {fieldError("title")}
         <label className="anw-nf">
           <span>{w.fBody}</span>
-          <textarea ref={bodyRef} name="body" rows={13} maxLength={10000} value={body} onChange={(event) => setBody(event.target.value)} placeholder={w.fBodyPh} disabled={busy} />
+          <textarea
+            ref={bodyRef}
+            name="body"
+            rows={13}
+            maxLength={10000}
+            value={body}
+            onChange={(event) => {
+              setBody(event.target.value);
+              if (errorField === "body") clearError();
+            }}
+            placeholder={w.fBodyPh}
+            disabled={busy}
+            aria-invalid={errorField === "body" || undefined}
+            aria-describedby={errorField === "body" ? "anw-err-body" : undefined}
+          />
         </label>
+        {fieldError("body")}
 
         <div className="anw-photos">
           {existingImages.map((url) => (
@@ -304,10 +372,10 @@ export function AnnouncementComposer({
             </button>
           ) : null}
           <span className="anw-photos__n num">{w.photoCount.replace("{n}", String(totalImages))}</span>
-          <input ref={fileRef} type="file" accept="image/gif,image/jpeg,image/png,image/webp" multiple className="sr-only" onChange={handlePick} tabIndex={-1} />
+          <input ref={fileRef} type="file" accept="image/gif,image/jpeg,image/png,image/webp" multiple className="sr-only" onChange={handlePick} tabIndex={-1} aria-hidden="true" />
         </div>
 
-        {error ? (
+        {error && !errorField ? (
           <p className="anw-err" role="alert">
             {error}
           </p>

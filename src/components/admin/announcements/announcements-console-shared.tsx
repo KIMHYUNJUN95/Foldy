@@ -14,7 +14,6 @@ import {
   Users,
 } from "lucide-react";
 import type { AnnouncementConsoleDictionary } from "@/lib/announcement-i18n";
-import type { Locale } from "@/lib/i18n";
 import type { OrganizationRole } from "@/config/roles";
 import type { AdminAnnouncementVM } from "@/lib/admin-announcements";
 
@@ -57,92 +56,8 @@ export function initial(name: string): string {
   return (name || "?").trim().charAt(0) || "?";
 }
 
-// ── 도쿄 운영 시각 포매터 ─────────────────────────────────────
-// 공지 행의 모든 타임스탬프(`published_at` / `archived_at` /
-// `popup_until` / `updated_at`)는 UTC 시점으로 저장된다. 모바일 화면은
-// 이를 Asia/Tokyo 기준으로 그리고 묶는다(docs/product/11-announcement-workflow.md
-// → "공지는 Tokyo 시간 기준 published_at 날짜로 그룹핑된다"), 관리자 콘솔도
-// 똑같이 해야 한다 — 원본 ISO 문자열을 자르면 UTC 시계가 보여서
-// JST 09:00 이전에 게시된 것은 하루가 통째로 어긋난다.
-// `src/lib/admin-orders.ts` 의 `tokyoDateKey` / `tokyoStamp` 와 같은 패턴.
-const TOKYO_TZ = "Asia/Tokyo";
-
-type TokyoParts = {
-  year: string;
-  month: string;
-  day: string;
-  hour: string;
-  minute: string;
-};
-
-function tokyoParts(iso: string): TokyoParts | null {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return null;
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: TOKYO_TZ,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(date);
-  const get = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((part) => part.type === type)?.value ?? "";
-  return {
-    year: get("year"),
-    month: get("month"),
-    day: get("day"),
-    // 일부 ICU 빌드는 hour12:false 에서 자정을 "24" 로 내보낸다 — 보정한다.
-    hour: get("hour") === "24" ? "00" : get("hour"),
-    minute: get("minute"),
-  };
-}
-
-/** 도쿄 기준 "YYYY-MM-DD". 저장된 UTC 시점으로 날짜 입력을 채울 때 쓴다. */
-export function tokyoDateKey(iso: string | null): string {
-  const parts = iso ? tokyoParts(iso) : null;
-  return parts ? `${parts.year}-${parts.month}-${parts.day}` : "";
-}
-
-/** 도쿄 기준 "HH:mm"(24시간). 저장된 UTC 시점으로 시간 입력을 채울 때 쓴다. */
-export function tokyoTimeHm(iso: string | null): string {
-  const parts = iso ? tokyoParts(iso) : null;
-  return parts ? `${parts.hour}:${parts.minute}` : "";
-}
-
-/** 도쿄 기준 "M.DD" — 촘촘한 목록 열의 날짜. */
-export function fmtDateShort(iso: string | null): string {
-  const parts = iso ? tokyoParts(iso) : null;
-  if (!parts) return "—";
-  return `${Number(parts.month)}.${parts.day}`;
-}
-
-export function fmtDateLong(iso: string | null, locale: Locale): string {
-  if (!iso) return "—";
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "—";
-  return new Intl.DateTimeFormat(locale, {
-    timeZone: TOKYO_TZ,
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).format(date);
-}
-
-/** 도쿄 기준 "M.DD HH:mm". */
-export function fmtDateTime(iso: string | null): string {
-  const parts = iso ? tokyoParts(iso) : null;
-  if (!parts) return "—";
-  return `${Number(parts.month)}.${parts.day} ${parts.hour}:${parts.minute}`;
-}
-
-/** 도쿄 기준 "YYYY-MM-DD HH:mm" — 상세 패널의 고정폭 스탬프. */
-export function fmtStamp(iso: string | null): string {
-  const parts = iso ? tokyoParts(iso) : null;
-  if (!parts) return "—";
-  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`;
-}
+// 도쿄 날짜 · 시각 함수(입력 칸 값 tokyoDateKey · tokyoTimeHm, 표기 annDate · annDateTime · annDayLabel)는
+// `@/lib/announcement-display` 한 곳에 있다(2026-11-20, 2차) — 여기에 다시 만들지 않는다.
 
 export function targetLabel(
   a: Pick<AdminAnnouncementVM, "targetScope" | "targetRoles">,

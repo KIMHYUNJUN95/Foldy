@@ -155,6 +155,7 @@ export type AnnouncementConsoleDictionary = {
   vTitleRequired: string;
   vBodyRequired: string;
   vRolesRequired: string;
+  vOrgRequired: string;
   // 읽음 상태 모달
   rKicker: string;
   rSegAll: string;
@@ -195,6 +196,7 @@ export type AnnouncementConsoleDictionary = {
   imgViewTitle: string;
   // 토스트
   tSaved: string;
+  tDraftSaved: string;
   tPublished: string;
   tRepublished: string;
   tArchived: string;
@@ -322,18 +324,9 @@ type AnnouncementDictionary = {
   author: string;
   authorCredit: string;
   backToDraft: string;
-  backToAnnouncements: string;
   close: string;
-  commentBlocked: string;
-  commentDeleted: string;
-  commentPlaceholder: string;
-  commentSaved: string;
-  commentSubmit: string;
-  commentUpdated: string;
   comments: string;
-  commentsEmpty: string;
   content: string;
-  confirmCommentDeleteTitle: string;
   create: string;
   createTitle: string;
   confirmDeleteBody: string;
@@ -355,7 +348,6 @@ type AnnouncementDictionary = {
   memberName: string;
   mobileDescription: string;
   mobileEmpty: string;
-  noMembers: string;
   organization: string;
   pinned: string;
   publishedForYou: string;
@@ -366,11 +358,9 @@ type AnnouncementDictionary = {
   readAt: string;
   readCount: string;
   readers: string;
-  readSummary: string;
   markAsRead: string;
   markedAsRead: string;
   notReadYet: string;
-  openList: string;
   roleTargets: string;
   roleLabel: string;
   showPopup: string;
@@ -382,7 +372,6 @@ type AnnouncementDictionary = {
   titleField: string;
   unreadCount: string;
   viewDetail: string;
-  unreadMembers: string;
   success: {
     created: string;
     deleted: string;
@@ -414,22 +403,10 @@ const dictionaries: Record<Locale, AnnouncementDictionary> = {
     author: "\uC791\uC131\uC790",
     authorCredit: "\uC791\uC131",
     backToDraft: "\uC784\uC2DC\uC800\uC7A5",
-    backToAnnouncements: "\uACF5\uC9C0 \uBAA9\uB85D\uC73C\uB85C",
     close: "\uB2EB\uAE30",
-    commentBlocked:
-      "\uC774 \uACF5\uC9C0\uC5D0\uB294 \uB313\uAE00\uC744 \uC791\uC131\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.",
-    commentDeleted: "\uB313\uAE00\uC774 \uC0AD\uC81C\uB418\uC5C8\uC2B5\uB2C8\uB2E4.",
-    commentPlaceholder:
-      "\uACF5\uC9C0\uC5D0 \uB300\uD55C \uD655\uC778 \uC0AC\uD56D\uC774\uB098 \uACF5\uC720\uD560 \uB0B4\uC6A9\uC744 \uC785\uB825\uD558\uC138\uC694.",
-    commentSaved: "\uB313\uAE00\uC774 \uB4F1\uB85D\uB418\uC5C8\uC2B5\uB2C8\uB2E4.",
-    commentSubmit: "\uB313\uAE00 \uB4F1\uB85D",
-    commentUpdated: "\uB313\uAE00\uC774 \uC218\uC815\uB418\uC5C8\uC2B5\uB2C8\uB2E4.",
     comments: "\uB313\uAE00",
-    commentsEmpty: "\uC544\uC9C1 \uB4F1\uB85D\uB41C \uB313\uAE00\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
     cancel: "\uCDE8\uC18C",
     confirm: "\uD655\uC778",
-    confirmCommentDeleteTitle:
-      "\uC815\uB9D0 \uC774 \uB313\uAE00\uC744 \uC0AD\uC81C\uD560\uAE4C\uC694?",
     confirmDeleteBody:
       "\uC815\uB9D0 \uC774 \uACF5\uC9C0\uB97C \uC0AD\uC81C\uD560\uAE4C\uC694? \uC0AD\uC81C\uD558\uBA74 \uBC14\uB85C \uBAA9\uB85D\uC5D0\uC11C \uC0AC\uB77C\uC9D1\uB2C8\uB2E4.",
     confirmDeleteTitle:
@@ -455,7 +432,6 @@ const dictionaries: Record<Locale, AnnouncementDictionary> = {
       "\uB0B4\uAC8C \uACF5\uAC1C\uB41C \uACF5\uC9C0\uB9CC \uBAA8\uC544 \uBCF4\uACE0 \uD544\uC694\uD55C \uB0B4\uC6A9\uC744 \uD655\uC778\uD569\uB2C8\uB2E4.",
     mobileEmpty:
       "\uC544\uC9C1 \uD655\uC778\uD560 \uACF5\uC9C0\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.",
-    noMembers: "\uD45C\uC2DC\uD560 \uC0AC\uC6A9\uC790\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.",
     organization: "\uC870\uC9C1",
     pinned: "\uACE0\uC815",
     publishedForYou: "\uB0B4\uAC8C \uACF5\uAC1C\uB41C \uACF5\uC9C0",
@@ -466,11 +442,9 @@ const dictionaries: Record<Locale, AnnouncementDictionary> = {
     readAt: "\uD655\uC778\uC77C",
     readCount: "\uC77D\uC74C",
     readers: "\uC77D\uC740 \uC0AC\uC6A9\uC790",
-    readSummary: "\uC77D\uC74C \uD604\uD669",
     markAsRead: "\uC77D\uC74C\uC73C\uB85C \uD655\uC778",
     markedAsRead: "\uC774 \uACF5\uC9C0\uB97C \uD655\uC778\uD588\uC2B5\uB2C8\uB2E4.",
     notReadYet: "\uC544\uC9C1 \uD655\uC778\uD558\uC9C0 \uC54A\uC74C",
-    openList: "\uBA85\uB2E8 \uBCF4\uAE30",
     roleTargets: "\uB300\uC0C1 \uC5ED\uD560",
     roleLabel: "\uC5ED\uD560",
     showPopup: "\uC571 \uC2E4\uD589 \uC2DC \uD31D\uC5C5",
@@ -480,7 +454,6 @@ const dictionaries: Record<Locale, AnnouncementDictionary> = {
     title: "\uACF5\uC9C0",
     titleField: "\uC81C\uBAA9",
     unreadCount: "\uBBF8\uD655\uC778",
-    unreadMembers: "\uBBF8\uD655\uC778 \uC0AC\uC6A9\uC790",
     tapToZoom: "\uD0ED\uD558\uC5EC \uD06C\uAC8C \uBCF4\uAE30",
     viewDetail: "\uC790\uC138\uD788 \uBCF4\uAE30",
     success: {
@@ -491,19 +464,6 @@ const dictionaries: Record<Locale, AnnouncementDictionary> = {
     },
     errors: {
       forbidden: "\uACF5\uC9C0 \uAD00\uB9AC \uAD8C\uD55C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
-      comment_failed: "\uB313\uAE00\uC744 \uC800\uC7A5\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.",
-      comment_forbidden:
-        "\uC774 \uACF5\uC9C0\uC5D0 \uB313\uAE00\uC744 \uB0A8\uAE30\uB294 \uAD8C\uD55C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
-      comment_invalid:
-        "\uB313\uAE00 \uB0B4\uC6A9\uC744 \uD655\uC778\uD574 \uC8FC\uC138\uC694.",
-      comment_delete_failed:
-        "\uB313\uAE00\uC744 \uC0AD\uC81C\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.",
-      comment_not_found:
-        "\uB313\uAE00\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.",
-      comment_update_failed:
-        "\uB313\uAE00\uC744 \uC218\uC815\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.",
-      comments_disabled:
-        "\uC774 \uACF5\uC9C0\uC5D0\uB294 \uB313\uAE00\uC774 \uBE44\uD65C\uC131\uD654\uB418\uC5B4 \uC788\uC2B5\uB2C8\uB2E4.",
       image_count_exceeded:
         "\uC774\uBBF8\uC9C0\uB294 \uCD5C\uB300 5\uC7A5\uAE4C\uC9C0 \uCCA8\uBD80\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
       image_size_exceeded:
@@ -681,9 +641,9 @@ const dictionaries: Record<Locale, AnnouncementDictionary> = {
       fSaveDraft: "\uCD08\uC548 \uC800\uC7A5",
       fSave: "\uC800\uC7A5",
       fPublish: "\uAC8C\uC2DC",
-      vTitleRequired: "\uC81C\uBAA9\uC744 \uC785\uB825\uD574 \uC8FC\uC138\uC694.",
-      vBodyRequired: "\uBCF8\uBB38\uC744 \uC785\uB825\uD574 \uC8FC\uC138\uC694.",
-      vRolesRequired: "\uB300\uC0C1 \uC5ED\uD560\uC744 \uD558\uB098 \uC774\uC0C1 \uC120\uD0DD\uD574 \uC8FC\uC138\uC694.",
+      vTitleRequired: "\uC81C\uBAA9\uC744 \uC785\uB825\uD574 \uC8FC\uC138\uC694",
+      vBodyRequired: "\uBCF8\uBB38\uC744 \uC785\uB825\uD574 \uC8FC\uC138\uC694",
+      vRolesRequired: "\uB300\uC0C1 \uC5ED\uD560\uC744 \uD558\uB098 \uC774\uC0C1 \uC120\uD0DD\uD574 \uC8FC\uC138\uC694",
       rKicker: "\uC77D\uC74C \uD604\uD669",
       rSegAll: "\uC804\uCCB4",
       rSegRead: "\uC77D\uC74C",
@@ -720,6 +680,8 @@ const dictionaries: Record<Locale, AnnouncementDictionary> = {
       cDelBtn: "\uC0AD\uC81C",
       imgViewTitle: "\uCCA8\uBD80 \uC774\uBBF8\uC9C0",
       tSaved: "\uACF5\uC9C0\uAC00 \uC800\uC7A5\uB418\uC5C8\uC2B5\uB2C8\uB2E4.",
+      vOrgRequired: "조직을 선택해 주세요",
+      tDraftSaved: "초안을 저장했어요",
       tPublished: "\uACF5\uC9C0\uB97C \uAC8C\uC2DC\uD588\uC2B5\uB2C8\uB2E4.",
       tRepublished: "\uACF5\uC9C0\uB97C \uC7AC\uAC8C\uC2DC\uD588\uC2B5\uB2C8\uB2E4.",
       tArchived: "\uACF5\uC9C0\uB97C \uBCF4\uAD00\uD588\uC2B5\uB2C8\uB2E4.",
@@ -843,25 +805,10 @@ const dictionaries: Record<Locale, AnnouncementDictionary> = {
     author: "\u4F5C\u6210\u8005",
     authorCredit: "\u4F5C\u6210\u8005",
     backToDraft: "\u4E0B\u66F8\u304D",
-    backToAnnouncements: "\u304A\u77E5\u3089\u305B\u4E00\u89A7\u3078",
     close: "\u9589\u3058\u308B",
-    commentBlocked:
-      "\u3053\u306E\u304A\u77E5\u3089\u305B\u306B\u306F\u30B3\u30E1\u30F3\u30C8\u3067\u304D\u307E\u305B\u3093\u3002",
-    commentDeleted:
-      "\u30B3\u30E1\u30F3\u30C8\u3092\u524A\u9664\u3057\u307E\u3057\u305F\u3002",
-    commentPlaceholder:
-      "\u78BA\u8A8D\u4E8B\u9805\u3084\u5171\u6709\u3057\u305F\u3044\u5185\u5BB9\u3092\u5165\u529B\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
-    commentSaved: "\u30B3\u30E1\u30F3\u30C8\u3092\u767B\u9332\u3057\u307E\u3057\u305F\u3002",
-    commentSubmit: "\u30B3\u30E1\u30F3\u30C8\u3092\u767B\u9332",
-    commentUpdated:
-      "\u30B3\u30E1\u30F3\u30C8\u3092\u66F4\u65B0\u3057\u307E\u3057\u305F\u3002",
     comments: "\u30B3\u30E1\u30F3\u30C8",
-    commentsEmpty:
-      "\u307E\u3060\u767B\u9332\u3055\u308C\u305F\u30B3\u30E1\u30F3\u30C8\u306F\u3042\u308A\u307E\u305B\u3093\u3002",
     cancel: "\u30AD\u30E3\u30F3\u30BB\u30EB",
     confirm: "\u78BA\u8A8D",
-    confirmCommentDeleteTitle:
-      "\u3053\u306E\u30B3\u30E1\u30F3\u30C8\u3092\u672C\u5F53\u306B\u524A\u9664\u3057\u307E\u3059\u304B\u3002",
     confirmDeleteBody:
       "\u3053\u306E\u304A\u77E5\u3089\u305B\u3092\u672C\u5F53\u306B\u524A\u9664\u3057\u307E\u3059\u304B\u3002\u524A\u9664\u3059\u308B\u3068\u4E00\u89A7\u304B\u3089\u3059\u3050\u306B\u8868\u793A\u304C\u6D88\u3048\u307E\u3059\u3002",
     confirmDeleteTitle:
@@ -888,8 +835,6 @@ const dictionaries: Record<Locale, AnnouncementDictionary> = {
       "\u81EA\u5206\u306B\u516C\u958B\u3055\u308C\u305F\u304A\u77E5\u3089\u305B\u3060\u3051\u3092\u78BA\u8A8D\u3057\u3001\u5FC5\u8981\u306A\u5185\u5BB9\u3092\u3059\u3050\u306B\u898B\u3089\u308C\u307E\u3059\u3002",
     mobileEmpty:
       "\u78BA\u8A8D\u3067\u304D\u308B\u304A\u77E5\u3089\u305B\u306F\u307E\u3060\u3042\u308A\u307E\u305B\u3093\u3002",
-    noMembers:
-      "\u8868\u793A\u3067\u304D\u308B\u30E6\u30FC\u30B6\u30FC\u306F\u307E\u3060\u3044\u307E\u305B\u3093\u3002",
     organization: "\u7D44\u7E54",
     pinned: "\u56FA\u5B9A",
     publishedForYou: "\u81EA\u5206\u5411\u3051\u306B\u516C\u958B\u4E2D",
@@ -900,12 +845,10 @@ const dictionaries: Record<Locale, AnnouncementDictionary> = {
     readAt: "\u78BA\u8A8D\u65E5",
     readCount: "\u65E2\u8AAD",
     readers: "\u65E2\u8AAD\u30E6\u30FC\u30B6\u30FC",
-    readSummary: "\u65E2\u8AAD\u72B6\u6CC1",
     markAsRead: "\u65E2\u8AAD\u306B\u3059\u308B",
     markedAsRead:
       "\u3053\u306E\u304A\u77E5\u3089\u305B\u3092\u78BA\u8A8D\u3057\u307E\u3057\u305F\u3002",
     notReadYet: "\u672A\u78BA\u8A8D",
-    openList: "\u540D\u7C3F\u3092\u898B\u308B",
     roleTargets: "\u5BFE\u8C61\u30ED\u30FC\u30EB",
     roleLabel: "\u30ED\u30FC\u30EB",
     showPopup:
@@ -916,7 +859,6 @@ const dictionaries: Record<Locale, AnnouncementDictionary> = {
     title: "\u304A\u77E5\u3089\u305B",
     titleField: "\u30BF\u30A4\u30C8\u30EB",
     unreadCount: "\u672A\u8AAD",
-    unreadMembers: "\u672A\u8AAD\u30E6\u30FC\u30B6\u30FC",
     tapToZoom: "\u30BF\u30C3\u30D7\u3057\u3066\u62E1\u5927",
     viewDetail: "\u8A73\u3057\u304F\u898B\u308B",
     success: {
@@ -928,20 +870,6 @@ const dictionaries: Record<Locale, AnnouncementDictionary> = {
     errors: {
       forbidden:
         "\u304A\u77E5\u3089\u305B\u3092\u7BA1\u7406\u3059\u308B\u6A29\u9650\u304C\u3042\u308A\u307E\u305B\u3093\u3002",
-      comment_failed:
-        "\u30B3\u30E1\u30F3\u30C8\u3092\u4FDD\u5B58\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002",
-      comment_forbidden:
-        "\u3053\u306E\u304A\u77E5\u3089\u305B\u306B\u30B3\u30E1\u30F3\u30C8\u3059\u308B\u6A29\u9650\u304C\u3042\u308A\u307E\u305B\u3093\u3002",
-      comment_invalid:
-        "\u30B3\u30E1\u30F3\u30C8\u5185\u5BB9\u3092\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
-      comment_delete_failed:
-        "\u30B3\u30E1\u30F3\u30C8\u3092\u524A\u9664\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002",
-      comment_not_found:
-        "\u30B3\u30E1\u30F3\u30C8\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3002",
-      comment_update_failed:
-        "\u30B3\u30E1\u30F3\u30C8\u3092\u66F4\u65B0\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002",
-      comments_disabled:
-        "\u3053\u306E\u304A\u77E5\u3089\u305B\u3067\u306F\u30B3\u30E1\u30F3\u30C8\u304C\u7121\u52B9\u3067\u3059\u3002",
       image_count_exceeded:
         "\u753B\u50CF\u306F\u6700\u59275\u679A\u307E\u3067\u6DFB\u4ED8\u3067\u304D\u307E\u3059\u3002",
       image_size_exceeded:
@@ -1120,9 +1048,9 @@ const dictionaries: Record<Locale, AnnouncementDictionary> = {
       fSaveDraft: "\u4E0B\u66F8\u304D\u4FDD\u5B58",
       fSave: "\u4FDD\u5B58",
       fPublish: "\u516C\u958B",
-      vTitleRequired: "\u30BF\u30A4\u30C8\u30EB\u3092\u5165\u529B\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
-      vBodyRequired: "\u672C\u6587\u3092\u5165\u529B\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
-      vRolesRequired: "\u5BFE\u8C61\u30ED\u30FC\u30EB\u30921\u3064\u4EE5\u4E0A\u9078\u629E\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
+      vTitleRequired: "\u30BF\u30A4\u30C8\u30EB\u3092\u5165\u529B\u3057\u3066\u304F\u3060\u3055\u3044",
+      vBodyRequired: "\u672C\u6587\u3092\u5165\u529B\u3057\u3066\u304F\u3060\u3055\u3044",
+      vRolesRequired: "\u5BFE\u8C61\u30ED\u30FC\u30EB\u30921\u3064\u4EE5\u4E0A\u9078\u629E\u3057\u3066\u304F\u3060\u3055\u3044",
       rKicker: "\u65E2\u8AAD\u72B6\u6CC1",
       rSegAll: "\u5168\u4F53",
       rSegRead: "\u65E2\u8AAD",
@@ -1159,6 +1087,8 @@ const dictionaries: Record<Locale, AnnouncementDictionary> = {
       cDelBtn: "\u524A\u9664",
       imgViewTitle: "\u6DFB\u4ED8\u753B\u50CF",
       tSaved: "\u304A\u77E5\u3089\u305B\u3092\u4FDD\u5B58\u3057\u307E\u3057\u305F\u3002",
+      vOrgRequired: "組織を選んでください",
+      tDraftSaved: "下書きを保存しました",
       tPublished: "\u304A\u77E5\u3089\u305B\u3092\u516C\u958B\u3057\u307E\u3057\u305F\u3002",
       tRepublished: "\u304A\u77E5\u3089\u305B\u3092\u518D\u516C\u958B\u3057\u307E\u3057\u305F\u3002",
       tArchived: "\u304A\u77E5\u3089\u305B\u3092\u30A2\u30FC\u30AB\u30A4\u30D6\u3057\u307E\u3057\u305F\u3002",
@@ -1282,20 +1212,10 @@ const dictionaries: Record<Locale, AnnouncementDictionary> = {
     author: "Author",
     authorCredit: "Author",
     backToDraft: "Draft",
-    backToAnnouncements: "Back to announcements",
     close: "Close",
-    commentBlocked: "Comments are not available for this announcement.",
-    commentDeleted: "Comment deleted.",
-    commentPlaceholder:
-      "Add a confirmation note or a message to share with the team.",
-    commentSaved: "Comment posted.",
-    commentSubmit: "Post comment",
-    commentUpdated: "Comment updated.",
     comments: "Comments",
-    commentsEmpty: "There are no comments yet.",
     cancel: "Cancel",
     confirm: "Confirm",
-    confirmCommentDeleteTitle: "Delete this comment?",
     confirmDeleteBody:
       "Delete this announcement? Once deleted, it disappears from the list immediately.",
     confirmDeleteTitle: "Delete this announcement?",
@@ -1318,7 +1238,6 @@ const dictionaries: Record<Locale, AnnouncementDictionary> = {
     mobileDescription:
       "See only the announcements published for you and open the details you need right away.",
     mobileEmpty: "There are no announcements for you yet.",
-    noMembers: "There are no users to show.",
     organization: "Organization",
     pinned: "Pinned",
     publishedForYou: "Published for you",
@@ -1329,11 +1248,9 @@ const dictionaries: Record<Locale, AnnouncementDictionary> = {
     readAt: "Read at",
     readCount: "Read",
     readers: "Readers",
-    readSummary: "Read status",
     markAsRead: "Mark as read",
     markedAsRead: "You have read this announcement.",
     notReadYet: "Not read yet",
-    openList: "Open list",
     roleTargets: "Target roles",
     roleLabel: "Role",
     showPopup: "Show popup on app open",
@@ -1343,7 +1260,6 @@ const dictionaries: Record<Locale, AnnouncementDictionary> = {
     title: "Announcements",
     titleField: "Title",
     unreadCount: "Unread",
-    unreadMembers: "Unread users",
     tapToZoom: "Tap to zoom",
     viewDetail: "View detail",
     success: {
@@ -1353,14 +1269,6 @@ const dictionaries: Record<Locale, AnnouncementDictionary> = {
     },
     errors: {
       forbidden: "You do not have permission to manage announcements.",
-      comment_failed: "Could not save comment.",
-      comment_forbidden:
-        "You do not have permission to comment on this announcement.",
-      comment_invalid: "Check the comment content.",
-      comment_delete_failed: "Could not delete comment.",
-      comment_not_found: "Could not find that comment.",
-      comment_update_failed: "Could not update comment.",
-      comments_disabled: "Comments are disabled for this announcement.",
       image_count_exceeded: "You can attach up to 5 images.",
       image_size_exceeded: "Each image must be 8MB or less.",
       image_type_invalid:
@@ -1532,9 +1440,9 @@ const dictionaries: Record<Locale, AnnouncementDictionary> = {
       fSaveDraft: "Save draft",
       fSave: "Save",
       fPublish: "Publish",
-      vTitleRequired: "Please enter a title.",
-      vBodyRequired: "Please enter the body.",
-      vRolesRequired: "Please select at least one target role.",
+      vTitleRequired: "Please enter a title",
+      vBodyRequired: "Please enter the body",
+      vRolesRequired: "Please select at least one target role",
       rKicker: "Read status",
       rSegAll: "All",
       rSegRead: "Read",
@@ -1571,6 +1479,8 @@ const dictionaries: Record<Locale, AnnouncementDictionary> = {
       cDelBtn: "Delete",
       imgViewTitle: "Attached image",
       tSaved: "Announcement saved.",
+      vOrgRequired: "Choose an organization",
+      tDraftSaved: "Draft saved",
       tPublished: "Announcement published.",
       tRepublished: "Announcement republished.",
       tArchived: "Announcement archived.",

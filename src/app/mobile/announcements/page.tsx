@@ -9,31 +9,9 @@ import { AnnouncementListMobile, type MobileNoticeGroup } from "@/components/ann
 import { getOnboardingState } from "@/lib/onboarding";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import type { OrganizationRole } from "@/config/roles";
+import { annDate, annDayKey, annDayLabel } from "@/lib/announcement-display";
 
-function localeTag(locale: string): string {
-  return locale === "ko" ? "ko-KR" : locale === "ja" ? "ja-JP" : "en-US";
-}
-
-function toTokyoDate(dateStr: string | null): string {
-  if (!dateStr) return "";
-  return new Date(dateStr).toLocaleDateString("en-CA", { timeZone: "Asia/Tokyo" });
-}
-
-/** 묶음 머리 — 「10월 6일 (월)」. */
-function formatDayLabel(dateStr: string | null, locale: string): string {
-  if (!dateStr) return "";
-  return new Intl.DateTimeFormat(localeTag(locale), {
-    month: "long", day: "numeric", weekday: "short", timeZone: "Asia/Tokyo",
-  }).format(new Date(dateStr));
-}
-
-/** 고정 묶음 meta 앞 날짜 — 「10월 8일」. */
-function formatShortDay(dateStr: string | null, locale: string): string {
-  if (!dateStr) return "";
-  return new Intl.DateTimeFormat(localeTag(locale), {
-    month: "long", day: "numeric", timeZone: "Asia/Tokyo",
-  }).format(new Date(dateStr));
-}
+// 날짜 표기 · 묶음 열쇠는 lib/announcement-display 하나로(2026-11-20) — 묶음 머리 「2026.11.14 (토)」 · 고정 줄 날짜 「2026.11.18」.
 
 function targetLabel(
   scope: string,
@@ -101,7 +79,7 @@ export default async function MobileAnnouncementsPage() {
   const toRow = (ann: (typeof announcements)[number], withDate: boolean) => ({
     id: ann.id,
     title: ann.title,
-    meta: [withDate ? formatShortDay(ann.published_at, locale) : null, targetLabel(ann.target_scope, ann.target_roles as string[], copy), ann.author_name || null]
+    meta: [withDate ? annDate(ann.published_at) : null, targetLabel(ann.target_scope, ann.target_roles as string[], copy), ann.author_name || null]
       .filter(Boolean)
       .join(" · "),
     important: ann.is_important,
@@ -113,10 +91,10 @@ export default async function MobileAnnouncementsPage() {
   if (pinned.length > 0) groups.push({ key: "pinned", label: copy.white.mPinned, items: pinned.map((ann) => toRow(ann, true)) });
   for (const ann of announcements) {
     if (ann.is_pinned) continue;
-    const key = toTokyoDate(ann.published_at) || "unknown";
+    const key = annDayKey(ann.published_at) || "unknown";
     let group = groups.find((g) => g.key === key);
     if (!group) {
-      group = { key, label: formatDayLabel(ann.published_at, locale), items: [] };
+      group = { key, label: annDayLabel(ann.published_at, locale), items: [] };
       groups.push(group);
     }
     group.items.push(toRow(ann, false));

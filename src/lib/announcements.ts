@@ -4,6 +4,7 @@ import type { AppSession } from "@/lib/session";
 import type { Database } from "@/types/database";
 import type { OrganizationRole } from "@/config/roles";
 import { bestEffortWrite } from "@/lib/db-write-guard";
+import { countsTowardRead } from "@/lib/announcement-display";
 
 type OrgRoleMap = Map<string, OrganizationRole>;
 
@@ -101,16 +102,6 @@ export type AnnouncementReadUser = {
   name: string;
   readAt: string | null;
   role: OrganizationRole;
-};
-
-export type AnnouncementCommentItem = {
-  authorName: string;
-  content: string;
-  createdAt: string;
-  id: string;
-  isAuthor: boolean;
-  updatedAt: string;
-  userId: string;
 };
 
 const announcementSelect =
@@ -325,7 +316,10 @@ export async function getAnnouncementReadSummary(
     announcement.target_scope === "roles"
       ? await membershipQuery.in("role", announcement.target_roles)
       : await membershipQuery;
-  const memberships = (membershipData ?? []) as MembershipRow[];
+  // 쓴 사람은 「안 읽음」 목록 · 읽음 분모에서 빠진다(2026-11-20, countsTowardRead — 목록 숫자와 같은 판정).
+  const memberships = ((membershipData ?? []) as MembershipRow[]).filter((membership) =>
+    countsTowardRead(membership.user_id, announcement.created_by_user_id),
+  );
   const userIds = memberships.map((membership) => membership.user_id);
 
   if (userIds.length === 0) {
@@ -397,34 +391,4 @@ export async function getPopupDismissals(
   const rows = (data ?? []) as PopupDismissalRow[];
 
   return new Set(rows.map((row) => row.announcement_id));
-}
-
-export async function getAnnouncementComments(
-  announcement: Pick<AnnouncementRow, "id" | "organization_id">,
-  currentUserId: string,
-) {
-  const service = getSupabaseServiceClient();
-  const { data } = await service
-    .from("announcement_comments")
-    .select(
-      "id, announcement_id, organization_id, user_id, content, created_at, updated_at, deleted_at",
-    )
-    .eq("announcement_id", announcement.id)
-    .eq("organization_id", announcement.organization_id)
-    .is("deleted_at", null)
-    .order("created_at", { ascending: true });
-  const comments = (data ?? []) as AnnouncementCommentRow[];
-  const authorNames = await getAuthorNames([
-    ...new Set(comments.map((comment) => comment.user_id)),
-  ]);
-
-  return comments.map((comment) => ({
-    authorName: authorNames.get(comment.user_id) ?? "",
-    content: comment.content,
-    createdAt: comment.created_at,
-    id: comment.id,
-    isAuthor: comment.user_id === currentUserId,
-    updatedAt: comment.updated_at,
-    userId: comment.user_id,
-  })) as AnnouncementCommentItem[];
 }

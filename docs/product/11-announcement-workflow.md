@@ -76,7 +76,7 @@ archived_at
 구성:
 
 - 공지는 Tokyo 시간 기준 `published_at` 날짜로 그룹핑된다.
-- 각 날짜 그룹 상단에 날짜 라벨 (`년 월 일` 형식, 로케일 적용)이 표시된다.
+- 각 날짜 그룹 상단에 날짜 라벨이 표시된다 — 2026-11-20 부터 「2026.10.16 (금)」 꼴(`annDayLabel`, 요일만 언어별).
 - 각 항목은 좌측에 도트+라인 타임라인 마커가 붙는다.
   - 중요 공지: `bg-red-600` 도트
   - 일반 공지: `bg-primary` 도트
@@ -125,12 +125,12 @@ URL 진입 시 팝업 조건을 충족한 공지가 있으면 `AnnouncementPopup
 
 - `AnnouncementPopup` 은 공유 `BottomSheet` 컴포넌트를 사용한다.
 - BottomSheet 내부 구성:
-  1. 상단: 중요 칩 (AlertIcon + "중요") + 짧은 날짜 (`published_at`, 로케일 적용)
+  1. 상단: 중요 칩 (AlertIcon + "중요") + 날짜 (`published_at` 을 `annDate` 로 「2026.11.18」, 도쿄 기준)
   2. 제목 (`text-[19px] font-black`)
   3. 본문 프리뷰 (최대 6줄 clamp, `whitespace-pre-line`)
   4. 이미지 (`AnnouncementImageGrid`, `imageUrls` 가 있을 때)
   5. 7일 숨기기 체크박스
-  6. CTA 2버튼: 확인(ghost, `close` 호출) + 자세히 보기(primary, 상세 페이지로 이동)
+  6. CTA 2버튼: 확인(ghost, `close` 호출) + 자세히 보기(primary — 모바일은 `/mobile/announcements/[id]`, 관리자 쪽은 콘솔 `/admin/announcements?id=` 패널)
 - 드래그 내리기 / 스크림 탭으로 닫기 → `dismissCurrentAnnouncement()` 호출
 - BottomSheet는 `max-h-[calc(100dvh-2rem)] overflow-y-auto` 로 긴 콘텐츠를 스크롤 처리
 
@@ -148,7 +148,7 @@ URL 진입 시 팝업 조건을 충족한 공지가 있으면 `AnnouncementPopup
 - 파일: `announcement-list-mobile.tsx`(목록, 클라이언트) · `announcements-mobile.css`(ntw-*) · `announcement-popup.tsx`(모양만) ·
   `announcement-image-grid.tsx` 의 `variant="plain"`(테두리 · 그림자 없는 2열, 한 장이면 넓게). 문구는 `white` 묶음의 `m*`(ko/ja/en).
 - **목록**: 머리 「공지」 + 「안 읽은 공지 n개」(없으면 「모두 읽었어요」). 도트+선 타임라인은 없앴다.
-  고정 공지는 맨 위 **「고정」 묶음**(meta 앞에 날짜), 나머지는 도쿄 게시일 묶음(「10월 6일 (월)」). 줄은 「중요」(빨강) → 제목 → 대상 · 작성자, 사진이 있으면 오른쪽 아이콘.
+  고정 공지는 맨 위 **「고정」 묶음**(meta 앞에 날짜), 나머지는 도쿄 게시일 묶음(2026-11-20 부터 「2026.10.16 (금)」, `annDayLabel`). 줄은 「중요」(빨강) → 제목 → 대상 · 작성자, 사진이 있으면 오른쪽 아이콘.
   **안 읽은 공지**는 왼쪽 보라 점 + 굵은 제목(`getReadAnnouncementIds` — 본인 `announcement_reads`). 누르면 점이 바로 줄어 사라진다(태블릿 2분할은
   칸에 열린 줄 표시를 보고 지운다). 빈 목록은 「아직 공지가 없어요」.
 - **상세**: 상자 없는 한 장 — 「고정 · 중요」 → 제목 → 「10월 8일 18:20 · 대상 · 작성자」 → 가는 선 → 본문(16px) → 사진 2열 + 「사진을 누르면 크게 볼 수 있어요」.
@@ -163,7 +163,7 @@ URL 진입 시 팝업 조건을 충족한 공지가 있으면 `AnnouncementPopup
 
 기능 · 배치는 그대로, 크기 · 글자 · 줄만(`announcements-mobile.css`):
 - 줄 사이 선: 화면 끝(0)부터 긋던 것 → **글자 시작점 20부터**(안 읽음 점 8 + 간격 12, 공용 구분선 규칙). 칸 모드 고른 줄 위아래 선은 숨김.
-- 날짜 묶음 제목 「고정 · 오늘 · 10월 16일」 12/600 회색 + 아래 줄 → **17/600 먹색 · 높이 44, 아래 줄 없음**, 묶음 간격 18 → 10.
+- 날짜 묶음 제목 「고정 · 오늘 · 10월 16일」(2026-11-20 부터 날짜는 「2026.10.16 (금)」, `annDayLabel`) 12/600 회색 + 아래 줄 → **17/600 먹색 · 높이 44, 아래 줄 없음**, 묶음 간격 18 → 10.
 - 줄 제목 15 → 16(안 읽음 굵기 700 → 600), 아래 줄 · 「중요」 12 → 13, 사진 표시 16 → 18. 위 「안 읽은 공지 n개」 13 → 15. 빈 화면 17/15.
 - 상세 「사진을 누르면…」 12 → 13. 팝업 「7일 동안 다시 보지 않기」 14 → 15 · 「1 / 2」 12 → 13.
 
@@ -282,7 +282,7 @@ Current implementation:
 - 7일 hide preference는 `announcement_popup_dismissals` (user x announcement 1행) 에 서버 측 저장된다. 모든 브라우저·기기에 적용된다.
 - localStorage는 동일 페이지 내 즉시 숨기기 fast path로만 사용된다.
 - 팝업 닫기는 읽음 처리가 아님. 읽음 추적은 상세 페이지 진입과 연결된다.
-- 팝업 "자세히 보기" CTA: mobile → `/mobile/announcements/[id]`, admin → `/admin/announcements/[id]`
+- 팝업 "자세히 보기" CTA: mobile → `/mobile/announcements/[id]`, admin → 콘솔 `/admin/announcements?id=` 패널(예전 `/admin/announcements/[id]` 는 그리로 넘긴다, 2026-11-20). 지금 팝업은 `/mobile` 에서만 그린다.
 - 팝업은 공유 `BottomSheet` 컴포넌트로 표시된다 (2026-06-26 전환 완료).
 
 ## Admin Dashboard Management Console
@@ -435,7 +435,7 @@ Current implementation:
 
 - 어드민 공지 콘솔은 **댓글 없는 공식 공지 관리 표면**으로 정리한다.
 - 토론/피드백은 게시판(Board) 또는 제안함(Suggestions)으로 보낸다.
-- 현재 어드민 상세의 댓글 UI와 `allow_comments`는 **레거시 구현**으로 간주하며, 향후 클린업 대상이다.
+- 2026-11-20 어드민 상세의 댓글 화면과 댓글 서버 액션을 지웠다. DB 표 `announcement_comments` 와 `allow_comments` 열만 남았다(마이그레이션 없음).
 
 즉 "공지 = 공식 전달", "게시판/제안함 = 상호작용" 경계를 대시보드에서도 유지한다.
 
@@ -464,8 +464,7 @@ Current implementation:
 - 서버 액션 (`src/app/admin/announcements/actions.ts`, 결과 반환형):
   `saveAnnouncementConsole`(생성/편집) · `setAnnouncementStatusConsole`(게시/보관/초안) ·
   `deleteAnnouncementConsole` · `getAnnouncementReadStatusConsole`(읽음 명단).
-  기존 redirect 기반 액션(`createAnnouncement` 등)과 `/admin/announcements/[id]` 상세 페이지는
-  긴 본문/직접 진입 fallback 및 레거시 경로로 유지된다.
+  `/admin/announcements/[id]` 는 2026-11-20 부터 `/admin/announcements?id=…` 로 넘기기만 한다(아래 「공지 unslop」).
 - i18n: `src/lib/announcement-i18n.ts` 의 `console` 네임스페이스 (ko/ja/en 전체).
 
 권한 매핑 (Permission Split 반영):
@@ -513,10 +512,45 @@ Current implementation:
 
 - 목록 읽음 수는 **현재 대상 구성원(활성 + 대상 역할)이 읽은 것만** 센다 — 상세의 `getAnnouncementReadSummary` 와 같은 기준.
 - 게시된 공지를 **중요로 올리거나 대상 역할을 넓히면** 새로 대상이 된 사람에게도 알림을 보낸다(사람별 중복 키로 이미 받은 사람은 제외).
-- 서버 상한: 제목 200자 · 본문 10,000자 · 댓글 2,000자(넘으면 오류 — 댓글은 「내용을 확인하세요」).
+- 서버 상한: 제목 200자 · 본문 10,000자(넘으면 오류).
 - 여러 조직 소속이어도 목록에는 **관리자 웹 접근 · 공지 권한이 있는 조직**의 공지만 나온다.
 - 편집 저장 실패/업로드 실패 시 방금 올린 사진을 서버가 치우고, 편집에서 뺀 사진은 저장 성공 뒤 서버가 지운다(이 조직 · 이 공지 폴더 경로만).
 - 팝업 재노출(읽은 공지 다시 띄우기)은 사용자 결정으로 **하지 않는다**.
+
+## 공지 unslop (2026-11-20)
+
+PC 공지 콘솔 + 모바일 공지 다듬기(캔버스 DwV9yB2k…). 역할 권한 · 삭제 정책 · 읽음 처리 시점은 그대로다.
+
+### 표시 규칙 — 한 곳 `src/lib/announcement-display.ts`
+
+- **날짜는 한 모양 「2026.11.18」**, 시각이 붙으면 「2026.11.18 09:05」(24시간) — 모두 **도쿄 기준**. PC 목록 · 상세 · 작성 화면, 모바일 목록 · 상세, 앱 열 때 팝업이 같은 함수(`annDate` · `annDateTime`)를 쓴다.
+  모바일 날짜 묶음 머리는 「2026.11.14 (토)」 — 요일만 언어별(`annDayLabel`). 화면마다 따로 있던 날짜 함수는 지웠다.
+- **쓴 사람은 읽음 집계에서 빠진다**(`countsTowardRead`) — 「안 읽음」 명단 · 「18 / 24명」 분모 · 목록 숫자 모두. 자기 공지를 안 읽음으로 세면 숫자가 늘 하나 모자랐다.
+  작성 화면의 「받는 사람 n명」 미리보기도 같은 규칙으로 **쓴 사람을 뺀다**(`announcementRecipientCount` — 서버 분모와 같은 함수, 0 아래로 내려가지 않음). 새 공지는 지금 고른 조직의 내 역할, 수정은 원래 쓴 사람의 역할로 센다(2026-11-20, 2차).
+- **새 공지의 조직은 지금 보고 있는 조직**으로 시작한다(`pickInitialAnnouncementOrg`). 지금 조직이 없거나(플랫폼 관리자) 관리할 수 없는 조직이면 비워 두고 **고르기 필수** — 안 고르면 「조직을 선택해 주세요」. 조직이 하나뿐이면 그 조직.
+- **예전 상세 주소** `/admin/announcements/[id]` 는 `/admin/announcements?id=…` 로 넘기고, 콘솔이 그 공지를 오른쪽 패널로 연다(공지 번호 꼴일 때만). 패널을 닫거나 다른 줄을 고르면 주소의 `?id` 를 지운다.
+  예전 상세 페이지가 하던 「관리자 본인 읽음 기록」은 콘솔에서는 하지 않는다 — **PC 패널을 열어도 관리자 자신의 읽음은 기록되지 않는다**(리드 결정, 2026-11-20).
+  패널은 주소 `?id` 를 따라간다(뒤로 · 앞으로 · 링크 이동 포함). 목록에 없는 `?id` 는 기록을 남기지 않고 지운다(`history.replaceState`).
+
+### 보기
+
+- 굵기 700 → **600**, 제목 · 짧은 머리에 `text-wrap: balance`. 숫자는 `tabular-nums`. 보라 hex 대신 `--primary` · `--primary-ink` · `--primary-tint` 토큰.
+- PC 누름 크기 **40px**, 사진 썸네일 × 는 보이는 크기 26px 그대로 두고 누름 자리만 사방 8px 넓힘. 사진에 옅은 안쪽 테두리(검정 8%).
+  패널의 「안 읽음 / 읽음」 탭도 보이는 높이 28px 그대로, 누름 자리만 위아래 6px 넓혀 40px(2차).
+- 작성 화면 오류는 **해당 칸 바로 아래**(빨간 테두리 · `aria-invalid` · `aria-describedby`, 13px/500, 끝 마침표 없음). 칸에 묶이지 않는 오류(저장 실패 등)만 아래에 따로.
+- 초안 저장 알림 「초안을 저장했어요」(전엔 게시와 같은 「저장되었습니다」). 게시 중인 공지를 고쳐 저장하면 「공지가 저장되었습니다.」(전엔 「게시했습니다」, 2차).
+- 움직임: **줄 차례 등장은 뺐다**(열 때마다 반복돼 느렸다). 읽음 막대는 `scaleX(.2)` 에서 240ms 차오름, 모바일 안 읽음 점은 `scale(.6)` 에서 200ms. 움직임 줄이기면 끈다.
+- 모바일 2분할 빈 칸 문구(모든 모바일 `SplitList` 공용 `common.splitEmpty`): 「목록에서 고르면 여기에 열려요」.
+
+### 고친 버그 — 태블릿 2분할 수화 경고
+
+태블릿(1180)에서 `/mobile/announcements` 줄을 고르면 오른쪽 칸(같은 출처 iframe)이 상세를 문서째 새로 받는데, 그때 「attributes didn't match」 경고가 났다.
+원인: 모바일 레이아웃의 공용 `ImageFadeIn` 은 먼저 수화되고, 상세는 `loading.tsx` 경계 뒤로 흘러 들어온다 — 흘러 들어온 사진이 받아지면 React 가 그 부분을 수화하기 전에 `<img data-loaded>` 가 붙는다.
+처방: `AnnouncementImageGrid` 의 `<Image>` 세 가지 모두 `suppressHydrationWarning`(그 요소 속성만 덮는다 — 손님 메시지 사진과 같은 처방). 회귀 테스트 `src/lib/__tests__/announcement-image-grid-render.test.tsx` — 세 모양을 `renderToString` 으로 `<img>` 까지 실제로 그려 본다(속성은 HTML 에 안 나와서 next/image 만 받은 속성을 적는 `<img>` 로 바꿈). 소스 글자를 찾던 예전 테스트는 지웠다(2026-11-20, 2차).
+
+### 지운 것
+
+- 쓰이지 않던 `announcement-comments-section.tsx` · `announcement-read-status-panel.tsx` · `src/app/announcements/actions.ts`(댓글 서버 액션) · `getAnnouncementComments`. **이제 댓글 화면은 어디에도 없다**(DB 표 `announcement_comments` · `allow_comments` 는 그대로).
 
 ## Comments
 
@@ -531,10 +565,10 @@ Current implementation:
 Current implementation (레거시 처리 상태):
 
 - 모바일 상세 페이지 (`/mobile/announcements/[id]`) 에서 `AnnouncementCommentsSection` 렌더링을 제거했다 (2026-06-26). `getAnnouncementComments` 호출과 댓글 관련 `searchParams` 처리도 함께 제거. 읽음 추적 (`ensureAnnouncementRead`) 은 유지.
-- 어드민 상세 페이지 (`/admin/announcements/[id]`) 에서는 여전히 `AnnouncementCommentsSection` 이 렌더링되며 댓글 제출/수정/삭제가 가능하다.
+- ~~어드민 상세 페이지 (`/admin/announcements/[id]`) 에서는 여전히 `AnnouncementCommentsSection` 이 렌더링되며 댓글 제출/수정/삭제가 가능하다.~~ 2026-11-20 상세 페이지는 콘솔로 넘기기만 하고, 댓글 화면 · 서버 액션 · 컴포넌트를 지웠다(위 「공지 unslop」).
 - DB 스키마 (`announcement_comments` 테이블, `allow_comments` 컬럼) 가 유지되고 있다.
-- 댓글 관련 server action (`createAnnouncementComment`, `updateAnnouncementComment`, `deleteAnnouncementComment` — `src/app/announcements/actions.ts`) 과 공유 컴포넌트 `AnnouncementCommentsSection`, lib 함수 `getAnnouncementComments` 는 어드민 사용을 위해 유지된다.
-- 모바일 UI에서만 댓글을 제거했고, 어드민 댓글 및 서버 구현 전체는 **향후 클린업 대상** 으로 간주한다.
+- ~~댓글 관련 server action · `AnnouncementCommentsSection` · `getAnnouncementComments` 는 어드민 사용을 위해 유지된다.~~ 2026-11-20 지웠다.
+- 2026-11-20 어드민 댓글 화면과 댓글 서버 액션까지 지웠다 — 댓글 화면 · 서버 액션은 어디에도 없고, DB 표 `announcement_comments` · `allow_comments` 열만 남았다.
 - 2026-07-22 재기획 기준으로도, 어드민 공지 콘솔은 댓글을 핵심 기능으로 유지하지 않는다.
 
 관련 마이그레이션:

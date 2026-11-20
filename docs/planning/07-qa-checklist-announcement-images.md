@@ -70,7 +70,7 @@
 | 페이지 | URL | 관련 시나리오 |
 |---|---|---|
 | 관리자 공지 목록 | `/admin/announcements` | TC-01 ~ TC-10 전체 |
-| 공지 상세 (admin) | `/admin/announcements/[id]` | TC-01 |
+| 공지 상세 (admin) | `/admin/announcements/[id]` → `?id=` 패널 | TC-01 |
 | 시드 로그인 (관리자) | `/api/dev/seed-login?as=admin` | 전체 |
 | 시드 로그인 (스태프) | `/api/dev/seed-login?as=staff` | TC-04 |
 | Supabase Storage 대시보드 | 프로젝트 → Storage → `announcement-images` | TC-01, TC-02, TC-08, TC-09 |

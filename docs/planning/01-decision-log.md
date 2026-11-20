@@ -2,6 +2,14 @@
 
 This file records important project decisions.
 
+## 2026-11-20 request-images 사진 폴더 목록은 DB 함수 하나 · 코드 목록 하나 (`202611200005`, 운영 적용 2026-11-20)
+
+- 202607160001 부터 정책을 다시 만들 때마다 폴더 목록을 통째로 다시 적다가 할 일 · 할 일 메모 · 제안 · 근태 정정 · 게시판 글 · 댓글 폴더가 빠져, 그 사진 올리기가 막혀 있었다.
+- 앞으로 폴더 목록은 **`public.request_image_folder_allows(폴더, 역할)` 한 곳**(DB)과 **`src/lib/request-image-folders.ts` 한 곳**(코드)에만 둔다. 정책은 함수를 부르기만 한다 —
+  폴더를 더할 때는 함수만 바꾸고 정책을 다시 만들지 않는다. 두 목록이 어긋나면 `request-image-folders-policy.test.ts` 가 실패한다.
+- 되살린 폴더의 역할 조건은 마지막 정의(202606290001) 그대로(할 일 두 폴더만 아르바이트 제외). 지우기는 지금 규칙(내 것 또는 권한 키). 서버만 쓰는 `bug-reports` · `complaint-images` 는 목록에 넣지 않는다.
+- 위 12-E 의 「사진은 `request-images` 지우기 정책에 `board-posts` 가 없어 남는다」는 이 마이그레이션으로 폴더 문제는 풀리지만, SELECT 정책이 없어 브라우저 `remove()` 는 여전히 아무것도 지우지 않는다(별개 · 미결정). 상세: `docs/engineering/05-rls-permissions.md`.
+
 ## 2026-11-20 게시판 표시 · 댓글 지우기 실행 취소 (게시판 unslop, 사용자 시안 승인)
 
 - 날짜는 모바일 · PC 신고 콘솔 모두 「2026.11.19 14:05」 도쿄 기준(`boardDateTime`). 상세 머리는 상대 시각 옆에 실제 시각.

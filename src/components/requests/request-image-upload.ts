@@ -2,28 +2,17 @@
 
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import type { PreviewItem } from "@/components/announcements/announcement-image-uploader";
+import type { RequestImageFolder } from "@/lib/request-image-folders";
 
 const BUCKET = "request-images";
 const PUBLIC_MARKER = `/storage/v1/object/public/${BUCKET}/`;
 const FALLBACK_MARKER = `/storage/v1/object/${BUCKET}/`;
 
-export type RequestImageType =
-  | "lost-items"
-  // 분실물 현장 처리(반환·폐기 등) 증빙 사진. 등록 사진과 같은 버킷이지만 폴더를 분리한다 —
-  // supabase/migrations/202607170001_lostfound_return.sql의 storage 정책 화이트리스트와 일치해야 한다.
-  | "lost-found-handling"
-  | "maintenance-reports"
-  // 완료(수리 후) 사진. 신고 사진과 같은 버킷이지만 폴더를 분리한다 —
-  // supabase/migrations/202607160001_maintenance_backend.sql의 storage 정책 화이트리스트와 일치해야 한다.
-  | "maintenance-resolutions"
-  | "order-images"
-  | "linen-returns"
-  | "task-images"
-  | "task-update-images"
-  | "suggestion-images"
-  | "attendance-corrections"
-  | "board-posts"
-  | "board-comments";
+/**
+ * 폴더(경로 2번째 칸). 목록 기준은 `src/lib/request-image-folders.ts` — DB 정책은 `public.request_image_folder_allows` 가 같은 목록을 든다.
+ * 새 폴더는 거기에 더하고 새 마이그레이션에서 그 함수를 바꾼다(정책을 다시 만들지 않는다).
+ */
+export type RequestImageType = RequestImageFolder;
 
 function getFileExtension(file: File): string {
   const ext = file.name.split(".").pop()?.toLowerCase();

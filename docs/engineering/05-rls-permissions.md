@@ -1639,6 +1639,38 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 - **2026-11-10 보강(`202611100002`, 운영 미적용):** 이 마이그레이션이 폴더 목록에서 `linen-returns` 를 빠뜨려 린넨 반품 사진 올리기 · 지우기가
   막혀 있었다. 같은 정책 이름 · 같은 다른 조건으로 다시 만들고 `linen-returns` 만 더했다. 지우기는 그 폴더에서 「내가 올린 것 또는 `linen.manage`」,
   다른 폴더는 그대로(내 것 또는 `request.delete_any`).
+- **2026-11-20 — 실제로는 6개 폴더가 더 빠져 있었다.** 아래 「2026-11-20 request-images 폴더 되살리기」.
+
+## 2026-11-20 request-images 폴더 되살리기 — 폴더 목록은 함수 하나 (`202611200005_request_images_folder_policies.sql`, 운영 적용 2026-11-20)
+
+- **버그:** 올리기 · 지우기 정책을 다시 만드는 마이그레이션마다 폴더 목록을 통째로 다시 적었다. `202606290001` 까지 12개였던 목록을
+  `202607160001_maintenance_backend.sql:123-125`(올리기) · `:156-158`(지우기)가 4개로 덮어썼고, `202607170001` · `202610220001` · `202611100002:29` · `:51`
+  이 짧은 목록을 이어받았다. 그래서 **브라우저(사용자 키)로 올리는 `task-images` · `task-update-images` · `suggestion-images` · `attendance-corrections` ·
+  `board-posts` · `board-comments` 사진이 2026-07-16 부터 막혀 있었다.**
+- **구조:** `public.request_image_folder_allows(폴더 text, 역할 organization_role) → boolean`(immutable, `search_path = ''`) 이 폴더 목록 · 폴더별 역할 조건을
+  든다. 두 정책은 이 함수만 부른다(멤버는 자기 `m.role`, 플랫폼 관리자는 `null`). **폴더를 더할 때는 이 함수만 `create or replace`** — 정책을 다시 만들지 않는다.
+  코드 기준 목록은 `src/lib/request-image-folders.ts`, 둘이 어긋나면 `src/lib/__tests__/request-image-folders-policy.test.ts` 가 실패한다
+  (마이그레이션 폴더 전체를 시간순으로 읽어 마지막 정의를 본다).
+
+| 폴더 | 올리는 쪽 | 올리기(정책) | 지우기(정책) |
+| --- | --- | --- | --- |
+| `lost-items` · `lost-found-handling` · `maintenance-reports` · `maintenance-resolutions` · `order-images` | 브라우저 | 그 조직 활성 멤버(아르바이트 포함) | 내 것 또는 `request.delete_any` |
+| `linen-returns` | 브라우저 | 활성 멤버(아르바이트 포함) | 내 것 또는 `linen.manage` |
+| `suggestion-images` · `attendance-corrections` · `board-posts` · `board-comments` (되살림) | 브라우저 | 활성 멤버(아르바이트 포함 — 06-29 정의) | 내 것 또는 `request.delete_any` |
+| `task-images` · `task-update-images` (되살림) | 브라우저 | 활성 멤버 중 **아르바이트 제외**(06-29 정의) | 같은 조건 + 내 것 또는 `request.delete_any` |
+| `bug-reports` · `complaint-images` · `complaint-comment-images` | 서버 service role | 정책 목록에 없음(서버만 — 정책을 거치지 않음) | 서버 |
+| `transport-reimbursements` · `annual-leave-requests` (5칸 · 별도 정책) | 브라우저 / 서버 지우기 | 별도 정책(그대로) | 별도 정책(그대로) |
+
+- 경로 검사(4칸 · 조직 id · 기록 id uuid · 파일 이름 3~160자 · 글자)는 그대로. 플랫폼 관리자도 예전처럼 목록 안 폴더만.
+- 지우기는 06-29 의 「조직 멤버 누구나 남의 사진 지우기」로 되돌리지 않고 지금 규칙(내 것 또는 권한 키)을 되살린 폴더에도 적용했다.
+- **알려진 별개 문제(고치지 않음):** `request-images` 에는 SELECT 정책이 처음부터 없다(공개 버킷이라 공개 주소 읽기는 정책을 안 거침). Supabase `remove()` 는
+  select + delete 둘 다 필요해서, 브라우저에서 부르는 지우기(`removeRequestImages` · `removeBoardUploads` — 실패 시 방금 올린 사진 되지우기)는 **오류 없이 아무것도
+  지우지 않는다.** 서버(service role) 정리는 정상. SELECT 정책을 더할지는 따로 정한다.
+- 함수 실행 권한: `public` 회수 + `anon` 따로 회수(Supabase 기본 권한이 anon 에 따로 준다) — authenticated · service_role 만.
+- 로컬 검증(2026-11-20, 로컬 Supabase 에서 `set role authenticated` + jwt sub 흉내, 시도마다 트랜잭션 롤백). 운영에서는 올리기를 재현하지 않았다(적용 뒤 정책 2개가 함수를 부르는 것 · 함수 실행 권한 · 폴더별 결과는 읽기로 확인) —
+  운영 정책 폴더 목록이 로컬과 같은 6개인 것만 읽기로 확인. 2026-11-20 로컬에서 적용 전 재현: 위 6개 폴더 올리기 모두 거절. 적용 뒤(로컬 DB 에는 최종본이 적용돼 있음): 직원 허용,
+  아르바이트는 할 일 두 폴더만 거절, 남의 조직 · 목록 밖 폴더 · `bug-reports` · 3칸/5칸 · uuid 아닌 기록 id · 잘못된 파일 이름 · 비활성 멤버 거절.
+  지우기 논리(임시 SELECT 정책으로 롤백 안에서): 내 것 허용 · 아르바이트가 남의 것 거절. 두 번 돌려도 같은 결과.
 
 ## 2026-10-22 청소 배정 담당 바꾸기 — `cleaning.assign_swap`
 

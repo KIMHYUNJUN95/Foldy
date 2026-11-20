@@ -1,6 +1,7 @@
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import type { FileAttachment } from "@/components/board/board-types";
 import { boardImageStoragePath } from "@/lib/board-upload-paths";
+import type { RequestImageFolder } from "@/lib/request-image-folders";
 
 const IMAGES_BUCKET = "request-images";
 const FILES_BUCKET = "board-attachments";
@@ -53,9 +54,9 @@ export async function uploadBoardImage(params: {
   file: File;
   organizationId: string;
   postId: string;
-  // `board-posts` 는 게시글 작성용, `board-comments` 는 댓글 사진용(둘 다 request-images 스토리지 정책에
-  // 화이트리스트됨). 기본값은 board-posts.
-  folder?: "board-posts" | "board-comments";
+  // `board-posts` 는 게시글 작성용, `board-comments` 는 댓글 사진용. 둘 다 `src/lib/request-image-folders.ts` 목록
+  // (= DB 함수 `request_image_folder_allows`)에 있어야 한다 — 2026-07-16 ~ 11-20 정책에서 빠져 업로드가 막혀 있었다. 기본값은 board-posts.
+  folder?: Extract<RequestImageFolder, "board-posts" | "board-comments">;
 }): Promise<string> {
   const { file, organizationId, postId, folder = "board-posts" } = params;
   const supabase = getSupabaseBrowserClient();
@@ -106,8 +107,9 @@ export async function uploadBoardAttachment(params: {
 /**
  * 글 저장이 서버에서 `{error}` 로 실패했을 때 방금 올린 사진 · 파일 지우기를 **시도한다**(게시판 unslop 2026-11-20).
  * 저장소 정책이 허락할 때만 지워지고, 아니면 그대로 남는다(고아 파일). 2026-11-20 기준 `board-attachments` 는
- * 올린 사람 지우기를 허락하지만(202606250001), `request-images` 지우기 정책(202611100002)의 폴더 목록에는
- * `board-posts` 가 없어 사진은 남는다 — 마이그레이션 없이 둔다. 실패해도 화면 오류를 덮지 않게 조용히 넘긴다.
+ * 올린 사람 지우기를 허락하지만(202606250001), `request-images` 사진은 남는다 — 이 버킷에 SELECT 정책이 없어
+ * 브라우저 `remove()` 가 지울 행을 못 보고 오류 없이 아무것도 지우지 않는다(폴더는 202611200005 로 지우기 정책에 들어감,
+ * SELECT 정책을 줄지는 별도 결정 대기 — docs/engineering/05-rls-permissions.md). 실패해도 화면 오류를 덮지 않게 조용히 넘긴다.
  */
 export async function removeBoardUploads(params: { imageUrls: string[]; attachmentPaths: string[] }): Promise<void> {
   const supabase = getSupabaseBrowserClient();

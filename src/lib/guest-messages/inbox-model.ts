@@ -274,6 +274,29 @@ export function defaultReplyTarget(staffLocale: string, guestLanguage: string | 
   return canTranslateReply(staffLocale, guestLanguage) ? guestLanguage : null;
 }
 
+/** 답장 칸을 열 때의 번역 처음 값 — 항상 번역 안 함(2026-11-22). 직원이 직접 고르면 번역한다. */
+export function initialReplyTarget(): string | null {
+  return null;
+}
+
+export type ReplyKeyInfo = {
+  key: string;
+  shiftKey: boolean;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  altKey: boolean;
+  isComposing: boolean;
+  keyCode: number;
+};
+
+/** 답장 칸 Enter — PC: Enter 전송 · Shift+Enter 줄바꿈, 폰: ⌘/Ctrl+Enter 만 전송. 글자 조합 중(한 · 일 변환 확정)은 건드리지 않는다. */
+export function replyKeyAction(info: ReplyKeyInfo, variant: "pc" | "phone"): "send" | "newline" | "none" {
+  if (info.key !== "Enter" || info.isComposing || info.keyCode === 229) return "none";
+  if (info.metaKey || info.ctrlKey) return "send";
+  if (variant !== "pc" || info.altKey) return "none";
+  return info.shiftKey ? "newline" : "send";
+}
+
 /** 서버 확인 — 화면이 보낸 번역 언어가 이 대화에서 고를 수 있는 것인지. */
 export function isAllowedReplyTarget(staffLocale: string, guestLanguage: string | null, target: unknown): target is string {
   return typeof target === "string" && replyTranslationTargets(staffLocale, guestLanguage).includes(target);

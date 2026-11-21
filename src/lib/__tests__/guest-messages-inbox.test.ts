@@ -58,6 +58,8 @@ import {
 import { outboundChannelRefusal } from "@/lib/guest-messages/beds24-adapter";
 import {
   defaultReplyTarget,
+  initialReplyTarget,
+  replyKeyAction,
   isAllowedReplyTarget,
   matchesChannelFilter,
   parseChannelFilter,
@@ -698,5 +700,31 @@ describe("자동 안내 출입 코드 — 5단계 리뷰(임시 결정, 47 §5-6
     const result = await getGuestConversation(AIRBNB);
     if (!result.ok) throw new Error(result.errorKey);
     expect(result.thread.messages.find((m) => m.id === AUTO_MSG)?.body).toBe("Door •••• · room ••••");
+  });
+});
+
+describe("답장 칸 — 번역 처음 값 · Enter 키 (2026-11-22)", () => {
+  it("번역 처음 값은 손님 언어와 상관없이 번역 안 함", () => {
+    expect(initialReplyTarget()).toBeNull();
+    // 선택지 · 손님 언어 꼬리표용 판정은 그대로
+    expect(defaultReplyTarget("ko", "en")).toBe("en");
+  });
+
+  const key = (over: Partial<Parameters<typeof replyKeyAction>[0]> = {}) => ({
+    key: "Enter", shiftKey: false, metaKey: false, ctrlKey: false, altKey: false, isComposing: false, keyCode: 13, ...over,
+  });
+  it.each([
+    ["Enter", {}, "send", "none"],
+    ["Shift+Enter", { shiftKey: true }, "newline", "none"],
+    ["Cmd+Enter", { metaKey: true }, "send", "send"],
+    ["Ctrl+Enter", { ctrlKey: true }, "send", "send"],
+    ["조합 중 Enter", { isComposing: true }, "none", "none"],
+    ["keyCode 229", { keyCode: 229 }, "none", "none"],
+    ["조합 중 Cmd+Enter", { isComposing: true, metaKey: true }, "none", "none"],
+    ["Alt+Enter", { altKey: true }, "none", "none"],
+    ["Enter 아닌 키", { key: "a" }, "none", "none"],
+  ] as const)("%s", (_n, over, pc, phone) => {
+    expect(replyKeyAction(key(over), "pc")).toBe(pc);
+    expect(replyKeyAction(key(over), "phone")).toBe(phone);
   });
 });

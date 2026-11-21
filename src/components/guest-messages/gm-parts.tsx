@@ -33,6 +33,8 @@ import {
   MAX_NOTE_CHARS,
   MAX_REPLY_CHARS,
   defaultReplyTarget,
+  initialReplyTarget,
+  replyKeyAction,
   liveRowState,
   liveWaitingMinutes,
   outboxErrorKey,
@@ -894,10 +896,10 @@ export function Composer({
   const inputId = useId();
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const channel = channelName(row.channel, copy);
-  // 번역해서 보낼 언어(§9) — 처음엔 손님 언어(번역할 수 있을 때), 직원이 영어 · 일본어 · 한국어로 바꾸거나 끌 수 있다.
+  // 번역해서 보낼 언어(§9) — 처음엔 번역 안 함(2026-11-22), 직원이 영어 · 일본어 · 한국어로 바꾸거나 끌 수 있다.
   const targets = replyTranslationTargets(locale, row.guestLanguage);
   const guestTarget = defaultReplyTarget(locale, row.guestLanguage);
-  const [target, setTarget] = useState<string | null>(guestTarget);
+  const [target, setTarget] = useState<string | null>(initialReplyTarget());
   const targetName = target ? languageName(target, locale) : null;
 
   // 「해결됐어요」 초안(6단계, 시안 R2PhoneThread) — 이어진 업무가 끝났고 그 뒤 답장이 없으면 빈 답장 칸에 띄운다. **보내지 않는다** —
@@ -1406,10 +1408,19 @@ export function Composer({
                 readOnly={aiLoading}
                 aria-busy={aiLoading || undefined}
                 onKeyDown={(event) => {
-                  if (
-                    event.key === "Enter" &&
-                    (event.metaKey || event.ctrlKey)
-                  ) {
+                  const action = replyKeyAction(
+                    {
+                      key: event.key,
+                      shiftKey: event.shiftKey,
+                      metaKey: event.metaKey,
+                      ctrlKey: event.ctrlKey,
+                      altKey: event.altKey,
+                      isComposing: event.nativeEvent.isComposing,
+                      keyCode: event.keyCode,
+                    },
+                    variant,
+                  );
+                  if (action === "send") {
                     event.preventDefault();
                     submit();
                   }

@@ -197,7 +197,7 @@ function CalendarPanel({
       ariaLabel={labels.title}
       header={
         <div className="min-w-0">
-          <h3 className="text-base font-black tracking-tight text-foreground">
+          <h3 className="text-base font-semibold tracking-tight text-foreground">
             {labels.title}
           </h3>
           <p className="mt-0.5 text-xs font-semibold text-muted-foreground">
@@ -218,10 +218,10 @@ function CalendarPanel({
                 return (
                   <button
                     className={cn(
-                      "h-9 flex-1 rounded-xl border text-xs font-extrabold transition-colors",
+                      "h-9 flex-1 rounded-xl text-xs font-semibold transition-colors",
                       on
-                        ? "border-[#315F91] bg-[#315F91] text-white"
-                        : "border-border bg-background/70 text-foreground hover:bg-muted/60",
+                        ? "bg-primary text-white"
+                        : "bg-muted text-foreground hover:bg-[var(--separator)]",
                     )}
                     key={preset.days}
                     onClick={() => applyPreset(preset.days)}
@@ -237,16 +237,16 @@ function CalendarPanel({
           <div className="mt-4 flex items-center justify-between">
             <button
               aria-label={labels.previousMonth}
-              className="flex size-9 items-center justify-center rounded-full border border-border bg-background/70 text-foreground transition-colors hover:bg-muted/60"
+              className="flex size-9 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-[var(--separator)]"
               onClick={() => setViewMonth((prev) => addMonths(prev, -1))}
               type="button"
             >
               <ChevronLeft className="size-4" aria-hidden="true" />
             </button>
-            <span className="text-sm font-black text-foreground">{monthLabel}</span>
+            <span className="text-sm font-semibold text-foreground">{monthLabel}</span>
             <button
               aria-label={labels.nextMonth}
-              className="flex size-9 items-center justify-center rounded-full border border-border bg-background/70 text-foreground transition-colors hover:bg-muted/60"
+              className="flex size-9 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-[var(--separator)]"
               onClick={() => setViewMonth((prev) => addMonths(prev, 1))}
               type="button"
             >
@@ -258,9 +258,8 @@ function CalendarPanel({
             {weekdayNames.map((name, index) => (
               <div
                 className={cn(
-                  "py-1.5 text-center text-[11px] font-bold uppercase tracking-wide text-muted-foreground",
-                  index === 0 && "text-rose-500/80",
-                  index === 6 && "text-[#315F91]",
+                  "py-1.5 text-center text-[11px] font-bold text-muted-foreground",
+                  index === 0 && "text-[#c4364b]",
                 )}
                 key={name}
               >
@@ -289,7 +288,7 @@ function CalendarPanel({
                   <span
                     aria-hidden="true"
                     className={cn(
-                      "absolute inset-y-1 inset-x-0 bg-[#EAF1F8]",
+                      "absolute inset-y-1 inset-x-0 bg-[var(--primary-tint)]",
                       capLeft && "rounded-l-full",
                       capRight && "rounded-r-full",
                     )}
@@ -299,7 +298,7 @@ function CalendarPanel({
                   <span
                     aria-hidden="true"
                     className={cn(
-                      "absolute inset-y-1 w-1/2 bg-[#EAF1F8]",
+                      "absolute inset-y-1 w-1/2 bg-[var(--primary-tint)]",
                       // 반쪽 띠의 안쪽 끝은 선택 동그라미에 가려지지만, 바깥쪽 끝은 주 경계에서
                       // 그대로 드러난다.
                       isStart ? "right-0" : "left-0",
@@ -312,13 +311,13 @@ function CalendarPanel({
                   aria-label={dayLabelFormatter.format(isoToDate(iso))}
                   aria-pressed={isEdge}
                   className={cn(
-                    "relative flex size-10 items-center justify-center rounded-full text-sm font-bold transition-colors",
+                    "relative flex size-10 items-center justify-center rounded-full text-sm font-medium transition-colors",
                     isEdge
-                      ? "bg-[#315F91] text-white shadow-sm"
+                      ? "bg-primary text-white"
                       : inRange
-                        ? "text-[#1F3A5F]"
+                        ? "text-[var(--primary-ink)]"
                         : "text-foreground hover:bg-muted/70",
-                    !isEdge && iso === todayIso && "ring-1 ring-[#C9D8E8]",
+                    !isEdge && iso === todayIso && "ring-1 ring-[var(--primary-ring)]",
                   )}
                   onClick={() => handleDayClick(iso)}
                   type="button"
@@ -331,9 +330,9 @@ function CalendarPanel({
           </div>
 
           {summaryLabel ? (
-            <div className="mt-2 flex items-center justify-between gap-2 rounded-xl border border-border bg-background/70 px-3 py-2.5">
+            <div className="mt-2 flex items-center justify-between gap-2 rounded-xl bg-muted px-3 py-2.5">
               <span className="text-[11.5px] font-bold text-muted-foreground">{summaryLabel}</span>
-              <span className="font-mono text-[13px] font-bold tabular-nums text-foreground">
+              <span className="text-[13px] font-semibold tabular-nums text-foreground">
                 {summaryText}
               </span>
             </div>
@@ -341,14 +340,14 @@ function CalendarPanel({
 
           <div className="mt-2 flex items-center gap-2 border-t-[0.5px] border-[var(--separator)] pt-4">
             <button
-              className="h-11 flex-1 rounded-xl border border-border bg-background/70 text-sm font-bold text-foreground transition-colors hover:bg-muted/60"
+              className="h-11 flex-1 rounded-xl bg-muted text-sm font-semibold text-foreground transition-colors hover:bg-[var(--separator)]"
               onClick={handleClear}
               type="button"
             >
               {labels.clear}
             </button>
             <button
-              className="h-11 flex-1 rounded-xl bg-[#315F91] text-sm font-black text-white transition-colors hover:bg-[#274D76] disabled:opacity-50"
+              className="h-11 flex-1 rounded-xl bg-primary text-sm font-semibold text-white transition-colors hover:bg-[var(--primary-hover)] disabled:opacity-50"
               disabled={!draftStart}
               onClick={handleApply}
               type="button"

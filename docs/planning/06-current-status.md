@@ -7,6 +7,8 @@
 
 **2026-11-24 손님 메시지 예약 패널 「출입 번호」 (PC + 모바일)** (문서 47 §5-14 · §6-3 · 05) — 볼 수 있는 사람(`view` + `manage` 또는 `property_info.edit`, Q9)에게만 묶음을 그리고, 처음엔 가림 글자만 · 「번호 보기」를 누를 때 공용 서버 액션 `getConversationAccessCodes`(`src/actions/guest-messages-access-codes.ts`)로 받아 라벨 · 번호 · 복사 단추. 다시 누르면 숨김, 대화를 바꾸면 처음부터. 방 맞추기 규칙은 `src/lib/guest-messages/access-codes.ts` 한 곳(답장 칸 넣기 · 자동 안내 변수도 같이 씀). 시험 `guest-messages-access-codes*.test.ts`. DB 변경 없음.
 
+**2026-11-24 화이트 리디자인에서 빠졌던 화면 4묶음 모양 맞춤(모양만, 동작 · 문구 · 권한 그대로)** (design 05 「4. 구현 진행」 끝) — 일본어 로그인 글꼴(`.authw` ja 일 때 Geist → Noto JP → Noto KR) · 공용 기간 달력(남색 값 → 주색 토큰 · 그림자 없음 · 입력 칸 옅은 바탕 · 굵기 600/500) · 청소 중 수리 · 분실물 등록 폼(유리 카드 풂 · 공용 구분선 · 52px 주색 저장 단추) · PC 근태 직원별 월 상세 머리(`.uhead` 테두리 · 카드 · 세로선 없앰). 시험 추가 없음(모양만).
+
 **2026-11-24 request-images 읽기 정책 + 아르바이트 할 일 사진 — 마이그레이션 `202611240001` **운영 적용 완료(2026-11-24, 앱 코드 `e43feda6` 배포 뒤 대시보드로)**** (05 「2026-11-24 request-images 읽기 정책 · 할 일 사진 아르바이트 허용」 · 04 · 01 · 18) — 읽기(SELECT)는 「내가 올린 것 + 1시간 안」만 → 브라우저 `remove()` 가 방금 올린 저장 안 한 내 사진만 실제로 지운다(남의 사진 지우기는 브라우저에서 계속 0행 · 서버 정리) · `task-images` · `task-update-images` 아르바이트 제외 없앰(사용자 승인). 발주 · 청소 수리 신고 시트의 저장 중 닫기 막기 수정이 운영에 나간 뒤 적용. 로컬 버리는 DB 에서 역할 표 확인. 시험 `request-image-folders-policy.test.ts`.
 
 **2026-11-24 공용 바닥 시트 닫기 막기 `dismissDisabled`** (16 「Bottom Sheet — Canonical Visual Standard」) — 켜진 동안 스크림 · Esc · 끌어내리기 · 안쪽 close 모두 먹지 않고(끌기는 제자리로), 나가는 도중 켜지면 다시 올라오고 `onClose` 를 안 부른다. `onClose` 안에서 무시하던 곳(안 보인 시트가 화면을 덮던 것) 6곳을 바꿈 — 주문 · 수리 확인(`key` 다시 그리기 방편 지움) · `ConfirmFormSheet` · 분실물 확인 · 리넨 회수 삭제 · 요청 삭제. 시험 `sheet-dismiss-gate.test.ts`.

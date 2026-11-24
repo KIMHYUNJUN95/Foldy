@@ -30,14 +30,13 @@ type LostFoundLinkedFormProps = {
 };
 
 const FIELD_CLASS =
-  "h-12 w-full rounded-xl border border-border bg-background/60 px-3.5 text-sm font-semibold text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-primary focus:ring-2 focus:ring-primary/20";
+  "h-12 w-full rounded-xl bg-muted px-3.5 text-sm font-semibold text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus-visible:ring-2 focus-visible:ring-primary";
 
-const PANEL_CLASS =
-  "flex flex-col gap-4 rounded-2xl border border-border bg-surface/70 p-4 shadow-glass backdrop-blur-xl";
+const PANEL_CLASS = "flex flex-col gap-4 pt-1";
 
 function SectionLabel({ children, index }: { children: string; index: number }) {
   return (
-    <h2 className="pl-1 text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
+    <h2 className="pl-1 text-xs font-semibold text-muted-foreground">
       {index}. {children}
     </h2>
   );
@@ -136,7 +135,7 @@ export function LostFoundLinkedForm({
 
   return (
     <>
-      <form className="flex flex-col gap-6" onSubmit={handleSubmit} ref={formRef}>
+      <form className="flex flex-col gap-6 [&>section+section]:border-t-[0.5px] [&>section+section]:border-[var(--separator)] [&>section+section]:pt-5" onSubmit={handleSubmit} ref={formRef}>
         <input name="cleaningSessionId" type="hidden" value={cleaningSessionId} />
         <input name="guestName" type="hidden" value={linkedGuestName} />
         <input name="propertyName" type="hidden" value={defaultBuilding} />
@@ -148,14 +147,14 @@ export function LostFoundLinkedForm({
           <div className={PANEL_CLASS}>
             <label className="flex flex-col gap-2">
               <span className="text-xs font-semibold text-muted-foreground">{copy.form.building}</span>
-              <div className="flex h-12 items-center gap-2 rounded-xl border border-border bg-muted/40 px-3.5">
+              <div className="flex h-12 items-center gap-2 rounded-xl bg-muted px-3.5">
                 <span className="truncate text-sm font-semibold text-foreground">{buildingDisplay}</span>
               </div>
             </label>
 
             <label className="flex flex-col gap-2">
               <span className="text-xs font-semibold text-muted-foreground">{copy.room}</span>
-              <div className="flex h-12 items-center gap-2 rounded-xl border border-border bg-muted/40 px-3.5">
+              <div className="flex h-12 items-center gap-2 rounded-xl bg-muted px-3.5">
                 <span className="truncate text-sm font-semibold text-foreground">{roomDisplay}</span>
               </div>
             </label>
@@ -185,7 +184,7 @@ export function LostFoundLinkedForm({
             <label className="flex flex-col gap-2">
               <span className="text-xs font-semibold text-muted-foreground">{copy.memo}</span>
               <textarea
-                className="min-h-24 w-full resize-none rounded-xl border border-border bg-background/60 px-3.5 py-2.5 text-sm font-medium text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                className="min-h-24 w-full resize-none rounded-xl bg-muted px-3.5 py-2.5 text-sm font-medium text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus-visible:ring-2 focus-visible:ring-primary"
                 name="memo"
                 onChange={(event) => setMemo(event.target.value)}
                 placeholder={copy.memoPlaceholder}
@@ -217,8 +216,8 @@ export function LostFoundLinkedForm({
           <div className={PANEL_CLASS}>
             <div className="flex flex-col gap-2">
               <span className="text-xs font-semibold text-muted-foreground">{copy.reporter}</span>
-              <div className="flex h-12 items-center gap-2 rounded-xl border border-border bg-muted/40 px-3.5">
-                <User className="size-4 text-[#1F3A5F]" aria-hidden="true" />
+              <div className="flex h-12 items-center gap-2 rounded-xl bg-muted px-3.5">
+                <User className="size-4 text-[var(--primary-ink)]" aria-hidden="true" />
                 <span className="truncate text-sm font-semibold text-foreground">{reporterName}</span>
               </div>
             </div>
@@ -230,7 +229,7 @@ export function LostFoundLinkedForm({
         ) : null}
 
         <Button
-          className="h-14 w-full rounded-2xl text-base font-black shadow-glass"
+          className="h-[52px] w-full rounded-[14px] bg-primary text-base font-semibold text-white hover:bg-[var(--primary-hover)]"
           disabled={isPending}
           type="submit"
         >

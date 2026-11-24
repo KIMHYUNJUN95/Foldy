@@ -27,6 +27,11 @@
   color: var(--aw-ink);
   font-family: var(--font-sans);
 }
+/* 일본어는 한자가 한국어 글꼴로 나오지 않게 Noto Sans JP 를 먼저(globals.css :lang(ja) body 와 같은 순서). */
+:lang(ja) .authw {
+  font-family: var(--font-geist-sans), "Geist", var(--font-noto-jp), var(--font-noto-kr),
+    ui-sans-serif, system-ui, sans-serif;
+}
 .authw a { color: var(--aw-primary); text-decoration: none; }
 .authw a:hover { color: var(--aw-primary-press); }
 .authw .ic { display: inline-flex; width: 1em; height: 1em; }

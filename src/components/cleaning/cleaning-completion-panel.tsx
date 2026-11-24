@@ -157,7 +157,7 @@ export function CleaningCompletionPanel({
               </div>
 
               <div className="mt-3 text-center">
-                <h2 className="text-2xl font-black">
+                <h2 className="text-[20px] font-semibold tracking-[-0.01em]">
                   {labels.completionConfirmation}
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">{labels.reviewCompletion}</p>
@@ -170,34 +170,34 @@ export function CleaningCompletionPanel({
             <>
               <div className="mt-4 rounded-2xl bg-[#f7f7f9] p-4">
                 <div className="min-w-0">
-                  <p className="text-lg font-black leading-tight">{labels.room} {roomLabel}</p>
-                  <p className="mt-0.5 text-xs font-semibold text-muted-foreground">{taskLabel}</p>
+                  <p className="text-lg font-semibold leading-tight">{labels.room} {roomLabel}</p>
+                  <p className="mt-0.5 text-xs font-medium text-muted-foreground">{taskLabel}</p>
                 </div>
 
                 <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                  <div className="rounded-xl bg-white p-3">
-                    <dt className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                  <div className="py-1">
+                    <dt className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
                       <Clock3 className="size-3.5" aria-hidden="true" />
                       {labels.startedAt}
                     </dt>
-                    <dd className="mt-1 font-black">{startedAtLabel}</dd>
+                    <dd className="mt-1 font-semibold">{startedAtLabel}</dd>
                   </div>
-                  <div className="rounded-xl bg-white p-3">
-                    <dt className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                  <div className="py-1">
+                    <dt className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
                       <Timer className="size-3.5" aria-hidden="true" />
                       {labels.elapsed}
                     </dt>
-                    <dd className="mt-1 font-mono font-black text-primary">{elapsedLabel}</dd>
+                    <dd className="mt-1 font-semibold tabular-nums text-primary">{elapsedLabel}</dd>
                   </div>
                 </dl>
               </div>
 
               <label className="mt-4 block space-y-2">
-                <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{labels.notesLabel}</span>
+                <span className="text-xs font-medium text-muted-foreground">{labels.notesLabel}</span>
                 <div className="relative">
                   <Edit3 className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
                   <input
-                    className="h-11 w-full rounded-xl border border-border bg-surface pl-10 pr-3 text-sm font-medium outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    className="h-11 w-full rounded-xl border border-transparent bg-[#f4f4f7] pl-10 pr-3 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                     onChange={(event) => setNotes(event.target.value)}
                     placeholder={labels.notesPlaceholder}
                     type="text"
@@ -210,11 +210,11 @@ export function CleaningCompletionPanel({
               <form action={completeCleaningSession} className="mt-4 space-y-2">
                 <input name="sessionId" type="hidden" value={sessionId} />
                 <input name="notes" type="hidden" value={notes} />
-                <SubmitButton autoFocus className="h-12 w-full rounded-xl bg-primary font-black text-white shadow-[0_10px_28px_hsl(var(--primary-hsl)/0.28)] hover:bg-primary/90">
+                <SubmitButton autoFocus className="h-12 w-full rounded-[14px] bg-primary text-base! font-semibold! text-white hover:bg-primary/90">
                   {labels.confirmCompletion}
                 </SubmitButton>
                 <Button
-                  className="h-12 w-full rounded-xl border-0 bg-[#f4f4f7] font-bold"
+                  className="h-12 w-full rounded-[14px] border-0 bg-[#f4f4f7] text-base! font-medium!"
                   onClick={close}
                   type="button"
                   variant="secondary"
@@ -239,7 +239,7 @@ export function CleaningCompletionPanel({
               </div>
 
               <div className="mt-3 text-center">
-                <h2 className="text-2xl font-black">
+                <h2 className="text-[20px] font-semibold tracking-[-0.01em]">
                   {labels.cancelCleaningTitle}
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">{labels.cancelCleaningMessage}</p>
@@ -252,29 +252,31 @@ export function CleaningCompletionPanel({
             <>
               <div className="mt-4 rounded-2xl bg-[#f7f7f9] p-4">
                 <div className="min-w-0">
-                  <p className="text-lg font-black leading-tight">{labels.room} {roomLabel}</p>
-                  <p className="mt-0.5 text-xs font-semibold text-muted-foreground">{taskLabel}</p>
+                  <p className="text-lg font-semibold leading-tight">{labels.room} {roomLabel}</p>
+                  <p className="mt-0.5 text-xs font-medium text-muted-foreground">{taskLabel}</p>
                 </div>
-                <div className="mt-3 rounded-xl bg-white p-3">
-                  <dt className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
-                    <Clock3 className="size-3.5" aria-hidden="true" />
-                    {labels.startedAt}
-                  </dt>
-                  <dd className="mt-1 font-black">{startedAtLabel}</dd>
-                </div>
+                <dl className="mt-3">
+                  <div className="py-1">
+                    <dt className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+                      <Clock3 className="size-3.5" aria-hidden="true" />
+                      {labels.startedAt}
+                    </dt>
+                    <dd className="mt-1 font-semibold">{startedAtLabel}</dd>
+                  </div>
+                </dl>
               </div>
 
               <form action={cancelCleaningSession} className="mt-4 space-y-2">
                 <input name="sessionId" type="hidden" value={sessionId} />
                 <Button
                   autoFocus
-                  className="h-12 w-full rounded-xl bg-destructive font-black text-white hover:bg-destructive/90"
+                  className="h-12 w-full rounded-[14px] bg-destructive text-base! font-semibold! text-white hover:bg-destructive/90"
                   type="submit"
                 >
                   {labels.confirmCancelCleaning}
                 </Button>
                 <Button
-                  className="h-12 w-full rounded-xl border-0 bg-[#f4f4f7] font-bold"
+                  className="h-12 w-full rounded-[14px] border-0 bg-[#f4f4f7] text-base! font-medium!"
                   onClick={close}
                   type="button"
                   variant="secondary"

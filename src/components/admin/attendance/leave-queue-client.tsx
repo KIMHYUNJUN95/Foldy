@@ -867,7 +867,7 @@ function LeavePanel({
           </div>
           <div className="panel__title">
             <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span className="avatar" style={{ background: "var(--adm-primary)", color: "#fff" }}>
+              <span className="avatar">
                 {item.avatarInitial || initial(item.applicantName)}
               </span>
               <span>
@@ -1037,7 +1037,7 @@ function LeavePanel({
                       const op = statusPill(o.status, lc);
                       return (
                         <div className="cvrow" key={i}>
-                          <span className="avatar" style={{ background: "var(--adm-primary)", color: "#fff" }}>
+                          <span className="avatar">
                             {o.avatarInitial || initial(o.applicantName)}
                           </span>
                           <div className="cvrow__b">

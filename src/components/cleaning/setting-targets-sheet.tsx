@@ -72,10 +72,10 @@ export function SettingTargetsSheet({
           className="max-h-[84dvh] flex flex-col"
           header={
             <div className="min-w-0">
-              <p className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
+              <p className="text-xs font-medium text-[#6b6878]">
                 {title}
               </p>
-              <p id={titleId} className="mt-1 text-lg font-black">
+              <p id={titleId} className="mt-1 text-lg font-semibold">
                 {description}
               </p>
             </div>
@@ -91,10 +91,10 @@ export function SettingTargetsSheet({
                     key={item.roomLabel}
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="text-[15px] font-bold leading-tight text-foreground">
+                      <p className="text-[15px] font-medium leading-tight text-foreground">
                         {item.roomTitle}
                       </p>
-                      <p className="mt-1 text-sm font-semibold text-muted-foreground">
+                      <p className="mt-1 text-sm font-normal text-muted-foreground">
                         {item.arrivingGuestName}
                         {item.arrivingPax !== null ? ` · ${item.arrivingPax}${paxUnit}` : ""}
                       </p>
@@ -105,7 +105,7 @@ export function SettingTargetsSheet({
                       {/* 셋팅 목록의 방 — 목록 행과 같이 서버가 다시 확인한다(문서 45 C13). */}
                       <input name="source" type="hidden" value="list" />
                       <Button
-                        className="h-9 rounded-full border border-border bg-background px-3.5 text-xs font-black text-slate-800 shadow-none"
+                        className="h-10 rounded-full border-0 bg-[#f1ecfd] px-4 text-[13px]! font-semibold! text-[#5a30cf] shadow-none hover:bg-[#e9e1fc] active:bg-[#e9e1fc]"
                         type="submit"
                       >
                         {startLabel}
@@ -114,7 +114,7 @@ export function SettingTargetsSheet({
                   </div>
                 ))
               ) : (
-                <div className="rounded-2xl border border-dashed border-border bg-background p-4 text-sm font-semibold text-muted-foreground">
+                <div className="rounded-2xl bg-[#f7f7f9] p-4 text-sm font-normal text-muted-foreground">
                   {emptyMessage}
                 </div>
               )}

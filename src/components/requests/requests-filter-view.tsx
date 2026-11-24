@@ -271,7 +271,7 @@ type RequestsFilterViewProps = {
 
 function SegTrack({ children }: { children: React.ReactNode }) {
   return (
-    <div className="inline-flex items-center gap-0.5 rounded-full border border-slate-200/80 bg-white/80 p-1 shadow-[0_10px_22px_-20px_rgba(31,58,95,0.42)]">
+    <div className="inline-flex items-center gap-0.5 rounded-full bg-[#f4f4f7] p-1">
       {children}
     </div>
   );
@@ -292,10 +292,10 @@ function SegButton({
     <button
       aria-pressed={active}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-bold transition-all",
+        "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[15px]! transition-all",
         active
-          ? "bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20"
-          : "text-slate-500 hover:text-slate-900",
+          ? "bg-white font-semibold! text-[#16141f] shadow-[0_1px_2px_rgba(22,20,31,0.08)]"
+          : "font-medium! text-[#6b6878] hover:text-[#16141f]",
       )}
       onClick={onClick}
       type="button"
@@ -1100,7 +1100,7 @@ export function RequestsFilterView({
           header={
             <p
               id="filter-sheet-title"
-              className="px-1 text-[15px] font-black tracking-[-0.03em] text-slate-950"
+              className="px-1 text-[15px] font-semibold tracking-[-0.03em] text-slate-950"
             >
               {filterLabels.filterButton}
             </p>
@@ -1118,7 +1118,7 @@ export function RequestsFilterView({
                 <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-1 py-4">
                   {/* 상태 */}
                   <div className="space-y-2">
-                    <p className="text-[11px] font-black uppercase tracking-wider text-muted-foreground/70">
+                    <p className="text-[11px] font-medium text-[#6b6878]">
                       {filterLabels.groupStatus}
                     </p>
                     <SegTrack>
@@ -1142,7 +1142,7 @@ export function RequestsFilterView({
 
                   {/* 날짜 */}
                   <div className="space-y-2">
-                    <p className="text-[11px] font-black uppercase tracking-wider text-muted-foreground/70">
+                    <p className="text-[11px] font-medium text-[#6b6878]">
                       {filterLabels.groupDate}
                     </p>
                     <div className="flex flex-wrap items-center gap-1.5">
@@ -1172,10 +1172,10 @@ export function RequestsFilterView({
                         aria-haspopup="dialog"
                         aria-expanded={calendarOpen}
                         className={cn(
-                          "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-bold transition-colors",
+                          "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[15px]! transition-colors",
                           hasCustomRange
-                            ? "border-primary/20 bg-primary/10 text-primary"
-                            : "border-dashed border-border text-muted-foreground hover:border-primary/20 hover:text-foreground",
+                            ? "bg-primary/10 font-semibold! text-primary"
+                            : "bg-[#f4f4f7] font-medium! text-[#6b6878] hover:text-[#16141f]",
                         )}
                         onClick={() => setCalendarOpen(true)}
                         type="button"
@@ -1199,17 +1199,17 @@ export function RequestsFilterView({
                   {/* 건물 */}
                   {buildingOptions.length > 0 ? (
                     <div className="space-y-2">
-                      <p className="text-[11px] font-black uppercase tracking-wider text-muted-foreground/70">
+                      <p className="text-[11px] font-medium text-[#6b6878]">
                         {filterLabels.building}
                       </p>
                       <div className="flex flex-wrap gap-1.5">
                         <button
                           aria-pressed={!selectedBuildingKey}
                           className={cn(
-                            "inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-[13px] font-bold transition-colors",
+                            "inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-[15px]! font-medium! transition-colors",
                             !selectedBuildingKey
                               ? "bg-primary/10 text-primary"
-                              : "bg-muted/50 text-muted-foreground hover:text-foreground",
+                              : "bg-[#f4f4f7] text-[#6b6878] hover:text-[#16141f]",
                           )}
                           onClick={() => setBuildingFilter(null)}
                           type="button"
@@ -1221,10 +1221,10 @@ export function RequestsFilterView({
                           <button
                             aria-pressed={selectedBuildingKey === option.key}
                             className={cn(
-                              "inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-[13px] font-bold transition-colors",
+                              "inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-[15px]! font-medium! transition-colors",
                               selectedBuildingKey === option.key
                                 ? "bg-primary/10 text-primary"
-                                : "bg-muted/50 text-muted-foreground hover:text-foreground",
+                                : "bg-[#f4f4f7] text-[#6b6878] hover:text-[#16141f]",
                             )}
                             key={option.key}
                             onClick={() => setBuildingFilter(option.key)}
@@ -1244,7 +1244,7 @@ export function RequestsFilterView({
                 {/* 푸터 — 액션 버튼 */}
                 <div className="flex shrink-0 items-center gap-2 border-t-[0.5px] border-[var(--separator)] px-1 pt-4">
                   <button
-                    className="h-11 flex-1 rounded-2xl border border-border bg-surface text-sm font-bold text-slate-700 shadow-[0_8px_16px_-14px_rgba(34,40,60,0.3)] transition-colors hover:bg-muted/60 disabled:opacity-40"
+                    className="h-11 flex-1 rounded-[14px] bg-[#f4f4f7] text-sm! font-medium! text-slate-700 transition-colors hover:bg-[#ececf1] disabled:opacity-40"
                     disabled={activeFilterCount === 0}
                     onClick={resetFilters}
                     type="button"
@@ -1252,7 +1252,7 @@ export function RequestsFilterView({
                     {filterLabels.calendarClear}
                   </button>
                   <button
-                    className="h-11 flex-1 rounded-2xl bg-primary text-sm font-black text-white shadow-[0_12px_22px_-14px_hsl(var(--primary-hsl)/0.6)] transition-colors hover:bg-primary/90"
+                    className="h-11 flex-1 rounded-[14px] bg-primary text-sm! font-semibold! text-white transition-colors hover:bg-primary/90"
                     onClick={close}
                     type="button"
                   >

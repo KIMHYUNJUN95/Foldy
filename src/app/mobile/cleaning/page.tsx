@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 import { closeStaleCleaningSession, startCleaningSession } from "@/app/mobile/cleaning/actions";
 import { CleaningNotice } from "@/components/cleaning/cleaning-notice";
+import { resolveCleaningTaskLabel } from "@/lib/dashboard-format";
 import { CleaningCompletionPanel } from "@/components/cleaning/cleaning-completion-panel";
 import type { ManualBuildingOption, ManualRoomEntry } from "@/components/cleaning/manual-cleaning-form";
 import { ManualCleaningForm } from "@/components/cleaning/manual-cleaning-form";
@@ -23,7 +24,6 @@ import {
   getMyTodayCleaningSessions,
   getOrgProcessedCleaningRoomLabels,
   getOrgTodayCleaningRoomLabels,
-  isCleaningTaskKey,
 } from "@/lib/cleaning";
 import { getCleaningTargets } from "@/lib/cleaning-targets";
 import { sessionRoomKeyLookup, shouldOfferStart, type RoomRecord } from "@/lib/cleaning-assign/room-key";
@@ -230,7 +230,7 @@ function getTaskLabel(
   taskLabel: string,
   copy: ReturnType<typeof getDictionary>["cleaning"],
 ) {
-  return isCleaningTaskKey(taskLabel) ? copy.taskOptions[taskLabel] : taskLabel;
+  return resolveCleaningTaskLabel(taskLabel, copy.taskOptions, copy.taskUnknown);
 }
 
 /** 건물 묶음 안의 짧은 객실 표기 — 「402」, 객실 = 건물 하나인 곳은 건물 이름(시안 2026-10-13). */

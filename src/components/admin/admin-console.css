@@ -2780,7 +2780,12 @@
 .adm .panel__sub { font-weight: 500; color: #6b6878; }
 .adm .panel__body { padding: 12px 24px 24px; }
 .adm .panel__foot { padding: 14px 24px 20px; border-top: 0; }
-.adm .panel__foot .btn { height: 48px; border-radius: 14px; font-size: 15px; }
+.adm .panel__foot .btn { height: 48px; border-radius: 14px; font-size: 15px; border-color: transparent; }
+.adm .panel .mono { font-family: inherit; font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.adm .panel .avatar { border-radius: 50%; background: #f1ecfd; color: #5a30cf; }
+.adm .panel__title .avatar { flex: none; width: 36px; height: 36px; }
+.adm .panel .cvrow .avatar { width: 28px; height: 28px; font-size: 12px; }
+.adm .panel .reason { border-color: transparent; background: #f7f7f9; }
 .adm .panel .btn--pri { background: #7a52e6; }
 .adm .panel .btn--pri:hover { background: #6b40e0; }
 .adm .panel .btn--ghost { background: #f4f4f7; border-color: transparent; color: #3a3746; }

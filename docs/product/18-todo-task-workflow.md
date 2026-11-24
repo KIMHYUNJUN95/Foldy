@@ -876,6 +876,11 @@ the task's own org/`task-images` path are eligible, and removal happens server-s
 reference is dropped. Update-log photos are immutable once posted (the update-log has no edit/delete in
 this slice), so they are not storage-cleaned.
 
+Who can upload (2026-11-24, migration `202611240001`, **not yet applied to production**): every active member of the
+organization, **part-time staff included**, can upload task photos (`task-images`) and memo photos (`task-update-images`).
+Until then the storage policy excluded `part_time_staff` from these two folders (since 2026-11-20 `202611200005`).
+Storage rules: `docs/engineering/05-rls-permissions.md` → 「2026-11-24 request-images 읽기 정책 · 할 일 사진 아르바이트 허용」.
+
 ## Update Log
 
 Comments and progress notes should not be separate concepts in the first slice.

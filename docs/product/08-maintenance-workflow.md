@@ -263,6 +263,7 @@ Implementation note (2026-07-09):
   context from the linked reservation and stores `reservation_id` when the submitted room context
   still matches that reservation server-side.
 - Standalone manual creation still works without any reservation context.
+- 저장 중에는 확인 시트를 닫을 수 없다(2026-11-24) — 사진 올리는 중 · 저장 요청이 가는 중에는 [취소] · 바깥 누르기 · 아래로 끌기 · Esc · 뒤로가기가 먹지 않는다. 닫히면 방금 저장되는 기록의 사진을 지우기 때문(`canDismissConfirmSheet`).
 
 ## Visibility
 

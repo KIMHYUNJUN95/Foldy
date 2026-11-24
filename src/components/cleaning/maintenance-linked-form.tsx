@@ -1,5 +1,6 @@
 "use client";
 
+import { canDismissConfirmSheet } from "@/lib/confirm-sheet-dismiss";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { ChevronDown, User, Wrench } from "lucide-react";
 import { createMaintenanceReport } from "@/app/mobile/maintenance/new/actions";
@@ -317,7 +318,7 @@ export function MaintenanceLinkedForm({
         confirmLabel={copy.confirmSubmit}
         description={copy.form.confirmDescription}
         onCancel={() => {
-          if (photos.running) return;
+          if (!canDismissConfirmSheet({ running: photos.running, pending: isPending })) return;
           photos.abandon();
           setConfirmOpen(false);
         }}

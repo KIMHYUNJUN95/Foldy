@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ClipboardCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
@@ -50,6 +50,7 @@ export function MaintenanceConfirmModal({
   children,
 }: MaintenanceConfirmModalProps) {
   const confirmRef = useRef<HTMLButtonElement>(null);
+  const [sheetKey, setSheetKey] = useState(0);
 
   useEffect(() => {
     if (!open) return;
@@ -58,8 +59,18 @@ export function MaintenanceConfirmModal({
 
   if (!open) return null;
 
+  const requestCancel = () => {
+    if (pending) {
+      // 닫기를 무시하면 시트가 미끄러져 나간 채 안 보이게 남는다 — 새로 그려 다시 보이게 한다.
+      setSheetKey((k) => k + 1);
+      return;
+    }
+    onCancel();
+  };
+
   return (
     <BottomSheet
+      key={sheetKey}
       ariaLabel={title}
       header={
         <div className="flex flex-col items-center text-center">
@@ -74,7 +85,7 @@ export function MaintenanceConfirmModal({
           </p>
         </div>
       }
-      onClose={onCancel}
+      onClose={requestCancel}
     >
       {({ close }) => (
         <>

@@ -881,12 +881,16 @@ Storage buckets:
 ```txt
 request-images   -- shared image bucket; path: {org_id}/{request_type}/{request_id}/{filename}
                  -- folder whitelist (storage RLS, 2026-11-20 202611200005): one function
-                 -- public.request_image_folder_allows(folder, role) holds the list; both policies call it.
+                 -- public.request_image_folder_allows(folder, role) holds the list; the upload policy calls it.
                  -- code source of truth: src/lib/request-image-folders.ts (test keeps them equal)
-                 -- all active members: lost-items, lost-found-handling, maintenance-reports,
-                 --   maintenance-resolutions, order-images, linen-returns, suggestion-images,
-                 --   attendance-corrections, board-posts, board-comments
-                 -- part_time_staff excluded: task-images, task-update-images
+                 -- all active members (part_time_staff included): lost-items, lost-found-handling,
+                 --   maintenance-reports, maintenance-resolutions, order-images, linen-returns,
+                 --   suggestion-images, attendance-corrections, board-posts, board-comments,
+                 --   task-images, task-update-images (part-time exclusion removed 2026-11-24 202611240001)
+                 -- select (2026-11-24 202611240001, NOT yet applied to production — app code first): only my own
+                 --   uploads (owner_id = auth.uid()) from the last hour (created_at), 4-part path. So a browser
+                 --   remove() can delete = delete policy ∩ select = my fresh, unsaved photos only. Deleting other
+                 --   people's photos stays server (service role). Public URL reads bypass RLS.
                  -- server (service role) only, not in the list: bug-reports, complaint-images,
                  --   complaint-comment-images. 5-part paths (transport, annual leave) have own policies.
                  -- details: docs/engineering/05-rls-permissions.md 「2026-11-20 request-images 폴더 되살리기」

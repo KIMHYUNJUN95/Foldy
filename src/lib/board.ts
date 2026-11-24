@@ -106,10 +106,10 @@ export async function uploadBoardAttachment(params: {
 
 /**
  * 글 저장이 서버에서 `{error}` 로 실패했을 때 방금 올린 사진 · 파일 지우기를 **시도한다**(게시판 unslop 2026-11-20).
- * 저장소 정책이 허락할 때만 지워지고, 아니면 그대로 남는다(고아 파일). 2026-11-20 기준 `board-attachments` 는
- * 올린 사람 지우기를 허락하지만(202606250001), `request-images` 사진은 남는다 — 이 버킷에 SELECT 정책이 없어
- * 브라우저 `remove()` 가 지울 행을 못 보고 오류 없이 아무것도 지우지 않는다(폴더는 202611200005 로 지우기 정책에 들어감,
- * SELECT 정책을 줄지는 별도 결정 대기 — docs/engineering/05-rls-permissions.md). 실패해도 화면 오류를 덮지 않게 조용히 넘긴다.
+ * 저장소 정책이 허락할 때만 지워지고, 아니면 그대로 남는다(고아 파일). `board-attachments` 는 올린 사람 지우기를 허락한다(202606250001).
+ * `request-images` 사진은 SELECT 정책이 없어 브라우저 `remove()` 가 지울 행을 못 보고 0행을 지웠다 — 2026-11-24 `202611240001`
+ * (운영 미적용)이 「내가 1시간 안에 올린 사진만 보이는」 SELECT 정책을 더해 적용 뒤에는 방금 올린 내 사진이 지워진다
+ * (docs/engineering/05-rls-permissions.md 「2026-11-24」 절). 실패해도 화면 오류를 덮지 않게 조용히 넘긴다.
  */
 export async function removeBoardUploads(params: { imageUrls: string[]; attachmentPaths: string[] }): Promise<void> {
   const supabase = getSupabaseBrowserClient();

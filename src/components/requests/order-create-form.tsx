@@ -4,6 +4,7 @@
 // 이름표 칸(건물 · 요청자 자동) → 품목 줄(「첫 품목 이름이 요청 제목이 돼요」) → 긴급도 · 사유 → [요청 보내기] →
 // 확인 시트(품목 · 수량 · 합계). 제목 칸은 없다 — 서버가 첫 품목 이름을 제목으로 쓴다(createOrderRequest).
 
+import { canDismissConfirmSheet } from "@/lib/confirm-sheet-dismiss";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ChevronDown, Plus, X } from "lucide-react";
 import { createOrderRequest } from "@/app/mobile/orders/new/actions";
@@ -91,6 +92,7 @@ export function OrderCreateForm({
   const [formMessage, setFormMessage] = useState<string | null>(null);
     const [confirmOpen, setConfirmOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [sheetKey, setSheetKey] = useState(0);
   // 품목 사진은 「요청 보내기」 때 한 줄로 모아 올리고 확인 시트에서 사진마다 진행 · 실패한 사진만 다시(2026-10-15, 시안 Motion-C-Upload-Phone).
   const uploads = usePhotoUpload(organizationId, "order-images");
   /** 품목별 사진 목록 (itemId → PreviewItem[]) */
@@ -359,9 +361,14 @@ export function OrderCreateForm({
 
       {confirmOpen ? (
         <BottomSheet
+          key={sheetKey}
           ariaLabel={copy.wConfirmTitle}
           onClose={() => {
-            if (uploads.running) return;
+            if (!canDismissConfirmSheet({ running: uploads.running, pending: isPending })) {
+              // 닫기를 무시하면 시트가 미끄러져 나간 채 안 보이게 남는다 — 새로 그려 다시 보이게 한다.
+              setSheetKey((k) => k + 1);
+              return;
+            }
             uploads.abandon();
             setConfirmOpen(false);
           }}
@@ -395,7 +402,7 @@ export function OrderCreateForm({
                 onRetry={handleConfirmSubmit}
               />
               <div className="ofw-sheet__btns">
-                <button className="ofw-btn is-gray" disabled={uploads.running} onClick={close} type="button">
+                <button className="ofw-btn is-gray" disabled={uploads.running || isPending} onClick={close} type="button">
                   {copy.cancel}
                 </button>
                 <button className="ofw-btn is-pri" disabled={isPending || uploads.running} onClick={handleConfirmSubmit} type="button">

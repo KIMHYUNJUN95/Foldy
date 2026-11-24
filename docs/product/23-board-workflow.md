@@ -861,9 +861,9 @@ App Store(1.2) · Google Play(UGC 정책)는 사용자 작성 콘텐츠가 있�
 - **글쓰기 · 수정**: 저장 중 버튼 잠금 + 「올리는 중…」(수정 화면은 「저장하는 중…」, `editSaving`) · 오류는 본문 칸 바로 아래(`role="alert"`; 지금 오류는 모두 파일 · 사진 · 저장 오류라 본문 칸에
   `aria-invalid` 를 붙이지 않는다 — 빈 본문은 버튼이 꺼져 있다) · 서버가 `{error}` 로 거절했을 때(또는 올리기 자체가 실패했을 때)만 방금 올린 사진 · 파일 지우기를
   시도한다(`removeBoardUploads`). 저장 요청이 던지면(네트워크 · 시간 초과) 서버에 저장됐을 수도 있어 지우지 않고 오류만 보인 뒤 버튼을 다시 켠다.
-  지우기는 저장소 정책이 허락할 때만 된다 — 첨부(`board-attachments`)는 올린 사람이 지울 수 있지만, 사진(`request-images`)은 **남는다**(고아 파일) —
-  이 버킷에 SELECT 정책이 없어 브라우저 `remove()` 가 지울 행을 못 보고 오류 없이 아무것도 지우지 않는다(폴더는 202611200005 로 지우기 정책에 들어감,
-  SELECT 정책을 줄지는 별도 결정 대기 — `docs/engineering/05-rls-permissions.md` 「2026-11-20 request-images 폴더 되살리기」) · 제목 이름표 `titleLabel`.
+  지우기는 저장소 정책이 허락할 때만 된다 — 첨부(`board-attachments`)는 올린 사람이 지울 수 있다. 사진(`request-images`)은 이 버킷에 SELECT 정책이 없어
+  브라우저 `remove()` 가 지울 행을 못 보고 오류 없이 아무것도 지우지 않아 **남았다**(고아 파일). 2026-11-24 `202611240001`(**운영 미적용**)이 「내가 1시간 안에 올린 사진만 보이는」
+  SELECT 정책을 더해, 적용 뒤에는 방금 올린 내 사진이 지워진다 — `docs/engineering/05-rls-permissions.md` 「2026-11-24 request-images 읽기 정책 · 할 일 사진 아르바이트 허용」 · 제목 이름표 `titleLabel`.
 - **키보드**: 확인 창 Esc 로 닫기 · 열 때 버튼에 초점 · Tab 은 창 안 버튼 사이만 돈다, 닫으면 원래 자리로(연 줄이 시트와 함께 사라졌으면 상세의 「⋯」 단추로, PC 신고 콘솔은 휴지통 단추로) · 신고 사유 묶음은 Tab 한 번 + 화살표 · Home · End(`board-radio-keys.ts`).
 - **문구**(ko · ja · en): 오류 문구를 부드럽게, 끝 마침표 없이 — `errSaveFailed` · `errImageUploadFailed` · `errFileUploadFailed` · `errInvalidFileType`.
   새 키: `titleLabel` · `postSubmitting` · `commentDeletedToast` · `undo` · `commentDeleteFailed` · `commentRestoreFailed` · `editSaving` · `errLoadMoreFailed`(더 불러오기 실패, 예전엔 저장 실패 문구를 씀) · `reportsFailed`.

@@ -1657,20 +1657,54 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 | `lost-items` · `lost-found-handling` · `maintenance-reports` · `maintenance-resolutions` · `order-images` | 브라우저 | 그 조직 활성 멤버(아르바이트 포함) | 내 것 또는 `request.delete_any` |
 | `linen-returns` | 브라우저 | 활성 멤버(아르바이트 포함) | 내 것 또는 `linen.manage` |
 | `suggestion-images` · `attendance-corrections` · `board-posts` · `board-comments` (되살림) | 브라우저 | 활성 멤버(아르바이트 포함 — 06-29 정의) | 내 것 또는 `request.delete_any` |
-| `task-images` · `task-update-images` (되살림) | 브라우저 | 활성 멤버 중 **아르바이트 제외**(06-29 정의) | 같은 조건 + 내 것 또는 `request.delete_any` |
+| `task-images` · `task-update-images` (되살림) | 브라우저 | 활성 멤버 중 **아르바이트 제외**(06-29 정의) → **2026-11-24 `202611240001` 부터 아르바이트 포함**(운영 미적용) | 같은 조건 + 내 것 또는 `request.delete_any` |
 | `bug-reports` · `complaint-images` · `complaint-comment-images` | 서버 service role | 정책 목록에 없음(서버만 — 정책을 거치지 않음) | 서버 |
 | `transport-reimbursements` · `annual-leave-requests` (5칸 · 별도 정책) | 브라우저 / 서버 지우기 | 별도 정책(그대로) | 별도 정책(그대로) |
 
 - 경로 검사(4칸 · 조직 id · 기록 id uuid · 파일 이름 3~160자 · 글자)는 그대로. 플랫폼 관리자도 예전처럼 목록 안 폴더만.
 - 지우기는 06-29 의 「조직 멤버 누구나 남의 사진 지우기」로 되돌리지 않고 지금 규칙(내 것 또는 권한 키)을 되살린 폴더에도 적용했다.
-- **알려진 별개 문제(고치지 않음):** `request-images` 에는 SELECT 정책이 처음부터 없다(공개 버킷이라 공개 주소 읽기는 정책을 안 거침). Supabase `remove()` 는
+- **알려진 별개 문제(2026-11-24 `202611240001` 로 「내가 1시간 안에 올린 사진만」 보이게 정함 — 운영 미적용, 아래 절):** `request-images` 에는 SELECT 정책이 처음부터 없다(공개 버킷이라 공개 주소 읽기는 정책을 안 거침). Supabase `remove()` 는
   select + delete 둘 다 필요해서, 브라우저에서 부르는 지우기(`removeRequestImages` · `removeBoardUploads` — 실패 시 방금 올린 사진 되지우기)는 **오류 없이 아무것도
-  지우지 않는다.** 서버(service role) 정리는 정상. SELECT 정책을 더할지는 따로 정한다.
+  지우지 않는다.** 서버(service role) 정리는 정상. 2026-11-24 에 「내가 1시간 안에 올린 사진만」 보이는 SELECT 정책으로 정했다(아래 절).
 - 함수 실행 권한: `public` 회수 + `anon` 따로 회수(Supabase 기본 권한이 anon 에 따로 준다) — authenticated · service_role 만.
 - 로컬 검증(2026-11-20, 로컬 Supabase 에서 `set role authenticated` + jwt sub 흉내, 시도마다 트랜잭션 롤백). 운영에서는 올리기를 재현하지 않았다(적용 뒤 정책 2개가 함수를 부르는 것 · 함수 실행 권한 · 폴더별 결과는 읽기로 확인) —
   운영 정책 폴더 목록이 로컬과 같은 6개인 것만 읽기로 확인. 2026-11-20 로컬에서 적용 전 재현: 위 6개 폴더 올리기 모두 거절. 적용 뒤(로컬 DB 에는 최종본이 적용돼 있음): 직원 허용,
   아르바이트는 할 일 두 폴더만 거절, 남의 조직 · 목록 밖 폴더 · `bug-reports` · 3칸/5칸 · uuid 아닌 기록 id · 잘못된 파일 이름 · 비활성 멤버 거절.
   지우기 논리(임시 SELECT 정책으로 롤백 안에서): 내 것 허용 · 아르바이트가 남의 것 거절. 두 번 돌려도 같은 결과.
+
+## 2026-11-24 request-images 읽기 정책 · 할 일 사진 아르바이트 허용 (`202611240001_request_images_select_and_task_photos.sql`, **운영 미적용 · 앱 코드 먼저**)
+
+- **읽기(SELECT) 정책 `"uploaders can read own recent request images"`** — `to authenticated`, 조건은 다섯 개를 모두 만족(and):
+  버킷 `request-images` · 4칸 경로 · 1칸이 uuid · **`owner_id = auth.uid()`(내가 올린 것)** · **`created_at > now() - interval '1 hour'`(올린 지 1시간 안)**.
+  함수 없이 정책 하나로 둔다. 올리기 · 지우기 정책은 `202611200005` 그대로 다시 만들지 않는다.
+- **왜 이렇게 좁혔나:** SELECT 정책이 없어서 지우기 정책은 브라우저에서 **한 번도 작동한 적이 없다**(언제나 0행 — `remove()` 는 지울 행이 보여야 지운다).
+  「지우기와 같은 조건」으로 읽기를 열면 지우기 정책 전체가 처음으로 실제 권한이 된다:
+  ① 직원 · 아르바이트가 이미 제출한 근태 정정 증빙 · 분실물 · 수리 · 주문 사진을 개발자 도구로 지울 수 있고
+  ② `request.delete_any` 가진 사람(cs_staff 포함)이 모든 폴더의 남의 사진을 지우고 `list()` 로 남의 제안 · 근태 정정 사진 경로를 받고
+  ③ 플랫폼 관리자가 모든 조직 사진을 지운다.
+  앱이 브라우저 `remove()` 를 쓰는 곳은 「방금 올리고 아직 저장 안 한 내 사진 되지우기」뿐이다(`removeRequestImages` · `removeBoardUploads` ·
+  `uploadRequestImages` 실패 되지우기 · 사진 시트 그만두기). 그래서 그 쓰임에 맞게만 열었다.
+- **브라우저에서 실제로 지울 수 있는 행 = 지우기 정책 ∩ 읽기 정책** = 그 조직 활성 멤버 · 목록 안 폴더 · 내가 1시간 안에 올린 사진.
+  남의 사진 지우기(`request.delete_any` · `linen.manage` · 플랫폼 관리자 갈래)는 브라우저에서 계속 0행(오늘 운영과 같음)이고, 서버(service role) 정리가 맡는다.
+  그래서 `request.delete_any` 설명 문구는 바꾸지 않는다.
+- 칼럼 근거: `storage.objects.owner_id` 는 text(Supabase storage 스키마, `202610220001` 정책도 `owner_id = (auth.uid())::text` 로 비교),
+  `created_at` 은 storage 기본 칼럼 `timestamptz default now()`(올릴 때 서버가 채움, 덮어쓰기에도 그대로). 운영 DB 로는 확인하지 않았다(쓰기 금지, 읽기도 안 함).
+- **할 일 두 폴더(`task-images` · `task-update-images`) 아르바이트 제외 없앰**(사용자 승인 2026-11-24, 권한을 넓히는 변경) — 폴더 함수 갈래가 하나가 됐다(목록 안 = 활성 멤버 누구나).
+  `p_role` 인자는 정책 호출 모양을 바꾸지 않으려고 남겼다(지금은 안 씀). 그 밖의 폴더 · 역할 조건, 5칸 경로(교통비 · 휴가) 정책은 그대로.
+- 앱 호출 점검(grep): 브라우저 쪽은 `upload(…, { upsert: false })` 와 `remove()` 뿐. `list` · `createSignedUrls` 는 모두 서버 service role
+  (`bug-reports.ts:145` · `admin-attendance.ts:1602` · `admin/attendance/actions.ts:2462`)이라 정책과 상관없다.
+- **배포 순서 — 앱 코드가 먼저:** 발주 등록 · 청소 중 수리 신고 시트가 저장 중 닫기(그만두기)를 막는 수정(`order-create-form.tsx` · `maintenance-linked-form.tsx` ·
+  `maintenance-confirm-modal.tsx`)이 운영에 배포된 **뒤에** 이 SQL 을 적용한다. 이 정책이 들어가면 그만두기의 `remove()` 가 실제로 지워서, 저장 중에 시트를 닫으면
+  막 저장되는 기록의 사진이 지워질 수 있기 때문이다. 되돌리기 · 확인 SQL 은 파일 머리말.
+- 로컬 검증(2026-11-24): 로컬 Supabase(56422)가 꺼져 있어서(다른 세션 임시 폴더 정리로 데이터 폴더 손상) **버리는 로컬 postgres** 에 흉내 스키마(`auth.uid()` · memberships ·
+  platform_admins · has_capability 흉내 · `storage.objects` 의 owner_id text · created_at · RLS · anon/authenticated 표 권한)를 만들고 실제 마이그레이션 파일 두 개를 돌렸다
+  (시도마다 롤백, 최종본은 그 DB 에만 영구 적용). 사람 7명(직원 · 아르바이트 · `request.delete_any`+`linen.manage` 사무 · `request.delete_any` cs · 남의 조직 직원 ·
+  플랫폼 관리자 · 정지 멤버) × 8개 폴더 × 방금 / 2시간 전, 모두 114행:
+  - 적용 전(오늘 운영 모양): 모든 사람 · anon 보임 0 · 지움 0.
+  - 적용 뒤: 활성 멤버 6명은 각자 **자기 방금 올린 것만** 보임 8(목록 밖 폴더 2개 포함) · 지움 6(목록 안 폴더만), 남의 것 지움 0, 1시간 지난 것 보임 0 —
+    권한 있는 사무 · cs · 플랫폼 관리자도 같다. 정지 멤버는 자기 방금 올린 것 보임 8 · 지움 0. anon 보임 0 · 지움 0. 다른 버킷 · 5칸 경로는 안 보임.
+  - 올리기: 적용 전과 같고 아르바이트 할 일 두 폴더만 거절 → 허용. 두 번 실행해도 같은 결과. SELECT/ALL 정책은 새 정책 하나(버킷 조건 있음), anon 함수 실행 false.
+  운영에서는 돌리지 않았다.
 
 ## 2026-10-22 청소 배정 담당 바꾸기 — `cleaning.assign_swap`
 

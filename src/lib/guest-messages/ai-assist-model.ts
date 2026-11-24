@@ -9,6 +9,7 @@
  * - 보낸 글 ↔ 초안 비교(그대로 보냄 · 고쳐 보냄) · 이번 달(도쿄) 경계 · 비용 계산.
  */
 
+import { sameRoom } from "@/lib/guest-messages/access-codes";
 import { maskEntryCodes, MASKED_CODE } from "@/lib/guest-messages/auto-model";
 import type { GuestLang } from "@/lib/guest-messages/guest-info-model";
 import { messagePlainText } from "@/lib/guest-messages/message-body";
@@ -509,14 +510,6 @@ export function similarityOf(distance: number): number {
 
 // ── 이 예약 방의 손님용 출입 코드 ─────────────────────────────────────────────
 
-/** 대화 방 라벨(「201」 또는 「아라키초A 201」) ↔ 출입 코드 방 라벨. */
-export function sameRoomLabel(conversationRoom: string | null, codeRoom: string): boolean {
-  if (!conversationRoom?.trim()) return false;
-  const room = conversationRoom.trim();
-  const tail = room.includes(" ") ? room.slice(room.lastIndexOf(" ") + 1) : room;
-  return room === codeRoom || tail === codeRoom;
-}
-
 /** 손님이 쓰는 공용 출입 번호 종류 — 창고 · 키 박스 · 리넨실은 직원용이라 넣지 않는다(49 §4). */
 const GUEST_SHARED_ACCESS = new Set(["roomPassword", "doorPassword"]);
 
@@ -532,7 +525,7 @@ export function guestEntryCodeFor(
   roomLabel: string | null,
 ): string | null {
   if (!building) return null;
-  const room = building.roomAccess.find((item) => item.code.trim() && sameRoomLabel(roomLabel, item.roomLabel));
+  const room = building.roomAccess.find((item) => item.code.trim() && sameRoom(roomLabel, item.roomLabel));
   if (room) return room.code.trim();
   if (building.roomAccess.some((item) => item.code.trim())) return null;
   const shared = building.sharedAccess.filter((item) => item.code.trim() && GUEST_SHARED_ACCESS.has(item.labelKey));

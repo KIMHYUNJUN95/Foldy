@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
+import { AccessCodesSection } from "@/components/guest-messages/access-codes";
 import { AutoRunsList } from "@/components/guest-messages/auto-runs-list";
 import { useBuildingName } from "@/components/shared/building-names";
 import { TaskToast } from "@/components/tasks/task-toast";
@@ -301,6 +302,7 @@ export function MobileThreadScreen({
   locale,
   canReply,
   canManage = false,
+  canSeeAccessCodes = false,
   taskKinds = [],
   taskCategoryCopy,
 }: {
@@ -312,6 +314,8 @@ export function MobileThreadScreen({
   locale: string;
   canReply: boolean;
   canManage?: boolean;
+  /** 출입 번호를 볼 수 있는지(`canSeeStaffCodes`) — 참/거짓만. 번호는 「번호 보기」 때 서버 액션으로. */
+  canSeeAccessCodes?: boolean;
   /** 이 사람이 메시지에서 만들 수 있는 업무(6단계 — 서버 `creatableKinds`). */
   taskKinds?: LinkTargetType[];
   taskCategoryCopy: TaskCategoryCopy;
@@ -534,6 +538,15 @@ export function MobileThreadScreen({
           <div className="gm-sheet">
             <h2 className="gm-sheet__title">{placeLabel(row.propertyName, row.roomLabel) || copy.bookingInfo}</h2>
             <ReservationRows reservation={thread.reservation} copy={copy} locale={locale} surface="mobile" />
+            {/* 출입 번호(47 §5-14) — 볼 수 있는 사람만, 누를 때 받는다. 시트를 닫으면 사라져 다시 숨긴 상태로. */}
+            {canSeeAccessCodes ? (
+              <AccessCodesSection
+                key={`${thread.conversation.id}|${row.propertyName ?? ""}|${row.roomLabel ?? ""}`}
+                conversationId={thread.conversation.id}
+                copy={copy}
+                notify={(message) => notify(message)}
+              />
+            ) : null}
             {/* 자동 안내(5단계) — 읽기만. 규칙 · 멈추기는 PC 전용. */}
             <AutoRunsList runs={thread.autoRuns} copy={copy} locale={locale} guestName={thread.conversation.guestName} />
           </div>

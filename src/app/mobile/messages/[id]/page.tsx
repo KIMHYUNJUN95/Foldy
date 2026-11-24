@@ -3,6 +3,7 @@ import { getGuestConversation } from "@/actions/guest-messages";
 import { MobileThreadScreen } from "@/components/guest-messages/mobile-messages";
 import { InboxError } from "@/components/guest-messages/gm-parts";
 import { MobileShell } from "@/components/shell/mobile-shell";
+import { canSeeStaffCodes } from "@/lib/guest-messages/access-codes";
 import { UUID_RE } from "@/lib/guest-messages/inbox-model";
 import { creatableKinds } from "@/lib/guest-messages/task-link-model";
 import { getDictionary } from "@/lib/i18n";
@@ -37,6 +38,7 @@ export default async function MobileMessageThreadPage({ params }: { params: Prom
           locale={locale}
           canReply={session.capabilities.includes("guest_messages.reply")}
           canManage={session.capabilities.includes("guest_messages.manage")}
+          canSeeAccessCodes={canSeeStaffCodes(session.capabilities)}
           taskKinds={creatableKinds(session.capabilities)}
           taskCategoryCopy={{ maintenance: dict.maintenance.form.categories, lostFound: dict.lostFound.categoryLabels }}
         />

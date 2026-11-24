@@ -43,12 +43,12 @@ import {
   type ExistingAutoRun,
 } from "@/lib/guest-messages/auto-model";
 import { classifyGuestChannel, resolveOutboundChannel } from "@/lib/guest-messages/beds24-normalize";
+import { accessLabel, sameRoom } from "@/lib/guest-messages/access-codes";
 import { GUEST_LANGS, type GuestLang, type Localized } from "@/lib/guest-messages/guest-info-model";
 import { loadBuildingGuestInfos, type BuildingGuestInfo } from "@/lib/guest-messages/guest-info-server";
 import { nightsBetween, normalizeGuestLanguage, toChannelKey } from "@/lib/guest-messages/inbox-model";
 import { ensureConversationForBooking, resolveConversationSeed } from "@/lib/guest-messages/store";
 import { getDictionary } from "@/lib/i18n";
-import type { PropertyAccessInfo } from "@/lib/property-map-links";
 import { getReservationGuests } from "@/lib/reservation-guests";
 import {
   CANONICAL_TO_BUILDING_KEY,
@@ -169,29 +169,7 @@ export function groupKeyOf(row: Pick<ReservationRowForAuto, "master_id" | "bid" 
   return providerBookingIdOf(row);
 }
 
-/** 대화의 방 라벨(「201」 또는 「아라키초A 201」) ↔ 출입 코드 방 라벨(답장 칸과 같은 규칙). */
-function sameRoom(roomLabel: string | null, codeRoom: string): boolean {
-  if (!roomLabel) return false;
-  const room = roomLabel.trim();
-  const tail = room.includes(" ") ? room.slice(room.lastIndexOf(" ") + 1) : room;
-  return room === codeRoom || tail === codeRoom;
-}
-
 type Dict = ReturnType<typeof getDictionary>;
-
-function accessLabel(access: PropertyAccessInfo, t: Dict["mobile"]): string {
-  const labels: Record<PropertyAccessInfo["labelKey"], string> = {
-    doorPassword: t.calendarMapAccessKindDoorPassword,
-    keyBox: t.calendarMapAccessKindKeyBox,
-    keyBoxPassword: t.calendarMapAccessKindKeyBoxPassword,
-    linenStorageEntrancePassword: t.calendarMapAccessKindLinenStorageEntrancePassword,
-    roomPassword: t.calendarMapAccessKindRoomPassword,
-    storage: t.calendarMapAccessKindStorage,
-    storagePassword: t.calendarMapAccessKindStoragePassword,
-  };
-  const prefix = access.prefixKey === "floor1" ? t.calendarMapAccessFloor1 : null;
-  return prefix ? `${prefix} · ${labels[access.labelKey]}` : labels[access.labelKey];
-}
 
 let dictionaryCache: Record<GuestLang, Dict> | null = null;
 function guestDictionaries(): Record<GuestLang, Dict> {

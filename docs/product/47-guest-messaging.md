@@ -219,7 +219,7 @@ Beds24 예약 웹훅 ──▶ /api/beds24/webhook (기존) ──▶ 메시지 
 - 대화: 손님 말(번역 · 원문 보기) · 우리 답장 · 내부 메모(자물쇠, 손님에게 안 보임) · 시스템 줄(「Airbnb 문의 · 기다린 지 32분」).
 - 답장 칸: 정해 둔 문구 · 건물 정보 넣기(6-3) · 내부 메모로 쓰기 · 사진 · 「Airbnb 메시지로 나가요」 · 보내기.
 - **쓰던 글 보관(2026-11-19)**: 답장 칸 글은 **대화마다 이 브라우저 탭 세션**(`sessionStorage`, 키 `foldy:gm-drafts:v1`, 칸 이름 `조직 id : 대화 id`)에 보관한다 — 뒤로 가기 · 다른 대화로 갔다 오기 · 다시 그리기 · 새로고침 뒤에도 돌아온다. PC · 폰 · 태블릿 칸 모두 같은 `Composer` 라 같은 규칙. 글만 보관(사진 · 번역 미리 보기 · 내부 메모 칸 글은 아님). 직접 쓴 글 · 직원이 넣은 정해 둔 문구 · 건물 정보 · 고친 글이 저장된다(400ms 늦춰 저장, 대화를 닫거나 탭이 숨겨질 때 밀린 것을 바로). **자동으로 들어온 글(「해결됐어요」 초안 · AI 초안)은 직원이 고치기 전까지 저장하지 않는다**(고치면 보통 초안 — 다시 열면 일반 글로 돌아오고 AI 초안 표시 · 고쳐 보냄 기록은 이어지지 않는다). 칸이 비면 지운다. **보내기가 받아들여지면 화면이 이미 닫혔어도 저장소를 바로 지운다**(보내는 중 나가도 보낸 글이 되살아나지 않음). 보내는 중 나갔다가 응답 전에 같은 대화를 다시 열어 글이 되살아난 경우, 먼저 보낸 쪽의 성공이 같은 탭 안에서 알려져(`subscribeDraftSent`) 되살린 칸이 **한 글자도 안 고쳐졌으면 비워진다**(고쳤으면 직원의 새 글이라 둔다). 보내기 실패는 글이 그대로라 보관도 그대로. **내부 메모 칸은 답장 보관을 읽지도 쓰지도 않는다** — 다만 메모를 보냈을 때 저장된 답장 글이 방금 보낸 메모와 같은 글이면 그 보관만 지운다(다른 글이면 둔다). 열릴 때 효과 안에서 되살려 서버 그림과 어긋나지 않고, 포커스 · 키보드는 건드리지 않는다. 최근 30개 대화 · 한 글 4000자까지. 저장소가 막히거나 가득 차도 화면은 그대로(메모리 칸으로). 서버 · 테이블 없음. 로그인 사용자 id 는 화면에 내려오지 않아 **조직까지만 나눈다**(탭을 닫으면 사라지므로 한 기기 공용 사용 위험은 작다). 코드: `src/lib/guest-messages/composer-draft.ts` · `use-composer-draft.ts`.
-- 오른쪽 패널: 날짜 · 인원 · 채널 · 언어 · 예약 번호(캘린더로) · **업무 만들기**(6-4) · 보낼 자동 안내 순서.
+- 오른쪽 패널: 날짜 · 인원 · 채널 · 언어 · 예약 번호(캘린더로) · **출입 번호**(볼 수 있는 사람만, 누를 때 보임 — §5-14) · **업무 만들기**(6-4) · 보낼 자동 안내 순서.
 - 상태 화면(States): 직접 예약 답장 불가 · 보낼 차례 기다림(단추 없음 — 고치기 · 취소 없앰, 2026-11-13) · 보내지 못함(이유 + 다시 보내기) · 받는 통로 멈춤 경고 · 빈 상태.
 
 ### 5-2. 모바일 `/mobile/messages` (가칭)
@@ -245,6 +245,7 @@ Beds24 예약 웹훅 ──▶ /api/beds24/webhook (기존) ──▶ 메시지 
 | `src/app/admin/messages/page.tsx` · `src/components/admin/messages/messages-console.tsx` | PC 3칸(목록 · 대화 · 예약 패널). 필터 = 공용 `AdmDropdown`(상태 · 건물 · 채널), 고른 대화는 `?c=`, 채널은 `?channel=`. 「나중에」 팝오버 = 1시간 · 3시간 · 내일 9시 + 공용 `AdminDatePicker` · `AdminTimePicker`(도쿄). 「처리 끝」은 줄 접힘 + `AdminUndoToast` 되돌리기. 볼 권한 없으면 `AdminNoAccess`. 탭은 2단계엔 「대화」 하나라 탭 줄을 그리지 않는다 |
 | `src/app/mobile/messages/page.tsx` · `[id]/page.tsx` · `loading.tsx` 둘 · `src/components/guest-messages/mobile-messages.tsx` | 폰 · 폴드: 목록 → 대화 화면(제목 줄 누르면 예약 정보 `BottomSheet`, 처리 끝 아이콘, 「더 보기」 시트 = 나중에 · 예약 정보). 태블릿 가로: 공용 `SplitList`(`split`, 상세 주소 `messages`) — 오른쪽 칸 안은 같은 대화 화면(칸 모드). 칸에서 처리 끝 · 나중에를 누르면 서버를 기다리기 전에 왼쪽 줄이 접힌다(`postMessage`, 실패하면 다시 펴짐). 답장 칸은 아래에 붙는다(sticky `bottom: 0` — 이 화면만 셸 본문 아래 여백을 폰 = 탭바 자리 `--tabbar-h + 12px`, 폴드 · 칸 = 0 으로 줄여 탭바 바로 위에 붙고 그 밑 빈 칸이 없다. 새 말이 오면 — 맨 아래에 있을 때 · 내가 보냈을 때 — 셸 스크롤 칸을 끝까지 내려 마지막 말이 답장 칸 위에 보인다. 위로 올려 읽는 중이면 「새 메시지」 알약, §5-9). 폰 대화 머리 밑 한 줄 = 채널 · 방 · 예약 상태. 번역 아이콘 → 볼 언어 고르기 시트. 토스트 = `TaskToast`(공용 움직임) |
 | `src/components/guest-messages/gm-parts.tsx` · `gm-format.ts` · `use-thread.ts` · `guest-messages.css` | PC · 모바일 공용 — 목록 줄 · 대화 줄(번역 보기 · 원문 보기 · 내부 메모 자물쇠 · 보낼 차례 기다림(고치기 · 취소 단추 없음) · 보내지 못함 다시 보내기 · 모름 확인 창) · 답장 칸(내부 메모 전환 · 번역 미리 보기 · 번역 실패 시 「쓴 글 그대로 보내기」) · 직접 예약 막힘 안내(이메일 복사) · 예약 정보 줄. 시각은 모두 도쿄 |
+| `src/components/guest-messages/access-codes.tsx` | 예약 패널 「출입 번호」(PC 예약 패널 · 폰 예약 정보 시트 공용, §5-14) — 누를 때만 번호를 받고, 대화 · 건물 · 방이 바뀌면 숨긴 상태로 |
 | `src/actions/guest-messages.ts` | 서버 액션(PC · 모바일 공용, 문서 CLAUDE.md `src/actions`). 권한: 읽기 · 번역 = `guest_messages.view`, 답장 · 메모 · 처리 끝 · 나중에 · 다시 보내기 = `view + reply`. **관리자 웹 권한은 요구하지 않는다**(§8 — 알바에게 개인 부여 가능). 모든 쿼리 `organization_id` 로 거름(service_role) |
 | `src/lib/guest-messages/inbox-model.ts` | 순수 — 목록 상태(끝난 「나중에」 = 답장 기다림) · 정렬(`lastMessageAt` 내림차순 · 없는 줄은 맨 아래 · 같으면 id) · 「나중에」 시각(도쿄, 미래 · 30일 안 · 없는 날짜 거절) · 보낼 수 있는 채널(어댑터 `outboundChannelRefusal` 과 같음) · 번역 언어 |
 | `src/lib/guest-messages/inbox-server.ts` | 목록(열린 대화 ≤500 + 처리 끝 ≤200, 미리 보기 한 줄은 DB 함수 `guest_conversation_last_lines` — 대화마다 한 줄) · 대화(메시지 ≤300 · 큐 상태 · 작성자 이름(**이 조직 구성원만**) · 보는 사람 언어 번역 · 예약 인원) 읽기 · 메뉴 숫자(RLS 서버 클라이언트) |
@@ -279,7 +280,9 @@ Beds24 예약 웹훅 ──▶ /api/beds24/webhook (기존) ──▶ 메시지 
 | `src/app/admin/messages/actions.ts` | PC 탭 전용 — 설정 저장(`settings` 의 다른 키는 남김) · 문구 만들기/고치기/지우기(hard delete)/순서. 관리자 웹 + `guest_messages.manage`, 아니면 `forbidden` |
 | `src/components/admin/messages/saved-replies-manager.tsx` | 정해 둔 문구 탭 — 왼쪽 목록(위/아래로 순서) · 오른쪽 편집(제목 · 언어 탭 한국어/日本語/English · 변수 넣기 단추 · 지우기 확인 · 저장 안 한 채 나가기 확인). 세로 구분선 없음(목록 칸 바탕만 다름) |
 | `src/components/guest-messages/composer-inserts.tsx` · `gm-parts.tsx` | 답장 칸 「정해 둔 문구」 · 「건물 정보 넣기」 — PC 는 답장 칸 위 팝오버, 폰 · 폴드 · 태블릿은 공용 `BottomSheet`. 누르면 **커서 자리에 넣는다**(덮지 않음). 열 때마다 다시 읽는다(`getComposerInserts`, 앞 값은 읽는 동안 그대로 · 패널 저장 뒤 바로 다시). 빈 칸은 「비어 있음」으로 흐리게(누를 수 없음). 직원만 보는 출입 코드는 자물쇠 묶음으로 따로(「손님에게 보내도 되는지 확인하고 넣어요」). 「건물 정보 고치기」(PC · `property_info.edit`) → 건물 손님용 정보 패널, 「문구 관리」(관리 권한) → 정해 둔 문구 탭 |
-| `src/actions/guest-messages-compose.ts` | `getComposerInserts(conversationId)`(`view + reply`) — 언어마다(ko · ja · en) 건물 정보 넣기 글(와이파이 꼴은 그 언어 사전) · 문구(변수 채움) · 건물 이름(그 언어로) · 직원용 코드(공용 출입 코드 + 이 방 코드) |
+| `src/actions/guest-messages-compose.ts` | `getComposerInserts(conversationId)`(`view + reply`) — 언어마다(ko · ja · en) 건물 정보 넣기 글(와이파이 꼴은 그 언어 사전) · 문구(변수 채움) · 건물 이름(그 언어로) · 직원용 코드(공용 출입 코드 + 이 방 코드 — 고르기 · 라벨은 `access-codes.ts` 의 `conversationAccessCodes`, 2026-11-24) |
+| `src/actions/guest-messages-access-codes.ts` | `getConversationAccessCodes(conversationId)`(`view` + Q9 사람, 아니면 `forbidden`) — 예약 패널 「출입 번호」(§5-14). 다른 조직 = `not_found`, 실패 로그에 번호 없음 |
+| `src/lib/guest-messages/access-codes.ts` | 순수 — 방 맞추기 `sameRoom` · `canSeeStaffCodes` · `accessLabel` · `conversationAccessCodes` · 화면 상태 `accessCodesReducer`(늦게 온 답 버리기 · 권한 없음 구분). 답장 칸 · 자동 안내 · AI 답장 도우미가 같이 쓴다 |
 | `src/components/admin/messages/building-guest-info-panel.tsx` | 건물 손님용 정보 오른쪽 패널(공용 `.panel`) — 와이파이 이름 · 비밀번호(모든 언어 같은 값) + 언어 탭별 체크인 · 체크아웃 · 짐 보관 · 쓰레기 · 주차 · 길 안내 · 그 밖 안내 + 직원만 보는 정보 요약. 저장은 본 버전일 때만(충돌이면 쓴 글은 두고 「최신 값 불러오기 / 내 글로 덮기」). 출입 코드는 개수만 받는다. 메시지 답장 칸과 **예약 캘린더 「건물 정보」 카드의 「손님용 정보」** 둘 다에서 연다 |
 | `src/lib/guest-messages/guest-info-model.ts` · `guest-info-server.ts` | 손님용 칸 모양 · 검사(길이 넘으면 자르지 않고 거절: 짧은 칸 120 · 글 500 · 그 밖 안내 2,000) · 언어 고르기 · 넣기 목록 · 읽기/저장(`guest_info_updated_at` 버전) |
 | `src/lib/guest-messages/saved-reply-model.ts` · `saved-replies-server.ts` | 문구 검사(제목 1~80 · 본문 2,000 · 언어 하나 이상) · 변수 `{guest_name}` `{checkin_date}` `{checkout_date}` `{nights}` `{building}` `{room}` 채우기(날짜는 그 언어 꼴 「11월 20일 / 11月20日 / Nov 20」) · 조직마다 200개 |
@@ -512,6 +515,21 @@ PC `/admin/messages` 목록 위 · 모바일 `/mobile/messages` 필터 줄 위(�
 - **마이그레이션 `202611190001_guest_messages_perf.sql`**(04 「손님 메시지」): 인덱스 4개 더함(지운 것 없음) + `guest_conversation_last_lines` 를 LATERAL 로 다시 씀(서명 · `security definer` · `search_path = ''` · service_role 전용 권한 같음). 로컬 시험 DB(대화 9,161 · 예약 9,386 · 메시지 120,084) 실측: 처리 끝 창 2.65ms → 0.015ms(Seq Scan + 정렬 → Index Only Scan) · `raw_payload->>id` 찾기 3.2ms → 0.01ms · `->>masterId` 3.1ms → 0.012ms · 마지막 한 줄(대화 500) 6.1ms(디스크 정렬 3.9MB) → 0.69ms, 결과 462줄 같음. **운영에는 아직 적용하지 않았다** — 사용자 허락 뒤 대시보드 SQL 편집기로. 적용 전에도 앱 코드는 그대로 돈다(인덱스가 없으면 느릴 뿐, 함수는 예전 판도 같은 결과).
 - **알고 둔 것(이번에 안 고침)**: 메뉴 숫자 `countAwaitingConversations` 는 시각 없는 「나중에」(`snoozed` · `snooze_until` 비어 있음)를 기다림으로 세지 않는다 — 목록 머리 숫자와 어긋날 수 있다(그런 줄은 지금 쓰기 경로로는 생기지 않음). 자동 안내 묶음 예약 찾기(`auto-scheduler.ts` `expandGroups`)는 새 masterId 인덱스를 타지만 묶음 · 칸을 차례로 읽는 것은 그대로(발송 실행 범위 밖).
 
+### 5-14. 예약 패널 「출입 번호」 (2026-11-24, 사용자 승인 · 커밋 전)
+
+예약을 보다가 그 건물 · 방의 출입 번호를 바로 확인 · 복사하는 묶음. 답장 칸 「넣기」 목록(§6-3)과 **같은 번호 · 같은 권한**이다.
+
+- **어디**: PC 오른쪽 예약 패널(예약 줄 바로 아래) · 모바일 대화 위 한 줄 → 예약 정보 시트(예약 줄 바로 아래). 같은 컴포넌트 `src/components/guest-messages/access-codes.tsx`(`AccessCodesSection`). 폰 · 폴드 · 태블릿 모두 같은 시트 · 칸 안에서 그린다.
+- **누가**: `guest_messages.view` **와** (`guest_messages.manage` 또는 `property_info.edit`) — Q9 그대로. 화면 처음 데이터에는 **볼 수 있는지 참/거짓만** 싣고(`canSeeStaffCodes`), 거짓이면 묶음 자체가 없다(답장 권한만 있는 알바 · 야간 직원에게는 안 보임).
+- **번호는 누를 때만**: 처음엔 제목 · 안내 한 줄 · 고정 가림 글자(「••••••」 — 번호 길이와 상관없음)만. 「번호 보기」를 누르면 서버 액션 `getConversationAccessCodes(conversationId)`(`src/actions/guest-messages-access-codes.ts`)가 권한을 다시 보고 번호를 준다. 다시 누르면(「번호 숨기기」) 숨기고 받은 번호를 버린다. 다른 대화로 바꾸거나 **같은 대화라도 건물 · 방이 바뀌면**(방 옮김 동기화 — 묶음 `key` = 대화 id + 건물 + 방) 숨긴 상태로 처음부터(PC 는 패널을 새로 그림, 폰은 시트를 닫아도 사라짐). 늦게 온 답은 숨긴 뒤 · 바꾼 뒤 번호를 다시 펴지 않는다(`accessCodesReducer` — 누를 때마다 · 숨길 때마다 번호를 올리고 맞지 않는 답은 버림).
+- **줄**: 라벨(공용 번호 = 예약 캘린더 건물 정보 라벨 「1층 · 창고 비밀번호」 꼴, 방 번호 = 「{방} 출입 코드」) · 번호(고정폭 숫자) · 복사 단추(라벨 이름이 붙은 `aria-label`). 공용 번호 먼저(빈 값 빼고), 이 대화 방 번호 뒤(빈 값 · 다른 방 빼고). 라벨은 **보는 사람 언어**, 방 이름은 `localizeRoomPlaceLabel`.
+- **복사**: 공용 `copyText`(`src/lib/copy-text.ts` — 클립보드 API 가 없거나 거절하면 숨은 글 칸 + `execCommand("copy")`, 예약 캘린더 모바일과 같은 함수). 그 화면 알림(PC `AdminToast` · 폰 `TaskToast`)으로 「번호를 복사했어요」, 실패면 「복사하지 못했어요」(두 알림 모두 실패 색이 따로 없어 글로만 구분 — `TaskToast` 의 `tone="danger"` 는 되돌리기 단추 색이라 쓰지 않음). 햅틱: 보기 · 숨기기 · 복사 = `light`, 불러오기 · 복사 실패 = `error`.
+- **상태**: 불러오는 중(「불러오는 중…」) · 권한 없음(`forbidden` — 「이 작업을 할 권한이 없어요」, 다시 시도 없음: 화면을 연 뒤 권한이 빠진 경우) · 실패(`not_found` · `invalid` · `failed` · 통신 오류 — 「번호를 불러오지 못했어요」 + 「다시 시도」) · 없음(「이 예약에 저장된 출입 번호가 없어요」 — 건물을 모르거나 값이 비었을 때).
+- **접근성**: 상태 · 번호가 바뀌는 칸(`aria-live="polite"`)은 늘 그려 두고 안의 내용만 바꾼다(숨김 칸 안의 알림은 읽히지 않음). 「번호 보기」 단추는 `aria-expanded` · `aria-controls`. 가림 글자는 `aria-hidden`. 터치 화면(`pointer: coarse`)에서 보기 · 다시 시도 · 복사 단추는 44px. 번호 칸은 `min-width: 0` · `overflow-wrap: anywhere` 라 글자 1.35배 · 폭 320px 에서도 넘치지 않는다.
+- **방 맞추기 규칙 한 곳**: `src/lib/guest-messages/access-codes.ts` — `sameRoom`(대화 방 라벨을 다듬어 그대로 같거나, 마지막 띄어쓰기 뒤 토막이 같으면 같은 방 — `Ab402` ↔ `402` 아님) · `canSeeStaffCodes` · `accessLabel` · `conversationAccessCodes`. 대화 방 라벨이 비었거나 공백뿐이면 맞지 않고, 코드 방 라벨도 앞뒤 공백을 다듬어 비교한다(빈 라벨끼리는 같은 방이 아님). 답장 칸 넣기 목록(`guest-messages-compose.ts`) · 자동 안내 변수(`auto-scheduler.ts`) · AI 답장 도우미 손님용 번호(`ai-assist-model.ts`, 예전 `sameRoomLabel` 은 지움)도 이것 하나를 쓴다.
+- **안전**: 번호 값은 로그 · 오류 글에 넣지 않는다(실패 로그는 오류 글만). 다른 조직 대화 id 는 `not_found`, 잘못된 id 는 `invalid`, 권한 없으면 `forbidden`(redirect 없음 — 폰 사용자를 관리자 화면으로 보내지 않게).
+- 시험: `src/lib/__tests__/guest-messages-access-codes.test.ts`(규칙 · 공백 방 라벨 · 화면 상태 — 답이 오기 전에 숨기면 늦게 온 번호를 버림 · 권한 없음 구분) · `guest-messages-access-codes-actions.test.ts`(권한 문 · 조직 범위 · 언어 · 실패 로그에 번호 없음) · `copy-text.test.ts`(대체 복사). 번호는 가짜 값만. 컴포넌트를 실제로 그리는 시험은 없다(저장소에 Testing Library · jsdom 이 없음 — 늦은 답 규칙은 순수 상태 함수로 시험).
+
 ## 6. 추가 기능 (D5)
 
 ### 6-1. 기다린 시간 표시
@@ -541,8 +559,8 @@ PC `/admin/messages` 목록 위 · 모바일 `/mobile/messages` 필터 줄 위(�
 - **새 표를 만들지 않고** 예약 캘린더의 건물 정보(`property_operation_infos` — 공용 출입 코드 · 객실 출입 코드 · 운영 메모, 문서 15 「건물 정보」)를 넓힌다. 편집 권한도 같은 `property_info.edit`.
 - 더할 칸(손님에게 보내도 되는 정보, 언어별 ko · ja · en): 와이파이 이름 · 비밀번호 · 짐 보관 · 주차 · 쓰레기 버리는 법 · 체크인 · 체크아웃 시각 · 길 안내 · 자유 칸.
 - **손님에게 보내도 되는 칸과 직원용 칸을 나눈다.** 운영 메모는 손님용이 아니다. 출입 코드는 자동 안내 변수로만 쓰고 답장 칸 「넣기」 목록에서는 따로 표시한다.
-- 쓰는 곳: 답장 칸 「건물 정보 넣기」(손님 언어로 넣음) · 자동 안내 변수 · 예약 패널.
-- **출입 코드를 답장 칸에서 누가 보나 — Q9 확정 (2026-11-12 사용자)**: `guest_messages.manage` 또는 `property_info.edit` 가 있는 사람에게만 직원용 코드 묶음을 준다. 답장 권한만 개인으로 받은 알바 · 야간 직원에게는 안 보인다(코드는 손님에게 잘못 나가면 위험).
+- 쓰는 곳: 답장 칸 「건물 정보 넣기」(손님 언어로 넣음) · 자동 안내 변수 · 예약 패널(「출입 번호」 — 누를 때만 보임, §5-14).
+- **출입 코드를 답장 칸에서 누가 보나 — Q9 확정 (2026-11-12 사용자)**: `guest_messages.manage` 또는 `property_info.edit` 가 있는 사람에게만 직원용 코드 묶음을 준다. 답장 권한만 개인으로 받은 알바 · 야간 직원에게는 안 보인다(코드는 손님에게 잘못 나가면 위험). 예약 패널 「출입 번호」(§5-14)도 같은 사람만.
 - **구현(4단계, 2026-11-13)**: `property_operation_infos.guest_info`(jsonb) + `guest_info_updated_at`(마이그레이션 `202611130003`). 고치는 곳 = 예약 캘린더 「건물 정보」 카드 「손님용 정보」 · 메시지 답장 칸 「건물 정보 고치기」(같은 패널, §5-5).
 - 셀프 체크인 건물 비밀번호(사용자 정리 대기 — 메모리)와 같은 값인지 Q6.
 
@@ -641,7 +659,7 @@ PC `/admin/messages` 목록 위 · 모바일 `/mobile/messages` 필터 줄 위(�
 | Q6 | 건물 정보 카드의 출입 코드와 셀프 체크인 건물 비밀번호를 하나로 둘지 |
 | Q7 | 메시지 보관 기간 · 퇴실 뒤 삭제 여부 — **확정 (2026-11-12 사용자): 지금은 자동 삭제 없음.** 보관 기준(예: 체크아웃 3년 뒤 삭제)은 **2027-02-12 까지** 정한다(19 열린 할 일, §4-0-2) |
 | Q8 | 크레딧 한도를 200 으로 유지할지(지금 200, 기본은 100) |
-| Q9 | 답장 칸에서 출입 코드를 넣을 수 있는 사람 — **확정 (2026-11-12 사용자)**: 관리(`guest_messages.manage`) 또는 건물 정보 고치기(`property_info.edit`)만, 답장 권한만 있는 사람은 못 봄(§6-3) |
+| Q9 | 답장 칸에서 출입 코드를 넣을 수 있는 사람 — **확정 (2026-11-12 사용자)**: 관리(`guest_messages.manage`) 또는 건물 정보 고치기(`property_info.edit`)만, 답장 권한만 있는 사람은 못 봄(§6-3). 예약 패널 출입 번호(§5-14)도 같은 사람만 |
 | Q10 | 대화에 보이는 자동 안내의 출입 코드 — **확정 (2026-11-12 사용자)**: Q9 와 같은 사람만 보이고, 나머지는 「••••」로 가림(손님에게 나간 글은 그대로). 자동 안내 큐 줄 다시 보내기는 관리만(§5-6; 대화의 고치기 · 취소는 2026-11-13 없앰) |
 | Q11 | 묶음 예약(Beds24 `masterId`, 방 여러 개)의 자동 안내 — **확정 (2026-11-12 사용자)**: 묶음마다 한 번, 대표 예약으로 보내고 `{room}` · `{entry_code_room}` 에 묶음의 방 전부(「201 / 202」 · 「201 코드 / 202 코드」, 한 방이라도 코드가 없으면 막힘)(§5-6) |
 | Q12 | 정기 실행 간격 — **확정 (2026-11-12 사용자): 보정 조회 15분 · 발송 5분 · 자동 안내 5분.** Vercel 요금제가 Hobby 라( 는 하루보다 짧은 크론을 거절) `vercel.json` 이 아니라 Supabase pg_cron `202611130006`(운영 적용 2026-11-13) |

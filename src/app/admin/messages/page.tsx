@@ -23,6 +23,7 @@ import { PROPERTY_MAP_META } from "@/lib/property-map-links";
 import { CANONICAL_TO_BUILDING_KEY, localizeBuildingName } from "@/lib/room-label-normalization";
 import { getDictionary } from "@/lib/i18n";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { canSeeStaffCodes } from "@/lib/guest-messages/access-codes";
 import { InboxSearchProvider } from "@/components/guest-messages/inbox-search-provider";
 import "@/components/guest-messages/guest-messages.css";
 
@@ -203,6 +204,7 @@ export default async function AdminMessagesPage({
           initialThread={initialThread}
           canReply={session.capabilities.includes("guest_messages.reply")}
           canManage={canManage}
+          canSeeAccessCodes={canSeeStaffCodes(session.capabilities)}
           stall={stall}
           taskKinds={creatableKinds(session.capabilities)}
           taskCategoryCopy={{ maintenance: dict.maintenance.form.categories, lostFound: dict.lostFound.categoryLabels }}

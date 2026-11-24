@@ -898,6 +898,26 @@ html[data-pane] [data-shell-scroll]:has(.gm-mthread) { padding-bottom: 0 !import
 .gm-aruns__main > span { font-size: 12px; color: var(--gm-muted); line-height: 1.4; }
 .gm-aruns__at { font-variant-numeric: tabular-nums; }
 .gm-sheet .gm-aruns { margin-top: 8px; }
+/* 예약 패널 「출입 번호」(47 §5-14) — 「자동 안내 기록」 묶음과 같은 위 구분선 · 줄 모양. 숨긴 동안은 고정 가림 글자만. */
+.gm-codes { display: flex; flex-direction: column; gap: 4px; padding-top: 14px; box-shadow: inset 0 0.5px 0 var(--gm-sep); }
+.gm-codes__head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; }
+.gm-codes__title { margin: 0; display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; }
+.gm-codes__title svg { color: var(--gm-muted); }
+.gm-codes__toggle { margin-left: auto; font-size: 12px; font-weight: 600; }
+.gm-codes__mask { margin: 2px 0 0; font-size: 13px; letter-spacing: 0.12em; color: var(--gm-muted); }
+.gm-codes__state { margin: 4px 0 0; }
+.gm-codes__list { margin: 2px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+.gm-codes__row { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 4px 0; box-shadow: inset 0 -0.5px 0 var(--gm-sep); }
+.gm-codes__row:last-child { box-shadow: none; }
+.gm-codes__label { flex: 1; min-width: 0; font-size: 12px; color: var(--gm-muted); line-height: 1.4; overflow-wrap: anywhere; }
+.gm-codes__value { flex: 0 1 auto; min-width: 0; max-width: 60%; overflow-wrap: anywhere; text-align: right; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+.gm-codes__copy { flex: none; margin-right: -6px; }
+@media (pointer: coarse) {
+  .gm-codes__toggle,
+  .gm-codes__retry { min-height: 44px; display: inline-flex; align-items: center; }
+  .gm-codes__copy { width: 44px; height: 44px; margin-right: -10px; }
+}
+.gm-sheet .gm-codes { margin-top: 8px; }
 
 /* ══ 6단계 — 메시지 → 업무 한 번에(시안 R2Task · R2PhoneTask · R2PhoneThread · R2Main) ════════════════ */
 /* 대화 안 업무 링크 줄 — 시스템 줄처럼 가운데, 아이콘 · 회색 상태 글자 · 「열기」. */

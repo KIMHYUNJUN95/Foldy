@@ -9,6 +9,7 @@
 
 import { haptic } from "@/lib/haptics";
 import { setAutoRunPausedAction } from "@/app/admin/messages/auto-actions";
+import { AccessCodesSection } from "@/components/guest-messages/access-codes";
 import { AutoRunsList } from "@/components/guest-messages/auto-runs-list";
 import type { AutoRunView } from "@/lib/guest-messages/auto-model";
 import { useRouter } from "next/navigation";
@@ -86,6 +87,7 @@ export function MessagesConsole({
   initialThread,
   canReply,
   canManage = false,
+  canSeeAccessCodes = false,
   stall = null,
   taskKinds = [],
   taskCategoryCopy,
@@ -104,6 +106,8 @@ export function MessagesConsole({
   canReply: boolean;
   /** `guest_messages.manage` — 「문구 관리」 링크 · 받는 통로 멈춤 줄. */
   canManage?: boolean;
+  /** 출입 번호를 볼 수 있는지(`canSeeStaffCodes`) — 참/거짓만. 번호는 「번호 보기」 때 서버 액션으로. */
+  canSeeAccessCodes?: boolean;
   stall?: StallNotice | null;
   /** 이 사람이 메시지에서 만들 수 있는 업무(6단계 — 서버 `creatableKinds`). */
   taskKinds?: LinkTargetType[];
@@ -541,6 +545,7 @@ export function MessagesConsole({
           now={now}
           canPause={canManage || canReply}
           canManage={canManage}
+          canSeeAccessCodes={canSeeAccessCodes}
           notify={(message) => showToast(message)}
           taskKinds={taskKinds}
           onPickTask={openTask}
@@ -600,6 +605,7 @@ function ReservationPanel({
   now,
   canPause,
   canManage,
+  canSeeAccessCodes,
   notify,
   taskKinds,
   onPickTask,
@@ -611,6 +617,7 @@ function ReservationPanel({
   now: Date;
   canPause: boolean;
   canManage: boolean;
+  canSeeAccessCodes: boolean;
   notify: (message: string) => void;
   taskKinds: LinkTargetType[];
   onPickTask: (kind: LinkTargetType) => void;
@@ -649,6 +656,15 @@ function ReservationPanel({
         <h2 className="gm-panel__title">{placeLabel(row.propertyName, row.roomLabel) || copy.unknownValue}</h2>
       </div>
       <ReservationRows reservation={thread.reservation} copy={copy} locale={locale} surface="admin" />
+      {canSeeAccessCodes ? (
+        // 대화 · 건물 · 방이 바뀌면(방 옮김 동기화 포함) 펼친 번호를 버리고 숨긴 상태로(47 §5-14).
+        <AccessCodesSection
+          key={`${row.id}|${row.propertyName ?? ""}|${row.roomLabel ?? ""}`}
+          conversationId={row.id}
+          copy={copy}
+          notify={notify}
+        />
+      ) : null}
       <AssistSimilarSection similar={similar} copy={copy} locale={locale} />
       <TaskPanelSection kinds={taskKinds} links={thread.links} copy={copy} locale={locale} onPick={onPickTask} />
       <AutoRunsList

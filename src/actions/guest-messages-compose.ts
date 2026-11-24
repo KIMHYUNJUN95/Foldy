@@ -18,10 +18,10 @@ import { UUID_RE } from "@/lib/guest-messages/inbox-model";
 import { buildReplyContext, guestDictionaries } from "@/lib/guest-messages/reply-context-server";
 import { buildGuestInserts, GUEST_LANGS, type GuestInsertItem, type GuestLang } from "@/lib/guest-messages/guest-info-model";
 import { loadBuildingGuestInfo } from "@/lib/guest-messages/guest-info-server";
+import { accessLabel, canSeeStaffCodes, conversationAccessCodes } from "@/lib/guest-messages/access-codes";
 import { savedReplyText, type ReplyContext, type SavedReplyVariable } from "@/lib/guest-messages/saved-reply-model";
 import { loadSavedReplies } from "@/lib/guest-messages/saved-replies-server";
 import { getDictionary } from "@/lib/i18n";
-import type { PropertyAccessInfo } from "@/lib/property-map-links";
 import { localizeRoomPlaceLabel } from "@/lib/room-label-normalization";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
@@ -42,33 +42,6 @@ export type ComposerInserts = {
 };
 
 export type ComposerInsertsResult = { ok: true; data: ComposerInserts } | { ok: false; errorKey: "forbidden" | "invalid" | "not_found" | "failed" };
-
-function accessLabel(access: PropertyAccessInfo, t: ReturnType<typeof getDictionary>["mobile"]): string {
-  const labels: Record<PropertyAccessInfo["labelKey"], string> = {
-    doorPassword: t.calendarMapAccessKindDoorPassword,
-    keyBox: t.calendarMapAccessKindKeyBox,
-    keyBoxPassword: t.calendarMapAccessKindKeyBoxPassword,
-    linenStorageEntrancePassword: t.calendarMapAccessKindLinenStorageEntrancePassword,
-    roomPassword: t.calendarMapAccessKindRoomPassword,
-    storage: t.calendarMapAccessKindStorage,
-    storagePassword: t.calendarMapAccessKindStoragePassword,
-  };
-  const prefix = access.prefixKey === "floor1" ? t.calendarMapAccessFloor1 : null;
-  return prefix ? `${prefix} · ${labels[access.labelKey]}` : labels[access.labelKey];
-}
-
-/** 대화의 방 라벨(「201」 또는 「아라키초A 201」) ↔ 출입 코드 방 라벨. */
-function sameRoom(conversationRoom: string | null, codeRoom: string): boolean {
-  if (!conversationRoom) return false;
-  const room = conversationRoom.trim();
-  const tail = room.includes(" ") ? room.slice(room.lastIndexOf(" ") + 1) : room;
-  return room === codeRoom || tail === codeRoom;
-}
-
-/** 출입 코드를 넣기 목록에 보일 사람 — 임시(47 §6-3 · Q9). */
-function canSeeStaffCodes(capabilities: readonly string[]): boolean {
-  return capabilities.includes("guest_messages.manage") || capabilities.includes("property_info.edit");
-}
 
 export async function getComposerInserts(conversationId: string): Promise<ComposerInsertsResult> {
   const session = await getCurrentAppSession().catch(() => null);
@@ -111,15 +84,10 @@ export async function getComposerInserts(conversationId: string): Promise<Compos
                 ]),
               ) as Record<GuestLang, GuestInsertItem[]>,
               staffCodes: canSeeCodes
-                ? [
-                ...building.sharedAccess.filter((a) => a.code.trim()).map((a) => ({ label: accessLabel(a, staffT), code: a.code })),
-                ...building.roomAccess
-                  .filter((room) => room.code.trim() && sameRoom(conversation.room_label, room.roomLabel))
-                  .map((room) => ({
-                    label: staffCopy.insertRoomCode.replace("{room}", localizeRoomPlaceLabel(room.roomLabel, staffDict.cleaning.buildingLabels)),
-                    code: room.code,
-                  })),
-                ]
+                ? conversationAccessCodes(building, conversation.room_label, {
+                    shared: (access) => accessLabel(access, staffT),
+                    room: (roomLabel) => staffCopy.insertRoomCode.replace("{room}", localizeRoomPlaceLabel(roomLabel, staffDict.cleaning.buildingLabels)),
+                  }).map(({ label, code }) => ({ label, code }))
                 : [],
             }
           : null,

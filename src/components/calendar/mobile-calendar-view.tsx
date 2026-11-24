@@ -20,6 +20,7 @@ import { useIsTablet } from "@/components/shell/split-list";
 import { BuildingPicker } from "@/components/calendar/building-picker";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import { formatPhoneDisplay } from "@/lib/phone-format";
+import { copyText } from "@/lib/copy-text";
 import { haptic } from "@/lib/haptics";
 import { barLabelMaxWidth } from "@/lib/calendar-row-labels";
 import { cn } from "@/lib/utils";
@@ -291,24 +292,6 @@ function toDialablePhone(value: string | null) {
   if (!value) return null;
   const normalized = value.trim().replace(/[^\d+]/g, "");
   return normalized.length > 0 ? normalized : null;
-}
-
-async function copyText(value: string) {
-  if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(value);
-    return;
-  }
-
-  const textarea = document.createElement("textarea");
-  textarea.value = value;
-  textarea.setAttribute("readonly", "true");
-  textarea.style.position = "absolute";
-  textarea.style.left = "-9999px";
-  document.body.appendChild(textarea);
-  textarea.select();
-  const ok = document.execCommand("copy");
-  document.body.removeChild(textarea);
-  if (!ok) throw new Error("clipboard_unavailable");
 }
 
 function sharedAccessLabel(

@@ -33,7 +33,8 @@ import {
   type HomeReservationRow,
 } from "@/lib/home";
 import { resolveCleaningTaskLabel } from "@/lib/dashboard-format";
-import { getHomeImportantAnnouncement } from "@/lib/announcements";
+import { getHomeImportantAnnouncement, getHomePopupAnnouncements } from "@/lib/announcements";
+import { AnnouncementPopup } from "@/components/announcements/announcement-popup";
 import {
   CANONICAL_TO_BUILDING_KEY,
   getCanonicalPropertyName,
@@ -357,6 +358,20 @@ async function HomeBody({
 }
 
 
+/** 앱을 켰을 때 공지 팝업(2026-11-12) — 홈 본문과 따로 스트리밍해 첫 화면을 막지 않는다. 목록 화면과 같은 세션 기록을 써서 두 번 뜨지 않는다. */
+async function HomeAnnouncementPopup({ session }: { session: AppSession }) {
+  const announcements = await getHomePopupAnnouncements(session);
+  if (announcements.length === 0) return null;
+  return (
+    <AnnouncementPopup
+      announcements={announcements}
+      detailHrefBase="/mobile/announcements"
+      locale={session.user.preferredLanguage}
+      userId={session.user.id}
+    />
+  );
+}
+
 export default async function MobileHomePage() {
   const session = await getCurrentAppSession();
 
@@ -396,6 +411,10 @@ export default async function MobileHomePage() {
           <HomeBody session={session} dictionary={dictionary} />
         </Suspense>
       </div>
+
+      <Suspense fallback={null}>
+        <HomeAnnouncementPopup session={session} />
+      </Suspense>
 
       <div className="sr-only">
         {m.today}

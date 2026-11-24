@@ -95,6 +95,17 @@ function isPopupActive(row: AnnouncementRow, nowIso: string): boolean {
 }
 
 /**
+ * 콘솔에 보일 공지인가 — 게시 중은 누구나, 초안 · 보관은 플랫폼 관리자 · `announcement.manage` · 작성자만(2026-11-12).
+ */
+export function canSeeConsoleAnnouncement(
+  row: Pick<AnnouncementRow, "status" | "created_by_user_id">,
+  viewer: { isPlatformAdmin: boolean; userId: string; caps: readonly string[] },
+): boolean {
+  if (row.status === "published" || viewer.isPlatformAdmin) return true;
+  return row.created_by_user_id === viewer.userId || viewer.caps.includes("announcement.manage");
+}
+
+/**
  * 현재 관리자가 볼 수 있는 모든 공지(쓰기 가능한 조직 전체)를 불러와, 작성자 / 조직 이름과
  * 파생된 도달 수 + 읽음 지표를 붙여 대시보드 콘솔에 준다. 읽기 전용이며,
  * 변경은 콘솔 서버 액션이 한다.
@@ -198,7 +209,15 @@ export async function getAdminAnnouncements(
       .order("is_pinned", { ascending: false })
       .order("published_at", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false });
-    const rows = (announcementData ?? []) as AnnouncementRow[];
+    // 초안 · 보관 공지는 관리 권한자와 작성자만(2026-11-12) — DB 읽기 정책(202611120003)과 같은 규칙.
+    // 게시 중 공지는 예전처럼 콘솔 조직 전체가 본다.
+    const rows = ((announcementData ?? []) as AnnouncementRow[]).filter((row) =>
+      canSeeConsoleAnnouncement(row, {
+        isPlatformAdmin,
+        userId: me.id,
+        caps: capsByOrg.get(row.organization_id) ?? [],
+      }),
+    );
     const announcementIds = rows.map((row) => row.id);
 
     // 3. 조직 전체의 활성 멤버십 — 역할별 수 + 전체 합계.

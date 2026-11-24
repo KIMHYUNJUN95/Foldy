@@ -5,6 +5,7 @@ import type { Database } from "@/types/database";
 import type { OrganizationRole } from "@/config/roles";
 import { bestEffortWrite } from "@/lib/db-write-guard";
 import { countsTowardRead } from "@/lib/announcement-display";
+import { selectPopupCandidates } from "@/lib/announcement-rules";
 
 type OrgRoleMap = Map<string, OrganizationRole>;
 
@@ -205,6 +206,56 @@ export async function getHomeImportantAnnouncement(session: AppSession) {
   return (
     (data as Pick<AnnouncementRow, "id" | "title" | "content"> | null) ?? null
   );
+}
+
+/**
+ * 앱을 켰을 때(홈) 띄울 팝업 공지(2026-11-12) — 게시 중 · 나를 대상으로 하는(읽기 정책) 팝업 공지 중
+ * 끝나지 않았고 · 읽지 않았고 · 7일 숨기지 않은 것. 목록 화면과 같은 규칙(selectPopupCandidates).
+ * 실패하면 빈 목록 — 홈을 막지 않는다.
+ */
+export async function getHomePopupAnnouncements(session: AppSession) {
+  if (session.organization.id === "platform") return [];
+  try {
+    const supabase = await getSupabaseServerClient();
+    const { data } = await supabase
+      .from("announcements")
+      .select("id, organization_id, title, content, image_urls, is_important, published_at, show_popup_on_app_open, popup_until")
+      .eq("organization_id", session.organization.id)
+      .eq("status", "published")
+      .eq("show_popup_on_app_open", true)
+      .order("is_pinned", { ascending: false })
+      .order("published_at", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false });
+    const rows = (data ?? []) as Pick<
+      AnnouncementRow,
+      | "id"
+      | "organization_id"
+      | "title"
+      | "content"
+      | "image_urls"
+      | "is_important"
+      | "published_at"
+      | "show_popup_on_app_open"
+      | "popup_until"
+    >[];
+    if (rows.length === 0) return [];
+    const ids = rows.map((row) => row.id);
+    const [dismissedIds, readIds] = await Promise.all([
+      getPopupDismissals(session.user.id, ids),
+      getReadAnnouncementIds(session.user.id, ids),
+    ]);
+    return selectPopupCandidates(rows, { dismissedIds, readIds, now: new Date() }).map((row) => ({
+      content: row.content,
+      id: row.id,
+      imageUrls: row.image_urls,
+      isImportant: row.is_important,
+      organizationId: row.organization_id,
+      publishedAt: row.published_at,
+      title: row.title,
+    }));
+  } catch {
+    return [];
+  }
 }
 
 export async function getVisibleAnnouncementById(

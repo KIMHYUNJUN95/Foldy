@@ -6,7 +6,11 @@ import { organizationRoles } from "@/config/roles";
 import { memberCapabilities } from "@/lib/capabilities-server";
 import { getPublicSupabaseEnv } from "@/lib/env";
 import { getAnnouncementReadSummary } from "@/lib/announcements";
-import { createImportantAnnouncementNotifications } from "@/lib/notifications/create";
+import { nextPublishedAtOnEdit } from "@/lib/announcement-rules";
+import {
+  createImportantAnnouncementNotifications,
+  deleteAnnouncementNotifications,
+} from "@/lib/notifications/create";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import type { Database } from "@/types/database";
@@ -415,6 +419,14 @@ export async function updateAnnouncementStatus(formData: FormData) {
     announcementsRedirect("error=save_failed");
   }
 
+  // 게시 중이던 공지를 내리면(보관 · 초안으로) 알림함에서도 내린다 — 대상 직원은 더 이상 열 수 없다.
+  if (announcement.status === "published" && nextStatus !== "published") {
+    await deleteAnnouncementNotifications(service, {
+      organizationId: announcement.organization_id,
+      announcementId: announcement.id,
+    });
+  }
+
   if (
     nextStatus === "published" &&
     announcement.status !== "published" &&
@@ -462,6 +474,11 @@ export async function deleteAnnouncement(formData: FormData) {
   if (error) {
     announcementsRedirect("error=save_failed");
   }
+
+  await deleteAnnouncementNotifications(getSupabaseServiceClient(), {
+    organizationId: announcement.organization_id,
+    announcementId: announcement.id,
+  });
 
   // DB 행 삭제 성공. 이제 붙어 있던 Storage 이미지를 정리한다.
   // 이미 지워진 파일을 가리키는 행이 남지 않도록
@@ -515,6 +532,8 @@ type SaveAnnouncementConsoleInput = {
   isPinned: boolean;
   showPopup: boolean;
   popupUntil: string | null;
+  /** 수정할 때 불러온 행의 updated_at — 그사이 남이 고쳤으면 저장하지 않고 `conflict`(2026-11-12). */
+  expectedUpdatedAt?: string | null;
 };
 
 function normalizeConsoleTargetRoles(roles: string[]): OrganizationRole[] {
@@ -568,8 +587,24 @@ export async function saveAnnouncementConsole(
     !["everyone", "roles"].includes(targetScope) ||
     (targetScope === "roles" && targetRoles.length === 0)
   ) {
-    // 새 글이면 방금 올린 사진이 고아가 되지 않게 치운다(수정이면 아래 편집 경로가 따로 정리).
-    if (announcementId && isValidUUID(announcementId) && input.organizationId && isValidUUID(input.organizationId)) {
+    // 방금 올린 사진이 고아가 되지 않게 치운다. 새 글이면 그 폴더 전체, 수정이면(권한 확인 뒤) 원래 목록에 없던 것만.
+    const current = await getAnnouncement(announcementId);
+    if (current) {
+      if (await canManageAnnouncement(userId, current)) {
+        await cleanupStoragePaths(
+          getValidatedAnnouncementImagePaths(
+            imageUrls.filter((u) => !current.image_urls.includes(u)),
+            current.organization_id,
+            announcementId,
+          ),
+        );
+      }
+    } else if (
+      input.organizationId &&
+      isValidUUID(input.organizationId) &&
+      (await canCreateInOrganization(userId, input.organizationId))
+    ) {
+      // 그 조직에 쓸 권한이 있을 때만 — 권한 없는 사람이 남의 업로드 폴더를 지우는 통로가 되지 않게.
       await cleanupSubmittedAnnouncementImages(imageUrls, input.organizationId, announcementId);
     }
     return { ok: false, error: "invalid_announcement" };
@@ -606,7 +641,7 @@ export async function saveAnnouncementConsole(
     const wasPublished = existing.status === "published";
     // 수정 폼은 draft/published 만 만들므로 행이 보관됨으로 남지 않는다.
     // 오래된 타임스탬프가 남지 않도록 수정 뒤에는 archived_at 을 무조건 비운다.
-    const { error } = await service
+    let update = service
       .from("announcements")
       .update({
         archived_at: null,
@@ -615,8 +650,7 @@ export async function saveAnnouncementConsole(
         is_important: input.isImportant,
         is_pinned: input.isPinned,
         popup_until: popupUntil,
-        published_at:
-          status === "published" ? (existing.published_at ?? now) : existing.published_at,
+        published_at: nextPublishedAtOnEdit(existing, status, now),
         show_popup_on_app_open: input.showPopup,
         status,
         target_roles: targetScope === "roles" ? targetRoles : [],
@@ -624,10 +658,17 @@ export async function saveAnnouncementConsole(
         title,
       })
       .eq("id", announcementId);
+    // 동시 수정 막기 — 불러온 뒤 누가 고치거나 보관했으면 0줄이 되어 덮어쓰지 않는다(보관 공지를 몰래 되살리지 않음).
+    if (input.expectedUpdatedAt) update = update.eq("updated_at", input.expectedUpdatedAt);
+    const { data: updatedRows, error } = await update.select("id");
 
     if (error) {
       await cleanupStoragePaths(newlyUploaded);
       return { ok: false, error: "save_failed" };
+    }
+    if (!updatedRows || updatedRows.length === 0) {
+      await cleanupStoragePaths(newlyUploaded);
+      return { ok: false, error: "conflict" };
     }
 
     // 편집에서 뺀 사진은 DB가 더 이상 가리키지 않게 된 뒤에 서버에서 지운다(2026-10-26) —
@@ -753,6 +794,14 @@ export async function setAnnouncementStatusConsole(
 
   if (error) return { ok: false, error: "save_failed" };
 
+  // 게시 중이던 공지를 내리면(보관 · 초안으로) 알림함에서도 내린다 — 대상 직원은 더 이상 열 수 없다.
+  if (announcement.status === "published" && nextStatus !== "published") {
+    await deleteAnnouncementNotifications(service, {
+      organizationId: announcement.organization_id,
+      announcementId: announcement.id,
+    });
+  }
+
   if (
     nextStatus === "published" &&
     announcement.status !== "published" &&
@@ -791,6 +840,12 @@ export async function deleteAnnouncementConsole(
     .eq("id", announcementId);
 
   if (error) return { ok: false, error: "save_failed" };
+
+  // 공지가 지워진 뒤에 알림도 지운다(2026-11-12).
+  await deleteAnnouncementNotifications(getSupabaseServiceClient(), {
+    organizationId: announcement.organization_id,
+    announcementId: announcement.id,
+  });
 
   if (announcement.image_urls.length > 0) {
     const storagePaths = getValidatedAnnouncementImagePaths(

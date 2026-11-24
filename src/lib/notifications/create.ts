@@ -319,6 +319,29 @@ export async function createImportantAnnouncementNotifications(
 }
 
 /**
+ * 공지를 지우거나 보관하면 그 공지의 알림을 모두의 알림함에서 지운다(2026-11-12) — 눌러도 「없는 공지」가
+ * 뜨는 알림이 남지 않게. service 클라이언트로 부른다(받는 사람마다 행이 있어 본인 RLS 로는 못 지운다).
+ * 실패해도 공지 처리는 되돌리지 않는다(로그만). 다시 게시하면 중복 키가 비어 있어 알림이 다시 간다.
+ */
+export async function deleteAnnouncementNotifications(
+  supabase: SupabaseClient<Database>,
+  params: { organizationId: string; announcementId: string },
+): Promise<void> {
+  const { error } = await supabase
+    .from("notifications")
+    .delete()
+    .eq("organization_id", params.organizationId)
+    .eq("source_type", "announcement")
+    .eq("source_id", params.announcementId);
+  if (error && !isNotificationsTableUnavailable(error.message)) {
+    console.error("[notifications] announcement notification cleanup failed", {
+      announcementId: params.announcementId,
+      error: error.message,
+    });
+  }
+}
+
+/**
  * 조직의 모든 검토자(owner/office_admin)에게 `bug_report_activity:created` 알림을
  * 팬아웃한다(작업자 본인은 제외). 검토자 멤버십은 여기서 service 클라이언트로 해석하므로
  * 호출자가 넘길 필요가 없다. 역할 필터가 서버에서 강제되어 가시 범위를 넓히지 않는다.

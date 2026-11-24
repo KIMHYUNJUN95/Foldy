@@ -576,25 +576,41 @@ RLS pattern: same structure as the `maintenance_reports` delete policy above.
 
 ## announcements
 
-Read:
+Read (2026-11-12, `202611120003_announcements_hardening.sql`):
 
-- Targeted users.
-- Platform admins.
+- Platform admins — 전부.
+- 같은 조직 활성 멤버 —
+  - 게시 중(`published`) 공지: 대상(`everyone` 또는 내 역할 ∈ `target_roles`)일 때만 — 예전과 같다.
+  - 초안 · 보관 공지: 작성자 본인, 또는 `announcement.manage` 가 있으면 그 조직 것 전부. 예전 정책은 상태를 보지 않아
+    대상 직원이 초안 · 보관 공지를 PostgREST 로 직접 읽을 수 있었다.
+- 앱의 사용자 세션 읽기(모바일 목록 · 상세 · 홈 · 안 읽음 수)는 모두 `status = 'published'` 로 거르므로 화면 동작은 그대로다.
+  관리자 콘솔은 service role 로 읽고 같은 규칙을 코드로 건다(`canSeeConsoleAnnouncement` — 게시 중은 콘솔 조직 전체, 초안 · 보관은
+  관리 권한자 · 작성자).
 
-Create:
+Create / Update / Delete:
 
-- All roles except Part-time Staff.
-
-Update/delete:
-
-- Creator
-- Owner
-- Office Admin
-- Platform admins
+- **로그인 사용자(`authenticated`) · `anon` 의 직접 insert · update · delete 권한을 거뒀다**(2026-11-12). INSERT 정책은
+  `created_by_user_id = auth.uid()` 를 보지 않아 남의 이름으로 공지를 넣고 서버 검증(길이 · 사진 경로 · 대상 · 알림)을 건너뛸 수 있었다.
+  쓰기는 전부 service role 서버 액션(`src/app/admin/announcements/actions.ts`)이고, 정책은 남아 있지만 표 권한이 없어 쓰이지 않는다.
+  **truncate 도 같이 거뒀다**(2026-11-24 추가) — RLS 를 타지 않아 권한만 있으면 표 전체를 비울 수 있다. PostgREST 로는 부를 길이
+  없지만 남겨 둘 이유가 없다. SELECT 는 그대로(읽기는 사용자 세션 + 위 읽기 정책).
+- 서버 액션 권한: 작성 = `announcement.create`, 수정 · 게시 · 보관 · 삭제 = `announcement.manage` 또는 작성자(작성 권한이
+  남아 있을 때) 또는 플랫폼 관리자(2026-11-12 결정 — 작성자의 자기 공지 운영 유지).
 
 Comments:
 
-- Users who can view an announcement can comment.
+- 읽기: 지워지지 않은 댓글 중 부모 공지를 읽을 수 있는 사람(위 읽기 규칙 — 상태 포함, 2026-11-12).
+- 쓰기는 service role 서버 액션(`src/app/announcements/actions.ts`). 댓글 화면은 현재 없다(doc 11).
+
+announcement_reads:
+
+- 읽기: 본인 · 플랫폼 관리자 · `announcement.manage`.
+- 고치기: 본인 행만, **신원 칸(`user_id` · `announcement_id` · `organization_id`)은 못 바꾼다** — 트리거
+  `announcement_reads_immutable_identity`(2026-11-12). 앱은 service role upsert(ignoreDuplicates)라 기존 행을 고치지 않는다.
+
+Notifications:
+
+- 공지를 지우거나 게시 중 공지를 내리면(보관 · 초안으로) 서버가 service role 로 그 공지의 알림(`source_type = 'announcement'`, `source_id`)을 지운다(2026-11-12).
 
 ## notifications
 

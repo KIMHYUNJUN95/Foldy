@@ -6,7 +6,7 @@
 // 흰 바탕 · 상자 · 세로선 없음 · 선택은 옅은 보라 바탕만. See docs/product/11-announcement-workflow.md.
 import { LiveWash } from "@/components/shared/live-wash";
 import Image from "next/image";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Check, Pin, Plus, Trash2, X } from "lucide-react";
 import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
@@ -345,22 +345,30 @@ function NoticePanel({
   const [readers, setReaders] = useState<{ read: Reader[]; unread: Reader[] } | null>(null);
   const [readError, setReadError] = useState(false);
   const [photo, setPhoto] = useState<string | null>(null);
-  const panelRef = useAdminPanelA11y<HTMLElement>(onClose, { disabled: confirm !== null || photo !== null || pending });
+  const panelRef = useAdminPanelA11y<HTMLElement>(onClose, {
+    disabled: confirm !== null || photo !== null || pending,
+    trapFocus: true,
+  });
   const sent = item.status !== "draft";
 
   // 명단은 패널을 열 때 서버에서 읽는다(목록 숫자는 빠른 집계, 명단은 지금 대상자 기준).
   useEffect(() => {
     if (!sent) return;
     let active = true;
-    getAnnouncementReadStatusConsole(item.id).then((result) => {
-      if (!active) return;
-      if (!result.ok) return setReadError(true);
-      const byName = (a: Reader, b: Reader) => a.name.localeCompare(b.name);
-      setReaders({
-        read: result.readers.map((r) => ({ ...r })).sort(byName),
-        unread: result.unreadUsers.map((u) => ({ ...u, readAt: null })).sort(byName),
+    getAnnouncementReadStatusConsole(item.id)
+      .then((result) => {
+        if (!active) return;
+        if (!result.ok) return setReadError(true);
+        const byName = (a: Reader, b: Reader) => a.name.localeCompare(b.name);
+        setReaders({
+          read: result.readers.map((r) => ({ ...r })).sort(byName),
+          unread: result.unreadUsers.map((u) => ({ ...u, readAt: null })).sort(byName),
+        });
+      })
+      // 네트워크 · 서버 오류도 「명단을 못 불러옴」으로(예전엔 「불러오는 중」에 멈췄다).
+      .catch(() => {
+        if (active) setReadError(true);
       });
-    });
     return () => {
       active = false;
     };
@@ -520,33 +528,46 @@ function NoticePanel({
         <ConfirmModal kind={confirm} item={item} w={w} pending={pending} onCancel={() => setConfirm(null)} onConfirm={() => run(confirm)} />
       ) : null}
 
-      {photo ? (
-        <div className="anw-viewer" role="dialog" aria-label={item.title} onClick={() => setPhoto(null)}>
-          <button type="button" className="anw-viewer__x" aria-label={w.close} onClick={() => setPhoto(null)}>
-            <X aria-hidden="true" />
-          </button>
-          {/* eslint-disable-next-line @next/next/no-img-element -- 원본 비율 그대로 크게 보기 */}
-          <img alt="" src={photo} onClick={(event) => event.stopPropagation()} />
-        </div>
-      ) : null}
-      <PhotoEscape open={photo !== null} onClose={() => setPhoto(null)} />
+      {photo ? <PhotoViewer src={photo} title={item.title} closeLabel={w.close} onClose={() => setPhoto(null)} /> : null}
     </>
   );
 }
 
-function PhotoEscape({ open, onClose }: { open: boolean; onClose: () => void }) {
+// 사진 크게 보기 — 열면 닫기 버튼에 초점, 닫으면 누른 사진 단추로 초점을 돌려준다. Esc 로 닫는다(2026-11-12).
+function PhotoViewer({ src, title, closeLabel, onClose }: { src: string; title: string; closeLabel: string; onClose: () => void }) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const onCloseRef = useRef(onClose);
   useEffect(() => {
-    if (!open) return;
+    onCloseRef.current = onClose;
+  }, [onClose]);
+  useEffect(() => {
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    closeRef.current?.focus();
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.stopPropagation();
-        onClose();
+        onCloseRef.current();
+      } else if (event.key === "Tab") {
+        // 닫기 버튼 하나뿐 — 초점이 뒤 패널로 빠지지 않게 붙잡는다.
+        event.preventDefault();
+        closeRef.current?.focus();
       }
     };
     window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [open, onClose]);
-  return null;
+    return () => {
+      window.removeEventListener("keydown", onKey, true);
+      if (opener?.isConnected) opener.focus();
+    };
+  }, []);
+  return (
+    <div className="anw-viewer" role="dialog" aria-modal="true" aria-label={title} onClick={onClose}>
+      <button ref={closeRef} type="button" className="anw-viewer__x" aria-label={closeLabel} onClick={onClose}>
+        <X aria-hidden="true" />
+      </button>
+      {/* eslint-disable-next-line @next/next/no-img-element -- 원본 비율 그대로 크게 보기 */}
+      <img alt={title} src={src} onClick={(event) => event.stopPropagation()} />
+    </div>
+  );
 }
 
 function ConfirmModal({

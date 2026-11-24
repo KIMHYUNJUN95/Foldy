@@ -5,6 +5,7 @@ import { SplitList } from "@/components/shell/split-list";
 import { getMobileNavBadges } from "@/lib/nav-badges";
 import { getAnnouncementDictionary } from "@/lib/announcement-i18n";
 import { getPopupDismissals, getReadAnnouncementIds, getVisibleAnnouncements } from "@/lib/announcements";
+import { selectPopupCandidates } from "@/lib/announcement-rules";
 import { AnnouncementListMobile, type MobileNoticeGroup } from "@/components/announcements/announcement-list-mobile";
 import { getOnboardingState } from "@/lib/onboarding";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
@@ -55,12 +56,8 @@ export default async function MobileAnnouncementsPage() {
     ),
     getReadAnnouncementIds(session.user.id, announcements.map((a) => a.id)),
   ]);
-  const popupAnnouncements = popupCandidates
-    .filter(
-      (announcement) =>
-        !dismissals.has(announcement.id) &&
-        (!announcement.popup_until || new Date(announcement.popup_until) > now),
-    )
+  // 팝업 — 이미 읽었거나 7일 숨긴 공지 · 끝난 팝업은 빼고(2026-11-12). 홈과 같은 규칙 · 같은 세션 기록이라 두 번 뜨지 않는다.
+  const popupAnnouncements = selectPopupCandidates(popupCandidates, { dismissedIds: dismissals, readIds, now })
     .map((announcement) => ({
       content: announcement.content,
       id: announcement.id,
@@ -112,6 +109,7 @@ export default async function MobileAnnouncementsPage() {
           announcements={popupAnnouncements}
           detailHrefBase="/mobile/announcements"
           locale={locale}
+          userId={session.user.id}
         />
 
         <AnnouncementListMobile

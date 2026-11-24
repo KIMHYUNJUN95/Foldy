@@ -204,6 +204,8 @@ export type AnnouncementConsoleDictionary = {
   tDeleted: string;
   tSynced: string;
   errProcess: string;
+  /** 수정 저장 중 다른 사람이 먼저 고쳤을 때(2026-11-12). */
+  errConflict: string;
   // 로드 오류 상태
   errT: string;
   errS: string;
@@ -689,6 +691,7 @@ const dictionaries: Record<Locale, AnnouncementDictionary> = {
       tDeleted: "\uACF5\uC9C0\uB97C \uC0AD\uC81C\uD588\uC2B5\uB2C8\uB2E4.",
       tSynced: "\uCD5C\uC2E0 \uC0C1\uD0DC\uC785\uB2C8\uB2E4.",
       errProcess: "\uCC98\uB9AC\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4. \uB2E4\uC2DC \uC2DC\uB3C4\uD574 \uC8FC\uC138\uC694.",
+      errConflict: "다른 사람이 먼저 이 공지를 바꿨습니다. 새로 불러온 뒤 다시 고쳐 주세요.",
       errT: "\uACF5\uC9C0\uB97C \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4",
       errS: "\uB124\uD2B8\uC6CC\uD06C \uC0C1\uD0DC\uB97C \uD655\uC778\uD55C \uB4A4 \uB2E4\uC2DC \uC2DC\uB3C4\uD574 \uC8FC\uC138\uC694.",
       retry: "\uB2E4\uC2DC \uC2DC\uB3C4",
@@ -1096,6 +1099,7 @@ const dictionaries: Record<Locale, AnnouncementDictionary> = {
       tDeleted: "\u304A\u77E5\u3089\u305B\u3092\u524A\u9664\u3057\u307E\u3057\u305F\u3002",
       tSynced: "\u6700\u65B0\u306E\u72B6\u614B\u3067\u3059\u3002",
       errProcess: "\u51E6\u7406\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002\u3082\u3046\u4E00\u5EA6\u304A\u8A66\u3057\u304F\u3060\u3055\u3044\u3002",
+      errConflict: "ほかの人が先にこのお知らせを変更しました。再読み込みしてから、もう一度編集してください。",
       errT: "\u304A\u77E5\u3089\u305B\u3092\u8AAD\u307F\u8FBC\u3081\u307E\u305B\u3093\u3067\u3057\u305F",
       errS: "\u30CD\u30C3\u30C8\u30EF\u30FC\u30AF\u72B6\u614B\u3092\u78BA\u8A8D\u3057\u3066\u304B\u3089\u518D\u8A66\u884C\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
       retry: "\u518D\u8A66\u884C",
@@ -1488,6 +1492,7 @@ const dictionaries: Record<Locale, AnnouncementDictionary> = {
       tDeleted: "Announcement deleted.",
       tSynced: "Up to date.",
       errProcess: "Could not complete. Please try again.",
+      errConflict: "Someone else changed this notice first. Reload, then edit it again.",
       errT: "Could not load announcements",
       errS: "Check your connection and try again.",
       retry: "Retry",

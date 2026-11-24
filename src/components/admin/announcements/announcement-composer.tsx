@@ -170,7 +170,10 @@ export function AnnouncementComposer({
         const compressed = await compressImageFile(file);
         return { id: crypto.randomUUID(), file: compressed, previewUrl: URL.createObjectURL(compressed) };
       }),
-    ).then((items) => setNewImages((prev) => [...prev, ...items]));
+    )
+      .then((items) => setNewImages((prev) => [...prev, ...items]))
+      // 압축 실패(읽을 수 없는 그림 등)는 「지원하지 않는 형식」으로 알린다(2026-11-12).
+      .catch(() => setError(t.fImgBadType));
   }
 
   function removeNew(id: string) {
@@ -250,14 +253,17 @@ export function AnnouncementComposer({
         isPinned: pinned,
         showPopup: popup,
         popupUntil,
+        expectedUpdatedAt: item?.updatedAt ?? null,
       });
       setSavingAs(null);
       if (result.ok) {
         haptic("success");
         onSaved(status === "published");
       } else {
+        // 저장이 안 됐으면 방금 올린 사진은 어디서도 가리키지 않는다 — 지운다(2026-11-12).
+        cleanup();
         haptic("error");
-        fail(t.errProcess);
+        fail(result.error === "conflict" ? t.errConflict : t.errProcess);
       }
     });
   }

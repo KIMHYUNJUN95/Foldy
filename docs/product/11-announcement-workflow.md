@@ -10,20 +10,30 @@ Questions / discussion / reactions should be handled in other modules, not insid
 
 ## Write Permission
 
-All roles except Part-time Staff can create announcements.
+작성은 권한 키 `announcement.create`(역할 기본, `src/config/capabilities.ts`)로 판정한다(2026-10-21~). 2026-11-12 기준 기본값:
 
 Can create:
 
-- Developer / Super Admin
+- Developer / Super Admin(플랫폼 관리자)
 - Owner
+- Senior Managing Director
 - Office Admin
 - CS Staff
 - Field Manager
-- Staff
 
 Cannot create:
 
+- Staff (예전 문서에는 작성 가능으로 적혀 있었지만, 권한 키 기본값에는 없다 — 2026-11-12 문서를 코드에 맞춤)
 - Part-time Staff
+
+게시 · 보관 · 초안으로 · 다시 게시 · 삭제 · 수정(2026-11-12 결정 — 지금 동작 유지):
+
+- `announcement.manage`(기본 대표 · 전무 · 오피스) — 그 조직 모든 공지
+- 작성자 본인 — 아직 `announcement.create` 가 있으면 **자기 공지**를 게시 · 보관 · 삭제까지 할 수 있다
+- 플랫폼 관리자 — 모든 조직
+
+쓰기는 전부 서버 액션(service role)이 하고, 진짜 관문은 서버 액션의 권한 확인(`canCreateInOrganization` ·
+`canManageAnnouncement`)이다. 로그인 사용자의 `announcements` 직접 쓰기 권한은 거뒀다(202611120003).
 
 ## Read Permission
 
@@ -41,6 +51,9 @@ Current implementation:
 - `everyone` scope: 조직 전체 대상
 - `roles` scope: 지정된 역할에게만 노출
 - Property/building targeting은 property setup 구현 전까지 보류 상태
+- **초안 · 보관 공지는 관리 권한자(`announcement.manage`)와 작성자만 본다**(2026-11-12, DB 읽기 정책 202611120003 ·
+  콘솔 `canSeeConsoleAnnouncement`). 게시 중 공지가 보이는 범위(대상 역할)는 예전 그대로다. 콘솔(관리자 웹)에서는
+  게시 중 공지는 조직 전체가 보고, 관리 권한이 없는 사람은 자기 초안 · 보관 공지만 본다.
 
 ## Required Fields
 
@@ -119,7 +132,9 @@ Current implementation:
 
 ### 팝업
 
-URL 진입 시 팝업 조건을 충족한 공지가 있으면 `AnnouncementPopup` 컴포넌트가 렌더링된다.
+**앱을 켰을 때(모바일 홈 `/mobile`)** 와 **공지 목록(`/mobile/announcements`)** 에서 조건을 충족한 공지가 있으면
+`AnnouncementPopup` 컴포넌트가 렌더링된다(홈 마운트 2026-11-12 — 예전에는 목록에서만 떠서 「앱 열 때 팝업」이 실제로는
+목록에 들어가야 보였다). 두 화면은 같은 규칙 · 같은 세션 기록을 써서 한 세션에 두 번 뜨지 않는다. 관리자 웹에는 팝업이 없다.
 
 현재 구현 (Wired 2026-06-26 — BottomSheet 전환 완료):
 
@@ -134,12 +149,23 @@ URL 진입 시 팝업 조건을 충족한 공지가 있으면 `AnnouncementPopup
 - 드래그 내리기 / 스크림 탭으로 닫기 → `dismissCurrentAnnouncement()` 호출
 - BottomSheet는 `max-h-[calc(100dvh-2rem)] overflow-y-auto` 로 긴 콘텐츠를 스크롤 처리
 
-팝업 표시 조건:
+팝업 표시 조건(서버 `selectPopupCandidates` · 브라우저 `filterPopupQueue` — `src/lib/announcement-rules.ts`):
 
+- 게시 중이고 나를 대상으로 하는 공지(읽기 정책)
 - `show_popup_on_app_open` = true
 - `popup_until` 이 현재 시각보다 미래이거나 null
+- **이미 읽은 공지가 아님**(`announcement_reads` 에 내 행이 없음, 2026-11-12)
 - 서버 측 dismissal 레코드가 없음 (페이지 로드 전 필터링)
-- 클라이언트 localStorage에 hide-until 기록이 없음 (즉시 숨기기 fast path)
+- 브라우저 localStorage 에 7일 숨김 기록이 없음 — 키는 **사람마다**(`foldy:announcement-popup-hidden-until:<userId>`, 2026-11-12)
+- 이번 세션(sessionStorage `foldy:announcement-popup-seen:<userId>`)에 이미 닫지 않음
+
+닫는 방법별 기록(2026-11-12):
+
+- 확인 · 바깥 누름 · 끌어내림 · **「자세히 보기」** — 모두 이번 세션 기록을 남긴다(같은 세션에 홈 · 목록을 오가도 다시 안 뜸).
+- 「7일 동안 보지 않기」를 **켠 채로** 닫거나 「자세히 보기」를 누르면 localStorage + 서버(`announcement_popup_dismissals`)에 7일 숨김. 켜지 않았으면 이번 세션 기록만 남는다.
+  예전에는 「자세히 보기」가 링크만 열어 체크를 켜도 저장되지 않았다.
+- 브라우저 저장소가 막힌 환경(사생활 보호 창 등)에서는 try/catch 로 넘어가고 서버 기록(읽음 · 7일 숨김)만으로 동작한다.
+- 화면 폭: 공용 `BottomSheet` 라 폰은 아래 시트, 태블릿(≥ 1000px)은 가운데 카드로 뜬다.
 
 ### 화이트 리디자인 — 모바일 (2026-10-15)
 
@@ -239,9 +265,9 @@ Current implementation:
 
 - `announcement_reads` 테이블에 공지별·사용자별 읽음 레코드 1건이 저장된다.
 - `(announcement_id, user_id)` unique pair로 최초 읽음 시각을 보존한다.
-- 상세 페이지 진입 시 `ensureAnnouncementRead()` server function 이 자동으로 읽음 처리한다 (mobile 및 admin 공통). 모바일은 `after()` 로 응답 뒤에 쓴다(위 참고).
+- 상세 페이지 진입 시 `ensureAnnouncementRead()` server function 이 자동으로 읽음 처리한다 (모바일만 — 관리자 콘솔 패널은 읽음을 기록하지 않는다, 2026-11-20). 모바일은 `after()` 로 응답 뒤에 쓴다(위 참고).
 - 모바일 상세 화면에는 읽음 확인 UI 블록을 표시하지 않는다 (2026-06-26 제거). 읽음 처리는 백그라운드 서버 로직으로만 동작한다.
-- Admin 공지 상세에서 읽음/미읽음 카운트 및 대상 사용자 목록 (역할·읽음 시각 포함) 조회가 가능하다.
+- 관리자 콘솔의 공지 패널에서 읽음/미읽음 카운트 및 대상 사용자 목록 (역할·읽음 시각 포함) 조회가 가능하다.
 - 팝업 닫기는 읽음 처리가 아님. 읽음 추적은 상세 페이지 진입에만 연결된다.
 
 관련 마이그레이션:
@@ -276,13 +302,13 @@ Pinned announcement:
 
 Current implementation:
 
-- 모바일 공지 목록 페이지와 어드민 공지 목록 페이지 진입 시 팝업 후보를 서버 측에서 pre-filter한다.
+- 모바일 홈과 모바일 공지 목록 진입 시 팝업 후보를 서버 측에서 pre-filter한다(관리자 웹에는 팝업 없음, 2026-07-23 제거).
   - 서버 측 dismissal 레코드 (`announcement_popup_dismissals`) 를 먼저 제외하므로 어떤 기기에서도 dismissed 팝업이 페이지 로드 시 플래시되지 않는다.
 - 사용자는 현재 세션에서만 닫거나, 7일 숨기기 체크박스를 통해 서버에 영구 저장할 수 있다.
 - 7일 hide preference는 `announcement_popup_dismissals` (user x announcement 1행) 에 서버 측 저장된다. 모든 브라우저·기기에 적용된다.
-- localStorage는 동일 페이지 내 즉시 숨기기 fast path로만 사용된다.
+- localStorage(사람별 키)는 7일 숨김의 즉시 반영용, sessionStorage 는 「이번 세션에 닫음」 기록용이다.
 - 팝업 닫기는 읽음 처리가 아님. 읽음 추적은 상세 페이지 진입과 연결된다.
-- 팝업 "자세히 보기" CTA: mobile → `/mobile/announcements/[id]`, admin → 콘솔 `/admin/announcements?id=` 패널(예전 `/admin/announcements/[id]` 는 그리로 넘긴다, 2026-11-20). 지금 팝업은 `/mobile` 에서만 그린다.
+- 팝업 "자세히 보기" CTA: mobile → `/mobile/announcements/[id]`, admin → 콘솔 `/admin/announcements?id=` 패널(예전 `/admin/announcements/[id]` 는 그리로 넘긴다, 2026-11-20). 지금 팝업은 `/mobile` 에서만 그린다. 「자세히 보기」는 닫기와 같은 기록을 남긴 뒤 이동한다(2026-11-12).
 - 팝업은 공유 `BottomSheet` 컴포넌트로 표시된다 (2026-06-26 전환 완료).
 
 ## Admin Dashboard Management Console
@@ -319,13 +345,13 @@ Current implementation:
 
 - **작성 / 초안 저장 / 자기 초안 수정**
   - 모바일 작성 권한이 있는 역할은 대시보드에서도 동일하게 수행 가능해야 한다
-  - 즉, Part-time Staff를 제외한 역할은 대시보드에서도 공지 작성이 가능하다
+  - 즉, `announcement.create` 가 있는 역할(위 Write Permission — Staff · Part-time Staff 제외)은 대시보드에서도 공지 작성이 가능하다
 - **게시 / 보관 / 삭제 / 전체 공지 운영 관리**
-  - 작성 권한과 별도로 더 강한 운영 권한으로 취급한다
-  - 기본 기준: owner / senior_managing_director / office_admin
-  - 다른 역할은 우선 자기 작성 공지의 초안 편집까지를 기본으로 보고, 게시/보관/삭제 확대는 별도 결정으로 둔다
+  - 남의 공지까지: `announcement.manage`(기본 owner / senior_managing_director / office_admin)
+  - **자기 공지: 작성자가 게시 · 보관 · 삭제까지 한다(2026-11-12 결정 — 지금 구현을 확정).** 예전 문서는 「자기 초안 편집까지,
+    확대는 별도 결정」이었지만 2026-10-21 권한 키 전환 때부터 코드는 작성자에게 자기 공지 운영을 허용했고, 그대로 두기로 했다.
 
-이 문서 기준으로는 **작성 가능 = 운영 관리 가능**으로 보지 않는다.
+남의 공지 운영은 여전히 **작성 가능 ≠ 운영 관리 가능**이다.
 
 ### Console Views
 
@@ -465,6 +491,7 @@ Current implementation:
   `saveAnnouncementConsole`(생성/편집) · `setAnnouncementStatusConsole`(게시/보관/초안) ·
   `deleteAnnouncementConsole` · `getAnnouncementReadStatusConsole`(읽음 명단).
   `/admin/announcements/[id]` 는 2026-11-20 부터 `/admin/announcements?id=…` 로 넘기기만 한다(아래 「공지 unslop」).
+  예전 상세는 초안에도 읽음 기록(`ensureAnnouncementRead`)을 남기고, 관리 권한 없이 관리자 웹 접근만 있어도 읽음 명단을 보여 줬다(둘 다 없앰 — 콘솔은 볼 수 없는 공지면 그냥 목록을 연다, 2026-11-12 점검).
 - i18n: `src/lib/announcement-i18n.ts` 의 `console` 네임스페이스 (ko/ja/en 전체).
 
 권한 매핑 (Permission Split 반영):
@@ -507,6 +534,27 @@ Current implementation:
 - **움직임**: 줄 차례 등장 · 패널 내용 페이드 · 읽음 막대 차오름 · 명단 탭 전환 페이드 · 사진 썸네일 · 크게 보기 확대 등장 · 스위치 손잡이 · 누름 반응 · 성공/실패 햅틱.
   움직임 줄이기 설정이면 끈다.
 - 패널의 「모바일 상세」 링크는 뺐다(01-decision-log 2026-10-15).
+
+## 공지 점검 반영 (2026-11-12)
+
+- **쓰기 권한**: 로그인 사용자의 `announcements` 직접 insert · update · delete 를 거뒀다 — 남의 이름으로 공지를 넣거나 서버 검증을
+  건너뛰던 구멍(쓰기는 전부 service role 서버 액션). 읽기 정책: 초안 · 보관은 관리 권한자와 작성자만, 댓글 읽기도 부모 공지 상태를 따른다.
+  읽음 기록(`announcement_reads`)은 신원 칸(user_id · announcement_id · organization_id)을 고칠 수 없다(트리거). 마이그레이션
+  `202611120003_announcements_hardening.sql`.
+- **알림 정리**: 공지를 **지우거나, 게시 중 공지를 내리면(보관 · 초안으로)** 그 공지의 알림(`notifications.source_type = 'announcement'`, `source_id = 공지 id`)을
+  모두의 알림함에서 지운다(service role, 공지 처리가 성공한 뒤 · 실패해도 공지 처리는 되돌리지 않음). 보관 공지는 모바일에서 열 수
+  없어 알림이 「없는 공지」로 이어졌다. 게시 중 공지를 **초안으로 내릴 때도** 같다. 다시 게시하면 중복 키가 비어 **중요 공지만** 알림이 다시 간다
+  (중요가 아닌 공지는 원래 알림이 없다).
+- **다시 게시 시각**: 수정 화면에서 게시 중이 아니던 공지(초안 · 보관)를 게시하면 `published_at` 을 지금으로 — 패널의 「다시 게시」와 같다.
+  예전에는 옛 게시일이 남아 목록 맨 아래에 묻혔다.
+- **동시 수정**: 수정 저장은 불러온 `updated_at` 과 같을 때만 쓴다. 그사이 누가 고치거나 보관했으면 저장하지 않고
+  「다른 사람이 먼저 이 공지를 바꿨습니다. 새로 불러온 뒤 다시 고쳐 주세요.」(ko/ja/en `console.errConflict`) — 보관 공지를 몰래 되살리지 않는다.
+- **고아 사진**: 저장이 실패하면(입력 오류 · 충돌 · 서버 오류) 작성 화면이 방금 올린 사진을 지운다. 서버도 수정 경로의 입력 오류에서
+  (권한 확인 뒤) 새로 올린 사진만 지운다. 사진 압축이 실패하면 「지원하지 않는 형식」 오류.
+- **시간**: 옛 댓글 · 읽음 명단 컴포넌트의 시각을 도쿄 기준으로 고정.
+- **접근성**: 사진 크게 보기 `aria-modal` · 열면 닫기 버튼에 초점 · 닫으면 원래 자리로 · 사진 대체 글은 공지 제목. 상세 패널은 초점을 패널 안에 붙잡는다.
+  읽음 명단을 못 불러오면(네트워크 오류 포함) 「불러오는 중」에 멈추지 않고 오류 문구.
+- 고아 사진 정리(`purgeOrphanAnnouncementImages`)의 공지 페이지 읽기에 `order("id")` — 페이지가 겹치거나 빠지지 않게.
 
 ## 서버 점검 반영 (2026-10-26)
 
@@ -569,6 +617,7 @@ Current implementation (레거시 처리 상태):
 - DB 스키마 (`announcement_comments` 테이블, `allow_comments` 컬럼) 가 유지되고 있다.
 - ~~댓글 관련 server action · `AnnouncementCommentsSection` · `getAnnouncementComments` 는 어드민 사용을 위해 유지된다.~~ 2026-11-20 지웠다.
 - 2026-11-20 어드민 댓글 화면과 댓글 서버 액션까지 지웠다 — 댓글 화면 · 서버 액션은 어디에도 없고, DB 표 `announcement_comments` · `allow_comments` 열만 남았다.
+- 댓글 읽기 정책은 부모 공지의 상태 규칙을 따른다(초안 · 보관 공지의 댓글은 관리 권한자 · 작성자만, `202611120003`). 댓글을 다시 쓸지는 결정 대기 — 소프트 삭제(`deleted_at`)는 바꾸지 않았다.
 - 2026-07-22 재기획 기준으로도, 어드민 공지 콘솔은 댓글을 핵심 기능으로 유지하지 않는다.
 
 관련 마이그레이션:
@@ -578,6 +627,9 @@ Current implementation (레거시 처리 상태):
 ```
 
 ## Notifications
+
+지금 구현: 중요 공지를 게시할 때(또는 게시 중 공지를 중요로 올리거나 대상을 넓힐 때) 대상자에게 `announcement_activity` 알림
+(`createImportantAnnouncementNotifications`). 공지를 지우거나 게시 중 공지를 내리면(보관 · 초안으로) 그 알림을 지운다(`deleteAnnouncementNotifications`, 2026-11-12).
 
 잠재적 알림 트리거:
 

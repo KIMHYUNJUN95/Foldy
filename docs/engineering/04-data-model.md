@@ -838,6 +838,8 @@ Note: per-transition audit columns are not in the MVP schema. The `status` enum 
 Internal notices.
 
 Migrations: `202605100001_announcements.sql`, `202605100003_announcement_images.sql`, and related hardening migrations.
+2026-11-12(`202611120003_announcements_hardening.sql`): 표 모양은 그대로, 로그인 사용자의 직접 쓰기 권한 회수 · 초안/보관 읽기 제한.
+공지를 지우거나 게시 중 공지를 내리면(보관 · 초안으로) `notifications`(source_type `announcement`)의 그 공지 행도 서버가 지운다.
 
 Fields:
 
@@ -900,7 +902,8 @@ announcement-images -- announcement images
 
 ## announcement_reads
 
-Read tracking.
+Read tracking. 신원 칸(`user_id` · `announcement_id` · `organization_id`)은 UPDATE 로 바꿀 수 없다(트리거
+`announcement_reads_immutable_identity`, `202611120003_announcements_hardening.sql`).
 
 Fields:
 

@@ -8,86 +8,76 @@ import type { Locale } from "@/lib/i18n";
 import { annDate } from "@/lib/announcement-display";
 import { getAnnouncementDictionary } from "@/lib/announcement-i18n";
 import { dismissPopupForWeek } from "@/app/announcements/popup-actions";
+import {
+  type HiddenPopupMap,
+  filterPopupQueue,
+  parseHiddenPopupMap,
+  parseSessionSeen,
+  popupHideStorageKey,
+  popupSessionStorageKey,
+} from "@/lib/announcement-rules";
 import "./announcements-mobile.css";
 
-const POPUP_HIDE_STORAGE_KEY = "stayops:announcement-popup-hidden-until";
-const POPUP_HIDE_STORAGE_EVENT = "stayops:announcement-popup-storage";
+const POPUP_STORAGE_EVENT = "foldy:announcement-popup-storage";
 const HIDE_FOR_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const SNAPSHOT_SEPARATOR = "\u0000";
 
-type HiddenPopupMap = Record<string, string>;
 type HidePreference = {
   announcementId: string | null;
   checked: boolean;
 };
 
-function readHiddenPopupSnapshot() {
-  if (typeof window === "undefined") {
-    return "";
-  }
-
+// 브라우저 기록 두 가지를 한 문자열로 읽는다 — 「7일 보지 않기」(localStorage, 사람별) + 이번 세션에 닫은 것(sessionStorage).
+// 저장소가 막힌 환경(사생활 보호 창 등)에서는 빈 값 — 팝업은 서버 기록(읽음 · DB 7일 숨김)만으로 동작한다.
+function readPopupSnapshot(userId: string): string {
+  if (typeof window === "undefined") return SNAPSHOT_SEPARATOR;
+  let hidden = "";
+  let seen = "";
   try {
-    const raw = window.localStorage.getItem(POPUP_HIDE_STORAGE_KEY);
-
-    if (!raw) {
-      return "";
-    }
-
-    const parsed = JSON.parse(raw) as unknown;
-
-    if (!parsed || typeof parsed !== "object") {
-      return "";
-    }
-
-    const now = Date.now();
-    const nextMap = Object.fromEntries(
-      Object.entries(parsed).filter((entry) => {
-        const [, value] = entry;
-
-        return typeof value === "string" && new Date(value).getTime() > now;
-      }),
-    ) as HiddenPopupMap;
-    const nextSnapshot = JSON.stringify(nextMap);
-
-    if (raw !== nextSnapshot) {
-      window.localStorage.setItem(POPUP_HIDE_STORAGE_KEY, nextSnapshot);
-    }
-
-    return nextSnapshot;
-  } catch {
-    return "";
-  }
+    const key = popupHideStorageKey(userId);
+    const raw = window.localStorage.getItem(key);
+    const pruned = JSON.stringify(parseHiddenPopupMap(raw, Date.now()));
+    if (raw && raw !== pruned) window.localStorage.setItem(key, pruned);
+    hidden = pruned;
+  } catch {}
+  try {
+    seen = window.sessionStorage.getItem(popupSessionStorageKey(userId)) ?? "";
+  } catch {}
+  return `${hidden}${SNAPSHOT_SEPARATOR}${seen}`;
 }
 
-function subscribeHiddenPopupSnapshot(callback: () => void) {
+function subscribePopupSnapshot(callback: () => void) {
   if (typeof window === "undefined") {
     return () => undefined;
   }
 
   const onCustomEvent = () => callback();
-  const onStorage = (event: StorageEvent) => {
-    if (event.key === POPUP_HIDE_STORAGE_KEY) {
-      callback();
-    }
-  };
+  const onStorage = () => callback();
 
-  window.addEventListener(POPUP_HIDE_STORAGE_EVENT, onCustomEvent);
+  window.addEventListener(POPUP_STORAGE_EVENT, onCustomEvent);
   window.addEventListener("storage", onStorage);
 
   return () => {
-    window.removeEventListener(POPUP_HIDE_STORAGE_EVENT, onCustomEvent);
+    window.removeEventListener(POPUP_STORAGE_EVENT, onCustomEvent);
     window.removeEventListener("storage", onStorage);
   };
 }
 
-function writeHiddenPopupMap(map: HiddenPopupMap) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
+function writeHiddenPopupMap(userId: string, map: HiddenPopupMap) {
   try {
-    window.localStorage.setItem(POPUP_HIDE_STORAGE_KEY, JSON.stringify(map));
-    window.dispatchEvent(new Event(POPUP_HIDE_STORAGE_EVENT));
+    window.localStorage.setItem(popupHideStorageKey(userId), JSON.stringify(map));
   } catch {}
+  window.dispatchEvent(new Event(POPUP_STORAGE_EVENT));
+}
+
+function markSeenThisSession(userId: string, announcementId: string) {
+  try {
+    const key = popupSessionStorageKey(userId);
+    const seen = parseSessionSeen(window.sessionStorage.getItem(key));
+    seen.add(announcementId);
+    window.sessionStorage.setItem(key, JSON.stringify([...seen]));
+  } catch {}
+  window.dispatchEvent(new Event(POPUP_STORAGE_EVENT));
 }
 
 function subscribeHydration(callback: () => void) {
@@ -115,12 +105,15 @@ type AnnouncementPopupProps = {
   announcements: PopupAnnouncement[];
   detailHrefBase: string;
   locale: Locale;
+  /** 브라우저 기록을 사람마다 나누는 키. */
+  userId: string;
 };
 
 export function AnnouncementPopup({
   announcements,
   detailHrefBase,
   locale,
+  userId,
 }: AnnouncementPopupProps) {
   const copy = getAnnouncementDictionary(locale);
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => new Set());
@@ -134,64 +127,53 @@ export function AnnouncementPopup({
     () => true,
     () => false,
   );
-  const hiddenPopupSnapshot = useSyncExternalStore(
-    subscribeHiddenPopupSnapshot,
-    readHiddenPopupSnapshot,
-    () => "",
+  const popupSnapshot = useSyncExternalStore(
+    subscribePopupSnapshot,
+    () => readPopupSnapshot(userId),
+    () => SNAPSHOT_SEPARATOR,
   );
-  const hiddenPopupMap = useMemo<HiddenPopupMap>(() => {
-    if (!hiddenPopupSnapshot) {
-      return {};
-    }
+  const { hiddenPopupMap, sessionSeen } = useMemo(() => {
+    const [hidden = "", seen = ""] = popupSnapshot.split(SNAPSHOT_SEPARATOR);
+    return {
+      // 읽을 때(readPopupSnapshot) 이미 끝난 숨김을 걸렀다 — 여기서는 모양만 푼다.
+      hiddenPopupMap: parseHiddenPopupMap(hidden || null, 0),
+      sessionSeen: parseSessionSeen(seen || null),
+    };
+  }, [popupSnapshot]);
 
-    try {
-      return JSON.parse(hiddenPopupSnapshot) as HiddenPopupMap;
-    } catch {
-      return {};
-    }
-  }, [hiddenPopupSnapshot]);
-
-  const announcement = useMemo(
-    () =>
-      announcements.find((item) => {
-        if (dismissedIds.has(item.id)) {
-          return false;
-        }
-
-        return !hiddenPopupMap?.[item.id];
-      }),
-    [announcements, dismissedIds, hiddenPopupMap],
-  );
+  // 이번 차례 — 7일 숨김 · 이번 세션에 닫은 것을 뺀다. 이 화면에서 방금 닫은 것은 「1 / 2」 번호가 이어지도록 남긴다.
+  const queue = filterPopupQueue(announcements, hiddenPopupMap, sessionSeen, dismissedIds);
+  const announcement = queue.find((item) => !dismissedIds.has(item.id));
   const hideForWeek =
     announcement?.id === hidePreference.announcementId && hidePreference.checked;
-  // 「1 / 2」 — 이번에 띄울 공지 묶음(이미 7일 숨긴 것 제외) 안에서 몇 번째인지. 닫은 것도 묶음에 남아 번호가 올라간다.
-  const queue = announcements.filter((item) => !hiddenPopupMap?.[item.id]);
   const position = announcement ? queue.findIndex((item) => item.id === announcement.id) + 1 : 0;
 
   if (!isHydrated || !announcement) {
     return null;
   }
 
+  // 닫기(확인 · 바깥 누름 · 끌어내림) · 「자세히 보기」 모두 여기로 — 이번 세션에는 다시 띄우지 않고,
+  // 「7일 동안 보지 않기」를 켰으면 브라우저 + 서버에 7일 숨김을 남긴다.
   function dismissCurrentAnnouncement() {
     if (!announcement) {
       return;
     }
+    const target = announcement;
 
     if (hideForWeek) {
-      const nextMap: HiddenPopupMap = {
+      writeHiddenPopupMap(userId, {
         ...hiddenPopupMap,
-        [announcement.id]: new Date(Date.now() + HIDE_FOR_WEEK_MS).toISOString(),
-      };
-
-      writeHiddenPopupMap(nextMap);
+        [target.id]: new Date(Date.now() + HIDE_FOR_WEEK_MS).toISOString(),
+      });
 
       // 서버에 비동기로 저장 — UI를 즉시 업데이트하기 위해 transition 내부에서 fire-and-forget
       startTransition(() => {
-        void dismissPopupForWeek(announcement.id, announcement.organizationId);
+        void dismissPopupForWeek(target.id, target.organizationId);
       });
     }
 
-    setDismissedIds((current) => new Set(current).add(announcement.id));
+    setDismissedIds((current) => new Set(current).add(target.id));
+    markSeenThisSession(userId, target.id);
   }
 
   return (
@@ -239,7 +221,7 @@ export function AnnouncementPopup({
             <button type="button" className="ntw-btn is-gray" onClick={close}>
               {copy.confirm}
             </button>
-            <Link href={`${detailHrefBase}/${announcement.id}`} className="ntw-btn is-pri">
+            <Link href={`${detailHrefBase}/${announcement.id}`} className="ntw-btn is-pri" onClick={dismissCurrentAnnouncement}>
               {copy.viewDetail}
             </Link>
           </div>

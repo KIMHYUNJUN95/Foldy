@@ -81,6 +81,7 @@ async function getReferencedPaths(): Promise<Set<string>> {
     const { data, error: queryError } = await service
       .from("announcements")
       .select("image_urls")
+      .order("id")
       .range(offset, offset + PAGE - 1);
 
     if (queryError) {

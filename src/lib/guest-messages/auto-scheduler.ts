@@ -43,7 +43,7 @@ import {
   type ExistingAutoRun,
 } from "@/lib/guest-messages/auto-model";
 import { classifyGuestChannel, resolveOutboundChannel } from "@/lib/guest-messages/beds24-normalize";
-import { accessLabel, sameRoom } from "@/lib/guest-messages/access-codes";
+import { accessLabel, pickSingleRoomAccess } from "@/lib/guest-messages/access-codes";
 import { GUEST_LANGS, type GuestLang, type Localized } from "@/lib/guest-messages/guest-info-model";
 import { loadBuildingGuestInfos, type BuildingGuestInfo } from "@/lib/guest-messages/guest-info-server";
 import { nightsBetween, normalizeGuestLanguage, toChannelKey } from "@/lib/guest-messages/inbox-model";
@@ -190,7 +190,7 @@ function perLang(make: (lang: GuestLang, dict: Dict) => string): Localized {
 export function autoFillContextFor(booking: AutoBooking, building: BuildingGuestInfo | null): AutoFillContext {
   const sharedCodes = building?.sharedAccess.filter((access) => access.code.trim()) ?? [];
   const codeFor = (label: string | null) =>
-    building?.roomAccess.find((room) => room.code.trim() && sameRoom(label, room.roomLabel))?.code.trim() || null;
+    pickSingleRoomAccess(label, building?.roomAccess.filter((room) => room.code.trim()) ?? [])?.code.trim() || null;
   // 묶음 대표면 방 전부(「201 / 202」) — 방 코드도 방마다, 하나라도 없으면 빈 값(보내지 않음).
   const rooms = booking.groupRooms && booking.groupRooms.length > 1 ? booking.groupRooms : null;
   if (rooms) {

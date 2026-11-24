@@ -9,7 +9,7 @@
  * - 보낸 글 ↔ 초안 비교(그대로 보냄 · 고쳐 보냄) · 이번 달(도쿄) 경계 · 비용 계산.
  */
 
-import { sameRoom } from "@/lib/guest-messages/access-codes";
+import { pickSingleRoomAccess } from "@/lib/guest-messages/access-codes";
 import { maskEntryCodes, MASKED_CODE } from "@/lib/guest-messages/auto-model";
 import type { GuestLang } from "@/lib/guest-messages/guest-info-model";
 import { messagePlainText } from "@/lib/guest-messages/message-body";
@@ -525,7 +525,7 @@ export function guestEntryCodeFor(
   roomLabel: string | null,
 ): string | null {
   if (!building) return null;
-  const room = building.roomAccess.find((item) => item.code.trim() && sameRoom(roomLabel, item.roomLabel));
+  const room = pickSingleRoomAccess(roomLabel, building.roomAccess.filter((item) => item.code.trim()));
   if (room) return room.code.trim();
   if (building.roomAccess.some((item) => item.code.trim())) return null;
   const shared = building.sharedAccess.filter((item) => item.code.trim() && GUEST_SHARED_ACCESS.has(item.labelKey));

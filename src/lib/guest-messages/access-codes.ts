@@ -1,8 +1,11 @@
 /**
  * 손님 메시지 직원용 출입 번호 — 규칙 한 곳(순수 함수). docs/product/47-guest-messaging.md §6-3 · Q9
  *
- * - `sameRoom`: 대화 방 라벨(「201」 또는 「아라키초A 201」) ↔ 출입 코드 방 라벨. 다듬은 라벨 그대로 같거나, 마지막 띄어쓰기 뒤
- *   토막이 같으면 같은 방(`Ab402` ↔ `Ab402` 맞음 · `402` 아님). 답장 칸 넣기 목록 · 자동 안내 변수 · 예약 패널 「출입 번호」가 같이 쓴다.
+ * - `sameRoom`: 대화 방 라벨(「201」 또는 「아라키초A 201」) ↔ 출입 코드 방 라벨. 마지막 띄어쓰기 뒤 토막(없으면 전체)을 t, 코드 라벨을 c 라 할 때
+ *   대소문자 무시하고 ① t == c ② 끝 `#` 와 그 앞 `_숫자` 묶음을 뗀 t == c(`201_2` · `401_2_2` · `202#`)
+ *   ③ ②의 t 가 영문 한 글자 + 숫자, c 가 그 숫자(`K202` ↔ `202` — `Ab402` ↔ `402` 는 아님)
+ *   ④ ②의 t 가 숫자, c 가 숫자 + f(`2` ↔ `2f`, 거꾸로도). 이 밖의 느슨한 맞추기는 하지 않는다.
+ *   정확히 같은 라벨(①)이 있으면 그것만 · 손님에게 가는 값(`pickSingleRoomAccess`)은 후보가 하나일 때만 쓴다(둘 이상이면 못 찾음). 답장 칸 넣기 목록 · 자동 안내 변수 · 예약 패널 「출입 번호」가 같이 쓴다.
  * - `canSeeStaffCodes`: 번호를 볼 사람 — `guest_messages.manage` 또는 `property_info.edit`(Q9 확정).
  *   대화 방 라벨이 비었거나 공백뿐이면(코드 방 라벨도 다듬어 비면) 맞지 않는다. AI 답장 도우미 손님용 번호도 같은 규칙.
  * - `conversationAccessCodes`: 이 대화에 보일 번호 — 공용 번호(빈 값 빼고) + 이 방 번호(빈 값 · 다른 방 빼고). 라벨은 부르는 쪽이 정한다.
@@ -15,14 +18,49 @@ import type { PropertyAccessInfo, PropertyRoomCode } from "@/lib/property-map-li
 
 export type ConversationAccessCode = { kind: "shared" | "room"; label: string; code: string };
 
+function roomTail(conversationRoom: string): string {
+  return conversationRoom.includes(" ") ? conversationRoom.slice(conversationRoom.lastIndexOf(" ") + 1) : conversationRoom;
+}
+
+/** 규칙 1 — 다듬은 전체 라벨 또는 마지막 토막이 코드 라벨과 같다(대소문자 무시). */
+function exactRoom(conversationRoom: string | null, codeRoom: string): boolean {
+  if (!conversationRoom?.trim()) return false;
+  const code = codeRoom.trim().toLowerCase();
+  if (!code) return false;
+  const room = conversationRoom.trim().toLowerCase();
+  return room === code || roomTail(room) === code;
+}
+
+/** 규칙 2~4 — 표기만 다른 같은 방(`_숫자` · `#` · 영문 한 글자 · `f`). */
+function looseRoom(conversationRoom: string | null, codeRoom: string): boolean {
+  if (!conversationRoom?.trim()) return false;
+  const code = codeRoom.trim().toLowerCase();
+  if (!code) return false;
+  const tail = roomTail(conversationRoom.trim().toLowerCase());
+  const base = tail.replace(/#$/, "").replace(/(?:_\d+)+$/, "");
+  if (!base) return false;
+  if (base === code) return true;
+  const letterThenDigits = /^[a-z](\d+)$/.exec(base);
+  if (letterThenDigits && letterThenDigits[1] === code) return true;
+  if (/^\d+$/.test(base) && code === `${base}f`) return true;
+  return /^\d+f$/.test(base) && code === base.slice(0, -1);
+}
+
 /** 대화의 방 라벨 ↔ 출입 코드 방 라벨. */
 export function sameRoom(conversationRoom: string | null, codeRoom: string): boolean {
-  if (!conversationRoom?.trim()) return false;
-  const room = conversationRoom.trim();
-  const code = codeRoom.trim();
-  if (!code) return false;
-  const tail = room.includes(" ") ? room.slice(room.lastIndexOf(" ") + 1) : room;
-  return room === code || tail === code;
+  return exactRoom(conversationRoom, codeRoom) || looseRoom(conversationRoom, codeRoom);
+}
+
+/** 이 대화의 방 항목 — 정확히 같은 라벨이 있으면 그것들만, 없을 때만 느슨한 규칙으로 찾는다. */
+export function pickRoomAccess<T extends { roomLabel: string }>(conversationRoom: string | null, roomAccess: readonly T[]): T[] {
+  const exact = roomAccess.filter((room) => exactRoom(conversationRoom, room.roomLabel));
+  return exact.length ? exact : roomAccess.filter((room) => looseRoom(conversationRoom, room.roomLabel));
+}
+
+/** 손님에게 나가는 값용 — 후보가 정확히 하나일 때만, 아니면 null(못 찾음). */
+export function pickSingleRoomAccess<T extends { roomLabel: string }>(conversationRoom: string | null, roomAccess: readonly T[]): T | null {
+  const picked = pickRoomAccess(conversationRoom, roomAccess);
+  return picked.length === 1 ? picked[0] : null;
 }
 
 /** 직원용 출입 번호를 볼 사람(47 §6-3 · Q9). */
@@ -56,8 +94,7 @@ export function conversationAccessCodes(
     ...building.sharedAccess
       .filter((access) => access.code.trim())
       .map((access): ConversationAccessCode => ({ kind: "shared", label: labels.shared(access), code: access.code })),
-    ...building.roomAccess
-      .filter((room) => room.code.trim() && sameRoom(conversationRoom, room.roomLabel))
+    ...pickRoomAccess(conversationRoom, building.roomAccess.filter((room) => room.code.trim()))
       .map((room): ConversationAccessCode => ({ kind: "room", label: labels.room(room.roomLabel), code: room.code })),
   ];
 }

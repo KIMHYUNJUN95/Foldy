@@ -224,6 +224,8 @@ describe("자동 안내 — 변수 · 언어", () => {
     expect(filled.sharedCodes?.en).toBe("519");
     expect(filled.roomCode).toBe("2010*");
     expect(filled.building?.en).toBe("Arakicho A");
+    const dup = autoFillContextFor({ ...toAutoBooking(row, null)!, roomLabel: "201_2" }, { ...building, roomAccess: [{ roomLabel: "201", code: "1*" }, { roomLabel: "201", code: "2*" }] });
+    expect(dup.roomCode).toBeNull();
   });
 });
 

@@ -161,6 +161,12 @@ describe("이 방 손님용 출입 코드", () => {
     expect(guestEntryCodeFor(building, null)).toBeNull();
   });
 
+  it("표기만 다른 방은 후보가 하나일 때만 — 둘이면 못 찾음(다른 방 번호를 보내지 않는다)", () => {
+    expect(guestEntryCodeFor(building, "201_2")).toBe("2010");
+    const twice = { sharedAccess: [], roomAccess: [{ roomLabel: "201", code: "1" }, { roomLabel: "201", code: "2" }] };
+    expect(guestEntryCodeFor(twice, "201_2")).toBeNull();
+  });
+
   it("방 코드가 없는 건물은 손님용 공용 번호 하나일 때만", () => {
     expect(guestEntryCodeFor({ sharedAccess: building.sharedAccess, roomAccess: [] }, "1")).toBe("1111");
     expect(guestEntryCodeFor({ sharedAccess: [{ labelKey: "storagePassword", code: "9" }], roomAccess: [] }, "1")).toBeNull();

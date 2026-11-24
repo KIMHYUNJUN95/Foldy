@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { accessCodesReducer, canSeeStaffCodes, conversationAccessCodes, sameRoom, type AccessCodesView } from "@/lib/guest-messages/access-codes";
+import { accessCodesReducer, canSeeStaffCodes, conversationAccessCodes, pickRoomAccess, pickSingleRoomAccess, sameRoom, type AccessCodesView } from "@/lib/guest-messages/access-codes";
 import type { PropertyAccessInfo, PropertyRoomCode } from "@/lib/property-map-links";
 
 /**
@@ -26,8 +26,63 @@ describe("sameRoom — 대화 방 라벨 ↔ 출입 코드 방 라벨", () => {
     [null, "", false],
     ["201", " 201 ", true],
     ["아라키초A 201", "201 ", true],
+    ["201_2", "201", true],
+    ["401_2_2", "401", true],
+    ["아라키초A 401_2_2", "401", true],
+    ["202#", "202", true],
+    ["202_2#", "202", true],
+    ["K202", "202", true],
+    ["k202", "202", true],
+    ["K202#", "202", true],
+    ["O101", "101", true],
+    ["O101", "O101", true],
+    ["o101", "O101", true],
+    ["Ab402", "402", false],
+    ["Ab402_2", "402", false],
+    ["2", "2f", true],
+    ["2", "2F", true],
+    ["2f", "2", true],
+    ["9_2", "9f", true],
+    ["201", "202", false],
+    ["2", "201", false],
+    ["20", "201", false],
+    ["201", "2f", false],
+    ["2", "20f", false],
+    ["201_2", "202", false],
+    ["_2", "2", false],
+    ["#", "", false],
+    ["K", "202", false],
+    ["K202", "K203", false],
+    ["Ab101", "Ab102", false],
+    ["201#_2", "201", false],
+    ["201_", "201", false],
+    ["201_2#", "201", true],
+    ["아라키초A  201", "201", true],
+    ["2f_2", "2", true],
   ] as const)("%s ↔ %s → %s", (conversation, code, expected) => {
     expect(sameRoom(conversation, code)).toBe(expected);
+  });
+});
+
+describe("pickRoomAccess — 정확히 같은 라벨 먼저 · 손님용은 하나일 때만", () => {
+  const item = (roomLabel: string, code: string) => ({ roomLabel, code });
+  it("K202 대화 → 코드에 202 와 K202 가 같이 있으면 K202 것만", () => {
+    expect(pickRoomAccess("K202", [item("202", "1"), item("K202", "2")]).map((r) => r.code)).toEqual(["2"]);
+  });
+  it("대화 2 → 코드 2 와 2f 중 2 것만", () => {
+    expect(pickRoomAccess("2", [item("2f", "1"), item("2", "2")]).map((r) => r.code)).toEqual(["2"]);
+  });
+  it("정확한 것이 없으면 느슨한 규칙으로", () => {
+    expect(pickRoomAccess("201_2", [item("201", "1"), item("202", "2")]).map((r) => r.code)).toEqual(["1"]);
+  });
+  it("손님용: 하나면 그 항목, 느슨한 후보가 둘이면 못 찾음, 없어도 못 찾음", () => {
+    expect(pickSingleRoomAccess("201_2", [item("201", "1")])?.code).toBe("1");
+    expect(pickSingleRoomAccess("201_2", [item("201", "1"), item("201", "2")])).toBeNull();
+    expect(pickSingleRoomAccess("301", [item("201", "1")])).toBeNull();
+  });
+  it("직원용 목록: 202 와 K202 가 같이 있어도 K202 대화엔 K202 것만", () => {
+    const rooms = [item("202", "1111"), item("K202", "2222")];
+    expect(conversationAccessCodes({ sharedAccess: [], roomAccess: rooms }, "K202", { shared: () => "", room: (l) => l }).map((c) => c.code)).toEqual(["2222"]);
   });
 });
 
@@ -64,6 +119,25 @@ describe("conversationAccessCodes — 공용 번호 + 이 방 번호", () => {
       { kind: "shared", label: "S:doorPassword", code: "000000" },
       { kind: "shared", label: "S:storagePassword@floor1", code: "111111" },
       { kind: "room", label: "R:201", code: "222222" },
+    ]);
+  });
+
+  it.each([["201_2"], ["201_2_2"], ["아라키초A 201_2"]])("변형 라벨 %s 도 201 방 번호가 나온다", (room) => {
+    expect(conversationAccessCodes({ sharedAccess: [], roomAccess: rooms }, room, labels)).toEqual([
+      { kind: "room", label: "R:201", code: "222222" },
+    ]);
+  });
+
+  it("K202 → 202 · 2 → 2f 방 번호가 나온다", () => {
+    expect(conversationAccessCodes({ sharedAccess: [], roomAccess: rooms }, "K202", labels)).toEqual([
+      { kind: "room", label: "R:202", code: "333333" },
+    ]);
+    const floors: PropertyRoomCode[] = [
+      { roomLabel: "2f", code: "4444" },
+      { roomLabel: "3f", code: "5555" },
+    ];
+    expect(conversationAccessCodes({ sharedAccess: [], roomAccess: floors }, "2", labels)).toEqual([
+      { kind: "room", label: "R:2f", code: "4444" },
     ]);
   });
 

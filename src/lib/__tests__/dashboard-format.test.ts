@@ -74,3 +74,27 @@ describe("요청 날짜 — 도쿄 기준 오늘 · 어제 · 짧은 날짜", ()
     expect(formatRequestDate("2026-12-31T20:00:00+09:00", jan, copy)).toBe("Yesterday");
   });
 });
+
+describe("진행 중 작업 — 모르는 영문 키는 내부 키로 보이지 않는다", () => {
+  const options = { checkout: "체크아웃 청소", long_stay: "장기 투숙 청소", simple: "간단 청소" };
+
+  it("사전에 없는 키(cleaning)는 fallback 문구", () => {
+    expect(resolveCleaningTaskLabel("cleaning", options, "청소")).toBe("청소");
+  });
+
+  it("옛 자유 글자는 fallback 이 있어도 그대로", () => {
+    expect(resolveCleaningTaskLabel("특별 청소", options, "청소")).toBe("특별 청소");
+  });
+
+  it("ko · ja · en 사전의 모든 종류 키와 fallback 이 내부 키와 다른 문구", async () => {
+    const { getDictionary } = await import("@/lib/i18n");
+    for (const locale of ["ko", "ja", "en"] as const) {
+      const c = getDictionary(locale).cleaning;
+      for (const key of ["checkout", "long_stay", "simple", "cleaning"]) {
+        const out = resolveCleaningTaskLabel(key, c.taskOptions, c.taskUnknown);
+        expect(out).not.toBe(key);
+        expect(out.length).toBeGreaterThan(0);
+      }
+    }
+  });
+});

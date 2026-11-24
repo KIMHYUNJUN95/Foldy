@@ -5,6 +5,8 @@
 > 2026-11-17: 손님 메시지 목록 순서를 손님 말 · 우리 답장 기준으로(리뷰 알림 system 줄 · 직원 메모는 올리지 않음) — `ingest-plan.ts` + 마이그레이션 `202611170001`(2026-11-17 운영 적용 · 어긋남 0). 커밋 · main 푸시.
 > 2026-10-25: 남은 일 전체(결정 대기 · 개발 순서 · 사용자 할 일 · 출시 일정)는 `docs/planning/19-open-tasks.md` 한곳에 모았다. 운영 마이그레이션은 `202610230008` 까지 전부 적용 확인.
 
+**2026-11-24 문구 버그 2건 + CLAUDE.md 색 표기** — ① ko 연차 문서 빈 상태 · 뷰어 줄의 일본어 서류 이름 「休暇届」 → 「휴가 신청서」(`admin.leaveConsole.docsEmptyBody` · `docsViewerMeta`) · en 도 같이(「leave application form」) ② 모바일 홈 「진행 중 작업」 · 오늘 기록의 모르는 영문 종류 키(`cleaning`)가 그대로 보이던 것 → `cleaning.taskUnknown`(ko/ja/en)을 fallback 으로 `resolveCleaningTaskLabel` 공용 사용 ③ `CLAUDE.md` 의 ivory · navy 표기를 실제(흰 바탕 · 보라 #7A52E6)에 맞춤. 테스트 `leave-docs-copy` · `dashboard-format`.
+
 **2026-11-24 손님 메시지 예약 패널 「출입 번호」 (PC + 모바일)** (문서 47 §5-14 · §6-3 · 05) — 볼 수 있는 사람(`view` + `manage` 또는 `property_info.edit`, Q9)에게만 묶음을 그리고, 처음엔 가림 글자만 · 「번호 보기」를 누를 때 공용 서버 액션 `getConversationAccessCodes`(`src/actions/guest-messages-access-codes.ts`)로 받아 라벨 · 번호 · 복사 단추. 다시 누르면 숨김, 대화를 바꾸면 처음부터. 방 맞추기 규칙은 `src/lib/guest-messages/access-codes.ts` 한 곳(답장 칸 넣기 · 자동 안내 변수도 같이 씀). 시험 `guest-messages-access-codes*.test.ts`. DB 변경 없음.
 
 **2026-11-24 화이트 리디자인에서 빠졌던 화면 4묶음 모양 맞춤(모양만, 동작 · 문구 · 권한 그대로)** (design 05 「4. 구현 진행」 끝) — 일본어 로그인 글꼴(`.authw` ja 일 때 Geist → Noto JP → Noto KR) · 공용 기간 달력(남색 값 → 주색 토큰 · 그림자 없음 · 입력 칸 옅은 바탕 · 굵기 600/500) · 청소 중 수리 · 분실물 등록 폼(유리 카드 풂 · 공용 구분선 · 52px 주색 저장 단추) · PC 근태 직원별 월 상세 머리(`.uhead` 테두리 · 카드 · 세로선 없앰). 시험 추가 없음(모양만).

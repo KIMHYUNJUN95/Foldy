@@ -7,10 +7,15 @@ import {
 
 const TZ = "Asia/Tokyo";
 
-/** 청소 세션의 task_label 은 키(`checkout`)로 저장된다 — 사전 문구로 바꾼다. 키가 아닌 옛 자유 글자는 그대로. */
-export function resolveCleaningTaskLabel(raw: string | null | undefined, taskOptions: Record<string, string>): string {
+/** 청소 세션의 task_label 은 키(`checkout`)로 저장된다 — 사전 문구로 바꾼다. 사전에 없는 영문 키(`cleaning`)는 fallback, 옛 자유 글자는 그대로. */
+export function resolveCleaningTaskLabel(
+  raw: string | null | undefined,
+  taskOptions: Record<string, string>,
+  fallback?: string,
+): string {
   if (!raw) return "";
-  return taskOptions[raw] ?? raw;
+  if (taskOptions[raw]) return taskOptions[raw];
+  return fallback && /^[a-z][a-z0-9_]*$/.test(raw) ? fallback : raw;
 }
 
 /** 「건물 객실」 세션 라벨을 방 번호 · 건물 이름(보는 사람 언어)으로 나눈다. 방이 하나뿐인 건물은 room 이 빈 글자. */

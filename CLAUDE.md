@@ -70,7 +70,7 @@ but completion still needs doc sync. Code + docs are one unit; if the implementa
 
 Full rules: detail doc §3 + `docs/product/16-mobile-navigation.md`. Do not break or re-implement any of these per screen:
 
-- Scroll-aware top chrome, three-line hamburger (shorter middle), left slide-out menu, flat **ivory** bottom tab bar
+- Scroll-aware top chrome, three-line hamburger (shorter middle), left slide-out menu, flat **white** bottom tab bar
   with centre FAB (`border-radius: 22px 22px 0 0`; FAB opens the tab editor, up to 4 tabs → `profiles.bottom_nav_tabs`).
   No page-specific stacked headers, no floating capsule / full-glass tab bar.
 - **Wide screens:** `fold:` (≥ 600px) = left rail; `tablet:` (≥ 1000px wide and ≥ 600px tall) = collapsible 248px
@@ -78,7 +78,7 @@ Full rules: detail doc §3 + `docs/product/16-mobile-navigation.md`. Do not brea
 - **Every `/mobile/*` screen is natively adaptive at `fold:` and `tablet:` (ABSOLUTE).** Design, implement and
   screenshot phone · fold · tablet. The shell's centred 760px column is a fallback, not an adaptation. List → detail =
   `SplitList` + `split`; no detail URL = own pane with `useIsTablet()`; full width = `wide`.
-- Colors: ivory chrome (`bg-background`), **white cards / sheets** (`bg-surface`), brand = deep ink navy/indigo
+- Colors: white chrome (`bg-background` #ffffff), **white cards / sheets** (`bg-surface`), brand = purple #7A52E6
   (`--primary`) — never teal/green. Liquid Glass only as selective accents.
 - Shared, never hand-rolled: screen transitions + placeholder loading shell (`loading.tsx` re-export; no full-screen
   loader) · press feedback (one rule in `globals.css`; `data-press="off"` opts out) · toast motion (`useToastMotion`) ·

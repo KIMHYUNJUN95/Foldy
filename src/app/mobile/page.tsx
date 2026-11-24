@@ -32,6 +32,7 @@ import {
   type HomeActivityEvent,
   type HomeReservationRow,
 } from "@/lib/home";
+import { resolveCleaningTaskLabel } from "@/lib/dashboard-format";
 import { getHomeImportantAnnouncement } from "@/lib/announcements";
 import {
   CANONICAL_TO_BUILDING_KEY,
@@ -89,15 +90,6 @@ function getActivityLogIcon(event: HomeActivityEvent) {
   if (event.type === "order_requested") return <Package aria-hidden="true" />;
   if (event.type === "linen_returned") return <Shirt aria-hidden="true" />;
   return <Sparkles aria-hidden="true" />;
-}
-
-function resolveCleaningTaskLabel(
-  rawTaskLabel: string | undefined,
-  taskOptions: Record<string, string> | undefined,
-): string | undefined {
-  if (!rawTaskLabel) return undefined;
-  if (!taskOptions) return rawTaskLabel;
-  return taskOptions[rawTaskLabel] ?? rawTaskLabel;
 }
 
 /**
@@ -275,7 +267,7 @@ async function HomeBody({
               </span>
               <div className="hm__task-b">
                 <div className="hm__task-t">{localizeRoomLabel(activeSession.data.room_label, dictionary.cleaning.buildingLabels)}</div>
-                <div className="hm__task-s">{resolveCleaningTaskLabel(activeSession.data.task_label ?? undefined, dictionary.cleaning?.taskOptions)}</div>
+                <div className="hm__task-s">{resolveCleaningTaskLabel(activeSession.data.task_label, dictionary.cleaning.taskOptions, dictionary.cleaning.taskUnknown)}</div>
               </div>
               <div className="hm__task-right">
                 <div className="hm__task-rk">{m.homeActiveTaskElapsed}</div>
@@ -343,7 +335,7 @@ async function HomeBody({
                   event.type,
                   m.homeActivityWhat,
                   event.taskLabel,
-                  resolveCleaningTaskLabel(event.taskLabel, dictionary.cleaning?.taskOptions),
+                  resolveCleaningTaskLabel(event.taskLabel, dictionary.cleaning.taskOptions, dictionary.cleaning.taskUnknown),
                 );
                 return (
                   <div className="hm__log-r" key={event.id}>

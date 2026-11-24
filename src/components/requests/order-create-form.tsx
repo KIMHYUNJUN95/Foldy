@@ -92,7 +92,6 @@ export function OrderCreateForm({
   const [formMessage, setFormMessage] = useState<string | null>(null);
     const [confirmOpen, setConfirmOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const [sheetKey, setSheetKey] = useState(0);
   // 품목 사진은 「요청 보내기」 때 한 줄로 모아 올리고 확인 시트에서 사진마다 진행 · 실패한 사진만 다시(2026-10-15, 시안 Motion-C-Upload-Phone).
   const uploads = usePhotoUpload(organizationId, "order-images");
   /** 품목별 사진 목록 (itemId → PreviewItem[]) */
@@ -361,14 +360,9 @@ export function OrderCreateForm({
 
       {confirmOpen ? (
         <BottomSheet
-          key={sheetKey}
           ariaLabel={copy.wConfirmTitle}
+          dismissDisabled={!canDismissConfirmSheet({ running: uploads.running, pending: isPending })}
           onClose={() => {
-            if (!canDismissConfirmSheet({ running: uploads.running, pending: isPending })) {
-              // 닫기를 무시하면 시트가 미끄러져 나간 채 안 보이게 남는다 — 새로 그려 다시 보이게 한다.
-              setSheetKey((k) => k + 1);
-              return;
-            }
             uploads.abandon();
             setConfirmOpen(false);
           }}

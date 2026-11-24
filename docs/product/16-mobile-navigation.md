@@ -1125,6 +1125,11 @@ bottom sheet looks identical. The reference design is the home check-in/out shee
   참조 수 바탕 잠금을 쓴다. 예약 캘린더는 따로 걸던 `useBodyScrollLock` 을 뺐다(공용 잠금과 두 겹이 되면 닫을 때 바탕이 잠긴 채 남을 수 있음).
   `rounded-t-[24px]` 를 `bottom-sheet.tsx` 밖에서 쓰는 곳이 생기면 손으로 만든 시트이니 공용으로 바꾼다.
 - **Dismiss**: drag past threshold, scrim tap, or Esc. **No top-right X button.**
+- **닫기 막기 `dismissDisabled` (2026-11-24)**: 저장 · 삭제 요청이 가는 중인 확인 시트처럼 닫히면 안 되는 동안 `dismissDisabled` 를
+  켠다 — 스크림 탭 · Esc · 끌어내리기 · 안쪽 `close()` 모두 먹지 않고, 임계값을 넘겨 놓은 끌기는 제자리로 돌아온다. 나가는 도중에
+  켜지면 다시 올라오고 `onClose` 는 부르지 않는다(판정 `decideSheetDismiss` · `src/lib/sheet-dismiss-gate.ts`). **`onClose` 안에서
+  조건부로 무시하지 말 것** — 시트가 이미 미끄러져 나간 뒤라 안 보인 채 화면을 덮고 바탕 스크롤이 잠긴 채 남는다. 쓰는 곳: 주문 ·
+  수리 · 분실물 · 게스트 피드백 확인 시트, 리넨 회수 · 요청 삭제 확인.
 - **Lifecycle**: portals to `<body>`, locks body scroll, closes on Esc. **겹친 시트(2026-10-20):** 시트 위에 시트를 띄우면(`zIndexClassName="z-[90]"`, 예: 업무일지 → 보낼 시각) Esc 는 **맨 위 시트만** 닫는다(열린 순서를 쌓아 둔다).
 - **Drag performance (2026-06-23)**: live drag distance updates are coalesced with `requestAnimationFrame`; refs still track every pointer sample for threshold/velocity accuracy, but React renders at most once per frame.
 - **Sheet content must be self-contained (2026-07-22)**: because `BottomSheet` portals to `<body>`,

@@ -167,7 +167,7 @@ export function ConfirmFormSheet({
   children?: ReactNode;
 }) {
   return (
-    <BottomSheet ariaLabel={title} onClose={() => (pending ? undefined : onCancel())}>
+    <BottomSheet ariaLabel={title} dismissDisabled={pending} onClose={onCancel}>
       {({ close }) => (
         <div className="ofw-sheet">
           <div className="ofw-sheet__h">

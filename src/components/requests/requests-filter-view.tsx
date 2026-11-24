@@ -1281,6 +1281,7 @@ export function RequestsFilterView({
         <BottomSheet
           ariaLabel={deleteCopy.confirmTitle}
           ariaLabelledBy="delete-confirm-title"
+          dismissDisabled={isDeleting}
           onClose={closeDelete}
           zIndexClassName="z-[200]"
           header={

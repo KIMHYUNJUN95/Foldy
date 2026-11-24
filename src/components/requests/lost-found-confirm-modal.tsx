@@ -41,6 +41,7 @@ export function LostFoundConfirmModal({
   return (
     <BottomSheet
       ariaLabel={title}
+      dismissDisabled={pending}
       header={
         <div className="flex flex-col items-center text-center">
           <div className="mb-3 flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/15">

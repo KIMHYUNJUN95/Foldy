@@ -12,6 +12,7 @@ import {
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { useSheetDragDismiss } from "@/components/shell/use-sheet-drag-dismiss";
+import { decideSheetDismiss } from "@/lib/sheet-dismiss-gate";
 
 /**
  * BottomSheet — 앱 전체에서 쓰는 유일한 표준 바텀 시트.
@@ -161,6 +162,11 @@ type BottomSheetProps = {
    * 올라오는 시트(폭 560) — 약관 보기 · 출근 QR 결과처럼 사용자가 정한 예외(2026-10-09, 16번 「BottomSheet — 넓은 화면」).
    */
   tabletLayout?: "card" | "bottom";
+  /**
+   * 닫기 막기(2026-11-24) — true 인 동안 스크림 탭 · Esc · 끌어내리기 · 안쪽 close 모두 닫지 않는다(끌던 시트는 제자리로).
+   * 저장 중인 확인 시트에 쓴다. `onClose` 안에서 무시하지 말 것 — 시트가 안 보인 채 화면을 덮는다.
+   */
+  dismissDisabled?: boolean;
 };
 
 export function BottomSheet({
@@ -172,6 +178,7 @@ export function BottomSheet({
   ariaLabel,
   ariaLabelledBy,
   tabletLayout = "card",
+  dismissDisabled = false,
 }: BottomSheetProps) {
   const tabletCard = tabletLayout === "card";
   const [shown, setShown] = useState(false);
@@ -184,14 +191,34 @@ export function BottomSheet({
   useEffect(() => {
     onCloseRef.current = onClose;
   }, [onClose]);
+  // 닫기 막기(`dismissDisabled`) — close 는 고정 함수로 남아야 해서 「요청 번호」만 올리고, 막혔는지는 렌더에서 최신 prop 으로
+  // 판정한다(ref 를 close 에서 읽으면 render-prop 으로 넘길 때 react-hooks/refs 에 걸린다). 타이머 쪽은 ref 로 읽는다.
+  const dismissDisabledRef = useRef(dismissDisabled);
+  useEffect(() => {
+    dismissDisabledRef.current = dismissDisabled;
+  }, [dismissDisabled]);
   const [closing, setClosing] = useState(false);
-  const close = useCallback(() => {
-    setClosing(true);
-    setShown(false);
-  }, []);
+  const [closeRequest, setCloseRequest] = useState(0);
+  const [handledCloseRequest, setHandledCloseRequest] = useState(0);
+  const close = useCallback(() => setCloseRequest((n) => n + 1), []);
+  if (closeRequest !== handledCloseRequest) {
+    setHandledCloseRequest(closeRequest);
+    if (decideSheetDismiss("request", dismissDisabled) === "slideOut") {
+      setClosing(true);
+      setShown(false);
+    }
+  }
   useEffect(() => {
     if (!closing) return;
-    const timer = setTimeout(() => onCloseRef.current(), SHEET_CLOSE_MS); // 슬라이드 아웃 전환 시간과 일치
+    const timer = setTimeout(() => {
+      // 나가는 도중에 막혔으면(저장 시작) onClose 를 부르지 않고 다시 올린다.
+      if (decideSheetDismiss("finish", dismissDisabledRef.current) === "reopen") {
+        setClosing(false);
+        setShown(true);
+        return;
+      }
+      onCloseRef.current();
+    }, SHEET_CLOSE_MS); // 슬라이드 아웃 전환 시간과 일치
     return () => clearTimeout(timer);
   }, [closing]);
 

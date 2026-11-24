@@ -58,7 +58,7 @@ export function LinenReturnDetailActions({ building, copy, errorCode, recordId }
         <Trash2 aria-hidden="true" />
       </button>
       {confirmOpen ? (
-        <BottomSheet ariaLabel={copy.deleteConfirmTitle} onClose={() => (isPending ? undefined : setConfirmOpen(false))}>
+        <BottomSheet ariaLabel={copy.deleteConfirmTitle} dismissDisabled={isPending} onClose={() => setConfirmOpen(false)}>
           {({ close }) => (
             <div className="lnw-sheet">
               <div className="lnw-sheet__h">

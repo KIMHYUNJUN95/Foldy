@@ -1657,13 +1657,13 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 | `lost-items` · `lost-found-handling` · `maintenance-reports` · `maintenance-resolutions` · `order-images` | 브라우저 | 그 조직 활성 멤버(아르바이트 포함) | 내 것 또는 `request.delete_any` |
 | `linen-returns` | 브라우저 | 활성 멤버(아르바이트 포함) | 내 것 또는 `linen.manage` |
 | `suggestion-images` · `attendance-corrections` · `board-posts` · `board-comments` (되살림) | 브라우저 | 활성 멤버(아르바이트 포함 — 06-29 정의) | 내 것 또는 `request.delete_any` |
-| `task-images` · `task-update-images` (되살림) | 브라우저 | 활성 멤버 중 **아르바이트 제외**(06-29 정의) → **2026-11-24 `202611240001` 부터 아르바이트 포함**(운영 미적용) | 같은 조건 + 내 것 또는 `request.delete_any` |
+| `task-images` · `task-update-images` (되살림) | 브라우저 | 활성 멤버 중 **아르바이트 제외**(06-29 정의) → **2026-11-24 `202611240001` 부터 아르바이트 포함**(운영 적용 2026-11-24) | 같은 조건 + 내 것 또는 `request.delete_any` |
 | `bug-reports` · `complaint-images` · `complaint-comment-images` | 서버 service role | 정책 목록에 없음(서버만 — 정책을 거치지 않음) | 서버 |
 | `transport-reimbursements` · `annual-leave-requests` (5칸 · 별도 정책) | 브라우저 / 서버 지우기 | 별도 정책(그대로) | 별도 정책(그대로) |
 
 - 경로 검사(4칸 · 조직 id · 기록 id uuid · 파일 이름 3~160자 · 글자)는 그대로. 플랫폼 관리자도 예전처럼 목록 안 폴더만.
 - 지우기는 06-29 의 「조직 멤버 누구나 남의 사진 지우기」로 되돌리지 않고 지금 규칙(내 것 또는 권한 키)을 되살린 폴더에도 적용했다.
-- **알려진 별개 문제(2026-11-24 `202611240001` 로 「내가 1시간 안에 올린 사진만」 보이게 정함 — 운영 미적용, 아래 절):** `request-images` 에는 SELECT 정책이 처음부터 없다(공개 버킷이라 공개 주소 읽기는 정책을 안 거침). Supabase `remove()` 는
+- **알려진 별개 문제(2026-11-24 `202611240001` 로 「내가 1시간 안에 올린 사진만」 보이게 정함 — 운영 적용 2026-11-24, 아래 절):** `request-images` 에는 SELECT 정책이 처음부터 없다(공개 버킷이라 공개 주소 읽기는 정책을 안 거침). Supabase `remove()` 는
   select + delete 둘 다 필요해서, 브라우저에서 부르는 지우기(`removeRequestImages` · `removeBoardUploads` — 실패 시 방금 올린 사진 되지우기)는 **오류 없이 아무것도
   지우지 않는다.** 서버(service role) 정리는 정상. 2026-11-24 에 「내가 1시간 안에 올린 사진만」 보이는 SELECT 정책으로 정했다(아래 절).
 - 함수 실행 권한: `public` 회수 + `anon` 따로 회수(Supabase 기본 권한이 anon 에 따로 준다) — authenticated · service_role 만.
@@ -1672,7 +1672,7 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
   아르바이트는 할 일 두 폴더만 거절, 남의 조직 · 목록 밖 폴더 · `bug-reports` · 3칸/5칸 · uuid 아닌 기록 id · 잘못된 파일 이름 · 비활성 멤버 거절.
   지우기 논리(임시 SELECT 정책으로 롤백 안에서): 내 것 허용 · 아르바이트가 남의 것 거절. 두 번 돌려도 같은 결과.
 
-## 2026-11-24 request-images 읽기 정책 · 할 일 사진 아르바이트 허용 (`202611240001_request_images_select_and_task_photos.sql`, **운영 미적용 · 앱 코드 먼저**)
+## 2026-11-24 request-images 읽기 정책 · 할 일 사진 아르바이트 허용 (`202611240001_request_images_select_and_task_photos.sql`, **운영 적용 2026-11-24 · 앱 코드 먼저 배포함**)
 
 - **읽기(SELECT) 정책 `"uploaders can read own recent request images"`** — `to authenticated`, 조건은 다섯 개를 모두 만족(and):
   버킷 `request-images` · 4칸 경로 · 1칸이 uuid · **`owner_id = auth.uid()`(내가 올린 것)** · **`created_at > now() - interval '1 hour'`(올린 지 1시간 안)**.

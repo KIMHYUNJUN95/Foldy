@@ -812,7 +812,7 @@ Per-occurrence state for recurring tasks (migration `202607300001_task_occurrenc
 
 ## 할 일 · 프로젝트 직접 읽기 보강 (2026-11-25)
 
-`supabase/migrations/202611250001_task_project_read_hardening.sql` — **적용 필요(운영 미적용).** 앱을 거치지 않고 PostgREST ·
+`supabase/migrations/202611250001_task_project_read_hardening.sql` — **운영 적용 · 확인 완료(2026-11-25 — 9개 표 anon 권한 없음 · authenticated 는 SELECT 만 · 읽기 정책 5개 조직 조건 확인).** 앱을 거치지 않고 PostgREST ·
 Realtime 으로 직접 읽을 때의 빈틈만 닫는다. 누가 무엇을 볼 수 있는지(권한 규칙)는 그대로고, 활성 멤버에게 보이는 행도 그대로다.
 
 | 표 | 빈틈(앞 정책) | 닫은 방법 |

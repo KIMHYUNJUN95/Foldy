@@ -123,3 +123,16 @@ describe("출근지 라벨 = 캘린더 라벨", () => {
     expect(localizePropertyName("STAY ARI Apartment Hotel", {})).toBe("STAY ARI Apartment Hotel");
   });
 });
+
+describe("resolveTransportDestinationKey — 저장할 출근지 키는 서버가 다시 만든다(2026-11-25)", () => {
+  it("확인된 건물 id → 그 id, 아니면 사무실 · 기타 상수만, 그 밖은 비움", async () => {
+    const { resolveTransportDestinationKey } = await import("@/lib/transport-destinations");
+    expect(resolveTransportDestinationKey("prop-1", "prop-1")).toBe("prop-1");
+    expect(resolveTransportDestinationKey("prop-1", undefined)).toBe("prop-1");
+    expect(resolveTransportDestinationKey(null, TRANSPORT_OFFICE_KEY)).toBe(TRANSPORT_OFFICE_KEY);
+    expect(resolveTransportDestinationKey(null, ` ${TRANSPORT_OTHER_KEY} `)).toBe(TRANSPORT_OTHER_KEY);
+    expect(resolveTransportDestinationKey(null, "아무거나")).toBeNull();
+    expect(resolveTransportDestinationKey(null, "prop-1")).toBeNull();
+    expect(resolveTransportDestinationKey(null, undefined)).toBeNull();
+  });
+});

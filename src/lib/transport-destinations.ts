@@ -45,6 +45,23 @@ export type TransportDestination = {
   kind: "property" | "office" | "other";
 };
 
+/**
+ * 저장할 출근지 키 — **서버가 다시 만든다**(2026-11-25). 화면 키 문자열은 믿지 않는다.
+ * 키 규칙은 목록(`listTransportDestinations`)과 같다: 건물 = `property_id`, 사무실 · 기타 = 위 상수.
+ * - 같은 조직으로 **확인된** 건물 id 가 있으면 그 id.
+ * - 없으면 화면 키가 사무실 · 기타 상수일 때만 그 값.
+ * - 그 밖(엉뚱한 문자열, 확인 안 된 건물 id)은 비움.
+ * 금액 기억 키(`property_id ?? destinationKey`)는 화면이 목록 키를 그대로 보내던 지금까지의 저장값과 같다.
+ */
+export function resolveTransportDestinationKey(
+  verifiedPropertyId: string | null,
+  rawKey: string | null | undefined,
+): string | null {
+  if (verifiedPropertyId) return verifiedPropertyId;
+  const key = rawKey?.trim();
+  return key === TRANSPORT_OFFICE_KEY || key === TRANSPORT_OTHER_KEY ? key : null;
+}
+
 /** `기타` 는 메모가 없으면 저장할 수 없다. 화면과 서버가 같은 판정을 쓴다. */
 export function transportDestinationRequiresMemo(key: string): boolean {
   return key === TRANSPORT_OTHER_KEY;

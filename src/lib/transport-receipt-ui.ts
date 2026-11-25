@@ -57,6 +57,29 @@ export function canChangeEntryMode(from: "linked" | "manual", to: "linked" | "ma
   return from === to || (from === "linked" && to === "manual");
 }
 
+type EditOriginal = { mode: "linked" | "manual"; context: string };
+
+/**
+ * 고치기 시트에서 입력 방식을 바꿀 때 「방」 칸 글(2026-11-25). 연결 항목을 직접으로 바꿔 고친 뒤 다시 자동으로 되돌리면
+ * 원래 요약으로 돌아간다 — 서버는 연결 항목의 요약을 바꾸지 않으므로, 고친 글이 남으면 화면과 저장 값이 어긋난다.
+ */
+export function editContextForMode(original: EditOriginal, nextMode: "linked" | "manual", current: string): string {
+  return nextMode === "linked" && original.mode === "linked" ? original.context : current;
+}
+
+/**
+ * 저장 뒤 화면에 둘 「방」 글. 서버가 돌려준 저장 값이 있으면 그것, 없으면 연결 항목으로 남을 때는 원래 요약, 직접 입력은 적은 글.
+ */
+export function savedTransportContext(
+  serverValue: string | undefined,
+  original: EditOriginal,
+  savedMode: "linked" | "manual",
+  entered: string,
+): string {
+  if (serverValue !== undefined) return serverValue;
+  return savedMode === "linked" && original.mode === "linked" ? original.context : entered.trim();
+}
+
 /** 영어 단수 · 복수 구분용 — 1장이면 `one`. */
 export function receiptCountForm(n: number): "one" | "other" {
   return n === 1 ? "one" : "other";

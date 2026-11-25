@@ -105,3 +105,23 @@ describe("removeReceiptImage", () => {
     expect(removeReceiptImage(list, "zzz")).toHaveLength(3);
   });
 });
+
+describe("고치기 시트의 「방」 글 — 연결 항목은 원래 요약(2026-11-25)", () => {
+  it("직접으로 바꿔 고친 뒤 자동으로 되돌리면 원래 요약으로 돌아간다", async () => {
+    const { editContextForMode } = await import("../transport-receipt-ui");
+    const original = { mode: "linked" as const, context: "아라키초A · 201" };
+    expect(editContextForMode(original, "manual", "고친 글")).toBe("고친 글");
+    expect(editContextForMode(original, "linked", "고친 글")).toBe("아라키초A · 201");
+    // 직접 입력 항목은 손대지 않는다.
+    expect(editContextForMode({ mode: "manual", context: "A" }, "manual", "B")).toBe("B");
+  });
+
+  it("저장 뒤 화면 값: 서버가 돌려준 값 → 없으면 연결 항목은 원래 요약, 직접 입력은 적은 글", async () => {
+    const { savedTransportContext } = await import("../transport-receipt-ui");
+    const original = { mode: "linked" as const, context: "아라키초A · 201" };
+    expect(savedTransportContext("서버 값", original, "linked", "고친 글")).toBe("서버 값");
+    expect(savedTransportContext("", original, "manual", "x")).toBe("");
+    expect(savedTransportContext(undefined, original, "linked", "고친 글")).toBe("아라키초A · 201");
+    expect(savedTransportContext(undefined, original, "manual", " 301 ")).toBe("301");
+  });
+});

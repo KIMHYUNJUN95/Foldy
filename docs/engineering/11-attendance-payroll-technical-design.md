@@ -1563,6 +1563,14 @@ Notes:
   「방」 칸 `readOnly`). 연결할 수 있는 기록 = `LINKABLE_ATTENDANCE_EXCLUDED_STATUS`(근태 `status <> 'invalid'`) ·
   `LINKABLE_CLEANING_STATUS`(청소 `completed` + `closed_without_cleaning = false`) — 후보 쿼리와 저장 확인이 같이 쓴다.
   후보 목록의 5개 읽기(근태 · 근무지 · 청소 · 방 · 건물) 오류는 던진다(예전엔 빈 목록 · 빈 이름으로 삼킴).
+- **2026-11-25 추가 — 고치기 뒤 화면 값**: `updateTransportItemAction` 은 성공하면 `{ ok: true, contextSummary }`(저장된 요약)를 돌려준다
+  (`UpdateTransportItemResult`). 화면은 `savedTransportContext`(서버 값 → 없으면 연결 항목은 원래 요약 · 직접 입력은 적은 글)로 반영하고,
+  「자동」으로 되돌릴 때 `editContextForMode` 로 「방」 칸을 원래 요약으로 되돌린다(`src/lib/transport-receipt-ui.ts`, 테스트 `transport-receipt-ui.test.ts`).
+- **2026-11-25 추가 — 출근지 키는 서버가 다시 만든다**: `work_context.destinationKey`(금액 기억 키)는
+  `resolveTransportDestinationKey(확인된 propertyId, 화면 키)`(`src/lib/transport-destinations.ts`)로만 정한다 — 같은 조직으로 확인된 건물 id →
+  그 id, 아니면 화면 키가 `TRANSPORT_OFFICE_KEY` · `TRANSPORT_OTHER_KEY`(목록 `listTransportDestinations` 와 같은 상수)일 때만 그 값, 그 밖은 비움.
+  기타 메모 필수 판정 · 사무실/기타 건물 라벨도 이 결과로 본다. 고치기(`updateTransportItemAction`)는 키를 받지 않아 저장된 키 그대로.
+  건물 · 사무실 · 기타 · 연결 항목의 저장값은 그전과 같다(테스트 `transport-hardening.test.ts`, `transport-destinations.test.ts`).
 
 - **버킷**: 새 업로드 = 비공개 `transport-receipts`(`TRANSPORT_RECEIPT_BUCKET`, `src/lib/transport-receipt-bucket.ts` — 브라우저도 쓰는 이름 상수).
   예전 파일 = 공개 `request-images`(`LEGACY_TRANSPORT_RECEIPT_BUCKET`). 서버 도우미 `src/lib/transport-receipt-storage.ts`(server-only):

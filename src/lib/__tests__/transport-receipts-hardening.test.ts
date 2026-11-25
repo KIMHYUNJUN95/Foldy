@@ -383,7 +383,7 @@ describe("서명 주소 — 새 버킷 먼저, 없으면 예전 버킷, 실패�
 describe("updateTransportItemAction — 입력 방식(entryMode)", () => {
   it("자동 연결 → 직접 입력은 받는다: 연결 출처와 근태 칸을 비운다", async () => {
     const { updateTransportItemAction } = await actions();
-    expect(await updateTransportItemAction({ itemId: I1, entryMode: "manual" })).toEqual({ ok: true });
+    expect(await updateTransportItemAction({ itemId: I1, entryMode: "manual" })).toMatchObject({ ok: true });
     const item = fake.tables.transport_reimbursement_items[0];
     expect(item.entry_mode).toBe("manual");
     expect(item.attendance_session_id).toBeNull();

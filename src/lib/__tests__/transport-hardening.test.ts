@@ -192,7 +192,7 @@ describe("건물 이름은 서버가 정한다 — 화면이 보낸 이름을 �
     if (!created.ok) throw new Error("create failed");
     expect(
       await updateTransportItemAction({ itemId: created.itemId, buildingLabel: "가짜 건물" } as never),
-    ).toEqual({ ok: true });
+    ).toMatchObject({ ok: true });
     expect(label()).toBe("아라키초A");
   });
 });
@@ -291,9 +291,15 @@ describe("연결 항목의 건물 정보는 서버가 연결 기록에서 한 �
     const created = await create({ usageDate: "2026-11-06", cleaningSessionId: "cl-1" });
     if (!created.ok) throw new Error("create failed");
     const before = ctx().contextSummary;
-    expect(await updateTransportItemAction({ itemId: created.itemId, contextSummary: "가짜" })).toEqual({ ok: true });
+    // 화면이 저장 뒤 그대로 보여 줄 수 있게 서버가 저장된 요약을 돌려준다.
+    expect(await updateTransportItemAction({ itemId: created.itemId, contextSummary: "가짜" })).toEqual({
+      ok: true,
+      contextSummary: before,
+    });
     expect(ctx().contextSummary).toBe(before);
-    await updateTransportItemAction({ itemId: created.itemId, contextSummary: "301", entryMode: "manual" });
+    expect(
+      await updateTransportItemAction({ itemId: created.itemId, contextSummary: "301", entryMode: "manual" }),
+    ).toEqual({ ok: true, contextSummary: "301" });
     expect(ctx().contextSummary).toBe("301");
   });
 
@@ -361,6 +367,44 @@ describe("연결 항목의 건물 정보는 서버가 연결 기록에서 한 �
       await expect(candidates()).rejects.toThrow(/read failed/);
       fake.client.from = original;
     }
+  });
+});
+
+describe("출근지 키(destinationKey)는 서버가 다시 만든다 — 화면 문자열을 믿지 않는다(2026-11-25 추가)", () => {
+  const manual = { targetMonth: "2026-11", amountYen: 400, entryMode: "manual" as const, usageDate: "2026-11-05" };
+  const create = async (input: Record<string, unknown>) => {
+    const { createTransportItemAction } = await import("@/app/mobile/attendance/transport/actions");
+    return createTransportItemAction({ ...manual, ...input } as never);
+  };
+  const row = (i = 0) => fake.tables.transport_reimbursement_items[i];
+  const key = (i = 0) => (row(i).work_context as Record<string, string>).destinationKey;
+
+  it("엉뚱한 키 문자열은 저장되지 않고 빈다(확인 안 된 건물 id 도)", async () => {
+    expect((await create({ destinationKey: "아무거나" })).ok).toBe(true);
+    expect((await create({ destinationKey: "prop-1" })).ok).toBe(true);
+    expect([key(0), key(1)]).toEqual([undefined, undefined]);
+  });
+
+  it("건물 · 사무실 · 기타는 지금 저장값과 같다", async () => {
+    await create({ propertyId: "prop-1", destinationKey: "prop-1" });
+    await create({ destinationKey: "office" });
+    await create({ destinationKey: "other", memo: "택배" });
+    expect([row(0).property_id, key(0)]).toEqual(["prop-1", "prop-1"]);
+    expect([row(1).property_id, key(1)]).toEqual([null, "office"]);
+    expect([row(2).property_id, key(2)]).toEqual([null, "other"]);
+  });
+
+  it("기타 메모 필수는 서버가 만든 키로 판정한다", async () => {
+    expect(await create({ destinationKey: " other " })).toEqual({ ok: false, error: "memo_required" });
+    expect(fake.tables.transport_reimbursement_items).toHaveLength(0);
+  });
+
+  it("고치기는 출근지 키를 받지 않는다(저장된 키 그대로)", async () => {
+    const { updateTransportItemAction } = await import("@/app/mobile/attendance/transport/actions");
+    const created = await create({ destinationKey: "office" });
+    if (!created.ok) throw new Error("create failed");
+    await updateTransportItemAction({ itemId: created.itemId, destinationKey: "아무거나", propertyId: "prop-1" } as never);
+    expect([row().property_id, key()]).toEqual([null, "office"]);
   });
 });
 

@@ -35,11 +35,13 @@ import { haptic } from "@/lib/haptics";
 import { TRANSPORT_RECEIPT_BUCKET } from "@/lib/transport-receipt-bucket";
 import {
   canChangeEntryMode,
+  editContextForMode,
   isReceiptUrlStale,
   mergeChosenFiles,
   removeReceiptImage,
   receiptCountForm,
   receiptSlotsLeft,
+  savedTransportContext,
   transportErrorKind,
   TRANSPORT_MAX_RECEIPTS,
 } from "@/lib/transport-receipt-ui";
@@ -1108,7 +1110,13 @@ function EditItemSheet({
       }
       haptic(uploaded.failed > 0 ? "warning" : "success");
       onSaved(
-        { amount: amountNum, context: context.trim(), memo: memo.trim(), mode, receiptCount: item.receiptCount + uploaded.ok },
+        {
+          amount: amountNum,
+          context: savedTransportContext(result.contextSummary, item, mode, context),
+          memo: memo.trim(),
+          mode,
+          receiptCount: item.receiptCount + uploaded.ok,
+        },
         uploaded.failed,
       );
       close();
@@ -1287,7 +1295,10 @@ function EditItemSheet({
               type="button"
               className={mode === "linked" ? "trn-on" : ""}
               disabled={!canSwitchToLinked}
-              onClick={() => setMode("linked")}
+              onClick={() => {
+                setMode("linked");
+                setContext((current) => editContextForMode(item, "linked", current));
+              }}
             >
               <LinkIcon />
               {t.modeAutoLink}

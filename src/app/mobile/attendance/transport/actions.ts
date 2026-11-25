@@ -15,6 +15,7 @@ import { getCanonicalPropertyName } from "@/lib/room-label-normalization";
 import {
   TRANSPORT_OFFICE_KEY,
   TRANSPORT_OTHER_KEY,
+  resolveTransportDestinationKey,
   transportDestinationRequiresMemo,
 } from "@/lib/transport-destinations";
 import {
@@ -119,17 +120,18 @@ function isOwnItemImagePath(
  * - 자동 연결: 서버가 연결된 기록에서 정한 이름(`linkedLabel`, `resolveLinkedTransportPlace` — 근태 근무지 이름 ·
  *   청소 건물 이름, 후보 목록과 같은 판정 함수). 화면 값은 받지 않는다.
  * - 직접 입력 · 건물: 같은 조직 `properties.name` → `getCanonicalPropertyName`(목적지 목록의 `canonicalLabel` 과 같은 값).
- * - 직접 입력 · 사무실 · 기타: 한국어 사전 값. 그 밖에는 비운다.
+ * - 직접 입력 · 사무실 · 기타: 한국어 사전 값(서버가 다시 만든 출근지 키로 판정). 그 밖에는 비운다.
  */
 function resolveBuildingLabel(
   input: CreateTransportItemInput,
   propertyName: string | null,
   linkedLabel: string | null,
+  destinationKey: string | null,
 ): string | null {
   if (input.entryMode === "linked") return linkedLabel?.trim() || null;
   if (propertyName) return getCanonicalPropertyName(propertyName);
-  const key = input.destinationKey?.trim();
   const ko = getDictionary("ko");
+  const key = destinationKey;
   if (key === TRANSPORT_OFFICE_KEY) return ko.transport.buildings.office;
   if (key === TRANSPORT_OTHER_KEY) return ko.transport.destinationOther;
   return null;
@@ -184,16 +186,6 @@ export async function createTransportItemAction(
   if (input.entryMode === "linked" && !attendanceSessionId && !cleaningSessionId) {
     return { ok: false, error: "link_target_required" };
   }
-  // 기타는 메모가 있어야 한다. 화면에서도 막지만 여기서 한 번 더 본다 —
-  // 화면만 막으면 다른 경로로 들어온 요청이 그대로 통과한다.
-  if (
-    input.destinationKey &&
-    transportDestinationRequiresMemo(input.destinationKey) &&
-    !input.memo?.trim()
-  ) {
-    return { ok: false, error: "memo_required" };
-  }
-
   // 연결 대상은 **내 것 · 우리 조직 것 · 그날 것**만(2026-10-26, 날짜는 2026-11-11). 화면이 보낸 id 를 그대로
   // 저장하면 남의 근태 기록이나 다른 조직 건물에 이어진 행이 생긴다. DB 트리거와 같은 조건이다.
   // 연결 항목의 건물 정보(이름 · 요약 · 건물 id)는 서버가 연결 기록에서 정한다(2026-11-25, 후보 목록과 같은 판정).
@@ -242,7 +234,6 @@ export async function createTransportItemAction(
   // (FK 가 빈 근무지 — 화면이 이름으로 출근지를 맞춘 값) 지금처럼 화면 값을 아래에서 같은 조직인지 확인해 쓴다.
   // 후보의 `propertyId` 도 같은 판정이라, 화면이 후보 값을 그대로 보내던 지금까지의 저장값 · 금액 기억 키와 같다.
   const propertyId = linkedPlace?.propertyId ?? (input.propertyId?.trim() || null);
-  const destinationKey = linkedPlace?.propertyId ?? (input.destinationKey?.trim() || null);
   let propertyName: string | null = null;
   if (propertyId) {
     const propertyRes = await service
@@ -254,6 +245,12 @@ export async function createTransportItemAction(
     if (propertyRes.error || !propertyRes.data) return { ok: false, error: "invalid_link" };
     const name = (propertyRes.data as { name?: string | null }).name;
     propertyName = typeof name === "string" && name.trim() ? name : null;
+  }
+  // 출근지 키(금액 기억 키)는 서버가 다시 만든다(2026-11-25) — 확인된 건물 id, 아니면 사무실 · 기타 상수만.
+  const destinationKey = resolveTransportDestinationKey(propertyId, input.destinationKey);
+  // 기타는 메모가 있어야 한다. 화면에서도 막지만 여기서 한 번 더 본다 — 판정은 서버가 만든 키로.
+  if (destinationKey && transportDestinationRequiresMemo(destinationKey) && !input.memo?.trim()) {
+    return { ok: false, error: "memo_required" };
   }
 
   // 보고서 행은 **첫 항목을 넣을 때** 만든다 — 화면을 여는 것만으로는 만들지 않는다(page.tsx 는 읽기만).
@@ -269,7 +266,7 @@ export async function createTransportItemAction(
   const workContext: Record<string, string> = {};
   // 라벨은 **표시용**이다(로케일마다 다르다). 기억·집계의 키는 `destinationKey` 다.
   if (destinationKey) workContext.destinationKey = destinationKey;
-  const buildingLabel = resolveBuildingLabel(input, propertyName, linkedPlace?.buildingLabel ?? null);
+  const buildingLabel = resolveBuildingLabel(input, propertyName, linkedPlace?.buildingLabel ?? null, destinationKey);
   if (buildingLabel) workContext.buildingLabel = buildingLabel;
   // 요약: 연결 항목은 서버가 연결 기록에서 만든 글(후보 목록과 글자까지 같음), 직접 입력은 화면 값.
   const contextSummary = linkedPlace ? linkedPlace.contextSummary : input.contextSummary?.trim() || "";
@@ -379,9 +376,12 @@ async function loadEditableOwnItem(
   return { ok: true, item: loaded.item };
 }
 
+/** 성공하면 저장된 요약을 돌려준다(2026-11-25) — 화면은 이 값을 그대로 보여 준다(연결 항목은 화면 글을 버리므로). */
+export type UpdateTransportItemResult = { ok: true; contextSummary: string } | { ok: false; error: string };
+
 export async function updateTransportItemAction(
   input: UpdateTransportItemInput,
-): Promise<TransportActionResult> {
+): Promise<UpdateTransportItemResult> {
   const session = await getCurrentAppSession();
   if (!session || !hasOrganizationContext(session)) return { ok: false, error: "auth" };
   const organizationId = session.organization.id;
@@ -422,7 +422,8 @@ export async function updateTransportItemAction(
     else delete workContext.contextSummary;
   }
   if (workContext) update.work_context = workContext;
-  if (Object.keys(update).length === 0) return { ok: true };
+  const savedContextSummary = (workContext ?? loaded.item.work_context ?? {}).contextSummary ?? "";
+  if (Object.keys(update).length === 0) return { ok: true, contextSummary: savedContextSummary };
 
   const upd = await untyped(service)
     .from("transport_reimbursement_items")
@@ -434,7 +435,7 @@ export async function updateTransportItemAction(
 
   await syncReportTotalAmountQuietly(service, loaded.item.report_id);
   revalidatePath(TRANSPORT_PATH);
-  return { ok: true };
+  return { ok: true, contextSummary: savedContextSummary };
 }
 
 // ── 항목 삭제 ──────────────────────────────────────────────────────────────

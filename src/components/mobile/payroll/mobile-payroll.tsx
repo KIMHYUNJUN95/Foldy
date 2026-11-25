@@ -23,6 +23,7 @@ import type { PayrollPrepCopy } from "@/lib/payroll-prep-i18n";
 import type { PayrollPrepData } from "@/lib/payroll-prep-server";
 import { fillCopy } from "@/lib/payroll-settings-i18n";
 import type { WithholdingClass } from "@/lib/payroll-settings-rules";
+import { sharedFirstIssue } from "./shared-issue";
 import { fmtTime, initialOf, num, signedNum, yenMark } from "./payroll-format";
 import { PayrollPerson } from "./payroll-person";
 import { PayrollFiles } from "./payroll-files";
@@ -100,6 +101,10 @@ export function MobilePayroll({
   const visible = rows.filter((r) => filter === "all" || r.paymentMethod === filter);
   const selected = rows.find((r) => r.userId === selectedId) ?? null;
   // 태블릿은 칸이 늘 하나를 보여 준다 — 고른 게 없거나 거른 목록에 없으면 첫 줄.
+  // 모든 줄이 같은 안내면 줄마다 반복하지 않고 목록 위에 한 줄로 모은다.
+  const sharedIssue = sharedFirstIssue(visible);
+  /** 모은 안내 줄(.mpp-note)이 보이는 폭(폰 · 폴드)에서만 줄 · 표의 같은 안내를 뺀다 — 태블릿은 모은 줄이 없어 줄에 그대로 둔다. */
+  const hideRowIssue = sharedIssue !== null && !isTablet;
   const paneRow = visible.find((r) => r.userId === selectedId) ?? visible[0] ?? null;
 
   const month = (key: string) =>
@@ -230,8 +235,8 @@ export function MobilePayroll({
     row.paymentMethod === "cash" ? copy.cash : row.paymentMethod === "transfer" ? copy.transfer : copy.noMethod;
 
   /** 목록 줄의 둘째 줄 — 확인할 게 있으면 첫 번째 이유(빨간 점), 없으면 시간과 눈에 띄는 것 하나. */
-  const subLine = (row: PrepRow, withTime: boolean, extra: boolean) => {
-    const first = row.issues[0];
+  const subLine = (row: PrepRow, withTime: boolean, extra: boolean, skipIssue = false) => {
+    const first = skipIssue ? undefined : row.issues[0];
     if (first) return <span className="mpp-sub mpp-dot">{copy.issues[first]}</span>;
     const parts: string[] = [];
     if (withTime) parts.push(fmtTime(copy, row.paidMinutes));
@@ -243,7 +248,7 @@ export function MobilePayroll({
     return <span className="mpp-sub">{parts.join(" · ") || " "}</span>;
   };
   const tableSub = (row: PrepRow) => {
-    const first = row.issues[0];
+    const first = hideRowIssue ? undefined : row.issues[0];
     if (first) return <small className="mpp-sub mpp-dot">{copy.issues[first]}</small>;
     if (row.withholding) return <small className="mpp-sub">{`${copy.withholding} ${num(row.withholding)}`}</small>;
     if (row.prevAdjustmentTaxable !== 0) return <small className="mpp-sub">{`${copy.prevAdjust} ${signedNum(row.prevAdjustmentTaxable)}`}</small>;
@@ -444,6 +449,10 @@ export function MobilePayroll({
             </ul>
           ) : null}
 
+          {sharedIssue ? (
+            <p className="mpp-sub mpp-dot mpp-note">{fillCopy(copy.allSameIssue, { n: String(visible.length), issue: copy.issues[sharedIssue] })}</p>
+          ) : null}
+
           <div className="mpp-seg" role="radiogroup" aria-label={copy.filterLabel}>
             {filters.map((f) => (
               <button
@@ -476,7 +485,7 @@ export function MobilePayroll({
                   </span>
                   <span className="mpp-row__b">
                     <span className="mpp-row__t">{row.name}</span>
-                    {subLine(row, true, !isTablet)}
+                    {subLine(row, true, !isTablet, hideRowIssue)}
                     {monthOnly(row, "span")}
                   </span>
                   <span className={`mpp-amt num${row.net == null ? " is-none" : ""}`}>{row.net == null ? "—" : yenMark(row.net)}</span>

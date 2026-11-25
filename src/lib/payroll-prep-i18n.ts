@@ -33,6 +33,7 @@ export type PayrollPrepCopy = {
   netTotal: string;
   uncalculated: string; // "{n}명 계산 전"
   checkPeople: string; // "확인할 사람 {n}명"
+  allSameIssue: string; // "{n}명 모두 {issue}"
   noChecks: string;
   requestApproval: string;
   approvalLater: string;
@@ -243,6 +244,7 @@ const ko: PayrollPrepCopy = {
   netTotal: "실수령 합계",
   uncalculated: "{n}명 계산 전",
   checkPeople: "확인할 사람 {n}명",
+  allSameIssue: "{n}명 모두 {issue}",
   noChecks: "확인할 사람 없음",
   requestApproval: "결재 요청",
   approvalLater: "결재는 다음 단계에서 열려요",
@@ -462,6 +464,7 @@ const ja: PayrollPrepCopy = {
   netTotal: "差引支給 合計",
   uncalculated: "{n}名 未計算",
   checkPeople: "要確認 {n}名",
+  allSameIssue: "{n}名全員、{issue}",
   noChecks: "要確認なし",
   requestApproval: "決裁を依頼",
   approvalLater: "決裁は次の段階で使えます",
@@ -681,6 +684,7 @@ const en: PayrollPrepCopy = {
   netTotal: "Net pay total",
   uncalculated: "{n} not calculated",
   checkPeople: "{n} to check",
+  allSameIssue: "All {n}: {issue}",
   noChecks: "Nothing to check",
   requestApproval: "Request approval",
   approvalLater: "Approval opens in a later step",

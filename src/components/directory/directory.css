@@ -31,7 +31,7 @@
 .drw-t > span { font-size: 13px; color: var(--drw-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .drw-me { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 6px; background: var(--drw-tint); font-size: 11px; font-weight: 600; color: var(--drw-pri-ink); vertical-align: 2px; }
 .drw-ph { display: none; }
-.drw-call { display: grid; place-items: center; width: 44px; height: 44px; flex: none; border-radius: 50%; background: var(--drw-tint); color: var(--drw-pri-ink); transition: transform 140ms ease, background 150ms ease; -webkit-tap-highlight-color: transparent; }
+.drw-call { display: grid; place-items: center; width: 44px; height: 44px; flex: none; border-radius: 50%; background: transparent; color: var(--drw-pri-ink); -webkit-tap-highlight-color: transparent; }
 .drw-call svg { width: 18px; height: 18px; }
 .drw-call:focus-visible, .drw-r__main:focus-visible, .drw-btn:focus-visible { outline: 2px solid var(--drw-pri); outline-offset: 2px; }
 .drw-call-gap { width: 44px; flex: none; }

@@ -272,12 +272,12 @@ export function MyShiftView({ copy, locale, ym, today, nextYm, days, details, up
   return (
     <div className="shf">
       <div className="shf-main">
-        <div className="shf-top">
+        <div className="shf-head">
+          <div className="shf-titles">
+            <h1 className="shf-title">{copy.myShiftTitle}</h1>
+            {nextYm ? <span className="shf-sub">{fill(copy.nextMonthDue, { m, mon: monthName(nextYm, locale), n: daysLeft })}</span> : null}
+          </div>
           {nextYm ? <Link href={`/mobile/shift?ym=${nextYm}`}>{fill(copy.applyNextMonth, { m, mon: monthName(nextYm, locale) })}</Link> : null}
-        </div>
-        <div className="shf-titles">
-          <h1 className="shf-title">{copy.myShiftTitle}</h1>
-          {nextYm ? <span className="shf-sub">{fill(copy.nextMonthDue, { m, mon: monthName(nextYm, locale), n: daysLeft })}</span> : null}
         </div>
 
         <section className={`shf-mode${nudge > 0 && !applying ? " is-nudge" : ""}`} key={nudge > 0 ? `n${nudge}` : "mode"} aria-label={copy.applyMode}>

@@ -55,6 +55,10 @@
 .mpp-av--lg { width: 44px; height: 44px; font-size: 18px; }
 .mpp-av--sm { width: 36px; height: 36px; font-size: 15px; }
 .mpp-dot { display: inline-flex; align-items: baseline; gap: 6px; color: var(--mpp-mid); }
+.mpp-note { margin: 16px 0 0; }
+/* 태블릿은 아래 막대(.mpp-bar)가 같은 안내를 한다 */
+@media (min-width: 1000px) and (min-height: 600px) { .mpp-note { display: none; } }
+.mpp-note + .mpp-seg { margin-top: 12px; }
 .mpp-dot::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--mpp-red); flex: none; align-self: center; }
 
 /* ── 표(폴드) ── */

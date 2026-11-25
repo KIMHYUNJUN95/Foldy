@@ -921,6 +921,12 @@ History is reconciled. The normal workflow applies from this point:
 
 Run the commands after Supabase API authentication is available through `npx supabase login` or `SUPABASE_ACCESS_TOKEN`. Use `-p <db-password>` when the CLI asks for the remote Postgres password.
 
+**Migration-first deploys (no fallback path):** some changes ship code that reads a new column with no fallback for
+when it is missing. Apply those migrations to production **before** pushing the code. Example:
+`202611250003_cleaning_sessions_admin_complete_snapshot.sql` (cleaning 「완료 취소」, 2026-11-25) adds the
+`admin_complete_snapshot` column plus the forgery-guard trigger. Without it, force-complete and undo fail (the write
+names the missing column). See docs/product/07-cleaning-workflow.md → 「대리 완료 취소」.
+
 ## Deployment-Specific Decisions
 
 - Confirm the production support email and `VAPID_SUBJECT` before enabling those channels.

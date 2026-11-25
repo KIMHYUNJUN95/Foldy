@@ -35,9 +35,19 @@ import {
   localizeRoomPlaceLabel,
 } from "@/lib/room-label-normalization";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { memberCapabilities } from "@/lib/capabilities-server";
 import { isUnmeasuredSession } from "@/lib/cleaning-unmeasured";
 import { roomWriteErrorKind, sessionRoomKeyOf } from "@/lib/cleaning-assign/room-key";
 import { forceCompleteEndAllowed } from "@/lib/cleaning-assign/room-rules";
+import {
+  buildForceCompleteSnapshot,
+  decideForceCompleteUndo,
+  forceCompleteExpectedStale,
+  forceCompleteRedoInput,
+  forceCompleteUndoActorsOk,
+  undoRestoreFailure,
+  type ForceCompletePrevRow,
+} from "@/lib/cleaning-force-complete-undo";
 import { buildActiveRoomCatalog, fetchRoomCatalogRows } from "@/lib/rooms";
 // 소요 표기 · 합계는 화면(기록 표 · 모바일 기록)과 같은 함수(lib/cleaning-record-duration) — 취소 · 처리 끝은 「—」이고 합계에 안 들어간다.
 import {
@@ -257,10 +267,19 @@ export type ForceCompleteCleaningInput = {
    * 오늘로 저장하면 오늘 청소 큐에서 같은 방이 「완료」로 빠진다. 기존 세션은 세션의 cleaning_date 를 따른다.
    */
   cleaningDate: string;
+  /**
+   * 다시 완료(취소 토스트의 「실행 취소」, 2차 점검 1) — 취소가 되살린 줄의 `updated_at`. 있으면 그 뒤 바뀐 줄은 덮지 않는다(`processed`).
+   * 보통 강제 완료(모달)는 보내지 않는다.
+   */
+  expectedUpdatedAt?: string | null;
 };
 
 export type ForceCompleteCleaningResult =
-  | { ok: true }
+  /**
+   * `sessionId` · `updatedAt` — 완료한 기록과 그 순간 값. 완료 토스트의 「실행 취소」가 이 둘로 완료 취소를 부른다
+   * (그 뒤 바뀐 줄이면 `changed`, 2차 점검 1).
+   */
+  | { ok: true; sessionId: string; cleaningDate: string; updatedAt: string }
   | { ok: false; reason: "forbidden" | "invalid" | "error" | "processed" | "future" };
 
 function taskTypeToTaskLabel(type: CleaningTaskType): string {
@@ -320,14 +339,21 @@ export async function forceCompleteCleaningSession(
   let sessionId = input.sessionId ?? null;
   let unmeasured = false;
   let unmeasuredAt: string | null = null;
+  // 완료 취소용 — 덮어쓰기 직전 값(`admin_complete_snapshot`, 2026-11-25). 새로 만드는 기록이면 null.
+  let prevRow: ForceCompletePrevRow | null = null;
+  let prevUpdatedAt: string | null = null;
   if (sessionId) {
     const existing = await service
       .from("cleaning_sessions")
-      .select("cleaning_date, status, started_at, completed_at, duration_seconds, closed_without_cleaning")
+      .select(
+        "cleaning_date, status, staff_user_id, started_at, completed_at, duration_seconds, notes, completed_by_admin, closed_without_cleaning, updated_at",
+      )
       .eq("id", sessionId)
       .eq("organization_id", organizationId)
       .maybeSingle();
     if (!existing.data) return { ok: false, reason: "invalid" };
+    // 다시 완료는 취소 직후 그대로일 때만 — 그 사이 직원이 고친 줄을 예전 값으로 덮지 않는다(2차 점검 1).
+    if (forceCompleteExpectedStale(existing.data.updated_at, input.expectedUpdatedAt)) return { ok: false, reason: "processed" };
     // 완료 기록은 덮어쓰지 않는다 — 하나만 예외: 알바가 다음 날 「청소했어요」로 닫아 끝낸 시각을 모르는 기록
     // (`isUnmeasuredSession` — 소요 0초 · 끝 시각 = 시작 시각 · 「처리 끝」 아님)은 관리자가 시각을 채운다(2026-11-02 사용자 결정).
     // 1초 안에 끝낸 정상 기록은 끝 시각이 시작과 달라 여기 걸리지 않는다.
@@ -337,6 +363,18 @@ export async function forceCompleteCleaningSession(
     cleaningDate = existing.data.cleaning_date;
     // 취소만 남은 방(콘솔 「취소됨」 카드)은 그 기록을 되살리지 않고 아래에서 새 완료 기록을 만든다 — 취소 이력은 남긴다.
     if (existing.data.status === "cancelled") sessionId = null;
+    else {
+      prevRow = {
+        status: existing.data.status as ForceCompletePrevRow["status"],
+        staff_user_id: existing.data.staff_user_id,
+        started_at: existing.data.started_at,
+        completed_at: existing.data.completed_at,
+        duration_seconds: existing.data.duration_seconds,
+        notes: existing.data.notes,
+        completed_by_admin: existing.data.completed_by_admin,
+      };
+      prevUpdatedAt = existing.data.updated_at;
+    }
   }
   // 새 기록(세션 id 없음)일 때만 — 실제 방 키(`room_key`, 배정 방 키와 같은 모양)를 만들고 넣어도 되는지 본다(2026-11-02 점검 C1).
   let roomKey: string | null = null;
@@ -396,6 +434,8 @@ export async function forceCompleteCleaningSession(
     return { ok: false, reason: "invalid" };
   }
 
+  const applied = { staff_user_id: input.staffId, started_at: startIso, completed_at: endIso, notes: input.note || null };
+
   if (sessionId) {
     const update = service
       .from("cleaning_sessions")
@@ -407,22 +447,25 @@ export async function forceCompleteCleaningSession(
         duration_seconds: durationSeconds,
         notes: input.note || null,
         completed_by_admin: session.user.id,
+        admin_complete_snapshot: buildForceCompleteSnapshot(prevRow, applied),
       })
       .eq("id", sessionId)
-      .eq("organization_id", organizationId);
+      .eq("organization_id", organizationId)
+      // 읽은 뒤 그 사이 바뀐 기록(메모 · 시작 시각 등)은 덮어쓰지 않는다 — 스냅샷이 실제 「완료 처리 전」 값이어야 취소가 맞게 되돌린다.
+      .eq("updated_at", prevUpdatedAt ?? "");
     const { data: updated, error } = await (unmeasured
       ? update.eq("status", "completed").eq("duration_seconds", 0).eq("closed_without_cleaning", false).eq("completed_at", unmeasuredAt ?? "")
       : update.eq("status", "in_progress")
-    ).select("id");
+    ).select("id, updated_at");
     // 담당을 바꿔 완료할 때 그 사람이 이미 그 방 기록이 있거나 그 방에 배정 안 됐는데 남 기록이 있으면 DB 가 막는다(점검 C1) — 이미 처리된 방으로 알린다.
     if (error) return { ok: false, reason: isRoomTakenError(error) ? "processed" : "error" };
     // 0행 = 읽은 뒤 그 사이에 직원이 끝냈거나 취소했다(또는 시각이 이미 채워졌다) — 덮어쓰지 않는다.
     if (!updated || updated.length === 0) return { ok: false, reason: "processed" };
     await afterForceComplete(organizationId);
-    return { ok: true };
+    return { ok: true, sessionId, cleaningDate, updatedAt: updated[0].updated_at };
   }
 
-  const { error } = await service.from("cleaning_sessions").insert({
+  const { data: inserted, error } = await service.from("cleaning_sessions").insert({
     organization_id: organizationId,
     room_key: roomKey,
     room_label: roomLabel,
@@ -435,10 +478,88 @@ export async function forceCompleteCleaningSession(
     duration_seconds: durationSeconds,
     notes: input.note || null,
     completed_by_admin: session.user.id,
-  });
-  if (error) return { ok: false, reason: isRoomTakenError(error) ? "processed" : "error" };
+    admin_complete_snapshot: buildForceCompleteSnapshot(null, applied),
+  }).select("id, updated_at").single();
+  if (error || !inserted) return { ok: false, reason: error && isRoomTakenError(error) ? "processed" : "error" };
   await afterForceComplete(organizationId);
-  return { ok: true };
+  return { ok: true, sessionId: inserted.id, cleaningDate, updatedAt: inserted.updated_at };
+}
+
+export type UndoForceCompleteResult =
+  /** `redo` — 취소 토스트의 「실행 취소」가 이 값 그대로 `forceCompleteCleaningSession` 을 다시 부른다. */
+  | { ok: true; redo: ForceCompleteCleaningInput }
+  | { ok: false; reason: "forbidden" | "invalid" | "expired" | "changed" | "busy" | "error" };
+
+/**
+ * 관리자 대리 완료 취소(2026-11-25 사용자 결정) — **오늘 · 관리자가 완료 처리한 기록만**, 완료 처리 전 상태로 되돌린다.
+ * 진행 중이던 기록은 진행 중으로(담당 · 시작 시각 · 메모 복원), 관리자가 없던 자리에 만든 기록은 **지운다**(사용자 허용).
+ * 권한은 강제 완료와 같다(`cleaning.force_complete`). 판정은 `decideForceCompleteUndo` 한 곳.
+ * `expectedUpdatedAt` 은 **화면이 본** 줄의 `updated_at`(카드 · 강제 완료 결과, 2차 점검 1) — 패널을 연 뒤 메모 등이
+ * 바뀌었으면 `changed` 로 거절하고, 쓰기도 그 값일 때만 한다(서버가 방금 읽은 값으로 거르면 읽기~쓰기 사이만 지킨다).
+ */
+export async function undoForceCompleteCleaningSession(
+  sessionId: string,
+  expectedUpdatedAt: string,
+): Promise<UndoForceCompleteResult> {
+  const session = await requireAdminSession();
+  if (!canForceCompleteCleaning(session)) return { ok: false, reason: "forbidden" };
+  if (typeof sessionId !== "string" || !sessionId) return { ok: false, reason: "invalid" };
+  if (typeof expectedUpdatedAt !== "string" || !expectedUpdatedAt) return { ok: false, reason: "invalid" };
+
+  const service = getSupabaseServiceClient();
+  const organizationId = session.organization.id;
+  const { data: row, error: readError } = await service
+    .from("cleaning_sessions")
+    .select(
+      "id, room_label, task_label, cleaning_date, status, staff_user_id, started_at, completed_at, notes, completed_by_admin, closed_without_cleaning, admin_complete_snapshot, updated_at",
+    )
+    .eq("id", sessionId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+  if (readError) return { ok: false, reason: "error" };
+  if (!row) return { ok: false, reason: "invalid" };
+
+  const decision = decideForceCompleteUndo(row, { today: getCleaningOperatingDateKey(), expectedUpdatedAt });
+  if (!decision.ok) return { ok: false, reason: decision.reason };
+  const { snapshot, plan } = decision;
+  if (!row.completed_by_admin) return { ok: false, reason: "expired" };
+
+  // 스냅샷 속 사람이 이 조직 사람인지 — 서비스 키로 그대로 되살리므로 앱에서도 본다(점검 A1(b)).
+  const people = [...new Set([row.completed_by_admin, ...(snapshot.created ? [] : [snapshot.staff_user_id, snapshot.completed_by_admin])])].filter(
+    (id): id is string => typeof id === "string",
+  );
+  const [members, ...caps] = await Promise.all([
+    // 활성 구성원만 — 나간 직원에게 기록을 되살리지 않는다(2차 점검 7, 강제 완료의 담당 확인과 같은 기준).
+    service.from("memberships").select("user_id").eq("organization_id", organizationId).eq("status", "active").in("user_id", people),
+    ...people.map((id) => memberCapabilities(organizationId, id)),
+  ]);
+  if (members.error) return { ok: false, reason: "error" };
+  const memberIds = new Set((members.data ?? []).map((m) => m.user_id));
+  const forceCompleterIds = new Set(people.filter((_, i) => caps[i].includes("cleaning.force_complete")));
+  if (!forceCompleteUndoActorsOk(row.completed_by_admin, snapshot, memberIds, forceCompleterIds)) {
+    return { ok: false, reason: "invalid" };
+  }
+
+  // 화면이 본 그대로일 때만 쓴다 — 그 사이 직원이 다시 열었거나 메모를 고쳤거나 다른 관리자가 고쳤으면 0행 → changed.
+  const guard = <T extends { eq: (col: string, value: string) => T }>(q: T) =>
+    q
+      .eq("id", row.id)
+      .eq("organization_id", organizationId)
+      .eq("status", "completed")
+      .eq("updated_at", expectedUpdatedAt);
+  const { data: written, error } =
+    plan.kind === "delete"
+      ? await guard(service.from("cleaning_sessions").delete()).not("completed_by_admin", "is", null).select("id, updated_at")
+      : await guard(service.from("cleaning_sessions").update(plan.fields)).not("completed_by_admin", "is", null).select("id, updated_at");
+  if (error) {
+    const kind = undoRestoreFailure(error);
+    return { ok: false, reason: kind };
+  }
+  if (!written || written.length === 0) return { ok: false, reason: "changed" };
+
+  await afterForceComplete(organizationId);
+  const deleted = plan.kind === "delete";
+  return { ok: true, redo: forceCompleteRedoInput(row, deleted, deleted ? null : written[0].updated_at) };
 }
 
 /** DB 가 마지막에 막은 경우(방 트리거 · 한 사람 한 방 유니크, 점검 C1) — 분류는 직원 시작과 같은 `roomWriteErrorKind`. 그 밖은 「오류」. */

@@ -11,11 +11,17 @@ import { useRouter } from "next/navigation";
 import { Info } from "lucide-react";
 import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
 import { AdminDatePicker } from "@/components/admin/shared/admin-date-picker";
-import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
+import { ADMIN_TOAST_ERROR_MS, AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
 import { getDictionary, type Dictionary, type Locale } from "@/lib/i18n";
+import { createWriteGate, offerForceCompleteUndo } from "@/lib/cleaning-force-complete-undo";
 import type { AdminCleaningHistoryItem, AdminCleaningTask, AdminSettingTarget } from "@/lib/admin-cleaning";
 import type { CleaningStaffOption } from "@/lib/cleaning";
-import { fetchAdminCleaningHistory, forceCompleteCleaningSession } from "@/app/admin/cleaning/actions";
+import {
+  fetchAdminCleaningHistory,
+  forceCompleteCleaningSession,
+  undoForceCompleteCleaningSession,
+  type ForceCompleteCleaningInput,
+} from "@/app/admin/cleaning/actions";
 import { roomStatusOf } from "@/components/admin/cleaning/cleaning-console-shared";
 import "./cleaning-console.css";
 import { BUILDING_ORDER, nowLabelTokyo, type BuildingKey, type CleaningTaskType } from "./cleaning-console-data";
@@ -78,7 +84,7 @@ export function CleaningConsole({
   const t = useMemo(() => buildConsoleCopy(dictionary), [dictionary]);
   const buildingLabels = dictionary.cleaning.buildingLabels;
   const shared = dictionary.admin.shared;
-  const { toast, showToast, dismiss } = useAdminToast();
+  const { toast, showToast, showActionToast, dismiss, setPaused } = useAdminToast();
 
   const staffDirectory = useMemo(() => buildStaffDirectory(staff), [staff]);
 
@@ -108,6 +114,26 @@ export function CleaningConsole({
   // 기간을 빨리 바꿔 요청이 겹치면 늦게 온 옛 응답이 새 기간 위에 덮이지 않게 — 마지막 요청만 반영한다.
   const historyRequestSeq = useRef(0);
   const [isForcePending, startForceComplete] = useTransition();
+  const [isUndoPending, startUndo] = useTransition();
+  // 강제 완료 · 완료 취소 · 다시 완료는 한 번에 하나만(2차 점검 3) — 패널 단추와 토스트 「실행 취소」가 같은 기록에 겹치면
+  // 성공한 쪽이 다른 쪽의 「바뀌었어요」 안내에 덮였다. 모든 시작점이 이 문을 지난다.
+  const writeGate = useRef(createWriteGate());
+  // 토스트의 「실행 취소」는 몇 초 뒤에 눌린다 — 그때 보고 있는 기간을 읽게 ref 로 둔다(점검 B1, 만들 때 값을 잡아 두지 않는다).
+  const historyRangeRef = useRef({ from: initialHistoryFrom, to: initialHistoryTo });
+  // 완료 · 취소가 끝난 뒤 새 데이터(router.refresh)가 올 때까지 버튼을 막는다(점검 B2) — 그 전에 또 누르면 낡은 기록으로
+  // 「그 사이 기록이 바뀌었어요」가 성공 토스트 위에 뜬다. 끝난 순간의 `tasks` 를 들고 있다가 새 `tasks` 가 오면 풀린다.
+  const tasksRef = useRef(tasks);
+  const [staleTasks, setStaleTasks] = useState<AdminCleaningTask[] | null>(null);
+  const awaitingRefresh = staleTasks !== null && staleTasks === tasks;
+  useEffect(() => {
+    tasksRef.current = tasks;
+  }, [tasks]);
+  useEffect(() => {
+    if (!awaitingRefresh) return;
+    // 새로고침이 실패해도 버튼이 영영 잠기지 않게 — 잠깐 뒤 푼다.
+    const id = setTimeout(() => setStaleTasks(null), 8000);
+    return () => clearTimeout(id);
+  }, [awaitingRefresh]);
 
   const [lastSyncAt, setLastSyncAt] = useState(() => Date.now());
   const [, setTick] = useState(0);
@@ -187,7 +213,20 @@ export function CleaningConsole({
   function handleHistoryRangeChange(from: string, to: string) {
     setHistoryFrom(from);
     setHistoryTo(to);
+    historyRangeRef.current = { from, to };
     reloadHistory(from, to);
+  }
+
+  /** 지금 보고 있는 기간 다시 읽기 — 늦게 불리는 토스트 동작에서도 최신 기간(점검 B1). */
+  function reloadCurrentHistory() {
+    reloadHistory(historyRangeRef.current.from, historyRangeRef.current.to);
+  }
+
+  /** 쓰기가 끝난 뒤 새 데이터가 올 때까지 버튼을 막고 새로고침한다(점검 B2). */
+  function refreshAfterWrite() {
+    setStaleTasks(tasksRef.current);
+    router.refresh();
+    reloadCurrentHistory();
   }
 
   function reloadHistory(from: string, to: string) {
@@ -203,24 +242,102 @@ export function CleaningConsole({
     });
   }
 
-  function handleForceCompleteConfirm(result: ForceCompleteResult) {
-    const roomLabel = bRoom(modalTask?.room ?? "");
+  /** 쓰기 뒤 초점을 패널로 되돌린다(2차 점검 9) — 모달 · 토스트가 닫히며 BODY 로 가던 것. 단추가 잠겨 있으면 패널 자체. */
+  function focusPanel() {
+    requestAnimationFrame(() => {
+      const panel = document.querySelector<HTMLElement>("[data-cleaning-panel]");
+      if (!panel) return;
+      const primary = panel.querySelector<HTMLButtonElement>("[data-panel-primary]");
+      (primary && !primary.disabled ? primary : panel).focus();
+    });
+  }
+
+  /** 실패 안내 — 읽을 시간을 주고(2차 점검 2), 새 현황을 받아 패널 안내 · 단추가 같은 판정을 따르게 한다. */
+  function showFailure(message: string) {
+    showToast(message, false, ADMIN_TOAST_ERROR_MS);
+    refreshAfterWrite();
+  }
+
+  // 강제 완료 → 「실행 취소」 토스트 → 완료 취소 → 「실행 취소」(같은 값으로 다시 완료)가 이어지는 한 길(2026-11-25).
+  function runForceComplete(input: ForceCompleteCleaningInput, roomLabel: string, onDone?: () => void) {
+    if (!writeGate.current.tryBegin()) return;
+    // 남아 있는 토스트의 「실행 취소」는 이제 낡은 기록을 가리킨다 — 쓰기를 시작하면 닫는다.
+    dismiss();
     startForceComplete(async () => {
-      const res = await forceCompleteCleaningSession({ ...result, cleaningDate: viewDate });
-      if (res.ok) {
-        showToast(`${t.tDone} · ${roomLabel}`);
-        setModalTask(null);
-        // 기록 탭이 낡은 채로 남지 않게 지금 보는 기간을 다시 읽는다.
-        reloadHistory(historyFrom, historyTo);
-      } else {
-        showToast(res.reason === "processed" ? t.tDoneProcessed : res.reason === "future" ? t.tDoneFuture : t.tDoneFailed);
-        if (res.reason === "processed") {
-          setModalTask(null);
-          router.refresh();
-          reloadHistory(historyFrom, historyTo);
+      try {
+        const res = await forceCompleteCleaningSession(input);
+        if (res.ok) {
+          const message = `${t.tDone} · ${roomLabel}`;
+          // 「실행 취소」는 그 기록이 **지금** 도쿄 오늘일 때만 — 지난 날짜 화면의 완료 · 자정을 넘긴 완료는 서버가 어차피 막는다(점검 C1 · C2).
+          if (offerForceCompleteUndo(res.cleaningDate, nowTimestamp())) {
+            showActionToast(message, {
+              label: shared.undo,
+              // 완료한 순간의 값 — 그 뒤 직원이 고친 기록이면 서버가 `changed` 로 거절한다(2차 점검 1).
+              onAction: () => runUndoForceComplete(res.sessionId, res.updatedAt, roomLabel),
+            });
+          } else {
+            showToast(message);
+          }
+          onDone?.();
+          // 기록 탭이 낡은 채로 남지 않게 지금 보는 기간도 다시 읽는다.
+          refreshAfterWrite();
+        } else {
+          if (res.reason === "processed") onDone?.();
+          showFailure(res.reason === "processed" ? t.tDoneProcessed : res.reason === "future" ? t.tDoneFuture : t.tDoneFailed);
         }
+      } finally {
+        writeGate.current.end();
+        focusPanel();
       }
     });
+  }
+
+  function runUndoForceComplete(sessionId: string, expectedUpdatedAt: string, roomLabel: string) {
+    if (!writeGate.current.tryBegin()) return;
+    dismiss();
+    startUndo(async () => {
+      try {
+        const res = await undoForceCompleteCleaningSession(sessionId, expectedUpdatedAt);
+        if (res.ok) {
+          showActionToast(`${t.tUndoDone} · ${roomLabel}`, {
+            label: shared.undo,
+            onAction: () => runForceComplete(res.redo, roomLabel),
+          });
+          refreshAfterWrite();
+        } else {
+          showFailure(
+            res.reason === "forbidden"
+              ? t.tUndoForbidden
+              : res.reason === "expired"
+                ? t.tUndoExpired
+                : res.reason === "changed"
+                  ? t.tUndoChanged
+                  : res.reason === "busy"
+                    ? t.tUndoBusy
+                    : t.tUndoFailed,
+          );
+        }
+      } finally {
+        writeGate.current.end();
+        focusPanel();
+      }
+    });
+  }
+
+  function handleForceCompleteConfirm(result: ForceCompleteResult) {
+    const roomLabel = bRoom(modalTask?.room ?? "");
+    runForceComplete({ ...result, cleaningDate: viewDate }, roomLabel, () => setModalTask(null));
+  }
+
+  function handleUndoForceComplete(task: AdminCleaningTask) {
+    if (!task.sessionId || !task.sessionUpdatedAt) return;
+    // 화면을 띄운 채 자정을 넘겼으면 「오늘」이 바뀌었다 — 누르는 순간 다시 계산해 서버에 묻지 않고 같은 안내를 띄운다(점검 C2).
+    if (!offerForceCompleteUndo(viewDate, nowTimestamp())) {
+      showToast(t.tUndoExpired, false, ADMIN_TOAST_ERROR_MS);
+      router.refresh();
+      return;
+    }
+    runUndoForceComplete(task.sessionId, task.sessionUpdatedAt, bRoom(task.room));
   }
 
   function handleSync() {
@@ -406,6 +523,8 @@ export function CleaningConsole({
         // 미래 날짜에는 대리 완료를 노출하지 않는다 — 아직 일어나지 않은 청소를 완료로 만들 수
         // 있으면 안 된다. 서버가 최종 방어선이고 이건 UI 게이트다(2026-08-04).
         canForceComplete={canForceComplete && !isFuture}
+        onUndoForceComplete={isToday ? handleUndoForceComplete : undefined}
+        undoPending={isUndoPending || isForcePending || awaitingRefresh}
         disabled={modalTask !== null}
         viewDate={viewDate}
       />
@@ -425,7 +544,15 @@ export function CleaningConsole({
         />
       ) : null}
 
-      {toast ? <AdminToast message={toast.message} onDismiss={dismiss} /> : null}
+      {toast ? (
+        <AdminToast
+          key={toast.id}
+          message={toast.message}
+          action={toast.action}
+          onDismiss={dismiss}
+          onPauseChange={setPaused}
+        />
+      ) : null}
     </>
   );
 }

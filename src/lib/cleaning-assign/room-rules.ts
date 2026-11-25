@@ -686,6 +686,22 @@ export function sessionCloseFields(input: { cleaned: boolean; cleaningDate: stri
 }
 
 /**
+ * 직원 2분 되돌리기(`reopenSessionCore`)가 쓰는 값 — 다시 「청소 중」. 관리자 대리 완료를 직원이 되돌린 경우도 있어
+ * 대리 표시 · 완료 취소 스냅샷까지 비운다(점검 B3) — 남겨 두면 진행 중인데 「관리자 대리」로 보이고, 다시 끝낸 기록에 낡은 스냅샷이 붙는다.
+ * 서비스 키로 쓰므로 작업자 쓰기를 막는 DB 트리거(202611250003)와 부딪히지 않는다(트리거는 null 로 비우는 것도 허용).
+ */
+export function sessionReopenFields() {
+  return {
+    status: "in_progress" as const,
+    completed_at: null,
+    duration_seconds: null,
+    notes: null,
+    completed_by_admin: null,
+    admin_complete_snapshot: null,
+  };
+}
+
+/**
  * `/mobile/cleaning` 목록에서 시작한 방을 서버가 다시 확인(C13) — 지금 청소 · 셋팅 목록에 없으면(예약 취소 등) null, 있으면 그 목록의 종류.
  * 쉬는 계정 라벨도 같은 실제 방으로 본다. 수기 경로는 이 함수를 거치지 않는다(목록 밖 방 + 화면에서 고른 종류).
  */

@@ -8,7 +8,7 @@ import {
 } from "@/lib/cleaning";
 import { signalCleaningAssignChange } from "@/lib/cleaning-assign/live";
 import { roomRecordDecision, roomWriteErrorKind, sameRoomRecords, sessionRoomKeyOf } from "@/lib/cleaning-assign/room-key";
-import { roomStartBlock, sessionCloseFields } from "@/lib/cleaning-assign/room-rules";
+import { roomStartBlock, sessionCloseFields, sessionReopenFields } from "@/lib/cleaning-assign/room-rules";
 import { loadAssignDayRooms } from "@/lib/cleaning-assign/rooms";
 import { buildSessionRoomLabel, physicalRoomKeyOfSessionLabel } from "@/lib/room-label-normalization";
 import { buildActiveRoomCatalog, fetchRoomCatalogRows } from "@/lib/rooms";
@@ -244,7 +244,7 @@ export async function reopenSessionCore(
   }
   const { data: reopened, error: updateError } = await service
     .from("cleaning_sessions")
-    .update({ completed_at: null, duration_seconds: null, notes: null, status: "in_progress" })
+    .update(sessionReopenFields())
     .eq("id", sessionId)
     .eq("organization_id", session.organization.id)
     .eq("staff_user_id", session.user.id)

@@ -1,5 +1,7 @@
 import "server-only";
 
+import { forceCompleteUndoBlock } from "@/lib/cleaning-force-complete-undo";
+
 import {
   BUILDING_ORDER,
   buildingKeyOf,
@@ -93,6 +95,13 @@ export type AdminCleaningTask = {
   closed: boolean;
   /** 끝낸 시각 모르는 완료 기록(알바가 다음 날 「청소했어요」로 닫음) — 강제 완료로 시각을 채울 수 있다(서버도 같은 판별). */
   unmeasured: boolean;
+  /**
+   * 관리자 대리 완료를 취소할 수 있나(2026-11-25) — 오늘 · 관리자 완료 · 처리 끝 아님 · 완료 전 값이 남음 · 그 뒤 안 바뀜.
+   * 판정은 서버의 `forceCompleteUndoBlock` 하나(취소 액션도 같은 판정으로 다시 본다). 버튼을 보일지만 정한다.
+   */
+  undoable: boolean;
+  /** 카드가 가리키는 기록의 `updated_at`(2차 점검 1) — 「완료 취소」가 화면이 본 그대로일 때만 되돌리도록 서버에 넘긴다. 기록 없으면 null. */
+  sessionUpdatedAt: string | null;
   /**
    * 2인 방에서 아직 기록이 없는 배정 직원(2026-11-02 점검 C1 — 각자 기록). 방이 「끝남」이어도 이 사람 몫은 대신 완료할 수 있다.
    * 처리 끝 방 · 배정 없는 방은 빈 배열.
@@ -285,6 +294,7 @@ export async function getAdminCleaningToday(
   ]);
 
   const catalog: ActiveRoomCatalogItem[] = roomCatalog ?? [];
+  const operatingToday = getCleaningOperatingDateKey();
   // 그날 배정(방 → 사람) — 2인 방에서 아직 기록이 없는 사람을 찾는다. 배정 표는 서비스 전용이라 방 키 · 사람만 읽는다.
   // 못 읽으면 빈 목록(예전처럼 방 하나에 기록 하나로 보인다).
   const assigneesByRoom = new Map<string, string[]>();
@@ -351,6 +361,8 @@ export async function getAdminCleaningToday(
         proxy: Boolean(matched?.completed_by_admin),
         closed: Boolean(matched?.closed_without_cleaning),
         unmeasured: matched ? isUnmeasuredSession(matched) : false,
+        undoable: matched ? forceCompleteUndoBlock(matched, operatingToday) === null : false,
+        sessionUpdatedAt: matched?.updated_at ?? null,
         assigneeIds: assignees,
         missingAssignees,
         partial,
@@ -406,6 +418,8 @@ export async function getAdminCleaningToday(
       proxy: Boolean(relevant.completed_by_admin),
       closed: Boolean(relevant.closed_without_cleaning),
       unmeasured: isUnmeasuredSession(relevant),
+      undoable: forceCompleteUndoBlock(relevant, operatingToday) === null,
+      sessionUpdatedAt: relevant.updated_at,
       assigneeIds: assignees,
       missingAssignees: share.missingAssignees,
       partial: share.partial,

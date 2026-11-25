@@ -3259,6 +3259,7 @@ export type Database = {
           cleaning_date: string
           closed_without_cleaning: boolean
           completed_at: string | null
+          admin_complete_snapshot: Json | null
           completed_by_admin: string | null
           created_at: string
           duration_seconds: number | null
@@ -3277,6 +3278,7 @@ export type Database = {
           cleaning_date?: string
           closed_without_cleaning?: boolean
           completed_at?: string | null
+          admin_complete_snapshot?: Json | null
           completed_by_admin?: string | null
           created_at?: string
           duration_seconds?: number | null
@@ -3295,6 +3297,7 @@ export type Database = {
           cleaning_date?: string
           closed_without_cleaning?: boolean
           completed_at?: string | null
+          admin_complete_snapshot?: Json | null
           completed_by_admin?: string | null
           created_at?: string
           duration_seconds?: number | null

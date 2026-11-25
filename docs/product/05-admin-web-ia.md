@@ -292,6 +292,11 @@ Permissions · Invite Codes · Attendance Sites/QR 등)은 위 3개 그룹의 �
 - **오른쪽 패널 하단 결정 줄**(`.panel__foot--decide`, 2026-10-27) — 승인 · 반려 같은 결정 버튼은 같은 크기(높이 40 · 모서리 10),
   무게는 모양으로만(반려 = `.btn--text-danger` 글자 · 중간 동작 = `.btn--ghost` 옅은 칸 · 주 동작 = `.btn--ok` 보라 칸, 채운 칸은 하나).
   보기 · 이동(영수증 보기 등)은 결정 줄에 넣지 않는다. 처리 끝난 건은 `.panel__foot--end` + `.btn--text`(재오픈). 지금: 교통비 · 정정 요청 · 검토 큐.
+- **토스트** `useAdminToast()`(`src/components/admin/shared/admin-toast.tsx`, `.adm-toast` 하단 가운데) — `showToast` 는 글만, 1.8초 뒤 사라짐.
+  `showActionToast(message, action)` 은 버튼 하나(「실행 취소」 등)를 단 토스트로 기본 6초(`ADMIN_TOAST_ACTION_MS`), 마우스를 올리거나
+  초점이 들어오면 멈춘다(멈춤은 **그 토스트에만** — 바뀐 새 토스트는 처음부터 다시 센다, `adminToastTimerRuns`) — 지금: 청소 강제 완료 ·
+  완료 취소(docs/product/07 「대리 완료 취소」), 급여 설정. 실패 · 오류 안내는 `showToast(message, false, ADMIN_TOAST_ERROR_MS)`(5초). 여러 명을 연달아 처리해 합쳐 세는
+  「실행 취소」는 따로 `AdminUndoToast`(5초, 아래 「확정 · 승인 버튼 규칙」).
 - `AdmDropdown`(`.dd`) — **어드민 콘솔의 단일 드롭다운 표준**. 네이티브 `<select>`와 필터 드롭다운을
   모두 대체한다. 값 편집·필터·정렬 어디서든 이 하나만 쓴다. 폼 제출용은 `DdFormSelect`(숨은 input
   래퍼)를 쓴다. CSS는 `src/components/admin/shared/adm-dropdown.css`(2026-11-16 `admin-console.css` 에서 분리 — 컴포넌트가 직접 가져오고, `admin-console.css` 를 가져오는 곳은 바로 뒤에 같이 가져와 예전 순서 그대로). **화면마다 다른

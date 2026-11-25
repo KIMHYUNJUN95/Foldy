@@ -4,6 +4,7 @@ import { attendanceRoleLabel, formatAdminDate } from "@/lib/attendance-console-l
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
 import {
   ArrowUpRight,
   CircleAlert,
@@ -50,7 +51,6 @@ import { useAdminPanelA11y } from "../shared/use-admin-panel-a11y";
 
 type Att = Dictionary["admin"]["attendanceConsole"];
 type Filter = "all" | "hourly" | "salaried" | "check";
-type Toast = { id: number; msg: string; undo?: () => void };
 
 function Ic({ children }: { children: React.ReactNode }) {
   return <span className="ic">{children}</span>;
@@ -95,9 +95,11 @@ export function AttendanceWagesClient({
   }
   const [filter, setFilter] = useState<Filter>("all");
   const [panelId, setPanelId] = useState<string | null>(null);
-  const [toast, setToast] = useState<Toast | null>(null);
-  const showToast = (msg: string, undo?: () => void) => setToast({ id: Date.now(), msg, undo });
   const pc = getPayrollSettingsCopy(locale);
+  // 공용 관리자 토스트(2026-11-25 — 실행 취소 버튼 · 6초 · 마우스 올리면 멈춤을 청소 완료 취소와 함께 씀).
+  const { toast, showToast: showPlainToast, showActionToast, dismiss: dismissToast, setPaused: setToastPaused } = useAdminToast();
+  const showToast = (msg: string, undo?: () => void) =>
+    undo ? showActionToast(msg, { label: pc.undo, onAction: undo }) : showPlainToast(msg);
   // 확인 필요 보기에서 고쳐진 줄은 접히는 동안만 더 보여 준다.
   const [leaving, setLeaving] = useState<Set<string>>(new Set());
   const rowsRef = useRef(rows);
@@ -106,12 +108,6 @@ export function AttendanceWagesClient({
     rowsRef.current = rows;
     filterRef.current = filter;
   }, [rows, filter]);
-
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), toast.undo ? 6000 : 1800);
-    return () => clearTimeout(t);
-  }, [toast]);
 
   function applySetting(userId: string, setting: MemberPayrollSetting, bumpChange: boolean) {
     const before = rowsRef.current.find((r) => r.userId === userId);
@@ -371,26 +367,13 @@ export function AttendanceWagesClient({
       ) : null}
 
       {toast ? (
-        <div
+        <AdminToast
           key={toast.id}
-          role="status"
-          className={`adm-toast${toast.undo ? " adm-toast--undo" : ""}`}
-          onClick={toast.undo ? undefined : () => setToast(null)}
-        >
-          <span>{toast.msg}</span>
-          {toast.undo ? (
-            <button
-              type="button"
-              onClick={() => {
-                const undo = toast.undo;
-                setToast(null);
-                undo?.();
-              }}
-            >
-              {pc.undo}
-            </button>
-          ) : null}
-        </div>
+          message={toast.message}
+          action={toast.action}
+          onDismiss={dismissToast}
+          onPauseChange={setToastPaused}
+        />
       ) : null}
     </div>
   );

@@ -5,6 +5,7 @@
 // .pblock/.kv/.locknote/.rptiles primitive 를 쓴다. 데이터는
 // 2026-07-14 기준 실데이터(src/lib/admin-cleaning.ts)다.
 import { consoleWhoIds } from "@/lib/cleaning-assign/room-rules";
+import { cleaningPanelFoot } from "@/lib/cleaning-force-complete-undo";
 import { BedDouble, ChevronRight, Info, PackageSearch, ShieldCheck, Wrench, X } from "lucide-react";
 import { useAdminPanelA11y } from "@/components/admin/shared/use-admin-panel-a11y";
 import type { AdminCleaningHistoryItem, AdminCleaningTask, AdminSettingTarget } from "@/lib/admin-cleaning";
@@ -37,6 +38,10 @@ type DetailPanelProps = {
   onOpenReport: (kind: "lost" | "issue") => void;
   /** 서버(canForceCompleteCleaning)가 내려준 권한. false면 강제완료 버튼 자체를 감춘다. */
   canForceComplete: boolean;
+  /** 대리 완료 취소(2026-11-25) — 오늘 관리자가 완료 처리한 기록(`task.undoable`)에만 「완료 취소」를 보인다. 권한은 강제 완료와 같다. */
+  onUndoForceComplete?: (task: AdminCleaningTask) => void;
+  /** 완료 · 취소 진행 중이거나 끝난 뒤 새 데이터를 기다리는 중 — 패널의 쓰기 버튼을 막는다(점검 B2). */
+  undoPending?: boolean;
   /** 현황에서 보고 있는 날(YYYY-MM-DD) — 카드 상세의 「날짜」. */
   viewDate?: string;
   disabled?: boolean;
@@ -54,6 +59,8 @@ export function CleaningDetailPanel({
   onOpenForceComplete,
   onOpenReport,
   canForceComplete,
+  onUndoForceComplete,
+  undoPending,
   disabled,
   viewDate,
 }: DetailPanelProps) {
@@ -138,6 +145,19 @@ export function CleaningDetailPanel({
   const proxy = task ? task.proxy : history!.proxy;
   const closed = task ? task.closed : history!.closed;
   const note = task ? task.note : history!.note;
+  // 「완료 취소」 — 기록 탭 · 지난 날 · 직원 완료 · 처리 끝 · 예전 대리 완료(스냅샷 없음)는 서버 판정(`undoable`)에서 이미 빠진다.
+  // 아래 단추와 「오늘 안에는 완료를 취소할 수 있습니다」 안내는 이 판정 하나를 따른다(2차 점검 4) — 2인 방 · 시각 채우기 단추가
+  // 먼저 잡히면 안내도 감춘다.
+  const foot = cleaningPanelFoot({
+    canForceComplete,
+    isHistory: isHist || !task,
+    status,
+    sessionId: task?.sessionId ?? null,
+    unmeasured: Boolean(task?.unmeasured),
+    missingAssignees: task?.missingAssignees ?? [],
+    undoable: Boolean(task?.undoable),
+    hasUndoHandler: Boolean(onUndoForceComplete),
+  });
   const reports = task ? task.reports : history!.reports;
   const start = task ? task.start : history!.start;
   const dur = task ? durationMin(task.start, task.end) : history!.dur;
@@ -163,7 +183,7 @@ export function CleaningDetailPanel({
   return (
     <>
       <div className="panel-scrim on" onClick={onClose} />
-      <aside ref={panelRef} className="panel on" role="dialog" aria-label={t.pKicker} tabIndex={-1}>
+      <aside ref={panelRef} className="panel on" role="dialog" aria-label={t.pKicker} tabIndex={-1} data-cleaning-panel="">
         <div className="panel__h">
           <div className="panel__top">
             <span className="panel__kicker">
@@ -256,6 +276,8 @@ export function CleaningDetailPanel({
                   <div>
                     <div className="proxynote__t">{closed ? t.closedNote : t.proxy}</div>
                     <div className="proxynote__s">{closed ? t.closedNoteDesc : t.proxyNoteDesc}</div>
+                    {/* 문장을 공백으로 잇지 않고 줄을 나눈다 — ja 「。」 뒤 반각 공백이 어색하다(점검 D1). */}
+                    {foot === "undo" ? <div className="proxynote__s">{t.undoHint}</div> : null}
                   </div>
                 </div>
               ) : null}
@@ -331,7 +353,7 @@ export function CleaningDetailPanel({
               관리자가 시각을 채우도록 연다(2026-11-02, 서버 `forceCompleteCleaningSession` 의 같은 예외). */}
           {/* 2인 방(각자 기록, 2026-11-02 점검 C1): 방이 「끝남」이어도 아직 기록이 없는 배정 직원 몫은 대신 완료할 수 있다 —
               그 사람을 담당으로, 새 기록으로 연다(서버 `pickForceCompleteTarget` 이 같은 규칙 · 중복을 다시 본다). */}
-          {canForceComplete && !isHist && task && status === "done" && !(task.sessionId !== null && task.unmeasured) && task.missingAssignees.length > 0 ? (
+          {foot === "forceMissing" && task ? (
             <>
               <button type="button" className="btn btn--ghost" style={{ flex: 1 }} onClick={onClose}>
                 {t.close}
@@ -340,14 +362,16 @@ export function CleaningDetailPanel({
                 type="button"
                 className="btn btn--pri"
                 style={{ flex: 1.4 }}
+                data-panel-primary=""
+                disabled={undoPending}
                 onClick={() =>
-                  onOpenForceComplete({ ...task, sessionId: null, staffId: task.missingAssignees[0], start: null, end: null, note: "", unmeasured: false })
+                  onOpenForceComplete({ ...task, sessionId: null, sessionUpdatedAt: null, staffId: task.missingAssignees[0], start: null, end: null, note: "", unmeasured: false, undoable: false })
                 }
               >
                 {t.forceDoneMissing}
               </button>
             </>
-          ) : canForceComplete && !isHist && (status !== "done" || (task.sessionId !== null && task.unmeasured)) ? (
+          ) : foot === "force" && task ? (
             <>
               <button type="button" className="btn btn--ghost" style={{ flex: 1 }} onClick={onClose}>
                 {t.close}
@@ -356,13 +380,33 @@ export function CleaningDetailPanel({
                 type="button"
                 className="btn btn--pri"
                 style={{ flex: 1.4 }}
+                // 완료 · 취소 직후 새 데이터가 오기 전에는 낡은 기록으로 다시 열지 않는다(점검 B2).
+                data-panel-primary=""
+                disabled={undoPending}
                 onClick={() => task && onOpenForceComplete(task)}
               >
                 {t.forceDone}
               </button>
             </>
+          ) : foot === "undo" && task ? (
+            <>
+              <button type="button" className="btn btn--ghost" style={{ flex: 1 }} onClick={onClose}>
+                {t.close}
+              </button>
+              <button
+                type="button"
+                className="btn btn--undo"
+                style={{ flex: 1.4 }}
+                data-panel-primary=""
+                disabled={undoPending}
+                aria-busy={undoPending || undefined}
+                onClick={() => onUndoForceComplete?.(task)}
+              >
+                {t.undoDone}
+              </button>
+            </>
           ) : (
-            <button type="button" className="btn btn--ghost btn--block" onClick={onClose}>
+            <button type="button" className="btn btn--ghost btn--block" data-panel-primary="" onClick={onClose}>
               {t.close}
             </button>
           )}

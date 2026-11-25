@@ -553,6 +553,17 @@ notes text
 completed_by_admin uuid references profiles(id) on delete set null  -- admin id when force-completed on
                                                                      -- behalf of staff (202607150001); null
                                                                      -- for normal self-completion
+admin_complete_snapshot jsonb  -- 강제 완료가 덮어쓰기 직전 값(202611250003, 대리 완료 취소용). null 이면 취소 불가.
+                               -- applied = { staff_user_id, started_at, completed_at, notes } — 강제 완료가 쓴 값.
+                               --   notes 도 비교한다(완료 뒤 메모가 바뀌면 취소 불가, notes 없는 예전 모양은 읽지 않음).
+                               -- { v:1, created:true, applied } = 관리자가 새로 만든 기록(취소 = 삭제) ·
+                               -- { v:1, created:false, status, staff_user_id, started_at, completed_at, duration_seconds,
+                               --   notes, completed_by_admin, applied } = 기록을 덮어씀(취소 = 직전 상태로 복원 —
+                               --   진행 중 또는 끝난 시각 모름 완료. 이 두 모양만 받는다).
+                               -- 읽기 · 쓰기: src/lib/cleaning-force-complete-undo.ts. 취소 · 직원 다시 열기 때 null.
+                               -- 트리거 cleaning_sessions_admin_complete_guard: authenticated 가 이 칸이나
+                               --   completed_by_admin 을 null 아닌 값으로 넣거나 바꾸면 42501(비우기는 허용).
+                               --   서버 액션(service-role)만 쓴다. 배포 = 운영 마이그레이션 먼저, 그다음 코드(대비 길 없음).
 closed_without_cleaning boolean not null default false  -- 청소 배정 「처리 끝」이 남긴 기록(청소 안 함,
                                                          -- 202610210005). 담당자 = 누른 관리자, 소요 0
 room_key text                     -- 실제 방 키(배정 cleaning_assignments.room_key 와 같은 모양, 202611020010).
@@ -604,6 +615,10 @@ migration; behavior is correct) — noted here so it isn't mistaken for a timezo
 Admin force-complete (`forceCompleteCleaningSession` in `src/app/admin/cleaning/actions.ts`) and the
 cleaning-assignment 「처리 끝」 (`holdRoom` kind `resolved` in `src/app/admin/cleaning-assign/actions.ts`,
 which also sets `closed_without_cleaning = true`) are the only write paths that set `completed_by_admin`.
+Admin undo (`undoForceCompleteCleaningSession`, 2026-11-25) restores it to its previous value (usually null) — today's
+force-completed rows with an `admin_complete_snapshot` are restored from it, or hard-deleted when the admin had
+created the row. The undo writes only when the row's `updated_at` still equals the value the console saw
+(`expectedUpdatedAt`, compared to the microsecond) — edits made after the panel opened are never overwritten. The staff 2-minute reopen (`reopenSessionCore` → `sessionReopenFields()`) also clears both columns (see docs/product/07-cleaning-workflow.md → 「대리 완료 취소」).
 `closed_without_cleaning` rows are excluded from per-person numbers (transport reimbursement buildings,
 field activity, payroll cleaning detail, monthly comparison, 「내 오늘 청소」, 청소 현황 직원별 요약) and
 their duration is hidden (not averaged); `releaseHold` deletes them on undo. See `docs/product/07-cleaning-workflow.md` →

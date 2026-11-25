@@ -437,6 +437,20 @@ Additional implementation note (2026-07-09):
   `requireAdminSession()` + `canForceCompleteCleaning(role)` (= developer_super_admin / owner /
   senior_managing_director / office_admin / field_manager). 청소 강제완료와 같은 게이트다.
   `completed_by_admin = true`로 기록되어 현장 처리와 구분된다.
+- **청소 대리 완료 취소(2026-11-25)** `undoForceCompleteCleaningSession`(`src/app/admin/cleaning/actions.ts`)도
+  같은 게이트(`requireAdminSession()` + `canForceCompleteCleaning` · `cleaning.force_complete`)이고 service-role 로 쓴다.
+  RLS · GRANT 변경 없음. `202611250003` 는 `admin_complete_snapshot` 칸과 **위조 막는 트리거**
+  `cleaning_sessions_admin_complete_guard`(BEFORE INSERT · UPDATE)를 더한다 — **허용 목록**: `current_user` 가 `service_role` ·
+  `postgres` · `supabase_admin` 이면 통과, 그 밖의 모든 역할(authenticated · anon · 앞으로 생길 역할)은 검사(2차 점검 8).
+  **이 표에 쓰는 SECURITY DEFINER 함수를 만들면 트리거를 다시 볼 것** — 함수 안에선 current_user 가 주인(postgres)이라 통과한다
+  (2026-11-25 기준 그런 함수 없음).
+  작업자가 RLS 로 허용된 자기 줄 완료 쓰기에 `completed_by_admin` · `admin_complete_snapshot` 을 null 아닌 값으로 넣으면 42501
+  (비우기는 허용, service-role 은 그대로). 함수는 `search_path = ''`, 실행 권한은 public · anon · authenticated 에서 뺐다.
+  서버는 스냅샷 모양(진행 중 · 끝난 시각 모름 완료 두 가지만)과 속 사람(**활성** 조직 구성원 · 관리자는 `cleaning.force_complete`)도 다시 본다.
+  **읽기**: 자기 줄의 스냅샷은 작업자도 읽힌다(`src/lib/cleaning.ts` 의 `select("*")`) — 담기는 값이 그 줄의 이전 담당 · 시각 ·
+  메모 · 관리자 id 라 새로 드러나는 정보가 없어 그대로 둔다. 쓰기 조건 = id + 조직 + `status = completed` +
+  `completed_by_admin is not null` + **화면이 본** `updated_at`(`expectedUpdatedAt`, 0행 · 다름 → `changed`). **삭제 예외**: 관리자가 없던 자리에 만든 대리 완료 기록은
+  취소 때 하드 삭제한다(사용자 허용 2026-11-25) — 직원이 만든 기록 · 지난 날 · 처리 끝은 지우지 않는다.
 - **완료 사진 storage 정책**: `request-images` 버킷의 폴더 화이트리스트에
   `maintenance-resolutions`를 추가했다. 나머지 조건(4세그먼트, orgId/reportId UUID 형태,
   `part_time_staff` 제외)은 신고 사진과 동일하다.

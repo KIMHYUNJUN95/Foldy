@@ -252,3 +252,23 @@
 .adm .proxynote { border: 0; background: #f1ecfd; }
 .adm .proxynote__t { font-weight: 600; color: #5a30cf; }
 .adm .proxynote__s { font-weight: 400; }
+
+/* 대리 완료 취소(2026-11-25 시안) — 대리 완료 안내와 같은 보라, 테두리 없음. 지우는 일이 아니라 되돌리기라 빨강이 아니다.
+   한 번 누름 + 실행 취소 토스트(확인 창 · 꾹 누르기 없음). */
+.adm .panel__foot:has(.btn--undo) { gap: 10px; }
+.adm .panel__foot .btn--undo {
+  min-height: 40px;
+  border: 0;
+  background: #f1ecfd;
+  color: #5a30cf;
+  font-weight: 600;
+  transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1), background-color 140ms ease, opacity 140ms ease;
+}
+.adm .panel__foot .btn--undo:hover:not(:disabled) { background: #e8e0fb; }
+.adm .panel__foot .btn--undo:active:not(:disabled) { transform: scale(0.97); }
+.adm .panel__foot .btn--undo:disabled { opacity: 0.55; cursor: default; }
+.adm .panel__foot .btn--undo:focus-visible { outline: 2px solid #5a30cf; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .adm .panel__foot .btn--undo { transition: background-color 140ms ease, opacity 140ms ease; }
+  .adm .panel__foot .btn--undo:active:not(:disabled) { transform: none; }
+}

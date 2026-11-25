@@ -49,6 +49,8 @@ type ActionSheetProps = {
   canManage: boolean;
   /** 「글 수정」을 보일지 — 기본은 내 글(isOwn). 개발자는 남의 글도(2026-10-23). */
   canEdit?: boolean;
+  /** 「고정 / 고정 해제」를 보일지 — 서버의 `canPinBoardPosts` 결과(관리자만, 2026-11-25). 작성자라고 보이지 않는다. */
+  canPin?: boolean;
   isPinned: boolean;
   copy: BoardActionSheetCopy;
   /** false 면 글 전용 동작(수정 · 고정 · 공유 · 삭제)을 숨긴다 — 댓글 「⋯」 메뉴는 신고 · 차단만. */
@@ -66,6 +68,7 @@ function ActionSheetContent({
   isOwn,
   canManage,
   canEdit = isOwn,
+  canPin: canPinPosts = false,
   isPinned,
   copy,
   showPostActions = true,
@@ -77,7 +80,7 @@ function ActionSheetContent({
   onBlock,
 }: ActionSheetProps) {
   const close = useBottomSheetClose();
-  const canPin = showPostActions && (isOwn || canManage);
+  const canPin = showPostActions && canPinPosts;
   const canDelete = showPostActions && (isOwn || canManage);
 
   return (

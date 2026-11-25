@@ -5,7 +5,7 @@ import { getBoardPost, getBoardTags } from "@/lib/board-queries";
 import { getMobileNavBadges } from "@/lib/nav-badges";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { getDictionary } from "@/lib/i18n";
-import { isOrgTopAdminOrPlatform, isPlatformDeveloper } from "@/config/roles";
+import { canPinBoardPosts, isPlatformDeveloper } from "@/config/roles";
 import { BoardEditClient } from "./board-edit-client";
 
 type PageProps = {
@@ -51,8 +51,7 @@ export default async function BoardEditPage({ params }: PageProps) {
 
   const dictionary = getDictionary(session.user.preferredLanguage);
   // 작성 경로(`createBoardPost`)와 같은 고정 권한. 두 경로가 갈리면 수정으로 우회할 수 있다.
-  const canPin =
-    isOrgTopAdminOrPlatform(session.user.role) || session.user.role === "office_admin";
+  const canPin = canPinBoardPosts(session.user.role);
 
   const [tags, navBadges] = await Promise.all([
     getBoardTags(session),

@@ -12,7 +12,7 @@ import {
   searchMentionableMembers,
   validateMentionTargets,
 } from "@/lib/board-queries";
-import { isOrgTopAdminOrPlatform, isPlatformDeveloper } from "@/config/roles";
+import { canPinBoardPosts, isPlatformDeveloper } from "@/config/roles";
 import { BOARD_MAX_FILES, BOARD_MAX_IMAGES } from "@/lib/board";
 import type { AvatarColor, FileAttachment } from "@/components/board/board-types";
 import type { Database, Json } from "@/types/database";
@@ -425,12 +425,11 @@ async function setPinned(postId: string, pinned: boolean): Promise<ActionResult>
   const session = await getCurrentAppSession();
   if (!session || !hasOrganizationContext(session)) return { error: "no_org" };
 
+  // 고정은 관리자만(2026-11-25 결정) — 작성자 본인이어도 안 된다. 글쓰기 · 수정과 같은 판정.
+  if (!canPinBoardPosts(session.user.role)) return { error: "forbidden" };
+
   const post = await loadPostMeta(postId, session.organization.id);
   if (!post) return { error: "not_found" };
-
-  const isAuthor = post.created_by_user_id === session.user.id;
-  const canManage = session.capabilities.includes("board.manage");
-  if (!isAuthor && !canManage) return { error: "forbidden" };
 
   const service = getSupabaseServiceClient();
   const patch = pinned
@@ -535,7 +534,7 @@ export async function updateBoardPost(
     // **고정 권한은 작성 경로와 같아야 한다.** `createBoardPost` 는 owner/전무/office_admin 에게만
     // 고정을 허용하는데 여기엔 그 검사가 없어서, 일반 직원이 자기 글을 수정하며 상단 고정을 할 수
     // 있었다(2026-08-07 발견). 같은 상태를 바꾸는 두 경로가 다른 권한을 갖고 있으면 안 된다.
-    const canPin = isOrgTopAdminOrPlatform(session.user.role) || session.user.role === "office_admin";
+    const canPin = canPinBoardPosts(session.user.role);
     if (!canPin && input.isPinned !== post.is_pinned) return { error: "forbidden" };
   }
   // 고정 여부가 실제로 바뀔 때만 쓴다 — 고정된 글의 본문만 고쳐도 고정 시각 · 고정한 사람이 바뀌던 것을 막는다(2026-11-25).

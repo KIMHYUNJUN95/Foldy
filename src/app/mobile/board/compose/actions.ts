@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
-import { isOrgTopAdminOrPlatform } from "@/config/roles";
+import { canPinBoardPosts } from "@/config/roles";
 import type { FileAttachment } from "@/components/board/board-types";
 import { areOwnBoardImageUrls, isBoardUuid, sanitizeBoardAttachments } from "@/app/mobile/board/board-storage-guard";
 import type { Database, Json } from "@/types/database";
@@ -51,9 +51,7 @@ export async function createBoardPost(
   const safeAttachments = sanitizeBoardAttachments(fileAttachments, orgId, id);
   if (!safeAttachments) return { error: "invalid_attachment" };
 
-  const canPin =
-    isOrgTopAdminOrPlatform(session.user.role) ||
-    session.user.role === "office_admin";
+  const canPin = canPinBoardPosts(session.user.role);
 
   const shouldPin = isPinned && canPin;
   const service = getSupabaseServiceClient();

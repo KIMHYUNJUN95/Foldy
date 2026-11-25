@@ -73,7 +73,7 @@ vi.mock("@/lib/board-queries", () => ({
 vi.mock("@/lib/board-moderation", () => ({ canModerateBoard: () => true, isBoardReportReason: () => true }));
 vi.mock("@/lib/platform-developers", () => ({ displayRoleKey: () => "staff", fetchPlatformDeveloperIds: async () => new Set() }));
 
-const { pinBoardPost, updateBoardPost, deleteBoardPost } = await import("@/app/mobile/board/[id]/actions");
+const { pinBoardPost, unpinBoardPost, updateBoardPost, deleteBoardPost } = await import("@/app/mobile/board/[id]/actions");
 const { reportBoardContent, withdrawBoardReport, resolveBoardReport } = await import("@/actions/board-moderation");
 const { updateBugReport, deleteBugReport, updateBugReportStatus } = await import("@/lib/bug-reports");
 
@@ -100,6 +100,34 @@ describe("게시글 쓰기 — 조직 · 살아 있는 글 조건(F)", () => {
     const [u] = writes("board_posts");
     expect(u.filters).toEqual(expect.arrayContaining(["eq:id:p1", orgEq, "is:deleted_at:null"]));
     expect(u.selected).toBe(true);
+  });
+
+  it("고정(2026-11-25 결정): 알바 작성자는 자기 글도 고정 못 한다 → forbidden, 쓰지 않음", async () => {
+    role = "part_time_staff";
+    capabilities = ["board.manage"]; // 권한 묶음이 아니라 관리자 역할로만 판정한다(글쓰기 · 수정과 같은 판정).
+    handler = (c) => (c.op === "update" ? { data: [{ id: "p1" }] } : meta());
+    expect(await pinBoardPost("p1")).toEqual({ error: "forbidden" });
+    expect(writes("board_posts")).toHaveLength(0);
+  });
+
+  it("고정 해제: 관리자가 아니면 자기 글도 forbidden, 쓰지 않음", async () => {
+    role = "part_time_staff";
+    handler = (c) => (c.op === "update" ? { data: [{ id: "p1" }] } : meta({ is_pinned: true }));
+    expect(await unpinBoardPost("p1")).toEqual({ error: "forbidden" });
+    expect(writes("board_posts")).toHaveLength(0);
+  });
+
+  it("수정: 관리자가 아닌 작성자가 고정 값을 바꿔 보내면 forbidden, 쓰지 않음", async () => {
+    role = "part_time_staff";
+    handler = (c) => (c.op === "update" ? { data: [{ id: "p1" }] } : meta({ is_pinned: false }));
+    expect(await updateBoardPost("p1", { content: "hi", isPinned: true })).toEqual({ error: "forbidden" });
+    expect(writes("board_posts")).toHaveLength(0);
+  });
+
+  it("고정: 관리자(office_admin)는 남의 글도 고정한다", async () => {
+    role = "office_admin";
+    handler = (c) => (c.op === "update" ? { data: [{ id: "p1" }] } : meta({ created_by_user_id: "u2" }));
+    expect(await pinBoardPost("p1")).toEqual({ ok: true });
   });
 
   it("고정: 그 사이 지워져 0줄이면 not_found", async () => {
@@ -213,7 +241,7 @@ describe("버그 신고 수정 · 삭제 — 접수 상태 조건(D)", () => {
   const row = { data: { id: "b1", organization_id: ORG, reported_by_user_id: ME, status: "submitted", title: "t" } };
 
   beforeEach(() => {
-    role = "part_time";
+    role = "part_time_staff";
   });
 
   it("수정: 접수 상태에만 쓰고, 그 사이 검토가 시작돼 0줄이면 not_editable", async () => {

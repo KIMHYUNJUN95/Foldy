@@ -46,6 +46,7 @@ export function BoardDetailClient({
   viewerId,
   canManage,
   canEditAny = false,
+  canPin = false,
   organizationId,
   locale,
   copy,
@@ -55,6 +56,8 @@ export function BoardDetailClient({
   canManage: boolean;
   /** 플랫폼 개발자 — 남의 글도 「글 수정」을 보여 준다(2026-10-23). */
   canEditAny?: boolean;
+  /** 고정 / 고정 해제 — 관리자만(`canPinBoardPosts`, 2026-11-25). */
+  canPin?: boolean;
   organizationId: string;
   locale: Locale;
   copy: Dictionary["board"];
@@ -574,6 +577,7 @@ export function BoardDetailClient({
           isOwn={isOwn}
           canManage={canManage}
           canEdit={isOwn || canEditAny}
+          canPin={canPin}
           isPinned={isPinned}
           copy={copy}
           onEdit={() => {

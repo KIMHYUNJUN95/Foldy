@@ -54,6 +54,15 @@ export function isOrgTopAdminOrPlatform(role: Role): boolean {
 }
 
 /**
+ * 게시판 글 고정 · 고정 해제 — 관리자만(2026-11-25 사용자 결정: 알바 작성자는 자기 글도 고정 못 한다).
+ * 글쓰기 · 글 수정 · 고정 버튼 · 화면 표시가 모두 이 판정 하나를 쓴다(예전엔 같은 식이 네 곳에 따로 있었고,
+ * 고정 버튼만 「작성자 또는 board.manage」로 달랐다).
+ */
+export function canPinBoardPosts(role: Role): boolean {
+  return isOrgTopAdminOrPlatform(role) || role === "office_admin";
+}
+
+/**
  * 플랫폼 개발자(설계자) 계정인가. 2026-10-23 사용자 「난 개발자이고 … 전부 가능해야해. 난 이거 설계자야」.
  * 작성자 본인만 · 담당자만 · 다른 검토자가 잡은 건 손대지 않기 같은 「주인만」 게이트에서 개발자는 예외로 통과한다.
  * 조직 격리(session.organization)와 자기 계정 잠금 방지 가드(자기 역할 · 상태 · 권한 · 개발자 플래그 · 계정 삭제,

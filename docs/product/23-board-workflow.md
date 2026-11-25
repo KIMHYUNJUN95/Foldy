@@ -27,7 +27,7 @@
 - **파일 첨부**: PDF · Excel(.xlsx/.xls) · Word(.docx) · CSV · PowerPoint(.pptx) — 파일당 최대 20MB, 글당 최대 5개
 - **이모지 반응**: 👍 ❤️ 😂 😮 😢 — 사용자당 이모지별 1회 (토글)
 - **댓글**: 텍스트 + 이미지(최대 3장), 소프트 삭제
-- **최상단 고정(Pin)**: 글 작성 시 또는 작성 후 작성자가 직접 고정 가능. 관리자도 고정 가능. 고정 글은 여러 개 동시 허용 — 피드 최상단에 `pinned_at` 내림차순으로 표시
+- **최상단 고정(Pin)**: **관리자만**(owner · 전무 · office_admin · 플랫폼 개발자 — `canPinBoardPosts`, 2026-11-25 결정). 알바 등 작성자는 자기 글도 고정할 수 없다. 고정 글은 여러 개 동시 허용 — 피드 최상단에 `pinned_at` 내림차순으로 표시
 - **읽음 추적**: 읽지 않은 글 배지 표시
 - **소프트 삭제**: 글·댓글 모두 `deleted_at` 논리 삭제
 
@@ -190,7 +190,10 @@ CREATE TABLE board_reactions (
   `is_pinned` · `pinned_at` 을 쓴다(같은 값이면 고정 시각을 새로 찍지 않는다).
 - **삭제**(`deleteBoardPost`): 같은 조직 + `deleted_at IS NULL` — 이미 지워진 글의 지운 시각을 덮지 않는다. 0줄(그 사이 다른 기기 ·
   관리자가 먼저 지움)은 지우려던 결과와 같으니 **성공**으로 돌려주고 화면을 새로 그린다 — 오류를 띄우지 않는다.
-- **고정 권한**: 작성자는 자기 글, `board.manage` 는 모든 글(지금 동작 그대로 — 바꿀지는 사용자 결정 대기).
+- **고정 권한 — 2026-11-25 결정: 고정은 관리자만.** 고정 · 고정 해제(`setPinned`) · 글쓰기 · 글 수정이 모두 `canPinBoardPosts(role)`
+  (`src/config/roles.ts`, owner · 전무 · office_admin · 플랫폼 개발자) 하나를 쓴다. 작성자 본인이어도 관리자가 아니면 `forbidden`.
+  화면도 같은 값(`canPin`)을 받아 글 상세 「⋯」 시트의 「고정 / 고정 해제」를 관리자에게만 보인다. 예전엔 고정 버튼만 「작성자 또는
+  `board.manage`」라 글쓰기 · 수정과 판정이 달랐다.
 
 ## 5. 서버 액션 (Server Actions)
 
@@ -609,8 +612,8 @@ UI 디자인 핸드오프 후 아래 순서로 진행:
   `invalid_id`)는 화면에서 「저장 실패」 문구로 보인다. 회귀 테스트: `src/lib/__tests__/board-storage-guard.test.ts`.
 - **댓글 · 고정 결과 처리 (2026-10-26)**: 댓글 보내기가 실패해도 입력이 비워지던 것을 고쳤다 — 컴포저의 `onSubmit` 은
   `Promise<boolean>` 을 돌려주고, 저장됐을 때만 글 · 사진을 비운다. 댓글 지우기는 공용 줄 접힘(`.row-collapse` + `data-leaving`)으로 바로
-  접히고 실패하면 다시 펴지며 토스트 + `error` 햅틱. 2026-11-20 부터 지운 뒤 4초 「되돌리기」 알림이 뜬다(§12-E). 고정 토글은 `useOptimistic` 으로 바로 바뀌고 실패하면 되돌아가며 알린다. **누가
-  고정할 수 있는지는 바꾸지 않았다**(작성자 · `board.manage` — 사용자 결정 대기).
+  접히고 실패하면 다시 펴지며 토스트 + `error` 햅틱. 2026-11-20 부터 지운 뒤 4초 「되돌리기」 알림이 뜬다(§12-E). 고정 토글은 `useOptimistic` 으로 바로 바뀌고 실패하면 되돌아가며 알린다. 누가
+  고정할 수 있는지는 2026-11-25 에 「관리자만」으로 정했다(§4 「고정 권한」).
 - **사진 뷰어 (2026-06-25 추가)**: 게시글 사진과 댓글 사진을 탭하면 공유 `ImageLightbox`
   (`src/components/shell/image-lightbox.tsx` — 풀스크린·스와이프·원본 표시·`<body>` 포털)가 열린다.
   `target="_blank"`는 쓰지 않는다(설치형 PWA 이탈 방지 — decision-log 2026-06-22 이미지 계약).
@@ -641,7 +644,7 @@ UI 디자인 핸드오프 후 아래 순서로 진행:
   반응자 얼굴(상위 이모지 최대 3명) + 요약(`reactionSummaryOne`/`Many`).
 - **더보기 액션 시트**: 글 수정/고정·해제/공유/삭제. 공유는 `navigator.share()` → 실패 시 클립보드 복사
   + 토스트. 삭제는 중앙정렬 확인 모달(CLAUDE.md의 BottomSheet 예외) → `deleteBoardPost` →
-  `/mobile/board`로 이동. 권한에 따라 행 노출(작성자=수정/삭제, owner·office_admin=고정/삭제).
+  `/mobile/board`로 이동. 권한에 따라 행 노출(작성자=수정/삭제, owner·전무·office_admin=고정/삭제 — 고정은 관리자만, 2026-11-25).
 - **알림**: 새 `board_activity` 알림 타입(마이그레이션 `202606250002_board_notification_type.sql`,
   **적용 완료**). 댓글 작성 시 글 작성자에게 1건(작성자=본인이면 생략). `notifyBoardPostAuthor`
   (`src/lib/notifications/create.ts`) + 타입/가드(`types.ts`) + 표시 분기·`board_activity` 라벨

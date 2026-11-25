@@ -97,15 +97,18 @@ export function SkippedDaysSection({
     if (timer.current) clearTimeout(timer.current);
     setToast(null);
     startTransition(async () => {
+      let ok = false;
       try {
-        await skipOccurrenceOn(taskId, date);
-        // 다시 건너뛴 줄은 접힘 표시를 풀어 둔다 — 새 목록이 오면 접히지 않은 채로 나온다.
-        setLeave(date, false);
-        router.refresh();
-      } catch {
+        ok = (await skipOccurrenceOn(taskId, date)).ok;
+      } catch {}
+      if (!ok) {
         haptic("error");
         show({ message: copy.errors.save_failed });
+        return;
       }
+      // 다시 건너뛴 줄은 접힘 표시를 풀어 둔다 — 새 목록이 오면 접히지 않은 채로 나온다.
+      setLeave(date, false);
+      router.refresh();
     });
   }
 

@@ -149,7 +149,10 @@ export function TaskDetailView({
   const [moreOpen, setMoreOpen] = useState(false);
   const [isMoving, startMoveTransition] = useTransition();
   const [inboxToast, setInboxToast] = useState<
-    { kind: "moved"; projectId: string; sectionId: string | null } | { kind: "error" } | null
+    | { kind: "moved"; projectId: string; sectionId: string | null }
+    | { kind: "error" }
+    | { kind: "skip_failed" }
+    | null
   >(null);
   const inboxToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [confirmLeave, setConfirmLeave] = useState(false);
@@ -239,7 +242,17 @@ export function TaskDetailView({
     if (!occurrenceDate || isSkippingOccurrence) return;
     setConfirmDelete(false);
     startSkipTransition(async () => {
-      await skipOccurrenceOn(task.id, occurrenceDate);
+      let ok = false;
+      try {
+        ok = (await skipOccurrenceOn(task.id, occurrenceDate)).ok;
+      } catch {}
+      // 저장되지 않았으면 목록으로 넘어가지 않고 토스트로 알린다(2026-11-25) — 시트가 닫힌 뒤 스크롤 위치와
+      // 상관없이 보이게(상태 칸 아래 안내는 화면 밖일 수 있다). 목록 화면의 실패 토스트와 같은 문구.
+      if (!ok) {
+        haptic("error");
+        showInboxToast({ kind: "skip_failed" });
+        return;
+      }
       const params = new URLSearchParams({
         view: returnView,
         skippedTask: task.id,
@@ -746,7 +759,13 @@ export function TaskDetailView({
               : undefined
           }
           icon={inboxToast.kind === "moved" ? Inbox : AlertTriangle}
-          message={inboxToast.kind === "moved" ? copy.movedToInbox : copy.moveToInboxFailed}
+          message={
+            inboxToast.kind === "moved"
+              ? copy.movedToInbox
+              : inboxToast.kind === "skip_failed"
+                ? copy.errors.save_failed
+                : copy.moveToInboxFailed
+          }
           onDismiss={() => setInboxToast(null)}
           tone={inboxToast.kind === "moved" ? "neutral" : "danger"}
         />

@@ -270,6 +270,23 @@ export function canEditTaskCore(
   return canEditTaskAsOwnerOrAuthor(session.user, task.createdByUserId, task.projectOwnerUserId);
 }
 
+/**
+ * 할 일을 지우거나(소프트 삭제) 되살릴 수 있는가 — 모바일 · 관리자 일괄 삭제 · 되살리기가 함께 쓴다(2026-11-25).
+ *
+ * `canEditTaskCore` 와 같은 사람(작성자 · 프로젝트 주인 · 개발자)이면서 **지금 열 수 있는 할 일**(`inScope`,
+ * `getTaskScope` — 소프트 삭제된 행도 담는다)이어야 한다. 예외는 프로젝트가 없는 개인 할 일의 작성자뿐이다.
+ * 예전엔 작성자면 범위를 건너뛰어, 프로젝트를 나간 사람이 그 프로젝트에 남긴 할 일을 지우고 되살렸다.
+ */
+export function canDeleteOrRestoreTask(
+  user: { id: string; role: string | null | undefined },
+  task: { createdByUserId: string; projectId: string | null; projectOwnerUserId: string | null },
+  inScope: boolean,
+): boolean {
+  if (!canEditTaskAsOwnerOrAuthor(user, task.createdByUserId, task.projectOwnerUserId)) return false;
+  if (!task.projectId && task.createdByUserId === user.id) return true;
+  return inScope;
+}
+
 /** 프로젝트별 주인 · 멤버 id. 행을 하나도 읽지 못한 프로젝트(RLS 로 가려짐)는 맵에 없다. */
 export type ProjectMembershipMap = Map<string, { ownerUserId: string | null; memberIds: Set<string> }>;
 
@@ -793,22 +810,35 @@ export async function getTaskCompletions(session: AppSession): Promise<TaskCompl
   const supabase = await getSupabaseServerClient();
   const scope = await getTaskScope(session);
   const sinceIso = new Date(`${ymdShift(tokyoToday(), -120)}T00:00:00+09:00`).toISOString();
-  const { data, error } = await supabase
-    .from("task_updates")
-    .select("task_id, update_type, created_at, created_by_user_id")
-    .in("update_type", ["completed", "reopened"])
-    .gte("created_at", sinceIso)
-    .order("created_at", { ascending: true });
-  if (error) return [];
   type Row = {
+    id: string;
     task_id: string;
     update_type: string;
     created_at: string | null;
     created_by_user_id: string | null;
   };
+  // 한 번 읽기는 1,000행에서 잘린다(2026-11-25) — 120일 완료가 그보다 많으면 최근 것이 빠졌다. id 순으로
+  // 빈 쪽이 나올 때까지 이어 읽고(`referencedImagePaths` 와 같은 방식), 상쇄 계산용으로 시각 순으로 다시 놓는다.
+  const data: Row[] = [];
+  let lastId: string | null = null;
+  for (;;) {
+    let query = supabase
+      .from("task_updates")
+      .select("id, task_id, update_type, created_at, created_by_user_id")
+      .in("update_type", ["completed", "reopened"])
+      .gte("created_at", sinceIso);
+    if (lastId) query = query.gt("id", lastId);
+    const { data: page, error } = await query.order("id", { ascending: true }).limit(1000);
+    if (error) return [];
+    const rows = (page ?? []) as Row[];
+    if (rows.length === 0) break;
+    data.push(...rows);
+    lastId = rows[rows.length - 1].id;
+  }
+  data.sort((a, b) => (a.created_at ?? "").localeCompare(b.created_at ?? ""));
   // 키 = `${taskId}|${day}`
   const net = new Map<string, { net: number; by: string | null; at: string }>();
-  for (const r of (data ?? []) as Row[]) {
+  for (const r of data) {
     if (!scope.taskIds.has(r.task_id)) continue;
     const day = tokyoDateOf(r.created_at);
     if (!day) continue;

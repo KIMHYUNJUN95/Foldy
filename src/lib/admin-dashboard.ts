@@ -69,6 +69,8 @@ export type TodoItem = {
   title: string;
   done: boolean;
   priority: string;
+  /** 행 상태 — 완료 실행 취소가 완료 전 상태(진행 중)로 돌아가게 넘긴다(2026-11-25). */
+  status: string;
   /** 반복 할 일이면 이 날짜(도쿄 운영일 = 오늘) 회차를 체크한다 — 대시보드 체크(2026-10-28). */
   occurrenceDate: string;
 };
@@ -244,6 +246,7 @@ export async function getAdminDashboard(session: AppSession): Promise<AdminDashb
       title: t.title,
       done: t.status === "done" || t.status === "completed",
       priority: t.priority,
+      status: t.status,
       occurrenceDate: today,
     }))
     .slice(0, 6);

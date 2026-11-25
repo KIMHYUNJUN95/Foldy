@@ -103,6 +103,7 @@ export function TaskCard({
   buildingLabels,
   copy,
   currentUserId,
+  canEditAny = false,
   task,
   today,
   showDate = true,
@@ -130,6 +131,8 @@ export function TaskCard({
   copy: Copy;
   locale: Locale;
   currentUserId: string;
+  /** 플랫폼 개발자 — 남의 할 일도 작성자처럼 옮긴다(서버 canEditTaskCore 와 같은 규칙). */
+  canEditAny?: boolean;
   task: TaskRecord;
   today: string;
   showDate?: boolean;
@@ -242,7 +245,10 @@ export function TaskCard({
   // 통째로 사라진다. 서버도 `recurring_series` 로 거절한다.
   const isRecurringTask = isStandardRecurrence(task.recurrenceRule);
   const alreadyOnTarget = !isRecurringTask && anchorDate ? anchorDate === swipeTarget : false;
-  const canSwipe = swipe && !done && !selectMode && !isRecurringTask && !alreadyOnTarget;
+  // 오늘로 · 내일로는 작성자 · 프로젝트 주인 · 개발자만(2026-11-25, 서버 canEditTaskCore) — 공유받은 사람에겐 밀기를 열지 않는다.
+  const canMove =
+    canEditAny || task.createdByUserId === currentUserId || task.projectOwnerUserId === currentUserId;
+  const canSwipe = swipe && canMove && !done && !selectMode && !isRecurringTask && !alreadyOnTarget;
 
   // 길게 누르기 → 컨텍스트 메뉴. 움직임이 적은 480ms 누름이 발동하고, 드래그/스크롤은 취소한다.
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);

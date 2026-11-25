@@ -24,9 +24,11 @@
 - **흡수는 오늘(도쿄) 이후를 건드리지 않는다.** `occurrencesToAbsorb` = `[anchor, min(완료일, 오늘))` 의
   미해결 회차. 모바일 「내일」 탭에서 내일 회차를 체크하면 예전에는 열린 오늘 회차가 «이동» 처리돼
   오늘 목록에서 사라졌다.
-- **이중 완료 가드용 헬퍼.** 순수 `isOccurrenceCompleted(states, date)` (`tasks-recurrence.ts`), 서버
-  `occurrenceAlreadyCompleted(taskId, date): Promise<boolean>` (`task-occurrences.ts`). 완료 액션은
-  `resolveCompletionOccurrence` 가 돌려준 날짜로 부른다.
+- **이중 완료 가드는 쓰기 자체가 한다(2026-11-25).** 예전 `occurrenceAlreadyCompleted` 읽기 → upsert 는 그 사이에
+  들어온 완료를 못 봐서 기록 · 알림이 두 번 남았다. 이제 `completeOccurrence` 가 `"saved" | "already" | "failed"` 를
+  돌려준다 — «없으면 넣기»(`ignoreDuplicates`) → 넣지 못했으면 `.neq("state","completed")` 조건부 UPDATE(건너뜀 ·
+  이동 회차를 완료하는 건 그대로 허용). 바뀐 행이 없으면 `already` — 액션은 성공으로 돌려주고 기록 · 알림을 남기지 않는다.
+  순수 `isOccurrenceCompleted(states, date)` (`tasks-recurrence.ts`)는 화면 판정용으로 남는다.
 - **되돌리기의 한계(기록).** `releaseAbsorbedOccurrences` 는 `moved_to_date = 완료일` 인 `moved` 행을
   지운다. 흡수가 만든 행과 예전 「오늘로 가져오기」(2026-07-30 ~ 08-25)가 만든 행은 모양이 같아 구분할 수
   없어, 그날로 가져왔던 옛 행도 함께 지워질 수 있다. 옛 행은 그 기간 것뿐이라 그대로 둔다.
@@ -727,7 +729,7 @@ write). See `docs/planning/01-decision-log.md` → "2026-07-30 롤포워드 폐�
   - Tested in `src/lib/__tests__/task-predicates.test.ts` (27 cases). Being testable is the point:
     while these lived inside screen components there was no way to assert on them.
 - **Mutations** (`src/lib/task-occurrences.ts`, service-role): `completeOccurrence` /
-  `clearOccurrenceState` / `skipOccurrences` / `moveOccurrences` / `resolvedOccurrenceDates`. Shared by
+  `clearOccurrenceState` / `skipOccurrenceIfOpen` (2026-11-25, replaced `skipOccurrences`) / `moveOccurrences` / `resolvedOccurrenceDates`. Shared by
   mobile + console actions (no twin drift). Added 2026-08-25:
   - `occurrenceStatesForTask(taskId)` → `Map<occurrence_date, OccurrenceState>`. One task-scoped read
     that answers both "which dates are resolved" and "is this one *completed*" —
@@ -1034,6 +1036,8 @@ redirect to `/mobile/tasks?view=<originating tab>` (allow-listed) so the user st
 swiped from.
 `moveTaskToTomorrow` sets `scheduled_date` = `ymdShift(tokyoToday(), 1)`, `is_inbox = false`. The
 swipe reveal is a single fixed-width (74px) button; Sent/Calendar still pass `swipe={false}`.
+**2026-11-25:** 두 이동 액션은 `canEditTaskCore`(작성자 · 프로젝트 주인 · 개발자)만 — 아니면 `moveError=forbidden`.
+쓰기에 `organization_id` 조건을 걸고 바뀐 행이 없으면 `save_failed`. 카드는 같은 사람에게만 밀기를 연다(`canEditAny` prop).
 
 ### Drag-reorder, day tabs (as-built 2026-06-12)
 
@@ -1102,6 +1106,10 @@ Task-level images:
   still lists it in `image_urls`** (soft-deleted rows count). This closes «attach a colleague's photo URL,
   save, then remove it → their file is deleted». If the reference check errors, nothing is deleted
   (fail closed). Regression: `src/lib/__tests__/task-images-org-guard.test.ts`.
+  **2026-11-25:** the reference check compares **storage paths** and reads every photo-bearing row in `id` order,
+  1,000 at a time **after the last id read** (`.gt("id", lastId).order("id").limit(1000)`) until an empty page —
+  not by row offset, so rows deleted mid-read cannot shift a later reference out of view. Any page error → nothing
+  is deleted. Regression: `src/lib/__tests__/task-images-tail-guard.test.ts`.
 - **Project delete also removes memo photos (2026-10-29).** Deleting a project cascades `projects → tasks →
   task_updates` rows, but storage files stayed. `collectProjectImageUrls` (`task-images.ts`, shared by mobile
   `deleteProject` and console `deleteConsoleProject`) collects, *before* the delete, both task photos and memo
@@ -1419,9 +1427,14 @@ myOwn(t, meId)      // !sentInstr — 내 일정 뷰(오늘/내일/관리함/캘
 
 - **순서 저장**(`reorderConsoleTasks` · `reorderConsoleDateTasks`)은 `getTaskScope(session).taskIds` 에 든 작업만 쓴다 — 같은 조직 남의 개인 작업 순서를 서비스 키로 바꾸지 못한다.
 - **사진 주소**는 조직 폴더만: 작업 사진 `{org}/task-images/`(생성 `sanitizeTaskImageUrls`, 수정 `mergeTaskImageUrls` 에 `organizationId`), 메모 사진 `{org}/task-update-images/`(`isOrgTaskImageUrl`, 5장 상한).
-- **회차 쓰기 실패**(`completeOccurrence` · `clearOccurrenceState` · `skipOccurrences` — 셋 다 boolean 반환)는 `save_failed` 로 돌려주고 완료 기록 · 알림을 남기지 않는다. 일회성 완료/다시 열기도 `mustWrite`.
+- **회차 쓰기 실패**(`completeOccurrence` → `"failed"` · `clearOccurrenceState` → false · `skipOccurrenceIfOpen` → `"failed"`)는 `save_failed` 로 돌려주고 완료 기록 · 알림을 남기지 않는다. 일회성 완료/다시 열기도 `mustWrite`.
 - **이미 완료된 일회성 작업**을 다시 완료하면 아무것도 하지 않는다(완료 기록 · 알림 중복 방지).
 - **회차 건너뛰기**(`skipConsoleOccurrence`)는 이미 상태(완료 · 옮김)가 있는 회차를 덮어쓰지 않는다(`already_resolved`, 이미 건너뜀이면 성공 처리).
+  판정은 `skipOccurrenceIfOpen` 의 «없으면 넣기» 한 번이다(2026-11-25) — 예전엔 읽고 → upsert 라 그 사이에 들어온 완료를 «건너뜀»으로 덮었다. 넣지 못했을 때만 지금 상태를 읽어 `skipped`(성공) / `resolved`(`already_resolved`)를 가른다. 모바일 `skipOccurrenceOn` 도 같다.
+- **`updateConsoleTaskCore` 는 바꾼 칸만 받는다(2026-11-25).** 모든 칸이 선택이고, 생략한 칸은 저장값을 둔다 — 예전엔 우선순위 · 연결 · 사진 추가가 화면의 낡은 제목 · 본문 · 태그 · 일정을 함께 보내 남의 수정을 되돌렸다. 일정(`date` · `time` · `durationMinutes` · `repeat`)은 네 칸 한 묶음(소요 시간만 오는 것 포함, 하나라도 빠지면 `invalid_date`). 사진은 `addImageUrls` · `removeImageUrls` 변화분을 서버의 최신 `task.imageUrls` 에 적용한 뒤 `mergeTaskImageUrls`(전체 교체 `imageUrls` 도 남음). 한도가 차서 버린 새 사진(같은 주소는 한 번, 조직 주소 검사를 통과한 것만)은 `{ ok: true, droppedImages }` 로 장수를 돌려주고 올라간 파일은 `cleanupRemovedTaskImages` 로 지운다(화면은 `phTooMany`). 보낼 것이 없으면 쓰지 않고 성공 — 콘솔 코어 편집은 아예 부르지 않는다(`changedCoreFields`).
+- **반복으로 바꾸면 행은 열림(2026-11-25).** `recurringRowStatusPatch(nextRule, status)` (`tasks-recurrence.ts`) — 반복이 되는 행이 `completed` · `in_progress` 면 `open` + 완료 도장 지움(`cancelled` 는 둠). 관리자 `updateConsoleTaskCore` · `rescheduleConsoleTask`, 모바일 `updateTaskCore` 가 같이 쓴다. 이미 그렇게 저장된 예전 행은 한 번 더 수정할 때 풀린다.
+- **일회성 완료 실행 취소는 완료 전 상태로(2026-11-25).** `reopenTask(id, occ?, restoreStatus?)` · `toggleConsoleComplete(id, false, occ?, restoreStatus?)` — 화면이 완료 전 기록의 `status` 를 넘기고(모바일 목록 · PC 콘솔 · 관리자 홈 할 일 카드 — `TodoItem.status`; 체크를 다시 눌러 풀 때는 화면이 방금 완료하며 기억한 값 — `trackCompletedFrom`, 풀거나 완료가 실패하면 그 기억을 지움 — `forgetCompletedFrom`), `reopenedRowStatus` 가 `in_progress` 만 받아 들이고 나머지는 `open`. 일회성 되돌리기 UPDATE 는 `.eq("status", "completed")` — 이미 열린 줄이면 아무것도 바꾸지 않고 성공(`reopened` 기록 없음). 스키마 변경 없음.
+- **`getTaskCompletions` 는 끝까지 읽는다(2026-11-25).** 1,000행 상한에서 잘리지 않게 `.gt("id", lastId).order("id").limit(1000)` 로 빈 쪽까지 읽고, 상쇄 계산 전에 `created_at` 순으로 다시 정렬한다.
 - **건너뛴 날 되살리기**(2026-10-28): `clearSkippedOccurrenceState`(`task-occurrences.ts`)가 `state = 'skipped'` 행만 지운다. `unskipOccurrenceOn`(모바일, 이제 `{ ok }` 반환)과 `unskipConsoleOccurrence` 가 쓴다 — 완료된 회차는 풀리지 않는다. 모바일 상세 페이지는 반복 업무일 때 `occurrenceStatesForTask` 를 읽어 `selectRecentSkippedDays`(`task-skipped-days.ts`, 최근 30일 · 최신순)로 `skippedDays` 를 내려준다. 콘솔은 이미 가진 `occurrenceStates` 에서 같은 함수를 쓴다.
 - **프로젝트 작업을 관리함으로 이동**(`moveConsoleToInbox`)은 작성자(또는 개발자, `canEditTaskCore`)만. 2026-10-28 부터
   `canEditTaskCore` 에 프로젝트 주인도 들어가므로 주인도 옮길 수 있다 — 남이 쓴 할 일을 옮기면 프로젝트 밖으로 나가 주인 범위에서 빠지고 작성자에게 돌아간다.

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { toggleConsoleComplete } from "@/app/admin/tasks/actions";
+import { forgetCompletedFrom, trackCompletedFrom } from "@/lib/tasks-recurrence";
 import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
 import { AdminUndoToast } from "@/components/admin/shared/admin-undo-toast";
 import { LiveWash } from "@/components/shared/live-wash";
@@ -31,24 +32,46 @@ const CHECK = (
  */
 export function DashboardTodos({ todos, copy }: { todos: TodoItem[]; copy: DashboardTodosCopy }) {
   const [overrides, setOverrides] = useState<Record<string, boolean>>({});
-  const [undo, setUndo] = useState<{ stamp: number; id: string; title: string; done: boolean; occurrenceDate: string } | null>(null);
+  const [undo, setUndo] = useState<{
+    stamp: number;
+    id: string;
+    title: string;
+    done: boolean;
+    occurrenceDate: string;
+    /** 완료 전 행 상태 — 완료를 실행 취소하면 이 상태로(진행 중이면 진행 중). */
+    prevStatus?: string;
+  } | null>(null);
+  // 이 화면에서 방금 완료한 할 일의 완료 전 상태 — 체크를 다시 눌러 풀어도 진행 중으로 돌아가게.
+  const completedFrom = useRef<Record<string, string>>({});
   const [pending, startTransition] = useTransition();
   const { toast, showToast, dismiss } = useAdminToast();
 
   const items = todos.map((t) => ({ ...t, done: overrides[t.id] ?? t.done }));
   const doneCount = items.filter((t) => t.done).length;
 
-  const save = (t: { id: string; title: string; occurrenceDate: string }, done: boolean, offerUndo: boolean) => {
+  const save = (
+    t: { id: string; title: string; occurrenceDate: string; status?: string },
+    done: boolean,
+    offerUndo: boolean,
+    restoreStatus?: string,
+  ) => {
     setOverrides((prev) => ({ ...prev, [t.id]: done }));
+    const tracked = trackCompletedFrom(completedFrom.current, t.id, done, restoreStatus ?? t.status);
+    completedFrom.current = tracked.memory;
     startTransition(async () => {
-      const result = await toggleConsoleComplete(t.id, done, t.occurrenceDate);
+      const result = await toggleConsoleComplete(t.id, done, t.occurrenceDate, tracked.restoreStatus);
       if (!result.ok) {
+        if (done) completedFrom.current = forgetCompletedFrom(completedFrom.current, t.id);
         setOverrides((prev) => ({ ...prev, [t.id]: !done }));
         setUndo(null);
         showToast(copy.todoFailed);
         return;
       }
-      setUndo(offerUndo ? { stamp: Date.now(), id: t.id, title: t.title, done, occurrenceDate: t.occurrenceDate } : null);
+      setUndo(
+        offerUndo
+          ? { stamp: Date.now(), id: t.id, title: t.title, done, occurrenceDate: t.occurrenceDate, prevStatus: t.status }
+          : null,
+      );
     });
   };
 
@@ -81,7 +104,7 @@ export function DashboardTodos({ todos, copy }: { todos: TodoItem[]; copy: Dashb
         <AdminUndoToast
           message={(undo.done ? copy.todoDoneToast : copy.todoReopenToast).replace("{title}", undo.title)}
           onExpire={() => setUndo(null)}
-          onUndo={() => save(undo, !undo.done, false)}
+          onUndo={() => save(undo, !undo.done, false, undo.prevStatus)}
           pending={pending}
           stamp={undo.stamp}
           undoLabel={copy.todoUndo}

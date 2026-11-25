@@ -91,6 +91,8 @@ import {
   isStandardRecurrence,
   type OccurrenceState,
   recurringOccurrencesInRange,
+  forgetCompletedFrom,
+  trackCompletedFrom,
 } from "@/lib/tasks-recurrence";
 import { listReportSchedules, type ReportScheduleView } from "@/actions/task-report-schedule";
 import { haptic } from "@/lib/haptics";
@@ -290,7 +292,7 @@ export function TasksWorkspace({
       action:
         | { type: "hide"; ids: readonly string[] }
         | { type: "complete"; id: string }
-        | { type: "reopen"; id: string },
+        | { type: "reopen"; id: string; status: TaskRecord["status"] },
     ) => {
       if (action.type === "hide") {
         const gone = new Set(action.ids);
@@ -298,7 +300,7 @@ export function TasksWorkspace({
       }
       // 되돌리기 — 서버 확인 전에 열린 줄로(일회성 완료 실행 취소, 2026-10-26).
       if (action.type === "reopen") {
-        return tasks.map((t) => (t.id === action.id ? { ...t, status: "open" as const, completedAt: null } : t));
+        return tasks.map((t) => (t.id === action.id ? { ...t, status: action.status, completedAt: null } : t));
       }
       // 완료 — 목록에서 지우지 않고 **완료 상태로 바꾼다**(2026-10-15 화이트 리디자인). 그래야 같은 순간
       // 오늘 탭 아래 「완료」 묶음으로 내려앉는다(아래 `optimisticCompletions` 와 짝).
@@ -472,9 +474,15 @@ export function TasksWorkspace({
     setMoveNotice("action_failed");
     bumpToast("notice");
   }, [bumpToast]);
+  /** 권한이 없어 아무것도 바뀌지 않은 경우 — 같은 토스트 자리, `copy.errors.forbidden` 문구. */
+  const notifyForbidden = useCallback(() => {
+    haptic("error");
+    setMoveNotice("forbidden");
+    bumpToast("notice");
+  }, [bumpToast]);
 
   // 삭제 확정 (메뉴의 단건 또는 다중 선택 일괄). 낙관적으로 행을 숨긴 뒤
-  // 서버 일괄 삭제를 실행한다. 작성자 본인의 작업만 실제로 지워진다.
+  // 서버 일괄 삭제를 실행한다. 지울 수 있는 작업만 실제로 지워진다(`deleteTasksInList`).
   const performDelete = useCallback(
     (ids: string[]) => {
       if (ids.length === 0) return;
@@ -484,7 +492,19 @@ export function TasksWorkspace({
         hideTasksOptimistically(ids);
         let deletedIds: string[];
         try {
-          ({ deletedIds } = await deleteTasksInList(ids));
+          const res = await deleteTasksInList(ids);
+          // 읽기 · 쓰기 실패 — 「지울 것이 없음」과 달리 알린다. 선택은 그대로 둔다.
+          if (res.failed) {
+            notifyActionFailed();
+            return;
+          }
+          deletedIds = res.deletedIds;
+          // 지울 수 있는 것이 하나도 없었다(남의 할 일만 골랐다) — 조용히 끝내지 않고 알린다(2026-11-25).
+          // 여기서 끝내면 트랜지션이 닫히며 숨겼던 줄이 돌아오고, 선택은 그대로 남는다.
+          if (deletedIds.length === 0) {
+            notifyForbidden();
+            return;
+          }
         } catch {
           // 트랜지션이 끝나면 낙관적 숨김은 저절로 버려져 행이 돌아온다 — 이유만 알려 준다.
           // 선택 모드와 고른 항목은 그대로 둔다(2026-10-28) — 바로 다시 시도할 수 있게.
@@ -499,7 +519,7 @@ export function TasksWorkspace({
       });
       setConfirmIds(null);
     },
-    [hideTasksOptimistically, notifyActionFailed, showDeleteUndo],
+    [hideTasksOptimistically, notifyActionFailed, notifyForbidden, showDeleteUndo],
   );
 
   /**
@@ -532,9 +552,12 @@ export function TasksWorkspace({
     (taskId: string, date: string) => {
       setRecurDelete(null);
       startSkip(async () => {
+        let ok = false;
         try {
-          await skipOccurrenceOn(taskId, date);
-        } catch {
+          ok = (await skipOccurrenceOn(taskId, date)).ok;
+        } catch {}
+        // 저장되지 않았으면 실행 취소 토스트를 거두고 알린다(2026-11-25 — 예전엔 결과를 보지 않았다).
+        if (!ok) {
           setSkipUndo((cur) => (cur?.taskId === taskId && cur.date === date ? null : cur));
           notifyActionFailed();
         }
@@ -553,11 +576,11 @@ export function TasksWorkspace({
     if (skipUndoTimer.current) clearTimeout(skipUndoTimer.current);
     if (!cur) return;
     startSkip(async () => {
+      let ok = false;
       try {
-        await unskipOccurrenceOn(cur.taskId, cur.date);
-      } catch {
-        notifyActionFailed();
-      }
+        ok = (await unskipOccurrenceOn(cur.taskId, cur.date)).ok;
+      } catch {}
+      if (!ok) notifyActionFailed();
     });
   }, [notifyActionFailed, skipUndo]);
 
@@ -582,6 +605,8 @@ export function TasksWorkspace({
   // 마지막 완료 요청 — 실행 취소는 서버가 **실제로 기록한** 회차로 되돌린다. 회차가 아닌 날 완료하면
   // 가장 오래된 밀린 회차로 정산되므로, 누른 날짜로 되돌리면 아무것도 풀리지 않는다.
   const lastCompletion = useRef<Promise<TaskStatusResult> | null>(null);
+  // 이 화면에서 방금 완료한 일회성의 완료 전 상태 — 체크를 다시 눌러 풀어도 진행 중으로(`trackCompletedFrom`).
+  const completedFrom = useRef<Record<string, string>>({});
   /**
    * 완료/되돌리기 실행. 완료는 **누른 즉시** 목록에서 빠지고, 서버 왕복은 그 뒤에 따라온다.
    *
@@ -592,6 +617,8 @@ export function TasksWorkspace({
    */
   const runStatus = useCallback(
     (task: TaskRecord, complete: boolean, occurrenceDate?: string) => {
+      const tracked = trackCompletedFrom(completedFrom.current, task.id, complete, task.status);
+      completedFrom.current = tracked.memory;
       startComplete(async () => {
         if (complete) {
           if (occurrenceDate) resolveOccurrenceOptimistically({ taskId: task.id, occurrenceDate });
@@ -613,11 +640,13 @@ export function TasksWorkspace({
             haptic("success");
           } else {
             // 실행 취소할 것이 없다 — 이 작업의 완료 토스트를 걷고 이유를 알린다.
+            completedFrom.current = forgetCompletedFrom(completedFrom.current, task.id);
             setUndoTask((cur) => (cur?.id === task.id ? null : cur));
             notifyActionFailed();
           }
         } else {
-          const res = await reopenTask(task.id, occurrenceDate).catch(
+          // 실행 취소면 `task` 는 완료 전 기록이라 그 상태(진행 중)로 돌아간다 — 완료된 줄을 다시 열면 열림.
+          const res = await reopenTask(task.id, occurrenceDate, tracked.restoreStatus).catch(
             (): TaskStatusResult => ({ ok: false }),
           );
           if (!res.ok) notifyActionFailed();
@@ -659,11 +688,24 @@ export function TasksWorkspace({
       if (pending) {
         startComplete(async () => {
           // 기다리는 동안에도 바로 열린 줄로 보이게(서버 확인 전 즉시 반영) — 실패하면 transition 이 끝나며 되돌아온다.
-          if (!task.recurrenceRule) applyTaskOptimistic({ type: "reopen", id: task.id });
+          if (!task.recurrenceRule) {
+            applyTaskOptimistic({
+              type: "reopen",
+              id: task.id,
+              status: task.status === "in_progress" ? "in_progress" : "open",
+            });
+          }
           const recorded = await pending;
           // 완료 자체가 실패했다면 되돌릴 것이 없다(실패 안내는 runStatus 가 이미 냈다).
           if (!recorded.ok) return;
-          const res = await reopenTask(task.id, recorded.occurrenceDate ?? undoOcc ?? undefined).catch(
+          // 풀었으니 기억도 지운다 — `task` 는 누르기 전 기록이라 그 상태가 먼저 쓰인다.
+          const undoTracked = trackCompletedFrom(completedFrom.current, task.id, false, task.status);
+          completedFrom.current = undoTracked.memory;
+          const res = await reopenTask(
+            task.id,
+            recorded.occurrenceDate ?? undoOcc ?? undefined,
+            undoTracked.restoreStatus,
+          ).catch(
             (): TaskStatusResult => ({ ok: false }),
           );
           if (!res.ok) notifyActionFailed();
@@ -761,11 +803,11 @@ export function TasksWorkspace({
     if (deleteUndoTimer.current) clearTimeout(deleteUndoTimer.current);
     if (!ids?.length) return;
     startComplete(async () => {
+      let ok = false;
       try {
-        await restoreTasksInList(ids); // 액션이 revalidatePath 한다 — refresh 중복 금지
-      } catch {
-        notifyActionFailed();
-      }
+        ok = (await restoreTasksInList(ids)).ok; // 액션이 revalidatePath 한다 — refresh 중복 금지
+      } catch {}
+      if (!ok) notifyActionFailed();
     });
   }, [deletedUndoIds, notifyActionFailed]);
 
@@ -987,6 +1029,7 @@ export function TasksWorkspace({
     copy,
     locale,
     currentUserId,
+    canEditAny,
     today,
     selectMode,
     selectedIds,
@@ -1037,15 +1080,18 @@ export function TasksWorkspace({
   // return. 선택 모드가 아니면 내 지연 전체가 대상(오늘 뷰의 `overdueTargets` 와 같은 규칙).
   const rescheduleOverdue = (targetDate: string) =>
     startOverdue(async () => {
+      let ok = false;
       try {
-        await rescheduleOverdueTo(
-          targetDate,
-          overdueSelectMode ? [...overdueSelection] : ownedOverdueIds,
-        );
-      } catch {
+        ok = (
+          await rescheduleOverdueTo(targetDate, overdueSelectMode ? [...overdueSelection] : ownedOverdueIds)
+        ).ok;
+      } catch {}
+      // 실패하면 시트를 연 채로 두고 알린다 — 예전엔 쓰기 실패도 성공처럼 닫혔다(2026-11-25).
+      if (!ok) {
         notifyActionFailed();
         return;
       }
+      haptic("success");
       setOverdueRescheduleOpen(false);
       setOverdueSelectMode(false);
       setOverdueSelection(new Set());
@@ -1186,12 +1232,15 @@ export function TasksWorkspace({
   const overdueTargets = overdueSelectMode ? [...overdueSelection] : ownedOverdueIds;
   const clearOverdue = () =>
     startOverdue(async () => {
+      let ok = false;
       try {
-        await dismissOverdueTasks(overdueTargets);
-      } catch {
+        ok = (await dismissOverdueTasks(overdueTargets)).ok;
+      } catch {}
+      if (!ok) {
         notifyActionFailed();
         return;
       }
+      haptic("success");
       setOverdueConfirm(false);
       setOverdueSelectMode(false);
       setOverdueSelection(new Set());
@@ -2371,21 +2420,32 @@ export function TasksWorkspace({
 
       {/* 이동 거절 안내 — 반복 작업을 옮기려 했을 때. 서버가 돌려주는 에러 코드별로 문구가 다르다:
           `recurring_series` = 표준 반복은 애초에 스와이프를 못 연다(줄이 이미 막지만, 다른 경로 대비),
-          `duplicate_occurrence` = 그 날짜에 이미 회차가 있는 레거시 케이스. 모르는 값은 duplicate 문구로 폴백. */}
+          `duplicate_occurrence` = 그 날짜에 이미 회차가 있는 레거시 케이스, `forbidden` = 옮길 권한이 없음
+          (작성자 · 프로젝트 주인 · 개발자만, 2026-11-25). 모르는 값은 duplicate 문구로 폴백. */}
       {moveNotice && hydrated && visibleToast === "notice" ? (
         <TaskToast
-          icon={moveNotice === "save_failed" || moveNotice === "action_failed" ? AlertTriangle : Repeat}
+          icon={
+            moveNotice === "save_failed" || moveNotice === "action_failed" || moveNotice === "forbidden"
+              ? AlertTriangle
+              : Repeat
+          }
           message={
             moveNotice === "action_failed"
               ? copy.errors.save_failed
-              : moveNotice === "save_failed"
+              : moveNotice === "forbidden"
+                ? copy.errors.forbidden
+                : moveNotice === "save_failed"
                 ? copy.moveSaveFailed
                 : moveNotice === "recurring_series"
                   ? copy.moveRejectedRecurringSeries
                   : copy.moveDuplicateOccurrence
           }
           onDismiss={() => setMoveNotice(null)}
-          tone={moveNotice === "save_failed" || moveNotice === "action_failed" ? "danger" : "neutral"}
+          tone={
+            moveNotice === "save_failed" || moveNotice === "action_failed" || moveNotice === "forbidden"
+              ? "danger"
+              : "neutral"
+          }
         />
       ) : null}
 

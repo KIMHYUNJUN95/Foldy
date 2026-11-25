@@ -71,7 +71,10 @@
 - 작성자 전용 규칙은 그대로: 일정 · 우선순위 · 연결 값은 작성자일 때만 눌러서 바꾸고(서버도 거절), 참여자는 글자로만 본다.
   하단에 「원문은 작성자(OO)만 수정할 수 있습니다」.
 - **새로 생긴 것 — 상세에서 바로 「사진 추가」**: 편집 모드를 거치지 않고 붙인다. 클라이언트 압축 → `task-images/` 업로드 →
-  `updateConsoleTaskCore` 에 기존 사진 + 새 사진 전체를 넘긴다(편집 저장과 같은 경로, 서버 액션 변경 없음). 작성자만, 상한 5/20.
+  `updateConsoleTaskCore` 에 **새 사진만**(`addImageUrls`) 넘긴다(2026-11-25 — 서버가 최신 목록 끝에 붙인다). 작성자만, 상한 5/20.
+  그 사이 다른 사람이 붙여 한도가 찼으면 서버가 넘친 새 사진을 버리고 `droppedImages` 장수를 돌려준다 — 화면은 「수정됨」 대신
+  `phTooMany` 로 알리고, 올라간 파일은 서버가 기존 사진 정리(`cleanupRemovedTaskImages`)로 지운다. 코어 편집 저장도 같다.
+  같은 주소는 한 번만 세고, 조직 주소 검사(`isOrgTaskImageUrl`)에 걸린 주소는 세지도 지우지도 않는다.
 
 ### 움직임 (「움직임 줄이기」면 모두 끔)
 
@@ -427,6 +430,12 @@ Status: **Implemented (2026-07-27).** 이 문서는 대시보드(어드민 웹) 
 - **체크박스 완료가 낙관적 갱신을 탄다.** 모바일 `tasks-workspace.tsx` 와 같은 `useOptimistic`
   모델 — 일회성은 행을 즉시 제거, 반복은 회차 상태를 낙관적으로 «완료»로 얹는다. 되돌리기
   (reopen)는 낙관적 처리 대상이 아니다(실행 취소 토스트가 즉각 피드백).
+  실행 취소는 누르기 전 기록의 상태를 함께 넘긴다(2026-11-25, `toggleConsoleComplete(id, false, occ, t.status)`) —
+  진행 중이던 일회성은 진행 중으로 돌아간다(예전엔 언제나 열림). 관리자 홈 「오늘 할 일」 카드(`dashboard-todos.tsx`)의
+  실행 취소도 같다 — `TodoItem.status` 를 싣고 완료 전 상태를 넘긴다. 토스트 대신 **체크를 다시 눌러** 풀어도 같다: 콘솔 · 홈 카드 ·
+  모바일 목록이 이 화면에서 방금 완료한 할 일의 완료 전 상태를 기억해 두고(`trackCompletedFrom`, `tasks-recurrence.ts`) 그 값을 넘긴다.
+  기억이 없으면(예전에 완료된 것) 열림. 풀면 그 기억을 지우고, 완료가 실패해도 지운다(`forgetCompletedFrom`).
+  서버는 일회성 되돌리기를 **지금 완료일 때만** 고친다 — 그 사이 남이 이미 연 줄은 그대로 두고 성공(기록 없음).
 - **`run()` 의 `router.refresh()` 를 제거했다.** `src/app/admin/tasks/actions.ts` 의 모든 쓰기
   액션이 `revalidatePath(CONSOLE_PATH)` 를 호출함을 전수 확인했으므로 중복 왕복이었다. 읽기 전용
   (`getConsoleTaskDetail` 등)과 목록을 건드리지 않는 보고서 액션만 revalidate 가 없다.
@@ -439,8 +448,8 @@ Status: **Implemented (2026-07-27).** 이 문서는 대시보드(어드민 웹) 
 - **서버 액션** — `src/app/admin/tasks/actions.ts` (모두 `{ok:true,id?}|{ok:false,error}` 반환):
   `createConsoleTask` · `setConsoleTaskStatus`/`toggleConsoleComplete`(반복은 `occurrenceDate` 인자로
   회차 완료 → `task_occurrence_state`, 롤포워드 없음) · `updateConsoleTaskCore`(작성자) ·
-  `rescheduleConsoleTask`(참여자) · `shareConsoleTask`(작성자) · `addConsoleNote` · `deleteConsoleTask`(작성자) ·
-  `leaveConsoleTask`(작성자=전체 삭제) · `moveConsoleToToday` · `moveConsoleToInbox` · `createConsoleProject` ·
+  `rescheduleConsoleTask`(작성자 · 프로젝트 주인 · 개발자, `canEditTaskCore`) · `shareConsoleTask`(작성자) · `addConsoleNote` · `deleteConsoleTask`(작성자) ·
+  `leaveConsoleTask`(작성자=전체 삭제) · `moveConsoleToToday` · `moveConsoleToTomorrow`(둘 다 작성자 · 프로젝트 주인 · 개발자, 2026-11-25) · `moveConsoleToInbox` · `createConsoleProject` ·
   `deleteConsoleProject`(owner 전용, 조직 스코프, cascade 하드 삭제 — 참가자·섹션·프로젝트 작업까지. 되돌릴 수
   없는 확정 삭제라 confirm 유지, task soft-delete/undo 경로 미사용. 모바일 `deleteProject` 미러) ·
   `generateConsoleReport`(모바일 `generateDailyReport` 위임) · `getConsoleTaskDetail`(상세: updates+context) ·
@@ -503,6 +512,9 @@ Status: **Implemented (2026-07-27).** 이 문서는 대시보드(어드민 웹) 
 - **지연 배너 "일정 변경"은 일정 팝오버를 연다:** 이전엔 곧바로 "전부 오늘로 이동"이었으나, 다른 "일정 변경"
   트리거(상세/행 메뉴/날짜 칩)와 동일하게 일정 팝오버(빠른옵션·달력·시간·반복)를 띄우고, 선택한 날짜로
   지연 작업을 **일괄 이동**한다(각 작업의 시간/반복은 유지).
+- **일정 팝오버의 시각은 공용 `AdminTimePicker`(2026-11-25).** 브라우저 기본 `<input type="time">` 을 걷었다
+  (관리자 콘솔은 공용 선택기만 — CLAUDE.md 4a 와 같은 뜻). 팝오버가 `overflow` 로 잘리므로 시/분 칸은 접힘 칸 안에
+  펼친다(`.adm .sch .atp__pop { position: static }`). 시각이 있으면 옆에 「시간 없음」(`schTimeNone`) 칩으로 지운다.
 - **관리함 = 프로젝트 밖 모든 활성 작업 (모바일과 동일 모델로 정렬, 2026-07-27):** 이전 대시보드는 관리함을
   `is_inbox`(날짜 없는 것만)로 필터했으나, 모바일과 벤치마크(Todoist)처럼 **관리함 = 프로젝트에 속하지 않은
   모든 활성 작업**(날짜 유무 무관)으로 바꿨다. 콘솔은 `personalTasks = tasks.filter(!projectId)` 를 만들어
@@ -733,6 +745,9 @@ display: block; }`로 교체해, 원 안에서의 아이콘 중앙 정렬이 JSX
 
 **둘 중 하나만** 보인다 — 현재 날짜와 같은 쪽으로 옮기는 무의미한 항목은 아예 렌더하지 않는다.
 
+**누가 보나 (2026-11-25).** 작성자 · 프로젝트 할 일의 프로젝트 주인 · 플랫폼 개발자만(`canEditTaskCore`, 「일정 변경」과 같은 규칙).
+참여자에게는 메뉴에 이동 항목이 없고, 서버(`moveConsoleToToday` · `moveConsoleToTomorrow`)도 `forbidden` 으로 거절한다.
+
 **탭 기준이 아닌 이유.** 이 메뉴는 오늘/내일뿐 아니라 관리함 · 공유함 · 지시 · 캘린더 · 프로젝트
 뷰에서도 똑같이 뜬다. 탭을 기준으로 삼으면 그 화면들에서 판단 근거가 없어진다. 날짜 기준이면
 요청받은 오늘↔내일 동작이 그대로 나오면서 나머지 화면에서도 의미가 통한다.
@@ -800,8 +815,12 @@ display: block; }`로 교체해, 원 안에서의 아이콘 중앙 정렬이 JSX
   사진과 태그 사이를 끊는다.
 - **코어 편집**: 상세 패널 연필 버튼이 인라인 편집 모드를 연다. 제목·본문·태그·사진을 그 자리에서
   고친다. 모바일 상세로 가는 링크는 상단에 별도로 남아 있다.
-  > `updateConsoleTaskCore`는 날짜·시간·반복·우선순위를 **전부 다시 쓰는** 액션이라, 이 편집에서
-  > 건드리지 않는 값도 현재 값으로 되돌려 넘겨야 한다. 안 그러면 제목만 고쳤는데 일정이 지워진다.
+  > `updateConsoleTaskCore`는 **바꾼 칸만** 받는다(2026-11-25). 코어 편집은 제목 · 본문 · 태그와 사진 변화분
+  > (`removeImageUrls` = 편집을 연 순간 목록 − 남긴 것, `addImageUrls` = 새로 올린 것)만, 우선순위 팝오버는
+  > `priority` 만, 연결 팝오버는 `context` 만 보낸다. 예전엔 화면이 들고 있던 값을 전부 다시 보내 그 사이 다른
+  > 사람이 고친 값을 되돌렸다. 일정 칸(`date` · `time` · `durationMinutes` · `repeat`)은 네 칸 한 묶음으로만 받는다 — 하나라도
+  > 빠지면(소요 시간만 온 경우 포함) `invalid_date`. 코어 편집은 편집을 연 순간 값과 비교해(`changedCoreFields`, 앞뒤 공백 · 빈 태그
+  > 무시) 바뀐 칸만 보내고, 바뀐 칸 · 사진 변화가 하나도 없으면 서버를 부르지 않고 닫는다.
 
 ### 16.4 알려진 경계
 

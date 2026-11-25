@@ -6,7 +6,7 @@ import { notifyProjectMembers, notifyTaskParticipants } from "@/lib/notification
 import type { TaskNotificationPayload } from "@/lib/notifications/types";
 import { getProjectDetail, type ProjectDetailData } from "@/lib/projects";
 import {
-  canEditTaskAsOwnerOrAuthor,
+  canDeleteOrRestoreTask,
   canEditTaskCore,
   getProjectMembership,
   getTaskScope,
@@ -32,6 +32,8 @@ import {
   canMoveRecurringTo,
   isStandardRecurrence,
   recurringOccurrencesInRange,
+  recurringRowStatusPatch,
+  reopenedRowStatus,
 } from "@/lib/tasks-recurrence";
 import {
   clearOccurrenceState,
@@ -40,11 +42,10 @@ import {
   releaseAbsorbedOccurrences,
   resolveCompletionOccurrence,
   completeOccurrence,
-  occurrenceAlreadyCompleted,
   occurrenceStatesForTask,
   setOccurrenceOrders,
   setTaskSortOrders,
-  skipOccurrences,
+  skipOccurrenceIfOpen,
 } from "@/lib/task-occurrences";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { isOwnerOrPlatformDeveloper } from "@/config/roles";
@@ -69,6 +70,8 @@ export type TaskActionResult =
       carry?: { moved: number; carried: boolean };
       /** 반복 완료가 실제로 기록한 회차 — 넘긴 날짜가 회차가 아니면 달라진다. 실행 취소는 이 날짜로. */
       occurrenceDate?: string;
+      /** 핵심 수정 — 한도가 차서 붙이지 못하고 버린 새 사진 장수. */
+      droppedImages?: number;
     }
   | { ok: false; error: string };
 
@@ -168,29 +171,31 @@ async function contextBelongsToOrg(
 }
 
 /**
- * 남의 작업을 되살릴 수 있는가(플랫폼 개발자) — **열 수 있는 작업(getTaskScope)만**(2026-10-28,
- * 05 문서 규칙). 범위는 참여자 행 · 프로젝트 소속으로 정해져 소프트 삭제된 행도 담는다.
- * 작성자 본인 것은 범위와 상관없이 되살린다.
+ * 되살릴 수 있는 id — `canDeleteOrRestoreTask`(모바일과 같은 판정, 2026-11-25). 작성자 · 프로젝트 주인 · 개발자이면서
+ * 지금 열 수 있는 할 일(getTaskScope — 소프트 삭제된 행도 담는다)만. 프로젝트가 없는 내 할 일은 범위와 상관없이 되살린다.
+ * 프로젝트를 나간 작성자는 그 프로젝트 할 일을 되살리지 못한다.
  */
 async function restorableIds(
   session: Session,
   rows: { id: string; created_by_user_id: string; project_id: string | null }[],
 ): Promise<string[]> {
-  // 프로젝트 주인도 자기가 지운 멤버 할 일을 되살린다(2026-10-28, canEditTaskCore 와 같은 규칙).
   const membership = await getProjectMembership(
     rows.map((r) => r.project_id).filter((v): v is string => !!v),
   );
-  const own = rows.filter((r) =>
-    canEditTaskAsOwnerOrAuthor(
-      session.user,
-      r.created_by_user_id,
-      r.project_id ? (membership.get(r.project_id)?.ownerUserId ?? null) : null,
-    ),
-  );
-  if (own.every((r) => r.created_by_user_id === session.user.id)) return own.map((r) => r.id);
-  const scope = await getTaskScope(session);
-  return own
-    .filter((r) => r.created_by_user_id === session.user.id || scope.taskIds.has(r.id))
+  const needsScope = rows.some((r) => r.project_id || r.created_by_user_id !== session.user.id);
+  const scope = needsScope ? (await getTaskScope(session)).taskIds : new Set<string>();
+  return rows
+    .filter((r) =>
+      canDeleteOrRestoreTask(
+        session.user,
+        {
+          createdByUserId: r.created_by_user_id,
+          projectId: r.project_id,
+          projectOwnerUserId: r.project_id ? (membership.get(r.project_id)?.ownerUserId ?? null) : null,
+        },
+        scope.has(r.id),
+      ),
+    )
     .map((r) => r.id);
 }
 
@@ -399,19 +404,16 @@ async function completeInternal(
       anchor: taskAnchorDate(task),
       requested: String(occurrenceDate ?? "").trim() || recurringAnchorDate(task),
     });
-    // 이미 완료된 회차면 아무것도 하지 않는다(2026-10-28, 모바일 `completeTask` 와 같은 규칙) — 완료 기록 ·
-    // 알림이 겹치지 않게. 결과는 성공으로 돌려 화면의 체크를 그대로 둔다.
-    if (await occurrenceAlreadyCompleted(task.id, occ)) {
-      return { ok: true, recorded: occ };
-    }
     const saved = await completeOccurrence({
       taskId: task.id,
       organizationId: session.organization.id,
       occurrenceDate: occ,
       userId: session.user.id,
     });
-    // 저장이 실패하면 완료 기록 · 알림을 남기지 않는다(2026-10-26).
-    if (!saved) return { ok: false };
+    // 저장이 실패하면 완료 기록 · 알림을 남기지 않는다(2026-10-26). 이미 완료된 회차면 아무것도 하지 않고
+    // 성공으로 돌려 화면의 체크를 그대로 둔다 — 판정은 쓰기가 한다(2026-11-25, 동시에 눌러도 기록 · 알림 한 번).
+    if (saved === "failed") return { ok: false };
+    if (saved === "already") return { ok: true, recorded: occ };
     // 밀린 회차는 이 완료가 흡수한다 — 오늘 줄의 「N일 밀림」 배지가 함께 사라진다(2026-09-08).
     await absorbEarlierOccurrences({
       taskId: task.id,
@@ -469,6 +471,7 @@ async function reopenInternal(
   session: Session,
   task: TaskDetail,
   occurrenceDate?: string,
+  restoreStatus?: string,
 ): Promise<boolean> {
   const supabase = getSupabaseServiceClient();
   let reopenedOcc: string | null = null;
@@ -480,19 +483,25 @@ async function reopenInternal(
     // 그 완료가 흡수했던 밀린 회차도 되살린다 — 아니면 취소해도 밀림 배지가 안 돌아온다.
     await releaseAbsorbedOccurrences(task.id, occ);
   } else {
-    const reopened = await mustWrite(
-      "task: reopen",
-      supabase
-        .from("tasks")
-        .update({
-          status: "open",
-          completed_at: null,
-          completed_by_user_id: null,
-        })
-        .eq("id", task.id)
-        .eq("organization_id", session.organization.id),
-    );
-    if (!reopened) return false;
+    // 지금 완료일 때만 고친다 — 그 사이 남이 이미 연 줄을 늦게 온 풀기가 진행 중으로 덮지 않게(2026-11-25).
+    // 이미 열려 있으면 바꿀 것이 없으니 성공, 기록도 남기지 않는다.
+    const { data, error } = await supabase
+      .from("tasks")
+      .update({
+        // 실행 취소는 완료 전 상태(진행 중)로 돌아간다 — 화면이 들고 있던 값(2026-11-25).
+        status: reopenedRowStatus(restoreStatus),
+        completed_at: null,
+        completed_by_user_id: null,
+      })
+      .eq("id", task.id)
+      .eq("organization_id", session.organization.id)
+      .eq("status", "completed")
+      .select("id");
+    if (error) {
+      console.error("[db-write] task: reopen failed:", error.message);
+      return false;
+    }
+    if (!data?.length) return true;
   }
   await bestEffortWrite(
     "task_updates: insert",
@@ -586,6 +595,8 @@ export async function toggleConsoleComplete(
   taskId: string,
   complete: boolean,
   occurrenceDate?: string,
+  /** 일회성 완료의 실행 취소 — 완료 전 상태. `in_progress` 만 그대로 쓰고 나머지는 열림. */
+  restoreStatus?: string,
 ): Promise<TaskActionResult> {
   const resolved = await resolveTask(taskId);
   if (!resolved) return { ok: false, error: "not_found" };
@@ -596,7 +607,7 @@ export async function toggleConsoleComplete(
     revalidatePath(CONSOLE_PATH);
     return { ok: true, occurrenceDate: done.recorded };
   }
-  if (!(await reopenInternal(session, task, occurrenceDate))) {
+  if (!(await reopenInternal(session, task, occurrenceDate, restoreStatus))) {
     return { ok: false, error: "save_failed" };
   }
   revalidatePath(CONSOLE_PATH);
@@ -631,17 +642,15 @@ export async function skipConsoleOccurrence(
   if (!resolved) return { ok: false, error: "not_found" };
   const { session, task } = resolved;
   if (!isConsoleOccurrenceDate(task, date)) return { ok: false, error: "invalid_date" };
-  // 이미 완료 · 건너뜀 · 옮김 상태인 회차는 건드리지 않는다(2026-10-26) — 덮어쓰면 완료 기록이 사라진다.
-  const states = await occurrenceStatesForTask(task.id);
-  const existing = states.get(date);
-  if (existing === "skipped") return { ok: true };
-  if (existing) return { ok: false, error: "already_resolved" };
-  const skipped = await skipOccurrences({
+  // 이미 완료 · 옮김 상태인 회차는 건드리지 않는다(2026-10-26) — 판정은 «없을 때만 넣기» 쓰기 한 번이 한다
+  // (2026-11-25, 읽고 쓰는 사이에 들어온 완료를 덮어쓰지 않게).
+  const skipped = await skipOccurrenceIfOpen({
     taskId: task.id,
     organizationId: session.organization.id,
-    dates: [date],
+    occurrenceDate: date,
   });
-  if (!skipped) return { ok: false, error: "save_failed" };
+  if (skipped === "failed") return { ok: false, error: "save_failed" };
+  if (skipped === "resolved") return { ok: false, error: "already_resolved" };
   revalidatePath(CONSOLE_PATH);
   return { ok: true };
 }
@@ -666,85 +675,133 @@ export async function unskipConsoleOccurrence(
 }
 
 // ── 4. 핵심 수정(작성자만) ─────────────────────────────────────────────────
+/**
+ * **바꾼 칸만** 받는다(2026-11-25). 예전엔 우선순위 하나를 바꿔도 화면이 들고 있던 제목 · 본문 · 태그 · 일정을
+ * 통째로 다시 보내, 그 사이 다른 사람이 고친 값을 낡은 값으로 되돌렸다. 생략한 칸은 저장된 값을 그대로 둔다.
+ * 일정(date · time · durationMinutes · repeat)은 서로 얽혀 있어 네 칸 한 묶음으로만 받는다 — 일부만(소요 시간만 포함) 오면 `invalid_date`.
+ * 한도가 차서 버린 새 사진은 `droppedImages` 로 장수를 돌려주고, 올라간 파일은 `cleanupRemovedTaskImages` 로 지운다.
+ * 사진은 `addImageUrls` · `removeImageUrls` 변화분으로 받아 서버가 가진 최신 목록에 적용한다(`imageUrls` 는 전체 교체).
+ */
 export async function updateConsoleTaskCore(input: {
   taskId: string;
-  title: string;
-  desc: string;
-  date: string;
-  time: string;
-  durationMinutes: number | null;
-  repeat: string;
-  priority: string;
-  tags: string[];
+  title?: string;
+  desc?: string;
+  date?: string;
+  time?: string;
+  durationMinutes?: number | null;
+  repeat?: string;
+  priority?: string;
+  tags?: string[];
   /** 연결된 건물/객실/예약/게스트. 생략하면 기존 연결을 그대로 둔다. */
   context?: ConsoleTaskContext;
   /** 이미 업로드된 URL 전체로 교체한다. 생략하면 사진을 그대로 둔다. */
   imageUrls?: string[];
+  /** 새로 올린 사진 — 서버의 최신 목록 끝에 붙인다. */
+  addImageUrls?: string[];
+  /** 사용자가 뺀 사진 — 서버의 최신 목록에서 뺀다. */
+  removeImageUrls?: string[];
 }): Promise<TaskActionResult> {
   const resolved = await resolveTask(input.taskId);
   if (!resolved) return { ok: false, error: "not_found" };
   const { session, task } = resolved;
   if (!canEditTaskCore(session, task)) return { ok: false, error: "forbidden" };
 
-  const title = input.title.trim();
-  if (!title) return { ok: false, error: "missing_title" };
-  const description = input.desc.trim();
-  let date = input.date.trim();
-  const time = input.time.trim();
-  const tags = input.tags.map((t) => t.trim()).filter(Boolean).slice(0, 10);
-  const nextRecurrenceRule = resolveRecurrenceRule(input.repeat, task.recurrenceRule);
-  // 반복이 있는데 날짜가 없으면 오늘로 앵커(create 와 동일; repeat_needs_date 방지).
-  if (nextRecurrenceRule && !date) date = tokyoToday();
-  if ((date && !isValidYmd(date)) || (time && !isValidHm(time))) return { ok: false, error: "invalid_date" };
-
-  if (taskTimeWithoutDate({ scheduledDate: "", dueDate: date, time })) {
-    return { ok: false, error: "time_needs_date" };
+  const update: Database["public"]["Tables"]["tasks"]["Update"] = {};
+  if (input.title !== undefined) {
+    const title = input.title.trim();
+    if (!title) return { ok: false, error: "missing_title" };
+    update.title = title;
   }
-  const { scheduledDate: sched, dueAt, allDay, timeLabel } = normalizeTaskDateTime({
-    scheduledDate: "",
-    dueDate: date,
-    time,
-  });
-  const finalDuration = timeLabel ? clampDuration(input.durationMinutes) : null;
-  const anchorDate = taskAnchorDateInput({ scheduledDate: sched, dueAt });
-  if (taskNeedsRecurrenceDate(nextRecurrenceRule, anchorDate)) {
-    return { ok: false, error: "repeat_needs_date" };
+  if (input.desc !== undefined) update.description = input.desc.trim() || null;
+  if (input.tags !== undefined) {
+    update.tags = input.tags.map((t) => t.trim()).filter(Boolean).slice(0, 10);
+  }
+  if (input.priority !== undefined) {
+    update.priority = PRIORITIES.has(input.priority) ? input.priority : "normal";
+  }
+
+  const scheduleParts = [input.date, input.time, input.durationMinutes, input.repeat];
+  if (scheduleParts.some((v) => v !== undefined)) {
+    if (
+      input.date === undefined ||
+      input.time === undefined ||
+      input.durationMinutes === undefined ||
+      input.repeat === undefined
+    ) {
+      return { ok: false, error: "invalid_date" };
+    }
+    let date = input.date.trim();
+    const time = input.time.trim();
+    const nextRecurrenceRule = resolveRecurrenceRule(input.repeat, task.recurrenceRule);
+    // 반복이 있는데 날짜가 없으면 오늘로 앵커(create 와 동일; repeat_needs_date 방지).
+    if (nextRecurrenceRule && !date) date = tokyoToday();
+    if ((date && !isValidYmd(date)) || (time && !isValidHm(time))) return { ok: false, error: "invalid_date" };
+
+    if (taskTimeWithoutDate({ scheduledDate: "", dueDate: date, time })) {
+      return { ok: false, error: "time_needs_date" };
+    }
+    const { scheduledDate: sched, dueAt, allDay, timeLabel } = normalizeTaskDateTime({
+      scheduledDate: "",
+      dueDate: date,
+      time,
+    });
+    const anchorDate = taskAnchorDateInput({ scheduledDate: sched, dueAt });
+    if (taskNeedsRecurrenceDate(nextRecurrenceRule, anchorDate)) {
+      return { ok: false, error: "repeat_needs_date" };
+    }
+    Object.assign(update, {
+      scheduled_date: sched,
+      due_at: dueAt,
+      all_day: allDay,
+      time_label: timeLabel,
+      duration_minutes: timeLabel ? clampDuration(input.durationMinutes) : null,
+      recurrence_rule: nextRecurrenceRule,
+      recurrence_series_id: task.recurrenceSeriesId ?? (nextRecurrenceRule ? task.id : null),
+      recurrence_instance_date:
+        task.recurrenceSeriesId || nextRecurrenceRule
+          ? anchorDate ?? task.recurrenceInstanceDate ?? null
+          : null,
+      ...recurringRowStatusPatch(nextRecurrenceRule, task.status),
+    });
   }
 
   const supabase = getSupabaseServiceClient();
-  const update: Database["public"]["Tables"]["tasks"]["Update"] = {
-    title,
-    description: description || null,
-    scheduled_date: sched,
-    due_at: dueAt,
-    all_day: allDay,
-    time_label: timeLabel,
-    duration_minutes: finalDuration,
-    priority: PRIORITIES.has(input.priority) ? input.priority : "normal",
-    recurrence_rule: nextRecurrenceRule,
-    recurrence_series_id: task.recurrenceSeriesId ?? (nextRecurrenceRule ? task.id : null),
-    recurrence_instance_date:
-      task.recurrenceSeriesId || nextRecurrenceRule
-        ? anchorDate ?? task.recurrenceInstanceDate ?? null
-        : null,
-    tags,
-  };
   // 사진과 컨텍스트는 선택적 패치다. 생략한 필드는 저장된 값을 그대로 두므로
   // 제목만 고치는 호출자가 링크나 사진 연결을 모르는 사이에 지우지 않는다.
+  const photoDelta = input.addImageUrls !== undefined || input.removeImageUrls !== undefined;
+  const requestedImageUrls =
+    input.imageUrls ??
+    (photoDelta
+      ? [
+          ...task.imageUrls.filter((u) => !(input.removeImageUrls ?? []).includes(u)),
+          ...(input.addImageUrls ?? []),
+        ]
+      : undefined);
   const nextImageUrls =
-    input.imageUrls === undefined
+    requestedImageUrls === undefined
       ? null
-      : mergeTaskImageUrls(task.imageUrls, input.imageUrls, !!task.projectId, session.organization.id);
+      : mergeTaskImageUrls(task.imageUrls, requestedImageUrls, !!task.projectId, session.organization.id);
   if (nextImageUrls) update.image_urls = nextImageUrls;
   if (input.context !== undefined) {
     const context = normalizeContext(input.context);
     if (!(await contextBelongsToOrg(session, context))) return { ok: false, error: "forbidden" };
     Object.assign(update, context);
   }
+  if (Object.keys(update).length === 0) return { ok: true };
 
   // 이번 수정에서 분리된 파일 — 클라이언트 입력이 아니라 서버가 아는 값으로 정한다.
   const removedImageUrls = nextImageUrls
     ? task.imageUrls.filter((u) => !nextImageUrls.includes(u))
+    : [];
+  // 그 사이 다른 사람이 붙여 한도가 찼으면 새 사진은 버려진다 — 이미 올라간 파일도 같은 정리 길로 지운다.
+  // 같은 주소는 한 번만, 조직 주소 검사에 걸린 것은 세지도 지우지도 않는다 — 한도 때문에 빠진 우리 파일만.
+  const droppedImageUrls = nextImageUrls
+    ? [...new Set(input.addImageUrls ?? [])].filter(
+        (u) =>
+          isOrgTaskImageUrl(u, session.organization.id) &&
+          !nextImageUrls.includes(u) &&
+          !task.imageUrls.includes(u),
+      )
     : [];
   const { error } = await supabase
     .from("tasks")
@@ -753,7 +810,7 @@ export async function updateConsoleTaskCore(input: {
     .eq("organization_id", session.organization.id);
   if (error) return { ok: false, error: "save_failed" };
   // DB 가 더는 참조하지 않는 것을 확인한 뒤에만, 분리된 파일을 하드 삭제한다.
-  await cleanupRemovedTaskImages(supabase, removedImageUrls, session.organization.id);
+  await cleanupRemovedTaskImages(supabase, [...removedImageUrls, ...droppedImageUrls], session.organization.id);
   await bestEffortWrite(
     "task_updates: insert",
     supabase.from("task_updates").insert({
@@ -769,11 +826,11 @@ export async function updateConsoleTaskCore(input: {
     session.organization.id,
     "task_updated",
     "edited",
-    title,
+    update.title ?? task.title,
     `task_edited:${task.id}:${Date.now()}`,
   );
   revalidatePath(CONSOLE_PATH);
-  return { ok: true };
+  return droppedImageUrls.length ? { ok: true, droppedImages: droppedImageUrls.length } : { ok: true };
 }
 
 // ── 5. 일정 변경(작성자만) ────────────────────────────────────────────────
@@ -782,7 +839,7 @@ export async function updateConsoleTaskCore(input: {
  * 증명하므로, 예전에는 공유만 받은 참여자가 남의 작업 마감일·시간·반복 주기를 바꿀 수 있었다.
  * 날짜를 비우면 아래에서 `recurrence_*` 까지 지우므로 반복 시리즈를 통째로 해제하는 것도 가능했다.
  * 모바일의 같은 조작(`updateTaskCore`)은 처음부터 작성자 전용이라 두 화면의 권한이 어긋나 있었다.
- * 오늘/내일로 이동(`moveConsoleToToday`/`Tomorrow`)은 모바일에서도 참여자에게 열려 있어 그대로 둔다.
+ * 오늘/내일로 이동(`moveConsoleToToday`/`Tomorrow`)도 같은 판정을 쓴다(2026-11-25 — 예전엔 참여자에게 열려 있었다).
  */
 export async function rescheduleConsoleTask(
   taskId: string,
@@ -839,6 +896,7 @@ export async function rescheduleConsoleTask(
     recurrence_rule: nextRecurrenceRule,
     recurrence_series_id: task.recurrenceSeriesId ?? (nextRecurrenceRule ? task.id : null),
     recurrence_instance_date: task.recurrenceSeriesId || nextRecurrenceRule ? date : null,
+    ...recurringRowStatusPatch(nextRecurrenceRule, task.status),
   };
   const { error } = await supabase
     .from("tasks")
@@ -1196,9 +1254,10 @@ export async function reorderConsoleTasks(orderedIds: string[]): Promise<TaskAct
   ids.forEach((id, index) => {
     if (scope.taskIds.has(id)) positions.set(id, index);
   });
-  await setTaskSortOrders({ organizationId: session.organization.id, positions });
+  const saved = await setTaskSortOrders({ organizationId: session.organization.id, positions });
   revalidatePath(CONSOLE_PATH);
-  return { ok: true };
+  // 저장 실패를 성공으로 돌려주면 화면은 낙관적 순서를 그대로 두고, 새로고침에서야 되돌아간다(2026-11-25).
+  return saved ? { ok: true } : { ok: false, error: "save_failed" };
 }
 
 /**
@@ -1233,7 +1292,7 @@ export async function reorderConsoleDateTasks(
     else oneOffUpdates.push({ taskId: it.taskId, index });
   });
 
-  const [, orderOk] = await Promise.all([
+  const [sortOk, orderOk] = await Promise.all([
     setTaskSortOrders({
       organizationId: session.organization.id,
       positions: new Map(oneOffUpdates.map((it) => [it.taskId, it.index])),
@@ -1245,8 +1304,8 @@ export async function reorderConsoleDateTasks(
     }),
   ]);
   revalidatePath(CONSOLE_PATH);
-  // 회차 순서 저장이 실패하면 화면만 바뀐 채 새로고침에서 되돌아간다 — 조용히 넘기지 않는다.
-  if (!orderOk) return { ok: false, error: "save_failed" };
+  // 순서 저장이 실패하면 화면만 바뀐 채 새로고침에서 되돌아간다 — 조용히 넘기지 않는다(일회성도, 2026-11-25).
+  if (!sortOk || !orderOk) return { ok: false, error: "save_failed" };
   return { ok: true };
 }
 
@@ -1370,11 +1429,13 @@ export async function restoreConsoleTasks(taskIds: string[]): Promise<TaskAction
   return { ok: true };
 }
 
-// ── 9. 오늘 / Inbox 로 옮기기(참여자) ──────────────────────────────────
+// ── 9. 오늘 / Inbox 로 옮기기(작성자 · 프로젝트 주인 · 개발자) ──────────────────────────────────
 export async function moveConsoleToToday(taskId: string): Promise<TaskActionResult> {
   const resolved = await resolveTask(taskId);
   if (!resolved) return { ok: false, error: "not_found" };
   const { session, task } = resolved;
+  // 마감을 옮기는 일이라 일정 변경(`rescheduleConsoleTask`)과 같은 사람만 — 작성자 · 프로젝트 주인 · 개발자(2026-11-25).
+  if (!canEditTaskCore(session, task)) return { ok: false, error: "forbidden" };
   const today = tokyoToday();
   // 반복 업무는 이 이동을 아예 거절한다(2026-08-25). 이동은 `due_at`(=시리즈 앵커)을 다시 쓰는데,
   // 반복 앵커는 «고정»이 계약이고(2026-07-30 롤포워드 폐지) 밀린 회차는 앵커부터 계산되므로,
@@ -1412,6 +1473,8 @@ export async function moveConsoleToTomorrow(taskId: string): Promise<TaskActionR
   const resolved = await resolveTask(taskId);
   if (!resolved) return { ok: false, error: "not_found" };
   const { session, task } = resolved;
+  // 마감을 옮기는 일이라 일정 변경(`rescheduleConsoleTask`)과 같은 사람만 — 작성자 · 프로젝트 주인 · 개발자(2026-11-25).
+  if (!canEditTaskCore(session, task)) return { ok: false, error: "forbidden" };
   const tomorrow = ymdShift(tokyoToday(), 1);
   // `moveConsoleToToday` 와 같은 이유로 반복 업무는 거절한다 — 고정 앵커 계약 + 지연 백로그 소실.
   if (isStandardRecurrence(task.recurrenceRule)) {

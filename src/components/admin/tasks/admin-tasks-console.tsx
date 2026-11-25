@@ -106,6 +106,8 @@ import {
   type OccurrenceState,
   parseCustomWeekdays,
   recurringOccurrencesInRange,
+  forgetCompletedFrom,
+  trackCompletedFrom,
 } from "@/lib/tasks-recurrence";
 import type { AdminTasksData } from "@/lib/admin-tasks";
 import { getAdminTasksDictionary } from "@/lib/admin-tasks-i18n";
@@ -141,6 +143,7 @@ import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast
 import { haptic } from "@/lib/haptics";
 import { SKIPPED_DAYS_VISIBLE, selectRecentSkippedDays, selectUpcomingSkippedDays } from "@/lib/task-skipped-days";
 import { shiftMonthKey } from "@/components/admin/shared/admin-month-key";
+import { AdminTimePicker } from "@/components/admin/shared/admin-time-picker";
 import { compressImageFile } from "@/components/announcements/announcement-image-uploader";
 import { formatUpdateStampTokyo } from "@/lib/tasks-date-label";
 import { doneTodayEntries, todayProgress } from "@/lib/tasks-today-progress";
@@ -153,6 +156,7 @@ import {
   dateOf,
   DURATION_OPTIONS,
   dueDateOf,
+  changedCoreFields,
   fill,
   fmtLong,
   fmtMonthDay,
@@ -392,6 +396,11 @@ export function AdminTasksConsole({
     value: [],
     pending: [],
   });
+  // 편집을 연 순간의 사진 — 저장 때 «뺀 사진»을 이것과 비교해 변화분만 보낸다(2026-11-25).
+  const editPhotosStart = useRef<string[]>([]);
+  const coreEditStart = useRef({ title: "", desc: "", tags: [] as string[] });
+  // 이 화면에서 방금 완료한 일회성의 완료 전 상태 — 체크를 다시 눌러 풀어도 진행 중으로(`trackCompletedFrom`).
+  const completedFrom = useRef<Record<string, string>>({});
   const [notePhotos, setNotePhotos] = useState<PreviewItem[]>([]);
   // 오른쪽 상세 칸(2026-10-15 화이트 리디자인) — 예전의 미끄러져 나오는 패널을 대신한다.
   // `sel` = 사용자가 고른 작업. 고른 게 없으면 목록 보기(오늘·내일·관리함·공유함)는 **첫 작업**을
@@ -788,6 +797,8 @@ export function AdminTasksConsole({
   const startCoreEdit = useCallback((t: TaskRecord) => {
     setCoreEdit({ id: t.id, title: t.title, desc: t.description ?? "", tags: [...t.tags], tagInput: "" });
     setEditPhotos({ value: [...t.imageUrls], pending: [] });
+    editPhotosStart.current = [...t.imageUrls];
+    coreEditStart.current = { title: t.title, desc: t.description ?? "", tags: [...t.tags] };
   }, []);
   const cancelCoreEdit = useCallback(() => {
     setCoreEdit(null);
@@ -805,9 +816,19 @@ export function AdminTasksConsole({
   const saveCoreEdit = useCallback(
     (t: TaskRecord, draft: NonNullable<typeof coreEdit>) => {
       if (!draft.title.trim()) return;
-      // 날짜/시각/반복/우선순위는 여기서 편집하지 않지만 액션이 전부 다시 쓴다 — 작업의
-      // 현재 값을 되돌려 넘기지 않으면 이 편집이 일정을 조용히 지운다.
+      // 바꾼 칸만 보낸다(2026-11-25) — 일정 · 우선순위 · 연결을 화면이 들고 있던 값으로 다시 보내면 그 사이 다른
+      // 사람이 고친 값을 되돌린다. 사진도 변화분(뺀 것 · 새로 올린 것)만 — 서버가 최신 목록에 적용한다.
       const photos = editPhotos;
+      const removed = editPhotosStart.current.filter((u) => !photos.value.includes(u));
+      const changed = changedCoreFields(coreEditStart.current, draft);
+      const close = () => {
+        setCoreEdit(null);
+        setEditPhotos({ value: [], pending: [] });
+      };
+      if (Object.keys(changed).length === 0 && removed.length === 0 && photos.pending.length === 0) {
+        close();
+        return;
+      }
       run(
         async () => {
           const uploaded = photos.pending.length
@@ -819,29 +840,20 @@ export function AdminTasksConsole({
             : [];
           return updateConsoleTaskCore({
             taskId: t.id,
-            title: draft.title,
-            desc: draft.desc,
-            tags: draft.tags,
-            date: dueDateOf(t) ?? t.scheduledDate ?? "",
-            time: t.timeLabel ?? "",
-            durationMinutes: t.durationMinutes,
-            repeat: t.recurrenceRule ?? "none",
-            priority: t.priority,
-            // 유지한 사진 + 새로 올린 사진. 액션은 이것을 전체 교체 목록으로 보고
-            // 사용자가 뺀 것은 하드 삭제한다.
-            imageUrls: [...photos.value, ...uploaded],
+            ...changed,
+            ...(removed.length ? { removeImageUrls: removed } : {}),
+            ...(uploaded.length ? { addImageUrls: uploaded } : {}),
           });
         },
         {
-          toast: dict.tUpdated,
-          after: () => {
-            setCoreEdit(null);
-            setEditPhotos({ value: [], pending: [] });
+          after: (res) => {
+            showToast(res.droppedImages ? fill(dict.phTooMany, { max: t.projectId ? 20 : 5 }) : dict.tUpdated);
+            close();
           },
         },
       );
     },
-    [dict, editPhotos, organizationId, run],
+    [dict, editPhotos, organizationId, run, showToast],
   );
 
   const toggleComplete = useCallback(
@@ -856,24 +868,36 @@ export function AdminTasksConsole({
       if (isDone) {
         // 다시 열기: 낙관적 갱신 없음 — 행이 다시 나타나려면 새 서버 데이터를 기다려야 하고,
         // 실행 취소 토스트가 이미 즉각 피드백을 준다 (모바일과 같은 방식).
-        run(() => toggleConsoleComplete(t.id, false, occDate), { toast: dict.tReopened });
+        const tracked = trackCompletedFrom(completedFrom.current, t.id, false, t.status);
+        completedFrom.current = tracked.memory;
+        run(() => toggleConsoleComplete(t.id, false, occDate, tracked.restoreStatus), { toast: dict.tReopened });
         return;
       }
+      completedFrom.current = trackCompletedFrom(completedFrom.current, t.id, true, t.status).memory;
       const sub = occ ? undefined : recurringNextLabel(t);
       run(() => toggleConsoleComplete(t.id, true, occDate), {
         optimistic: () =>
           occDate
             ? resolveOccurrenceOptimistically({ taskId: t.id, occurrenceDate: occDate })
             : applyTaskOptimistic({ kind: "remove", ids: [t.id] }),
+        onError: () => {
+          completedFrom.current = forgetCompletedFrom(completedFrom.current, t.id);
+        },
         // 실행 취소는 서버가 **실제로 기록한** 회차로 — 회차가 아닌 날 완료하면 가장 오래된 밀린 회차로
         // 정산되므로, 누른 날짜로 되돌리면 아무것도 풀리지 않는다.
         after: (res) =>
           showUndo(
             dict.tCompleted,
-            (clear) =>
-              run(() => toggleConsoleComplete(t.id, false, res.occurrenceDate ?? occDate), {
-                after: clear,
-              }),
+            (clear) => {
+              // 완료 전 상태(진행 중)로 되돌린다 — `t` 는 누르기 전 기록(2026-11-25). 풀었으니 기억도 지운다.
+              const undoTracked = trackCompletedFrom(completedFrom.current, t.id, false, t.status);
+              completedFrom.current = undoTracked.memory;
+              run(
+                () =>
+                  toggleConsoleComplete(t.id, false, res.occurrenceDate ?? occDate, undoTracked.restoreStatus),
+                { after: clear },
+              );
+            },
             sub,
           ),
       });
@@ -1781,17 +1805,8 @@ export function AdminTasksConsole({
     }
     run(
       () =>
-        updateConsoleTaskCore({
-          taskId: t.id,
-          title: t.title,
-          desc: t.description ?? "",
-          date: dueDateOf(t) ?? t.scheduledDate ?? "",
-          time: t.timeLabel ?? "",
-          durationMinutes: t.durationMinutes,
-          repeat: t.recurrenceRule ?? "none",
-          priority: prio,
-          tags: t.tags,
-        }),
+        // 우선순위만 보낸다 — 나머지 칸은 서버가 저장된 값을 그대로 둔다(2026-11-25).
+        updateConsoleTaskCore({ taskId: t.id, priority: prio }),
       { toast: dict.tUpdated, after: () => setPop(null) },
     );
   };
@@ -3195,8 +3210,8 @@ export function AdminTasksConsole({
 
   /**
    * 상세 칸 「사진 추가」(2026-10-15) — 편집 모드를 거치지 않고 바로 붙인다. 업로드 계약은 편집 저장과
-   * 같다: 클라이언트 압축 → `task-images/` 업로드 → `updateConsoleTaskCore` 에 **전체 집합**을 넘긴다
-   * (기존 사진 + 새 사진이라 지워지는 건 없다). 작성자 전용이고 상한(5 / 프로젝트 20)은 서버도 다시 건다.
+   * 같다: 클라이언트 압축 → `task-images/` 업로드 → `updateConsoleTaskCore` 에 **새 사진만**(`addImageUrls`)
+   * 넘긴다(2026-11-25). 작성자 전용이고 상한(5 / 프로젝트 20)은 서버도 다시 건다.
    */
   const addDetailPhotos = (t: TaskRecord, files: File[]) => {
     if (files.length === 0 || photoBusy) return;
@@ -3206,18 +3221,7 @@ export function AdminTasksConsole({
     if (files.some((f) => f.size > 8 * 1024 * 1024)) return showToast(fill(dict.phTooLarge, { max: 8 }));
     if (t.imageUrls.length + files.length > max) return showToast(fill(dict.phTooMany, { max }));
     setPhotoBusy(t.id);
-    // try 안에 조건식(??)을 두면 React Compiler 가 콘솔 전체를 건너뛴다 — 본문은 밖에서 만든다.
-    const core = {
-      taskId: t.id,
-      title: t.title,
-      desc: t.description ?? "",
-      tags: t.tags,
-      date: dueDateOf(t) ?? t.scheduledDate ?? "",
-      time: t.timeLabel ?? "",
-      durationMinutes: t.durationMinutes,
-      repeat: t.recurrenceRule ?? "none",
-      priority: t.priority,
-    };
+    const taskId = t.id;
     run(
       async () => {
         try {
@@ -3228,13 +3232,20 @@ export function AdminTasksConsole({
               previewUrl: "",
             })),
           );
-          const uploaded = await uploadPendingTaskPhotos({ pending: pendingItems, organizationId, taskId: t.id });
-          return updateConsoleTaskCore({ ...core, imageUrls: [...t.imageUrls, ...uploaded] });
+          const uploaded = await uploadPendingTaskPhotos({ pending: pendingItems, organizationId, taskId });
+          // 새 사진만 보낸다(2026-11-25) — 서버가 최신 목록 끝에 붙이고, 다른 칸은 건드리지 않는다.
+          return updateConsoleTaskCore({ taskId, addImageUrls: uploaded });
         } catch {
           return { ok: false, error: "save_failed" } as TaskActionResult;
         }
       },
-      { toast: dict.tUpdated, after: () => setPhotoBusy(null), onError: () => setPhotoBusy(null) },
+      {
+        after: (res) => {
+          showToast(res.droppedImages ? fill(dict.phTooMany, { max }) : dict.tUpdated);
+          setPhotoBusy(null);
+        },
+        onError: () => setPhotoBusy(null),
+      },
     );
   };
 
@@ -4247,8 +4258,14 @@ export function AdminTasksConsole({
               </span>
             </button>
             <div className="exp-body">
+              {/* 공용 시간 선택기(CLAUDE.md 4a 와 같은 뜻 — 브라우저 기본 시계를 쓰지 않는다, 2026-11-25). */}
               <div className="time-in">
-                <input type="time" value={p.draft.time} onChange={(e) => set({ time: e.target.value })} />
+                <AdminTimePicker ariaLabel={dict.schTime} value={p.draft.time} onChange={(v) => set({ time: v })} />
+                {p.draft.time ? (
+                  <button className="ochip" onClick={() => set({ time: "" })} type="button">
+                    {dict.schTimeNone}
+                  </button>
+                ) : null}
               </div>
               <div className="dur-lbl">{dict.schDuration}</div>
               <div className="opt-chips">
@@ -4497,21 +4514,9 @@ export function AdminTasksConsole({
             return;
           }
           if (!t) return;
-          // 기존 작업은 코어 편집과 같은 액션을 쓴다 — 날짜/시간/반복/우선순위는 현재 값 그대로.
+          // 연결만 보낸다(2026-11-25) — 다른 칸은 서버가 저장된 값을 그대로 둔다.
           run(
-            () =>
-              updateConsoleTaskCore({
-                taskId: t.id,
-                title: t.title,
-                desc: t.description ?? "",
-                tags: t.tags,
-                date: dueDateOf(t) ?? t.scheduledDate ?? "",
-                time: t.timeLabel ?? "",
-                durationMinutes: t.durationMinutes,
-                repeat: t.recurrenceRule ?? "none",
-                priority: t.priority,
-                context: v,
-              }),
+            () => updateConsoleTaskCore({ taskId: t.id, context: v }),
             { toast: dict.tUpdated },
           );
         }}
@@ -4526,8 +4531,8 @@ export function AdminTasksConsole({
     const close = () => setPop(null);
     return (
       <div className="pop menu">
-        {/* 일정 변경 = 마감·시간·반복 주기 수정이라 **작성자 전용**(서버도 forbidden). 참여자에게는
-            아래 오늘/내일로 이동만 남는다 — 그쪽은 모바일에서도 참여자에게 열려 있다. */}
+        {/* 일정 변경 · 오늘/내일로 이동은 작성자 · 프로젝트 주인 · 개발자만(서버도 forbidden, 2026-11-25).
+            참여자에게는 둘 다 안 보인다 — 모바일 밀기도 같은 규칙. */}
         {mine && (
           <button className="mitem" onClick={(e) => openSchedulePop(e, t)}>
             <CalendarDays size={15} />
@@ -4566,8 +4571,10 @@ export function AdminTasksConsole({
             `moveConsoleToTomorrow` 는 `recurrence_instance_date` 를 다시 써서 시리즈 전체의 반복
             위상을 옮기고, 그 순간 밀린 회차 backlog 가 통째로 사라진다. 반복 업무는 고정 앵커여야
             한다(docs/planning/01-decision-log.md 2026-07-30 롤포워드 폐지). 일정을 바꾸려면
-            편집(반복 규칙/날짜)이나 회차 건너뛰기를 쓴다. */}
-        {!isStandardRecurrence(t.recurrenceRule) &&
+            편집(반복 규칙/날짜)이나 회차 건너뛰기를 쓴다.
+            날짜 옮기기는 작성자 · 프로젝트 주인 · 개발자만(`mine`, 2026-11-25 — 서버도 canEditTaskCore 로 거절). */}
+        {mine &&
+          !isStandardRecurrence(t.recurrenceRule) &&
           (!occursOn(t, today) ? (
             <button
               className="mitem"

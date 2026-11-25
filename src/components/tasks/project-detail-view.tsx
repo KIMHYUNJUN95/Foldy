@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useSplitPush } from "@/components/shell/split-list";
 import { AlertTriangle, ChevronLeft, LogOut, MoreHorizontal, Plus, Trash2, UserPlus, X } from "lucide-react";
@@ -435,48 +434,38 @@ export function ProjectDetailView({
         </ConfirmSheet>
       ) : null}
 
-      {/* Rename section — 가운데 확인 창(의도된 BottomSheet 예외: 짧은 이름 한 칸). */}
-      {renameTarget
-        ? createPortal(
-            <div
-              className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/45 px-7"
-              onClick={() => setRenameTarget(null)}
-              style={{ animation: "modal-overlay-in 180ms ease-out both" }}
-            >
-              <div
-                className="tkw-sheet w-full max-w-[340px] rounded-[20px] bg-white p-5"
-                onClick={(e) => e.stopPropagation()}
-                role="dialog"
-                style={{ animation: "modal-card-in 240ms cubic-bezier(0.34,1.26,0.64,1) both" }}
-              >
-                <h2>{p.renameSectionTitle}</h2>
-                <form action={renameProjectSection}>
-                  <input name="projectId" type="hidden" value={project.id} />
-                  <input name="sectionId" type="hidden" value={renameTarget.id} />
-                  <label className="tkw-nf">
-                    <input
-                      aria-label={p.renameSectionTitle}
-                      autoFocus
-                      className="tkw-nf__in is-sm"
-                      defaultValue={renameTarget.title}
-                      name="title"
-                      required
-                    />
-                  </label>
-                  <div className="tkw-btns2">
-                    <button className="tkw-btn is-gray" onClick={() => setRenameTarget(null)} type="button">
-                      {copy.cancel}
-                    </button>
-                    <button className="tkw-btn is-pri" type="submit">
-                      {copy.save}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
+      {/* Rename section — 공용 BottomSheet(스크림 탭 · 끌어 내리기 · Esc 로 닫힘, 2026-11-25). */}
+      {renameTarget ? (
+        <BottomSheet ariaLabel={p.renameSectionTitle} onClose={() => setRenameTarget(null)}>
+          {({ close }) => (
+            <div className="tkw-sheet">
+              <h2>{p.renameSectionTitle}</h2>
+              <form action={renameProjectSection}>
+                <input name="projectId" type="hidden" value={project.id} />
+                <input name="sectionId" type="hidden" value={renameTarget.id} />
+                <label className="tkw-nf">
+                  <input
+                    aria-label={p.renameSectionTitle}
+                    autoFocus
+                    className="tkw-nf__in is-sm"
+                    defaultValue={renameTarget.title}
+                    name="title"
+                    required
+                  />
+                </label>
+                <div className="tkw-btns2">
+                  <button className="tkw-btn is-gray" onClick={close} type="button">
+                    {copy.cancel}
+                  </button>
+                  <button className="tkw-btn is-pri" type="submit">
+                    {copy.save}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+        </BottomSheet>
+      ) : null}
 
       {/* 프로젝트 삭제 확인 */}
       {deleteProjectOpen ? (

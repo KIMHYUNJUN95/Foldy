@@ -2,7 +2,6 @@ import "server-only";
 
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import {
-  isOccurrenceCompleted,
   isRecurringOccurrenceDate,
   occurrencesToAbsorb,
   pickCompletionOccurrence,
@@ -22,13 +21,18 @@ import type { Database } from "@/types/database";
 
 type OccurrenceInsert = Database["public"]["Tables"]["task_occurrence_state"]["Insert"];
 
-/** 회차 날짜 하나를 완료로 표시한다(PK 기준 멱등 upsert). */
+/**
+ * 회차 날짜 하나를 완료로 표시한다. 읽고 → 쓰는 사이에 다른 완료가 끼어들 틈이 없도록(2026-11-25) 쓰기 자체가
+ * 판정한다: 먼저 «없으면 넣기»(ON CONFLICT DO NOTHING), 이미 행이 있으면 «완료가 아닐 때만» 완료로 바꾼다
+ * (건너뜀 · 이동한 회차를 완료하는 건 예전처럼 허용). 둘 다 바뀐 행이 없으면 이미 완료 — `already`.
+ * 호출부는 `saved` 일 때만 완료 기록 · 알림을 남긴다(두 사람이 동시에 눌러도 한 번).
+ */
 export async function completeOccurrence(args: {
   taskId: string;
   organizationId: string;
   occurrenceDate: string;
   userId: string;
-}): Promise<boolean> {
+}): Promise<"saved" | "already" | "failed"> {
   const supabase = getSupabaseServiceClient();
   const row: OccurrenceInsert = {
     task_id: args.taskId,
@@ -38,16 +42,70 @@ export async function completeOccurrence(args: {
     completed_by_user_id: args.userId,
     moved_to_date: null,
   };
-  // 결과를 돌려준다(2026-10-26) — 실패를 버리면 호출부가 완료 기록 · 알림을 그대로 남겨,
-  // 화면은 «완료됐다»고 말하는데 새로고침하면 다시 열려 있었다.
-  const { error } = await supabase
+  const { data: inserted, error } = await supabase
     .from("task_occurrence_state")
-    .upsert(row, { onConflict: "task_id,occurrence_date" });
+    .upsert(row, { onConflict: "task_id,occurrence_date", ignoreDuplicates: true })
+    .select("task_id");
   if (error) {
-    console.error("[completeOccurrence] upsert failed:", error.message);
-    return false;
+    console.error("[completeOccurrence] insert failed:", error.message);
+    return "failed";
   }
-  return true;
+  if (inserted && inserted.length > 0) return "saved";
+  const { data: updated, error: updateError } = await supabase
+    .from("task_occurrence_state")
+    .update({ state: "completed", completed_by_user_id: args.userId, moved_to_date: null })
+    .eq("task_id", args.taskId)
+    .eq("organization_id", args.organizationId)
+    .eq("occurrence_date", args.occurrenceDate)
+    .neq("state", "completed")
+    .select("task_id");
+  if (updateError) {
+    console.error("[completeOccurrence] update failed:", updateError.message);
+    return "failed";
+  }
+  return updated && updated.length > 0 ? "saved" : "already";
+}
+
+/**
+ * 회차 하나를 건너뜀으로 — **그 회차에 아무 상태도 없을 때만**(2026-11-25). 예전엔 읽고 → upsert 라, 그 사이에
+ * 들어온 완료를 «건너뜀»으로 덮어썼다. 이제 «없으면 넣기» 한 번으로 판정하고, 넣지 못했으면 지금 상태를 읽어
+ * 돌려준다: 이미 건너뜀이면 `skipped`(같은 결과), 완료 · 이동이면 `resolved`.
+ */
+export async function skipOccurrenceIfOpen(args: {
+  taskId: string;
+  organizationId: string;
+  occurrenceDate: string;
+}): Promise<"skipped" | "resolved" | "failed"> {
+  const supabase = getSupabaseServiceClient();
+  const row: OccurrenceInsert = {
+    task_id: args.taskId,
+    organization_id: args.organizationId,
+    occurrence_date: args.occurrenceDate,
+    state: "skipped",
+    completed_by_user_id: null,
+    moved_to_date: null,
+  };
+  const { data: inserted, error } = await supabase
+    .from("task_occurrence_state")
+    .upsert(row, { onConflict: "task_id,occurrence_date", ignoreDuplicates: true })
+    .select("task_id");
+  if (error) {
+    console.error("[skipOccurrenceIfOpen] insert failed:", error.message);
+    return "failed";
+  }
+  if (inserted && inserted.length > 0) return "skipped";
+  const { data: current, error: readError } = await supabase
+    .from("task_occurrence_state")
+    .select("state")
+    .eq("task_id", args.taskId)
+    .eq("organization_id", args.organizationId)
+    .eq("occurrence_date", args.occurrenceDate)
+    .maybeSingle();
+  if (readError || !current) {
+    if (readError) console.error("[skipOccurrenceIfOpen] read failed:", readError.message);
+    return "failed";
+  }
+  return (current as { state: string }).state === "skipped" ? "skipped" : "resolved";
 }
 
 /** 회차에 기록된 상태를 지운다(완료한 회차를 다시 열거나 취소할 때 사용). */
@@ -82,32 +140,6 @@ export async function clearSkippedOccurrenceState(
     .eq("state", "skipped");
   if (error) {
     console.error("[clearSkippedOccurrenceState] delete failed:", error.message);
-    return false;
-  }
-  return true;
-}
-
-/** 지난 회차 날짜들을 건너뜀("삭제")으로 처리한다 — 영구 보관되며 다시 나타나지 않는다. */
-export async function skipOccurrences(args: {
-  taskId: string;
-  organizationId: string;
-  dates: string[];
-}): Promise<boolean> {
-  if (args.dates.length === 0) return true;
-  const supabase = getSupabaseServiceClient();
-  const rows: OccurrenceInsert[] = args.dates.map((d) => ({
-    task_id: args.taskId,
-    organization_id: args.organizationId,
-    occurrence_date: d,
-    state: "skipped",
-    completed_by_user_id: null,
-    moved_to_date: null,
-  }));
-  const { error } = await supabase
-    .from("task_occurrence_state")
-    .upsert(rows, { onConflict: "task_id,occurrence_date" });
-  if (error) {
-    console.error("[skipOccurrences] upsert failed:", error.message);
     return false;
   }
   return true;
@@ -187,29 +219,6 @@ export async function resolveCompletionOccurrence(args: {
   if (isRecurringOccurrenceDate(args.rule, args.anchor, args.requested)) return args.requested;
   const states = await occurrenceStatesForTask(args.taskId);
   return pickCompletionOccurrence(args.rule, args.anchor, args.requested, new Set(states.keys()));
-}
-
-/**
- * 그 회차가 이미 완료로 기록돼 있는가(2026-10-28) — 완료 액션의 이중 완료 가드용.
- * `resolveCompletionOccurrence` 가 돌려준 날짜로 부른다. 읽기 실패는 «완료 아님» 으로 본다
- * (가드가 정상 완료를 막지 않게).
- */
-export async function occurrenceAlreadyCompleted(
-  taskId: string,
-  occurrenceDate: string,
-): Promise<boolean> {
-  const supabase = getSupabaseServiceClient();
-  const { data, error } = await supabase
-    .from("task_occurrence_state")
-    .select("state")
-    .eq("task_id", taskId)
-    .eq("occurrence_date", occurrenceDate)
-    .maybeSingle();
-  if (error || !data) return false;
-  return isOccurrenceCompleted(
-    new Map([[occurrenceDate, (data as { state: string }).state as OccurrenceState]]),
-    occurrenceDate,
-  );
 }
 
 /**
@@ -304,15 +313,20 @@ export async function setTaskSortOrders(args: {
   organizationId: string;
   /** taskId → 그 목록에서의 인덱스 */
   positions: ReadonlyMap<string, number>;
-}): Promise<void> {
-  if (args.positions.size === 0) return;
+}): Promise<boolean> {
+  if (args.positions.size === 0) return true;
   const supabase = getSupabaseServiceClient();
   const ids = [...args.positions.keys()];
-  const { data } = await supabase
+  // 결과를 돌려준다(2026-11-25) — 예전엔 오류를 버려 저장이 실패해도 화면은 성공으로 알았다.
+  const { data, error: readError } = await supabase
     .from("tasks")
     .select("id, sort_order")
     .in("id", ids)
     .eq("organization_id", args.organizationId);
+  if (readError) {
+    console.error("[setTaskSortOrders] read failed:", readError.message);
+    return false;
+  }
   const current = new Map(
     ((data ?? []) as Array<{ id: string; sort_order: number | null }>).map((r) => [
       r.id,
@@ -323,8 +337,8 @@ export async function setTaskSortOrders(args: {
   const changed = [...args.positions].filter(
     ([id, index]) => current.has(id) && current.get(id) !== index,
   );
-  if (changed.length === 0) return;
-  await Promise.all(
+  if (changed.length === 0) return true;
+  const results = await Promise.all(
     changed.map(([id, index]) =>
       supabase
         .from("tasks")
@@ -333,6 +347,12 @@ export async function setTaskSortOrders(args: {
         .eq("organization_id", args.organizationId),
     ),
   );
+  const failed = results.filter((r) => r.error);
+  if (failed.length > 0) {
+    console.error("[setTaskSortOrders] update failed:", failed.length, failed[0].error?.message);
+    return false;
+  }
+  return true;
 }
 
 /**

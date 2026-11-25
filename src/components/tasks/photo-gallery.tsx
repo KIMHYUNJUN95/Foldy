@@ -20,6 +20,16 @@ import { cn } from "@/lib/utils";
  * 목록은 공용 `BottomSheet` 다(2026-10-19 — 손으로 만든 시트를 공용으로: 태블릿 가운데 카드 · 끌어 닫기 ·
  * 바탕 잠금이 다른 시트와 같다). 라이트박스는 시트가 아니라 전체 화면 오버레이라서 여기에 그대로 둔다.
  */
+/** 목록 key — 순번 대신 주소. 같은 주소가 두 번 붙어 있으면 몇 번째인지 덧붙인다(2026-11-25). */
+export function photoKeys(urls: string[]): string[] {
+  const seen = new Map<string, number>();
+  return urls.map((url) => {
+    const n = seen.get(url) ?? 0;
+    seen.set(url, n + 1);
+    return `${url}#${n}`;
+  });
+}
+
 export function PhotoGallery({
   urls,
   size = "sm",
@@ -75,6 +85,7 @@ export function PhotoGallery({
   const MAX_THUMBS = 4;
   const shown = urls.slice(0, MAX_THUMBS);
   const overflow = urls.length - shown.length;
+  const keys = photoKeys(urls);
 
   const goTo = (index: number) => {
     const rail = railRef.current;
@@ -104,7 +115,7 @@ export function PhotoGallery({
               "relative shrink-0 overflow-hidden rounded-[10px] border border-border bg-muted/40 shadow-[0_1px_3px_rgba(20,32,43,0.06)]",
               thumb,
             )}
-            key={i}
+            key={keys[i]}
           >
             <Image alt="" aria-hidden="true" className="object-cover" fill sizes="72px" src={url} />
             {overflow > 0 && i === MAX_THUMBS - 1 ? (
@@ -134,7 +145,7 @@ export function PhotoGallery({
             {urls.map((url, i) => (
               <button
                 className="group relative aspect-square overflow-hidden rounded-2xl border border-border bg-muted/30 transition-transform active:scale-[0.97]"
-                key={i}
+                key={keys[i]}
                 onClick={() => openLightbox(i)}
                 type="button"
               >
@@ -158,8 +169,15 @@ export function PhotoGallery({
       {/* 전체 화면 스와이프 라이트박스. */}
       {lightbox !== null && typeof document !== "undefined"
         ? createPortal(
+            // 겹 화면 약속(2026-11-25, shell/image-lightbox 와 같다) — 화면 스와이프 뒤로가기가 이 겹을 알아보고,
+            // 사진 넘기기 캐러셀이라 가로 밀기는 뒤로가기로 가져가지 않는다.
             <div
+              aria-label={title}
+              aria-modal="true"
               className="fixed inset-0 z-[95] flex flex-col bg-slate-950/95 backdrop-blur-sm"
+              data-native-back-overlay=""
+              data-swipe-back="off"
+              role="dialog"
               style={{ animation: "modal-overlay-in 200ms ease-out both" }}
             >
               {/* 상단 글래스 바 — 카운터 + 닫기. */}
@@ -186,7 +204,7 @@ export function PhotoGallery({
                 {urls.map((url, i) => (
                   <div
                     className="flex h-full w-full shrink-0 snap-center items-center justify-center px-3"
-                    key={i}
+                    key={keys[i]}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
@@ -232,7 +250,7 @@ export function PhotoGallery({
                           "h-1.5 rounded-full transition-all",
                           i === activeIndex ? "w-5 bg-white" : "w-1.5 bg-white/35",
                         )}
-                        key={i}
+                        key={keys[i]}
                         onClick={() => goTo(i)}
                         type="button"
                       />

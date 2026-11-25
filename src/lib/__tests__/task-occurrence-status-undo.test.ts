@@ -18,15 +18,21 @@ function makeQuery(table: string) {
   const overlapFilters: Array<[string, unknown[]]> = [];
   // `.neq(col, v)` — 한 번만 완료되게 거는 조건부 갱신(2026-10-28).
   const negFilters: Array<[string, unknown]> = [];
+  const gtFilters: Array<[string, string]> = [];
   let op: "select" | "update" | "delete" | "insert" | "upsert" = "select";
   let payload: Row | Row[] | null = null;
+  let limitTo: number | null = null;
   const rows = () => (db[table] ??= []);
   const match = (r: Row) =>
     filters.every(([k, v]) => r[k] === v) &&
     negFilters.every(([k, v]) => r[k] !== v) &&
+    gtFilters.every(([k, v]) => String(r[k]) > v) &&
     overlapFilters.every(([k, vs]) => Array.isArray(r[k]) && (r[k] as unknown[]).some((x) => vs.includes(x)));
   const run = () => {
-    if (op === "select") return { data: rows().filter(match), error: null };
+    if (op === "select") {
+      const hit = rows().filter(match);
+      return { data: limitTo === null ? hit : hit.slice(0, limitTo), error: null };
+    }
     if (op === "update") {
       const hit = rows().filter(match);
       for (const r of hit) Object.assign(r, payload);
@@ -68,6 +74,17 @@ function makeQuery(table: string) {
       overlapFilters.push([k, vs]);
       return q;
     },
+    // 참조 확인은 사진이 있는 행을 마지막 id 다음부터 빈 쪽이 올 때까지 나눠 읽는다(2026-11-25).
+    order: () => q,
+    gt: (k: string, v: string) => {
+      gtFilters.push([k, v]);
+      return q;
+    },
+    limit: (n: number) => {
+      limitTo = n;
+      return q;
+    },
+    filter: () => q,
     update: (p: Row) => {
       op = "update";
       payload = p;

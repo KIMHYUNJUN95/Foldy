@@ -99,6 +99,38 @@
   노치 라벨 「본문」 → 안내 한 줄 + 「다시 생성」 → 「Slack으로 보내기 | 전체 복사」 한 줄. Slack 결과는 보라(성공) / 빨강(실패) 한 줄.
 - 문구: 제목 「일일 보고서」 → 「업무일지」, 복사 「복사」 → 「전체 복사」(ko/ja/en, PC와 같게). 새 키 `tasks.mobileWhite.reportSub` · `reportBody`.
 
+## 2026-11-25 할 일 점검 — 실패 알림 · 순서 저장 · 사진 지우기 · 옮기기 권한
+
+- **실패를 결과로 돌려준다(모바일).** `rescheduleOverdueTo` · `dismissOverdueTasks` · `skipOccurrenceOn` · `restoreTasksInList` 가
+  `{ ok }` 를 돌려준다. 대상이 없거나 쓰기 · 읽기가 하나라도 실패하면 `ok:false`. 화면(`tasks-workspace.tsx`)은 실패 때 지연 시트를 닫지
+  않고, 건너뛰기 실행 취소 토스트를 거두고, `notifyActionFailed`(오류 햅틱 + 「저장하지 못함」 토스트)로 알린다. 성공 햅틱은 서버가
+  확인한 뒤에만. `unskipOccurrenceOn` 결과도 이제 본다. 상세의 「이 날만 건너뛰기」는 실패하면 목록으로 넘어가지 않고 그 자리에서 알린다.
+  건너뛰기 뜻은 관리자 `skipConsoleOccurrence` 와 같다 — 이미 건너뛴 회차는 ok, 이미 완료 · 이동한 회차는 실패.
+- **순서 저장 결과.** `setTaskSortOrders` 가 boolean 을 돌려준다(읽기 · 수정 하나라도 실패하면 false). 모바일 `reorderTasks` ·
+  `reorderDateTasks` 는 `{ ok:false, reason:"error" }`, 관리자 `reorderConsoleTasks` · `reorderConsoleDateTasks` 는
+  `{ ok:false, error:"save_failed" }` — 화면은 낙관적 순서를 되돌린다(기존 경로).
+- **사진 지우기 규칙.** 받는 사진 주소는 표준 모양만, 지울 때는 저장소 경로로 다른 행의 참조를 본다(할 일 사진 · 메모 사진 모두).
+  자세한 내용은 `docs/engineering/05-rls-permissions.md` 「2026-11-25 할 일 점검」.
+- **오늘로 · 내일로는 작성자 · 프로젝트 주인 · 개발자만.** 공유받은 사람에겐 밀기(모바일) · 메뉴(PC)를 보이지 않고, 서버도 거절한다
+  (모바일 `moveError=forbidden` → `tasks.errors.forbidden`).
+- **프로젝트를 나간 작성자**는 그 프로젝트 할 일을 지우거나 되살리지 못한다. 개인 할 일은 그대로.
+- **사진 라이트박스**(`photo-gallery.tsx`)는 겹 화면 약속을 따른다 — `role="dialog"` · `aria-modal` · 이름 · `data-native-back-overlay` ·
+  `data-swipe-back="off"`(사진 넘기기). 목록 key 는 순번 대신 주소.
+
+
+## 2026-11-25 할 일 점검 2 — 덮어쓰기 · 반복으로 바꾸기 · 건너뛰기 겹침 · 실행 취소 상태
+
+- **완료된 일회성을 반복으로 바꾸면 다시 목록에 뜬다.** 반복 업무의 행은 언제나 열림이고 완료는 회차별인데, 수정 · 일정 변경이 행
+  상태를 그대로 두어 «완료» 행이 반복이 되면 `isActiveTask` 가 거짓 → 오늘 · 캘린더 · 관리함 어디에도 안 보였다. 이제 반복이 되는
+  행이 완료 · 진행 중이면 열림으로 돌리고 완료 도장을 지운다(`recurringRowStatusPatch`, 모바일 수정 · PC 코어 편집 · PC 일정 변경 공통).
+  취소 상태는 일부러 멈춘 것이라 그대로. 이미 그렇게 저장된 행은 한 번 더 수정하면 풀린다.
+- **건너뛰기와 완료가 겹쳐도 완료가 지워지지 않는다.** 「이 날만 건너뛰기」는 그 회차에 상태가 없을 때만 넣는다(쓰기 한 번으로 판정).
+  쓰기 직전에 다른 사람이 완료했으면 건너뛰지 않고 실패로 알린다. 반복 완료도 같은 방식이라, 두 사람이 동시에 눌러도 완료 기록 ·
+  알림은 한 번.
+- **일회성 완료의 실행 취소는 완료 전 상태로.** 진행 중이던 일을 완료 → 실행 취소하면 진행 중으로 돌아간다(예전엔 늘 열림). 화면이
+  완료 전 상태를 들고 있다가 `reopenTask(id, occ, status)` 로 넘긴다. 체크를 다시 눌러 여는 것은 그대로 열림.
+- **완료 · 기록 탭은 120일 완료를 끝까지 읽는다** — 1,000건에서 잘리던 것.
+- **프로젝트 섹션 이름 바꾸기 창은 공용 `BottomSheet`** — 손으로 만든 가운데 창이라 Esc · 끌어 내리기로 닫히지 않았다.
 ## 2026-08-06 multilingual context and accessibility copy
 
 Direct-booking context labels and task/project accessibility actions (toggle, previous/next month, more actions, remove participant) are dictionary-backed in Korean, Japanese, and English on both mobile and admin task surfaces.
@@ -327,6 +359,9 @@ anchored to tomorrow (Tokyo).
 - **Today tab → "내일로"** (defer to tomorrow): sets `scheduled_date` = tomorrow (Tokyo), un-inboxes.
 - **Tomorrow tab → "오늘로"** (pull to today): sets `scheduled_date` = today (Tokyo), un-inboxes.
 - Inbox also swipes **"오늘로"**; Sent / Calendar lists have swipe disabled.
+- **누가 밀 수 있나 (2026-11-25):** 작성자 · 프로젝트 할 일의 프로젝트 주인 · 플랫폼 개발자만(`canEditTaskCore`).
+  참여자 카드에는 밀기가 열리지 않고, 서버(`moveTaskToToday` · `moveTaskToTomorrow`)도 `forbidden` 으로 거절한다.
+  모바일에는 이 밀기만 있다 — 「오늘로 이동」 · 「내일로 이동」 메뉴는 PC 콘솔 행 메뉴다(28 §15, 같은 규칙).
 - After the move the server action returns the user to the **same tab** they swiped from (`?view=`),
   so the card simply leaves the list.
 

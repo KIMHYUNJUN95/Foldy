@@ -7,7 +7,7 @@ const pub = (path: string) => `${BASE}/storage/v1/object/public/request-images/$
 
 type Row = Record<string, unknown> & { image_urls: string[] };
 
-/** 이 테스트에 필요한 만큼만 흉내 낸 서비스 클라이언트 — select · eq · in · overlaps · storage.remove. */
+/** 이 테스트에 필요한 만큼만 흉내 낸 서비스 클라이언트 — select · eq(점 경로) · neq · filter · in · order · gt · limit · storage.remove. */
 function fakeClient(tables: Record<string, Row[]>, opts: { failOn?: string } = {}) {
   const removed: string[][] = [];
   const client = {
@@ -15,7 +15,17 @@ function fakeClient(tables: Record<string, Row[]>, opts: { failOn?: string } = {
       let rows = tables[table] ?? [];
       const q = {
         select: () => q,
-        eq: (col: string, val: unknown) => ((rows = rows.filter((r) => r[col] === val)), q),
+        eq: (col: string, val: unknown) => (
+          (rows = rows.filter(
+            (r) => col.split(".").reduce<unknown>((n, k) => (n as Record<string, unknown> | null)?.[k], r) === val,
+          )),
+          q
+        ),
+        neq: () => q,
+        filter: () => q,
+        order: () => q,
+        gt: (col: string, val: string) => ((rows = rows.filter((r) => String(r[col]) > val)), q),
+        limit: (n: number) => ((rows = rows.slice(0, n)), q),
         in: (col: string, vals: unknown[]) => ((rows = rows.filter((r) => vals.includes(r[col]))), q),
         overlaps: (col: string, vals: string[]) => (
           (rows = rows.filter((r) => (r[col] as string[]).some((v) => vals.includes(v)))), q
@@ -59,7 +69,9 @@ describe("프로젝트 삭제 — 메모 사진도 정리 (2026-10-29)", () => {
   it("메모 사진은 우리 조직 task-update-images 것만, 아직 다른 메모가 쓰면 남긴다", async () => {
     const gone = pub(`${ORG}/task-update-images/r/gone.jpg`);
     const kept = pub(`${ORG}/task-update-images/r/kept.jpg`);
-    const { client, removed } = fakeClient({ task_updates: [{ task_id: "other", image_urls: [kept] }] });
+    const { client, removed } = fakeClient({
+      task_updates: [{ task_id: "other", image_urls: [kept], tasks: { organization_id: ORG } }],
+    });
     await cleanupRemovedTaskUpdateImages(
       client,
       [gone, kept, pub(`org-2/task-update-images/r/z.jpg`), pub(`${ORG}/task-images/r/t.jpg`)],

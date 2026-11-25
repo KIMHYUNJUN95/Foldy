@@ -732,7 +732,8 @@ non-author-all-removed → private). Direct authenticated writes to `task_partic
 **Soft delete (2026-07-29):** user task deletion sets `deleted_at` (not a row DELETE). This is
 enforced in the **query lib** (`.is("deleted_at", null)` on every list/detail read), **not in RLS** —
 RLS intentionally still returns soft-deleted rows so the author's `restoreTask` / `restoreConsoleTask`
-(service-role, author-checked) can clear `deleted_at`. Owner-approved exception to the hard-delete
+(service-role, checked by `canDeleteOrRestoreTask` since 2026-11-25 — author · project owner · developer, and for project
+tasks only while the task is in the viewer's `getTaskScope`) can clear `deleted_at`. Owner-approved exception to the hard-delete
 policy (CLAUDE.md §9).
 
 - Read: active participants only.
@@ -808,6 +809,34 @@ Per-occurrence state for recurring tasks (migration `202607300001_task_occurrenc
 
 > 새 투두 읽기 경로를 추가할 때는 그 게이트를 함께 통과시킨다. RLS 만으로는 관리자 계정에서
 > 막히지 않는다.
+
+## 할 일 · 프로젝트 직접 읽기 보강 (2026-11-25)
+
+`supabase/migrations/202611250001_task_project_read_hardening.sql` — **적용 필요(운영 미적용).** 앱을 거치지 않고 PostgREST ·
+Realtime 으로 직접 읽을 때의 빈틈만 닫는다. 누가 무엇을 볼 수 있는지(권한 규칙)는 그대로고, 활성 멤버에게 보이는 행도 그대로다.
+
+| 표 | 빈틈(앞 정책) | 닫은 방법 |
+| --- | --- | --- |
+| `task_participants` · `task_updates` | `is_task_participant(task_id)` 만 봐서(202609040001) 조직에서 나간 사람도 참여자 행이 남아 있으면 명단 · 메모 · 완료 기록을 읽었다(이 표엔 `organization_id` 가 없어 조직 조건이 안 닿았다) | 참여자 조건 + **부모 할 일 조직의 활성 멤버**(`exists tasks … organization_id = any(current_user_active_organization_ids())`) |
+| `project_participants` · `project_sections` | `is_project_participant(project_id)` 만(202609080001) — 같은 빈틈 | 참여자 조건 + **프로젝트 조직의 활성 멤버** |
+| `task_report_schedules` | 본인만 봤고 조직 소속은 안 봤다(202610200005) | 본인 + 그 조직 활성 멤버 |
+| 9개 표 모두 | `anon` 에 기본 권한이 붙어 있을 수 있었다 | `anon` 은 모두 회수, `authenticated` 는 쓰기 · truncate · references · trigger 회수 후 select 만 |
+
+- `anon` 표 권한 회수는 `202611130100`(anon 이 읽어도 되는 표의 헬퍼 함수 EXECUTE 를 남김)과 다르다 — 이 9개 표는 anon 으로 읽는 곳이
+  없고(grep), 토큰 없이 붙은 실시간 구독은 원래 거절된다(`live-refresh.tsx` 72-74줄). 선례: `202611200003` 의 reservations. 파일 전체는
+  `begin; … commit;` 한 거래.
+- 사용자 세션 쓰기는 없다(2026-11-25 전수 grep — 쓰기 · 되살리기 모두 service role). 사용자 세션 읽기: `src/lib/tasks.ts` ·
+  `src/lib/projects.ts` · `src/actions/task-report.ts`, 실시간: `src/lib/live-sources.ts` → `live-refresh.tsx`(로그인 토큰).
+- **`tasks` 읽기 정책의 `deleted_at` 은 일부러 그대로.** 실시간 삭제 신호(소프트 삭제 UPDATE)가 다른 사람 화면에 가려면 지운 행이
+  RLS 를 통과해야 하고, `loadTaskScope` 도 지운 행을 포함해 읽는다. 위 「Soft delete」 와 같은 판단.
+- 프로젝트 멤버가 남의 할 일 기록 · 참여자 명단을 못 보는 것(예전과 같음), 남의 할 일을 완료 · 다시 열기 · 건너뛰기 하는 문제(서버 액션
+  권한 — 미결정)는 바꾸지 않았다.
+- 검사: `src/lib/__tests__/task-project-read-hardening.test.ts`(정적 + `FOLDY_PGLITE_DIR` 로 anon · authenticated · service_role 실제 읽기 · 쓰기,
+  적용 전후 표마다 보이는 행 수 비교).
+- **할 일 점검 묶음 2(2026-11-25, 마이그레이션 없음).** 회차 건너뛰기(`skipOccurrenceIfOpen`) · 반복 완료(`completeOccurrence`,
+  `src/lib/task-occurrences.ts`)는 서비스 키로 `task_occurrence_state` 에 `organization_id` 를 넣어 «없으면 넣기»(`ignoreDuplicates`)로 쓴다.
+  이미 행이 있을 때 조직 · 할 일 · 날짜 조건 UPDATE(`state <> 'completed'` 일 때만)는 완료 쪽만 하고, 건너뛰기는 그 행을 읽기만 한다.
+  권한 판정(`requireSessionAndTask` · `resolveTask`)은 그대로.
 
 ## board_posts
 
@@ -1820,7 +1849,7 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 
 ## 2026-10-28 할 일 서버 액션 권한 점검 반영
 
-- **복구 범위**: `restoreTask` · `restoreTasksInList` · `restoreConsoleTask(s)` — 쓴 사람이 아니면(대표 · 플랫폼 개발자) 그 사람이 열 수 있는 할 일(`getTaskScope`, 지운 행 포함)만 되살린다. 전엔 조직 안 아무 지운 할 일이나 되살릴 수 있었다.
+- **복구 범위**: `restoreTask` · `restoreTasksInList` · `restoreConsoleTask(s)` — 쓴 사람이 아니면(대표 · 플랫폼 개발자) 그 사람이 열 수 있는 할 일(`getTaskScope`, 지운 행 포함)만 되살린다. 전엔 조직 안 아무 지운 할 일이나 되살릴 수 있었다. (2026-11-25부터 쓴 사람도 프로젝트 할 일은 범위 안일 때만 — 나간 프로젝트 것은 못 되살린다, 아래 「할 일 점검」 절.)
 - **상태 바꾸기(PC)**: `setConsoleTaskStatus` 는 `open` · `in_progress` · `completed` 만 받고, 반복 할 일의 진행 중은 막는다(모바일과 같다). 쓰기 실패는 `ok:false`.
 - **나가기 · 일괄 삭제**: 내 참여 행이 없는 남의 프로젝트 할 일은 `forbidden`/실패로 돌려주고 그 할 일을 바꾸지 않는다.
 - **연결 항목**: `property_id` · `room_id` · `reservation_id` 는 저장 전에 같은 조직인지 확인한다(`src/lib/task-linked-context.ts`).
@@ -1836,12 +1865,29 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
   규칙(`removeTaskParticipant` · `leaveConsoleTask`)은 진짜 작성자에게만 그대로다.
 - **주인 권한이 닿지 않는 곳**: 「관리함으로 옮기기」(`moveTaskToInbox` · `restoreTaskToProject` · `moveConsoleToInbox`)는 작성자(또는 개발자)만 —
   주인이 남의 할 일을 프로젝트 밖으로 빼면 다시 작성자에게만 보이게 되기 때문이다. 목록 일괄 삭제 · 되돌리기(`deleteTasksInList` ·
-  `restoreTasksInList`)는 `manageableListTaskIds` 로 「내 할 일 + 내가 주인인 프로젝트의 할 일(개발자는 열 수 있는 할 일)」만 건드린다.
+  `restoreTasksInList`)는 `manageableListTaskIds` 로 「내 할 일 + 내가 주인인 프로젝트의 할 일(개발자는 열 수 있는 할 일)」만 건드린다
+  (2026-11-25부터 프로젝트 할 일은 범위 안일 때만 — 아래 「할 일 점검」 절).
 - **RLS 는 바꾸지 않았다(마이그레이션 없음).** 읽기는 RLS 가 더 넓다 — `tasks` select 정책은 `is_task_participant(id)` 를 보므로
   나간 작성자도 사용자 JWT 로 PostgREST 를 직접 부르면 자기 행을 읽을 수 있고, `author can update/delete task` 정책도 작성자에게
   열려 있다. 앱 화면 · 서버 액션은 모두 `getTaskScope` · service-role 경로라 닫혀 있다. DB 에서도 막으려면 정책에
   「프로젝트 작업이면 `is_project_participant(project_id)` 또는 author 가 아닌 참여자 행」 조건을 더하는 새 마이그레이션이 필요하다(보류 — **2026-10-29 사용자 결정: 보류 유지**, 쓰기는 `202610280001` 로 이미 막힘).
 - 쓰기 권한 회수(`202610280001_task_write_grants.sql`)는 위 「tasks」 절 참고 — **운영 DB 적용함 2026-10-29**.
+
+## 2026-11-25 할 일 점검 — 옮기기 · 나간 작성자 · 사진 주소
+
+- **오늘로 · 내일로 옮기기**(모바일 `moveTaskToToday` · `moveTaskToTomorrow`, 관리자 `moveConsoleToToday` · `moveConsoleToTomorrow`)는
+  `canEditTaskCore`(작성자 · 프로젝트 주인 · 개발자)만. 마감을 다시 쓰는 일이라 일정 변경(`rescheduleConsoleTask`)과 같은 사람이다.
+  예전엔 공유받은 사람 · 프로젝트 멤버도 옮겼다. 모바일은 `?moveError=forbidden`(문구 `tasks.errors.forbidden`), 관리자는 `forbidden`.
+  모바일 쓰기에 `organization_id` 조건을 더했고, 바뀐 행이 없으면 실패다. 화면도 밀기 · 메뉴를 같은 사람에게만 보인다.
+- **나간 작성자**: 지우기 · 되살리기 판정을 `canDeleteOrRestoreTask`(`src/lib/tasks.ts`) 하나로 모았다 — 작성자 · 주인 · 개발자이면서
+  `getTaskScope` 안(소프트 삭제된 행도 담는다)이어야 한다. 예외는 프로젝트가 없는 개인 할 일의 작성자뿐. 모바일 `restoreTask` ·
+  `deleteTasksInList` · `restoreTasksInList`(`manageableRows`), 관리자 `restorableIds`(`restoreConsoleTask` · `restoreConsoleTasks`)가 쓴다.
+  예전엔 작성자면 범위를 건너뛰어, 프로젝트를 나간 사람이 그 프로젝트에 남긴 할 일을 지우고 되살렸다.
+- **사진 주소**: `isOrgTaskImageUrl` 은 표준 모양(`canonicalRequestImageUrl(path)` 와 글자 그대로 같은 주소)만 받는다 — `?` · `#` ·
+  사용자 정보 · 포트 · 다른 퍼센트 인코딩 · 대문자 호스트 · 겹 빗금은 거절. 지울 때(`cleanupRemovedTaskImages` ·
+  `cleanupRemovedTaskUpdateImages`)는 같은 조직의 다른 행이 **저장소 경로**로 같은 파일을 쓰는지 본다. 참조는 id 순서로
+  마지막으로 읽은 id 다음부터 1,000줄씩 빈 쪽까지 읽는다(건너뛸 줄 수로 넘기지 않는다). 참조 확인이 한 쪽이라도 실패하면 아무것도
+  지우지 않는다. 예전엔 주소 문자열 전체로 비교해, 동료 사진 주소에 `?x=1` 을 붙여 저장했다가 떼면 동료 파일이 지워졌다.
 
 
 ## 보안 점검 후속 (2026-10-28)

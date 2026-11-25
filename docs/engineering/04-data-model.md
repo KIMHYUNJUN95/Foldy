@@ -1146,6 +1146,9 @@ actions with explicit permission checks; reads are RLS-scoped via `is_task_parti
 `task_occurrence_state` · `task_occurrence_order` · `task_report_schedules` · `projects` · `project_participants` · `project_sections`)
 에서 `anon` · `authenticated` 의 INSERT · UPDATE · DELETE · TRUNCATE 를 회수 — 사용자 권한은 SELECT 만, 쓰기는 service role 만.
 이유는 `docs/engineering/05-rls-permissions.md` → tasks.
+2026-11-25 (`202611250001_task_project_read_hardening.sql`, 적용 필요): 같은 9개 표에서 `anon` 권한을 모두 거두고, 칸이 없어 조직 조건이
+안 닿던 `task_participants` · `task_updates` · `project_participants` · `project_sections` 읽기에 「부모 할 일 · 프로젝트 조직의 활성 멤버」,
+`task_report_schedules` 에 「그 조직 활성 멤버」를 더함. 칸 변경 없음. → 05 「할 일 · 프로젝트 직접 읽기 보강(2026-11-25)」.
 
 Personal todo / shared task inbox. Private by default, but expandable to one shared task with participant set and common status. See `docs/engineering/09-todo-task-technical-design.md`.
 

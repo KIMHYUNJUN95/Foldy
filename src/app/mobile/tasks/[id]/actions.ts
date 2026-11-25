@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { notifyTaskParticipants } from "@/lib/notifications/create";
 import type { TaskNotificationPayload } from "@/lib/notifications/types";
 import {
-  canEditTaskAsOwnerOrAuthor,
+  canDeleteOrRestoreTask,
   canEditTaskCore,
   getProjectMembership,
   getShareableUsers,
@@ -30,6 +30,8 @@ import {
   canMoveRecurringTo,
   isRecurringOccurrenceDate,
   isStandardRecurrence,
+  recurringRowStatusPatch,
+  reopenedRowStatus,
 } from "@/lib/tasks-recurrence";
 import {
   absorbEarlierOccurrences,
@@ -38,11 +40,9 @@ import {
   clearOccurrenceState,
   clearSkippedOccurrenceState,
   completeOccurrence,
-  occurrenceAlreadyCompleted,
-  resolvedOccurrenceDates,
   setOccurrenceOrders,
   setTaskSortOrders,
-  skipOccurrences,
+  skipOccurrenceIfOpen,
 } from "@/lib/task-occurrences";
 import {
   cleanupRemovedTaskImages,
@@ -51,7 +51,7 @@ import {
 } from "@/lib/task-images";
 import { linkedContextBelongsToOrg } from "@/lib/task-linked-context";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
-import { isOwnerOrPlatformDeveloper, isPlatformDeveloper } from "@/config/roles";
+import { isOwnerOrPlatformDeveloper } from "@/config/roles";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { bestEffortWrite, mustWrite } from "@/lib/db-write-guard";
 import type { Database } from "@/types/database";
@@ -131,30 +131,34 @@ function isOverdueOwned(t: TaskRecord, today: string, userId: string): boolean {
  * "일정변경" — 선택한 지난 할 일을 `targetDate`(YYYY-MM-DD, 도쿄)로 옮긴다.
  * `taskIds` 는 사용자가 고른 ID 이고, 서버가 각각 실제로 지났고 본인 소유인지 다시 검증한다.
  */
-export async function rescheduleOverdueTo(targetDate: string, taskIds: string[]) {
+export async function rescheduleOverdueTo(targetDate: string, taskIds: string[]): Promise<{ ok: boolean }> {
   // 날짜 모양을 먼저 본다(2026-10-26) — 이상한 값이 오면 `new Date(...).toISOString()` 이
   // RangeError 를 던져 서버 액션이 500 으로 끝났다.
   const date = String(targetDate ?? "").trim();
-  if (!isValidYmd(date)) return;
+  if (!isValidYmd(date)) return { ok: false };
   const session = await requireSession();
   const today = tokyoToday();
   const allowed = new Set(taskIds);
   const overdue = (await getVisibleTasks(session)).filter(
     (t) => isOverdueOwned(t, today, session.user.id) && allowed.has(t.id),
   );
-  if (overdue.length === 0) return;
+  // 옮길 것이 없거나 쓰기가 하나라도 실패하면 실패를 돌려준다(2026-11-25) — 화면은 시트를 닫고
+  // 「옮겼다」고 알렸는데 실제론 그대로였다.
+  if (overdue.length === 0) return { ok: false };
   const supabase = getSupabaseServiceClient();
   const orgId = session.organization.id;
+  let ok = true;
   for (const t of overdue) {
     // 단발성만 — 반복은 isOverdueOwned 가 제외한다(회차별로 처리).
     const dueAt = new Date(`${date}T${t.timeLabel || "00:00"}:00+09:00`).toISOString();
-    await supabase
-      .from("tasks")
-      .update({ due_at: dueAt })
-      .eq("id", t.id)
-      .eq("organization_id", orgId);
+    const saved = await mustWrite(
+      "rescheduleOverdueTo",
+      supabase.from("tasks").update({ due_at: dueAt }).eq("id", t.id).eq("organization_id", orgId),
+    );
+    if (!saved) ok = false;
   }
   revalidatePath("/mobile/tasks");
+  return { ok };
 }
 
 /**
@@ -162,24 +166,27 @@ export async function rescheduleOverdueTo(targetDate: string, taskIds: string[])
  * 이 경로에서 제외된다(isOverdueOwned) — 반복의 밀린 회차는 다음 완료가 흡수하고
  * (`absorbEarlierOccurrences`), 한 회차만 빼려면 `skipOccurrenceOn` 을 쓴다.
  */
-export async function dismissOverdueTasks(taskIds: string[]) {
+export async function dismissOverdueTasks(taskIds: string[]): Promise<{ ok: boolean }> {
   const session = await requireSession();
   const today = tokyoToday();
   const allowed = new Set(taskIds);
   const overdue = (await getVisibleTasks(session)).filter(
     (t) => isOverdueOwned(t, today, session.user.id) && allowed.has(t.id),
   );
-  if (overdue.length === 0) return;
+  if (overdue.length === 0) return { ok: false };
   const supabase = getSupabaseServiceClient();
   const orgId = session.organization.id;
-  for (const t of overdue) {
-    await supabase
-      .from("tasks")
-      .update({ deleted_at: new Date().toISOString() })
-      .eq("id", t.id)
-      .eq("organization_id", orgId);
+  const { error } = await supabase
+    .from("tasks")
+    .update({ deleted_at: new Date().toISOString() })
+    .in("id", overdue.map((t) => t.id))
+    .eq("organization_id", orgId);
+  if (error) {
+    console.error("[dismissOverdueTasks] update failed:", error.message);
+    return { ok: false };
   }
   revalidatePath("/mobile/tasks");
+  return { ok: true };
 }
 
 /**
@@ -200,18 +207,25 @@ function isOccurrenceDate(task: TaskDetail, occurrenceDate: string): boolean {
   );
 }
 
-/** "이 날짜만 건너뛰기" — 그 회차만 `skipped`, 반복은 예정대로 계속된다. */
-export async function skipOccurrenceOn(taskId: string, occurrenceDate: string) {
+/**
+ * "이 날짜만 건너뛰기" — 그 회차만 `skipped`, 반복은 예정대로 계속된다.
+ *
+ * 결과를 돌려준다(2026-11-25, 관리자 `skipConsoleOccurrence` 와 같은 뜻). 이미 건너뛴 회차는 같은 결과라 ok,
+ * 이미 완료 · 이동한 회차 · 회차가 아닌 날 · 읽기 · 쓰기 실패는 실패 — 화면은 실행 취소 토스트를 거두고 알린다.
+ */
+export async function skipOccurrenceOn(taskId: string, occurrenceDate: string): Promise<{ ok: boolean }> {
   const id = String(taskId ?? "").trim();
   const date = String(occurrenceDate ?? "").trim();
-  if (!id || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+  if (!id || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false };
   const { session, task } = await requireSessionAndTask(id);
-  if (!isOccurrenceDate(task, date)) return;
-  const resolved = await resolvedOccurrenceDates(id);
-  if (resolved.has(date)) return;
-  await skipOccurrences({ taskId: id, organizationId: session.organization.id, dates: [date] });
+  if (!isOccurrenceDate(task, date)) return { ok: false };
+  const organizationId = session.organization.id;
+  // 판정은 «없을 때만 넣기» 쓰기 한 번이 한다(2026-11-25) — 읽고 쓰는 사이에 들어온 완료를 덮어쓰지 않게.
+  const skipped = await skipOccurrenceIfOpen({ taskId: id, organizationId, occurrenceDate: date });
+  if (skipped !== "skipped") return { ok: false };
   revalidatePath("/mobile/tasks");
   revalidatePath(detailPath(id));
+  return { ok: true };
 }
 
 /**
@@ -364,6 +378,7 @@ export async function updateTaskCore(formData: FormData) {
       task.recurrenceSeriesId || nextRecurrenceRule
         ? anchorDate ?? task.recurrenceInstanceDate ?? null
         : null,
+    ...recurringRowStatusPatch(nextRecurrenceRule, task.status),
     tags,
     image_urls: imageUrls,
     property_id: ctxPropertyId,
@@ -504,11 +519,30 @@ function anchorToDate(task: TaskDetail, date: string): Database["public"]["Table
   };
 }
 
+// 스와이프 「오늘로 · 내일로」가 함께 쓰는 쓰기. 조직 조건을 걸고, 실제로 바뀐 행이 있어야 성공이다(2026-11-25).
+async function writeMoveTo(task: TaskDetail, organizationId: string, date: string, label: string): Promise<boolean> {
+  const { data, error } = await getSupabaseServiceClient()
+    .from("tasks")
+    .update(anchorToDate(task, date))
+    .eq("id", task.id)
+    .eq("organization_id", organizationId)
+    .select("id");
+  if (error) {
+    console.error(`[${label}] update failed:`, error.message);
+    return false;
+  }
+  return (data ?? []).length > 0;
+}
+
 // "오늘로" 스와이프 액션: 할 일을 도쿄 운영 날짜로 맞추고 Inbox 에서
 // 꺼낸다. 시작한 탭으로 돌아가 카드가 오늘로 옮겨진 것을 보여준다.
 export async function moveTaskToToday(formData: FormData) {
   const id = cleanText(formData.get("taskId"));
-  const { task } = await requireSessionAndTask(id);
+  const { session, task } = await requireSessionAndTask(id);
+  // 마감을 옮기는 일이라 일정 변경과 같은 사람만 — 작성자 · 프로젝트 주인 · 개발자(2026-11-25).
+  if (!canEditTaskCore(session, task)) {
+    redirect(listPathForView(formData, "forbidden"));
+  }
   const today = tokyoToday();
   // 반복 업무는 이 이동을 아예 거절한다(2026-08-25). 이동은 `due_at`(=시리즈 앵커)을 다시 쓰는데,
   // 반복 앵커는 «고정»이 계약이고(2026-07-30 롤포워드 폐지) 밀린 회차는 앵커부터 계산되므로,
@@ -521,12 +555,8 @@ export async function moveTaskToToday(formData: FormData) {
   if (!canMoveRecurringTo(task.recurrenceRule, taskAnchorDate(task), today)) {
     redirect(listPathForView(formData, "duplicate_occurrence"));
   }
-  const supabase = getSupabaseServiceClient();
   // 실패하면 스와이프해도 카드가 안 움직인다 — 조용히 목록으로 돌려보내면 「앱이 고장났다」로 읽힌다.
-  const moved = await mustWrite(
-    "task: move to today",
-    supabase.from("tasks").update(anchorToDate(task, today)).eq("id", id),
-  );
+  const moved = await writeMoveTo(task, session.organization.id, today, "moveTaskToToday");
   redirect(listPathForView(formData, moved ? undefined : "save_failed"));
 }
 
@@ -534,7 +564,10 @@ export async function moveTaskToToday(formData: FormData) {
 // Inbox 에서 꺼낸다. 시작한 탭으로 돌아가 카드가 내일로 옮겨진 것을 보여준다.
 export async function moveTaskToTomorrow(formData: FormData) {
   const id = cleanText(formData.get("taskId"));
-  const { task } = await requireSessionAndTask(id);
+  const { session, task } = await requireSessionAndTask(id);
+  if (!canEditTaskCore(session, task)) {
+    redirect(listPathForView(formData, "forbidden"));
+  }
   const tomorrow = ymdShift(tokyoToday(), 1);
   // `moveTaskToToday` 와 같은 이유로 반복 업무는 거절한다 — 고정 앵커 계약 + 지연 백로그 소실.
   if (isStandardRecurrence(task.recurrenceRule)) {
@@ -543,12 +576,7 @@ export async function moveTaskToTomorrow(formData: FormData) {
   if (!canMoveRecurringTo(task.recurrenceRule, taskAnchorDate(task), tomorrow)) {
     redirect(listPathForView(formData, "duplicate_occurrence"));
   }
-  const supabase = getSupabaseServiceClient();
-  // 실패하면 스와이프해도 카드가 안 움직인다 — 조용히 목록으로 돌려보내면 「앱이 고장났다」로 읽힌다.
-  const moved = await mustWrite(
-    "task: move to tomorrow",
-    supabase.from("tasks").update(anchorToDate(task, tomorrow)).eq("id", id),
-  );
+  const moved = await writeMoveTo(task, session.organization.id, tomorrow, "moveTaskToTomorrow");
   redirect(listPathForView(formData, moved ? undefined : "save_failed"));
 }
 
@@ -583,11 +611,6 @@ export async function completeTask(
       anchor: taskAnchorDate(task),
       requested: String(occurrenceDate ?? "").trim() || recurringAnchorDate(task),
     });
-    // 이미 완료된 회차면 아무것도 하지 않는다(2026-10-28) — 두 번 누르거나 두 사람이 동시에 눌러도
-    // 완료 기록 · 알림이 겹치지 않게. 결과는 성공으로 돌려 화면의 체크를 그대로 둔다.
-    if (await occurrenceAlreadyCompleted(id, occ)) {
-      return { ok: true, occurrenceDate: occ };
-    }
     const saved = await completeOccurrence({
       taskId: id,
       organizationId: session.organization.id,
@@ -595,7 +618,9 @@ export async function completeTask(
       userId: session.user.id,
     });
     // 저장이 실패하면 완료 기록 · 알림을 남기지 않는다(2026-10-26) — 호출부가 낙관적 체크를 되돌린다.
-    if (!saved) return { ok: false };
+    // 이미 완료된 회차면 아무것도 하지 않고 성공 — 판정은 쓰기가 한다(2026-11-25, 두 사람이 동시에 눌러도 한 번).
+    if (saved === "failed") return { ok: false };
+    if (saved === "already") return { ok: true, occurrenceDate: occ };
     // 밀린 회차는 이 완료가 흡수한다 — 콘솔 `completeInternal` 과 같은 규칙(2026-09-08).
     await absorbEarlierOccurrences({
       taskId: id,
@@ -678,6 +703,8 @@ export async function completeTask(
 export async function reopenTask(
   taskId: string,
   occurrenceDate?: string,
+  /** 일회성 완료의 실행 취소 — 완료 전 상태(2026-11-25). `in_progress` 만 그대로 쓰고 나머지는 열림. */
+  restoreStatus?: string,
 ): Promise<TaskStatusResult> {
   const id = String(taskId ?? "").trim();
   if (!id) return { ok: false };
@@ -706,27 +733,32 @@ export async function reopenTask(
     return { ok: true, occurrenceDate: occ };
   }
 
-  const reopened = await mustWrite(
-    "task: reopen",
-    supabase
-      .from("tasks")
-      .update({
-        status: "open",
-        completed_at: null,
-        completed_by_user_id: null,
-      })
-      .eq("id", id)
-      .eq("organization_id", session.organization.id),
-  );
-  if (!reopened) return { ok: false };
-  await bestEffortWrite(
-    "task_updates: insert",
-    supabase.from("task_updates").insert({
+  // 지금 완료일 때만 — 남이 이미 연 줄을 늦게 온 풀기가 덮지 않게(2026-11-25). 이미 열려 있으면 그대로 성공.
+  const { data: reopened, error: reopenError } = await supabase
+    .from("tasks")
+    .update({
+      status: reopenedRowStatus(restoreStatus),
+      completed_at: null,
+      completed_by_user_id: null,
+    })
+    .eq("id", id)
+    .eq("organization_id", session.organization.id)
+    .eq("status", "completed")
+    .select("id");
+  if (reopenError) {
+    console.error("[db-write] task: reopen failed:", reopenError.message);
+    return { ok: false };
+  }
+  if (reopened?.length) {
+    await bestEffortWrite(
+      "task_updates: insert",
+      supabase.from("task_updates").insert({
         task_id: id,
         created_by_user_id: session.user.id,
         update_type: "reopened",
-      })
-  );
+      }),
+    );
+  }
   revalidatePath("/mobile/tasks");
   revalidatePath(detailPath(id));
   revalidateProjectPath(task.projectId);
@@ -950,18 +982,9 @@ export async function restoreTask(taskId: string): Promise<{ ok: boolean }> {
     .maybeSingle();
   const row = data as { created_by_user_id: string; project_id: string | null } | null;
   if (!row) return { ok: false };
-  // 프로젝트 주인도 자기가 지운 멤버 할 일을 되살린다(2026-10-28, canEditTaskCore 와 같은 규칙).
-  const projectOwnerUserId = row.project_id
-    ? ((await getProjectMembership([row.project_id])).get(row.project_id)?.ownerUserId ?? null)
-    : null;
-  if (!canEditTaskAsOwnerOrAuthor(session.user, row.created_by_user_id, projectOwnerUserId)) {
-    return { ok: false };
-  }
-  // 남의 작업(개발자)은 **열 수 있는 작업(getTaskScope)만** 되살린다(2026-10-28, 05 문서 규칙) — 범위는
-  // 소프트 삭제된 행도 담는다(참여자 행 · 프로젝트 소속은 삭제와 무관).
-  if (row.created_by_user_id !== session.user.id && !(await getTaskScope(session)).taskIds.has(id)) {
-    return { ok: false };
-  }
+  // 작성자 · 프로젝트 주인 · 개발자이면서 열 수 있는 할 일만(canDeleteOrRestoreTask, 2026-11-25 — 관리자와 같은 판정).
+  // 범위는 소프트 삭제된 행도 담는다. 프로젝트를 나간 작성자는 그 프로젝트 할 일을 되살리지 못한다.
+  if ((await manageableRows(session, [{ id, ...row }])).length === 0) return { ok: false };
   const { error } = await supabase
     .from("tasks")
     .update({ deleted_at: null })
@@ -972,45 +995,61 @@ export async function restoreTask(taskId: string): Promise<{ ok: boolean }> {
   return { ok: true };
 }
 
-// 목록 일괄 삭제 · 되돌리기 대상 — 내가 쓴 할 일 + 내가 주인인 프로젝트의 할 일(2026-10-28 주인 권한).
-// 개발자는 열 수 있는 작업(getTaskScope) 전부. 서비스 키 쓰기라 id 를 그대로 믿지 않는다.
+// 지우기 · 되살리기 판정 — `canDeleteOrRestoreTask`(관리자 restorableIds 와 같은 판정, 2026-11-25). 작성자 · 프로젝트 주인 ·
+// 개발자이면서 열 수 있는 할 일(getTaskScope)만. 프로젝트가 없는 내 할 일은 범위와 상관없이 된다.
+async function manageableRows(
+  session: Parameters<typeof getTaskScope>[0],
+  rows: Array<{ id: string; created_by_user_id: string; project_id: string | null }>,
+): Promise<string[]> {
+  const membership = await getProjectMembership(
+    rows.map((r) => r.project_id).filter((v): v is string => !!v),
+  );
+  const needsScope = rows.some((r) => r.project_id || r.created_by_user_id !== session.user.id);
+  const scope = needsScope ? (await getTaskScope(session)).taskIds : new Set<string>();
+  return rows
+    .filter((r) =>
+      canDeleteOrRestoreTask(
+        session.user,
+        {
+          createdByUserId: r.created_by_user_id,
+          projectId: r.project_id,
+          projectOwnerUserId: r.project_id ? (membership.get(r.project_id)?.ownerUserId ?? null) : null,
+        },
+        scope.has(r.id),
+      ),
+    )
+    .map((r) => r.id);
+}
+
+// 목록 일괄 삭제 · 되돌리기 대상. 서비스 키 쓰기라 id 를 그대로 믿지 않는다.
 async function manageableListTaskIds(
   session: Parameters<typeof getTaskScope>[0],
   ids: string[],
   supabase: ReturnType<typeof getSupabaseServiceClient>,
-): Promise<string[]> {
-  if (isPlatformDeveloper(session.user.role)) {
-    const scope = await getTaskScope(session);
-    return ids.filter((id) => scope.taskIds.has(id));
-  }
-  const { data } = await supabase
+): Promise<string[] | null> {
+  const { data, error } = await supabase
     .from("tasks")
     .select("id, created_by_user_id, project_id")
     .in("id", ids)
     .eq("organization_id", session.organization.id);
-  const rows = (data ?? []) as Array<{ id: string; created_by_user_id: string; project_id: string | null }>;
-  const projectIds = Array.from(
-    new Set(rows.filter((r) => r.created_by_user_id !== session.user.id && r.project_id).map((r) => r.project_id as string)),
-  );
-  const owned = new Set<string>();
-  if (projectIds.length > 0) {
-    const { data: projects } = await supabase
-      .from("projects")
-      .select("id")
-      .in("id", projectIds)
-      .eq("organization_id", session.organization.id)
-      .eq("created_by_user_id", session.user.id);
-    for (const p of (projects ?? []) as Array<{ id: string }>) owned.add(p.id);
+  if (error) {
+    console.error("[manageableListTaskIds] read failed:", error.message);
+    return null;
   }
-  return rows
-    .filter((r) => r.created_by_user_id === session.user.id || (!!r.project_id && owned.has(r.project_id)))
-    .map((r) => r.id);
+  return manageableRows(
+    session,
+    (data ?? []) as Array<{ id: string; created_by_user_id: string; project_id: string | null }>,
+  );
 }
 
-// 목록에서 일괄 삭제(다중 선택). 실행한 사용자가 만든 할 일만 지운다 —
-// `created_by_user_id` 필터가 권한 경계이므로, 공유받은(본인 것이 아닌) 할 일을 골라도
-// 그냥 건드리지 않고 둔다. 목록에 머문다(revalidate).
-export async function deleteTasksInList(taskIds: string[]): Promise<{ deletedIds: string[] }> {
+/**
+ * 목록에서 일괄 삭제(다중 선택). 지울 수 있는 것만 지운다 — 내가 만든 할 일(나간 프로젝트 것은 빼고) ·
+ * 내가 주인인 프로젝트의 할 일 · (개발자) 열 수 있는 할 일(`manageableListTaskIds`). 나머지는 골라도 그대로 둔다.
+ * 대상 읽기나 쓰기가 실패하면 `failed: true` — 「지울 것이 없음」과 구별해 화면이 실패를 알린다(2026-11-25).
+ */
+export async function deleteTasksInList(
+  taskIds: string[],
+): Promise<{ deletedIds: string[]; failed?: true }> {
   const ids = Array.from(
     new Set((taskIds ?? []).map((s) => String(s).trim()).filter(Boolean)),
   ).slice(0, 200);
@@ -1023,8 +1062,8 @@ export async function deleteTasksInList(taskIds: string[]): Promise<{ deletedIds
     redirect("/mobile/unavailable");
   }
   const supabase = getSupabaseServiceClient();
-  // 내 할 일 · 내가 주인인 프로젝트의 할 일 · (개발자) 열 수 있는 할 일만 — manageableListTaskIds.
   const targetIds = await manageableListTaskIds(session, ids, supabase);
+  if (!targetIds) return { deletedIds: [], failed: true };
   if (targetIds.length === 0) return { deletedIds: [] };
   // 실제로 지워진 id 만 돌려준다 — 목록에서 남의 작업을 같이 골랐어도 그건 안 지워지므로,
   // "실행 취소" 가 지우지도 않은 작업을 되살리려 하면 안 된다(콘솔 `bulkDeleteConsoleTasks` 와 동일).
@@ -1032,34 +1071,42 @@ export async function deleteTasksInList(taskIds: string[]): Promise<{ deletedIds
     .from("tasks")
     .update({ deleted_at: new Date().toISOString() })
     .in("id", targetIds)
-    // 조직 스코프도 함께 건다 — 작성자 조건만으로도 실무상 안전하지만, 쌍둥이인
-    // `restoreTasksInList` 는 걸고 있어서 두 함수의 방어 수준이 달랐다(2026-08-28).
     .eq("organization_id", session.organization.id);
-  const { data } = await query.select("id");
+  const { data, error } = await query.select("id");
   revalidatePath("/mobile/tasks");
+  if (error) {
+    console.error("[deleteTasksInList] write failed:", error.message);
+    return { deletedIds: [], failed: true };
+  }
   return { deletedIds: ((data ?? []) as Array<{ id: string }>).map((r) => r.id) };
 }
 
-/** 목록 일괄 삭제 되돌리기. 소프트 삭제라 `deleted_at` 만 지우면 복구된다(작성자 본인 한정). */
-export async function restoreTasksInList(taskIds: string[]): Promise<void> {
+/**
+ * 목록 일괄 삭제 되돌리기. 소프트 삭제라 `deleted_at` 만 지우면 복구된다.
+ * 결과를 돌려준다(2026-11-25) — 되살릴 것이 없거나 쓰기가 실패하면 `ok:false`, 화면이 알린다.
+ */
+export async function restoreTasksInList(taskIds: string[]): Promise<{ ok: boolean }> {
   const ids = Array.from(
     new Set((taskIds ?? []).map((s) => String(s).trim()).filter(Boolean)),
   ).slice(0, 200);
-  if (ids.length === 0) return;
+  if (ids.length === 0) return { ok: false };
   const session = await getCurrentAppSession();
-  if (!session || !hasOrganizationContext(session)) return;
+  if (!session || !hasOrganizationContext(session)) return { ok: false };
   const supabase = getSupabaseServiceClient();
-  // 플랫폼 개발자는 자기가 지운 남의 작업도 되살린다(단건 restoreTask 와 같은 규칙, 2026-10-23) — 다만
-  // **열 수 있는 작업(getTaskScope)만**(2026-10-28). 예전엔 조직 안 아무 작업이나 되살릴 수 있었다.
+  // 삭제와 같은 대상만 되살린다(`manageableListTaskIds`) — 개발자도 열 수 있는 작업(getTaskScope)만,
+  // 나간 프로젝트의 내 할 일은 빠진다(2026-11-25).
   const targetIds = await manageableListTaskIds(session, ids, supabase);
-  if (targetIds.length === 0) return;
-  const query = supabase
-    .from("tasks")
-    .update({ deleted_at: null })
-    .in("id", targetIds)
-    .eq("organization_id", session.organization.id);
-  await bestEffortWrite("tasks: bulk restore", query);
+  if (!targetIds || targetIds.length === 0) return { ok: false };
+  const restored = await mustWrite(
+    "tasks: bulk restore",
+    supabase
+      .from("tasks")
+      .update({ deleted_at: null })
+      .in("id", targetIds)
+      .eq("organization_id", session.organization.id),
+  );
   revalidatePath("/mobile/tasks");
+  return { ok: restored };
 }
 
 /**
@@ -1075,13 +1122,9 @@ async function reorderSession(): Promise<Session | null> {
   return session;
 }
 
-/**
- * `setTaskSortOrders` 를 부르고 실패를 결과로 바꾼다. 지금 그 헬퍼는 결과를 돌려주지 않지만(void),
- * false 를 돌려주게 바뀌어도 여기서 그대로 잡히도록 `unknown` 으로 받는다.
- */
-async function saveTaskSortOrders(organizationId: string, positions: Map<string, number>): Promise<boolean> {
-  const result: unknown = await setTaskSortOrders({ organizationId, positions });
-  return result !== false;
+/** `setTaskSortOrders` 의 결과(조회 · 수정 중 하나라도 실패하면 false, 2026-11-25). */
+function saveTaskSortOrders(organizationId: string, positions: Map<string, number>): Promise<boolean> {
+  return setTaskSortOrders({ organizationId, positions });
 }
 
 // 오늘 보기의 수동 드래그 순서 변경을 저장한다. `orderedIds` 는 섹션의 할 일 id 를 위에서 아래

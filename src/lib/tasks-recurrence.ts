@@ -126,6 +126,53 @@ export function isStandardRecurrence(value: string | null): boolean {
 }
 
 /**
+ * 수정 · 일정 변경으로 저장될 반복 규칙에 맞춘 행 상태(2026-11-25). 반복 업무의 행은 언제나 열림이고 완료는
+ * 회차별이다 — 완료(또는 진행 중)였던 일회성을 반복으로 바꾸면 행 상태가 그대로 남아 `isActiveTask` 가
+ * 거짓이 되고, 모든 목록에서 사라졌다. 반복이 되는 행이 완료 · 진행 중이면 열림으로 돌리고 완료 도장을 지운다.
+ * 취소(`cancelled`)는 일부러 멈춘 것이라 두고, 반복이 아니면 아무것도 바꾸지 않는다(빈 객체).
+ */
+export function recurringRowStatusPatch(
+  nextRule: string | null,
+  currentStatus: string,
+): { status?: "open"; completed_at?: null; completed_by_user_id?: null } {
+  if (!isStandardRecurrence(nextRule)) return {};
+  if (currentStatus !== "completed" && currentStatus !== "in_progress") return {};
+  return { status: "open", completed_at: null, completed_by_user_id: null };
+}
+
+/**
+ * 일회성 완료를 되돌릴 때 돌아갈 상태(2026-11-25) — 완료 전 상태를 화면이 들고 있다가 넘긴다. 진행 중만 그대로
+ * 받고, 그 밖의 값(없음 · 조작된 값)은 열림.
+ */
+export function reopenedRowStatus(restoreStatus: unknown): "open" | "in_progress" {
+  return restoreStatus === "in_progress" ? "in_progress" : "open";
+}
+
+/**
+ * 같은 화면에서 방금 완료한 일회성의 «완료 전 상태» 기억(2026-11-25). 체크를 다시 눌러 풀 때는 줄의 상태가 이미
+ * `completed` 라 넘길 값이 없다 — 완료할 때 적어 둔 값을 쓴다. 누르기 전 기록(실행 취소)이 오면 그 값이 먼저.
+ * 풀면(체크 해제 · 실행 취소) 그 id 기억은 지운다 — 나중에 남이 완료한 줄을 풀 때 낡은 값을 쓰지 않게.
+ * 기억이 없으면(예전에 완료된 것) `undefined` → 열림. 완료가 실패하면 `forgetCompletedFrom`.
+ */
+export function trackCompletedFrom(
+  memory: Readonly<Record<string, string>>,
+  id: string,
+  complete: boolean,
+  statusBefore: string | undefined,
+): { memory: Record<string, string>; restoreStatus?: string } {
+  const known = statusBefore && statusBefore !== "completed" ? statusBefore : undefined;
+  if (complete) return { memory: known ? { ...memory, [id]: known } : { ...memory } };
+  return { memory: forgetCompletedFrom(memory, id), restoreStatus: known ?? memory[id] };
+}
+
+/** 완료가 실패한 id 의 기억을 지운다(`trackCompletedFrom` 짝). */
+export function forgetCompletedFrom(memory: Readonly<Record<string, string>>, id: string): Record<string, string> {
+  const next = { ...memory };
+  delete next[id];
+  return next;
+}
+
+/**
  * 회차 상태를 읽는 창(일) — 서버 `getOccurrenceStates` 가 이만큼만 읽는다(2026-10-28).
  * 밀린 회차 계산(`outstandingOverdueOccurrences`)도 같은 창으로 자른다. 창이 서로 다르면 창 밖의
  * 완료 기록은 안 읽히는데 회차는 계속 세어져, 오래전에 끝낸 회차가 «밀림»으로 되살아난다.

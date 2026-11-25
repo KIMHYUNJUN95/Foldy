@@ -51,6 +51,10 @@ export type TaskImageFolder = "task-images" | "task-update-images";
  * 업로드 경로는 `{org}/{folder}/{requestId}/{uuid}.{ext}` 이다(`uploadRequestImages`). requestId 는
  * 생성 *과* 수정 모두 새 클라이언트 uuid 다(생성 시에는 할 일 id 가 아직 없다). 그래서
  * 가장 좁으면서 안정적인 규칙은 할 일 자신의 폴더가 아니라 조직 + 폴더 접두어다.
+ *
+ * 주소는 **표준 모양 그대로**여야 한다(2026-11-25) — 뽑은 경로로 다시 쓴 주소와 글자까지 같아야 받는다.
+ * 그래서 `?…` · `#…` · 사용자 정보 · 포트 · 대문자 호스트 · 같은 경로의 다른 퍼센트 인코딩은 모두 거절된다.
+ * 예전엔 경로만 봐서 동료 사진 주소에 `?x=1` 을 붙여 저장할 수 있었고, 떼는 순간 동료 파일이 지워졌다.
  */
 export function isOrgTaskImageUrl(
   url: string,
@@ -60,18 +64,87 @@ export function isOrgTaskImageUrl(
   const path = extractRequestImagePath(url);
   if (!path || !organizationId) return false;
   // `..` 를 섞어 접두사만 맞추는 경로는 거절한다(스토리지가 정규화하지 않더라도 방어적으로).
-  if (path.split("/").some((seg) => seg === ".." || seg === "")) return false;
+  if (path.split("/").some((seg) => seg === ".." || seg === "." || seg === "")) return false;
+  if (url !== canonicalRequestImageUrl(path)) return false;
   return path.startsWith(`${organizationId}/${folder}/`);
+}
+
+/**
+ * 저장소 경로 → 업로드가 만드는 공개 주소. 기준 주소가 없으면 null.
+ * `getPublicUrl` 과 똑같이 `encodeURI` 로 쓴다 — 업로드는 확장자가 없으면 MIME 꼬리(`svg+xml`)를 이름에 쓰는데,
+ * `encodeURIComponent` 로 쓰면 `+` 가 `%2B` 가 되어 방금 올린 사진이 검사에서 버려졌다.
+ */
+function canonicalRequestImageUrl(path: string): string | null {
+  const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  if (!baseUrl) return null;
+  try {
+    const origin = new URL(baseUrl).origin;
+    return encodeURI(`${origin}/storage/v1/object/public/${REQUEST_IMAGE_BUCKET}/${path}`);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 참조 확인용 — 이 조직에서 아직 쓰이는 사진의 **저장소 경로** 집합(2026-11-25).
+ * 주소 문자열로 비교하면 같은 파일을 꼬리 붙은 주소로 가리키는 참조를 놓치므로, 행마다 경로로 바꿔 모은다.
+ * 사진이 있는 행만 id 순서로 나눠 **빈 쪽이 올 때까지** 읽는다. 다음 쪽은 **마지막으로 읽은 id 다음부터**
+ * (`gt`) — 건너뛸 줄 수로 넘기면 읽는 사이 앞쪽 줄이 지워질 때 한 줄을 건너뛰고, 서버의 한 번 최대 줄 수가
+ * 쪽 크기보다 작아도 놓치지 않는다. 하나라도 실패하면 null(호출자는 아무것도 지우지 않는다).
+ */
+async function referencedImagePaths(
+  supabase: ReturnType<typeof getSupabaseServiceClient>,
+  table: "tasks" | "task_updates",
+  organizationId: string,
+): Promise<Set<string> | null> {
+  const PAGE = 1000;
+  const paths = new Set<string>();
+  let lastId: string | null = null;
+  for (;;) {
+    const base =
+      table === "tasks"
+        ? supabase.from("tasks").select("id, image_urls").eq("organization_id", organizationId)
+        : supabase
+            .from("task_updates")
+            .select("id, image_urls, tasks!inner(organization_id)")
+            .eq("tasks.organization_id", organizationId);
+    const filtered = base.filter("image_urls", "neq", "{}");
+    const { data, error } = await (lastId === null ? filtered : filtered.gt("id", lastId))
+      .order("id")
+      .limit(PAGE);
+    if (error) {
+      console.error(`[task-images] ${table} reference check failed:`, error.message);
+      return null;
+    }
+    const rows = (data ?? []) as Array<{ id: string; image_urls: string[] | null }>;
+    for (const u of rows.flatMap((r) => r.image_urls ?? [])) {
+      const p = extractRequestImagePath(u);
+      if (p) paths.add(p);
+    }
+    if (rows.length === 0) return paths;
+    lastId = rows[rows.length - 1].id;
+  }
+}
+
+/** 후보 주소 중 아무도 참조하지 않는 것의 저장소 경로(중복 없이). */
+function unreferencedPaths(candidates: string[], referenced: Set<string>): string[] {
+  const out = new Set<string>();
+  for (const u of candidates) {
+    const p = extractRequestImagePath(u);
+    if (p && !referenced.has(p)) out.add(p);
+  }
+  return [...out];
 }
 
 /**
  * 수정 중 작성자가 뗀 할 일 단위 사진을 완전 삭제한다.
  *
  * 세 가지 방어 경계가 모두 필수다: 후보는 **서버가 가진 이전 URL** 에서만 와야 하고
- * (클라이언트 입력 그대로는 안 됨), 각각 `${organizationId}/task-images/` 아래 경로로 해석돼야 하며,
+ * (클라이언트 입력 그대로는 안 됨), 각각 표준 모양의 `${organizationId}/task-images/` 주소여야 하며,
  * **조직 내 다른 할 일이 아직 참조하고 있지 않아야** 한다(2026-10-26). 마지막 것이
  * «남의 사진 URL 을 붙여 저장하고 지우는» 공격을 막는다 — 새 URL 은 조직 접두어만 검사하므로(`isOrgTaskImageUrl` 참고),
  * 이게 없으면 사용자가 자기 할 일을 통해 동료의 파일을 지울 수 있다.
+ * 참조는 주소가 아니라 저장소 경로로 비교한다(2026-11-25) — DB 에 이미 꼬리 붙은 주소가 있어도 같은 파일로 본다.
  * 소프트 삭제된 할 일도 참조로 센다(되돌리면 복구되므로).
  */
 export async function cleanupRemovedTaskImages(
@@ -83,23 +156,10 @@ export async function cleanupRemovedTaskImages(
   const candidates = removedUrls.filter((u) => isOrgTaskImageUrl(u, organizationId));
   if (candidates.length === 0) return;
   // 수정의 UPDATE 이후에 실행되므로 수정된 할 일은 더는 이것을 참조하지 않는다 — 걸리는 것은 모두 다른 할 일이다.
-  const { data: refs, error: refError } = await supabase
-    .from("tasks")
-    .select("image_urls")
-    .eq("organization_id", organizationId)
-    .overlaps("image_urls", candidates);
-  if (refError) {
-    // 닫힌 쪽으로 실패: 남은 파일은 해롭지 않지만, 다른 할 일이 보여주는 파일을 지우는 건 해롭다.
-    console.error("[cleanupRemovedTaskImages] reference check failed:", refError.message);
-    return;
-  }
-  const stillReferenced = new Set(
-    ((refs ?? []) as Array<{ image_urls: string[] | null }>).flatMap((r) => r.image_urls ?? []),
-  );
-  const paths = candidates
-    .filter((u) => !stillReferenced.has(u))
-    .map((u) => extractRequestImagePath(u))
-    .filter((p): p is string => !!p);
+  // 닫힌 쪽으로 실패: 남은 파일은 해롭지 않지만, 다른 할 일이 보여주는 파일을 지우는 건 해롭다.
+  const referenced = await referencedImagePaths(supabase, "tasks", organizationId);
+  if (!referenced) return;
+  const paths = unreferencedPaths(candidates, referenced);
   if (paths.length === 0) return;
   const { error } = await supabase.storage.from(REQUEST_IMAGE_BUCKET).remove(paths);
   if (error) {
@@ -110,7 +170,8 @@ export async function cleanupRemovedTaskImages(
 
 /**
  * 메모(갱신 로그) 사진 정리 — `cleanupRemovedTaskImages` 의 `task-update-images` 판(2026-10-29).
- * 우리 `${organizationId}/task-update-images/` 객체만, 아직 남은 메모(`task_updates.image_urls`)가 가리키는 파일은 남긴다.
+ * 표준 모양의 우리 `${organizationId}/task-update-images/` 주소만, 아직 남은 이 조직 메모(`task_updates.image_urls`)가
+ * 같은 저장소 경로를 가리키면 남긴다(2026-11-25 경로 비교).
  * 참조 확인이 실패하면 아무것도 지우지 않는다(남는 파일보다 보이는 사진을 지우는 쪽이 해롭다).
  */
 export async function cleanupRemovedTaskUpdateImages(
@@ -122,21 +183,9 @@ export async function cleanupRemovedTaskUpdateImages(
     isOrgTaskImageUrl(u, organizationId, "task-update-images"),
   );
   if (candidates.length === 0) return;
-  const { data: refs, error: refError } = await supabase
-    .from("task_updates")
-    .select("image_urls")
-    .overlaps("image_urls", candidates);
-  if (refError) {
-    console.error("[cleanupRemovedTaskUpdateImages] reference check failed:", refError.message);
-    return;
-  }
-  const stillReferenced = new Set(
-    ((refs ?? []) as Array<{ image_urls: string[] | null }>).flatMap((r) => r.image_urls ?? []),
-  );
-  const paths = candidates
-    .filter((u) => !stillReferenced.has(u))
-    .map((u) => extractRequestImagePath(u))
-    .filter((p): p is string => !!p);
+  const referenced = await referencedImagePaths(supabase, "task_updates", organizationId);
+  if (!referenced) return;
+  const paths = unreferencedPaths(candidates, referenced);
   if (paths.length === 0) return;
   const { error } = await supabase.storage.from(REQUEST_IMAGE_BUCKET).remove(paths);
   if (error) console.error("[cleanupRemovedTaskUpdateImages] storage remove failed:", error.message);

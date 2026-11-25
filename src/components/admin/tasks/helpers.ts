@@ -354,3 +354,21 @@ export function matchDate(t: TaskRecord, key: DateFilterKey | null, today: strin
   }
   return true;
 }
+
+type CoreFields = { title: string; desc: string; tags: string[] };
+
+/**
+ * 핵심 편집에서 열 때와 달라진 칸만(2026-11-25) — 안 바뀐 칸까지 보내면 그 사이 다른 사람이 고친 값을 되돌린다.
+ * 비교는 서버와 같은 정리(앞뒤 공백 · 빈 태그 제외) 뒤에 한다.
+ */
+export function changedCoreFields(
+  start: Omit<CoreFields, "desc"> & { desc: string | null },
+  draft: CoreFields,
+): Partial<CoreFields> {
+  const tagsOf = (tags: string[]) => JSON.stringify(tags.map((t) => t.trim()).filter(Boolean));
+  const out: Partial<CoreFields> = {};
+  if (draft.title.trim() !== start.title.trim()) out.title = draft.title;
+  if (draft.desc.trim() !== (start.desc ?? "").trim()) out.desc = draft.desc;
+  if (tagsOf(draft.tags) !== tagsOf(start.tags)) out.tags = draft.tags;
+  return out;
+}

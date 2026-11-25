@@ -221,6 +221,18 @@ Implementation:
   `{org}/bug-reports/{that report id}/` (shared `isOwnStoragePublicUrl()`, `src/lib/storage-url-guard.ts`) —
   `invalid_image` otherwise.
 
+## Server Write Rules (2026-11-25)
+
+- 모든 쓰기는 서버 액션 + 서버 키. 로그인한 사용자의 직접 쓰기 권한은 거뒀다(`202611250004`, 운영 미적용 · 커밋 전) — `docs/engineering/05-rls-permissions.md` 「bug_reports」.
+- 작성자 수정 · 삭제(`updateBugReport` · `deleteBugReport`)는 쓰기 쿼리에 `status = 'submitted'` 를 다시 건다(개발자 제외). 읽은 뒤 리뷰어가
+  상태를 바꿨으면 0줄 → `not_editable`, 수정 · 삭제하지 않는다.
+- 리뷰어 상태 바꾸기(`updateBugReportStatus`)도 쓰기 쿼리에 **읽은 상태**(`status = 읽은 값`)를 다시 건다. 그 사이 다른 리뷰어가
+  바꿨으면 0줄 → `status_changed`, 덮어쓰지 않고 작성자 알림도 보내지 않는다. 상세 화면은 「상태를 바꾸지 못했어요」를 띄우고 지금
+  상태로 다시 그린다.
+- 목록(`getMyBugReports` · `getOrgBugReports`)은 `{ reports, loadFailed }` 를 돌려준다. 못 읽으면 「아직 신고가 없어요」 대신
+  「신고를 불러오지 못했어요」를 같은 빈 화면 모양으로 보인다(`bugs.white.loadFailedTitle` · `loadFailedSub`, ko · ja · en).
+  이때 목록 위 건수 줄(「전체 신고 0건」)은 숨기고, 새 신고 화면의 「내 신고」 링크는 숫자 없이 보인다(`myReportsNoCount`) — 「0」은 거짓이라서.
+
 ## Reviewer Actions
 
 Reviewer-side (1차 구현):

@@ -31,7 +31,7 @@ export default async function MobileBugComposePage() {
 
   return (
     <MobileShell activeItem="bugs" badges={navBadges} title={copy.title}>
-      <BugComposeClient copy={copy} myCount={mine.length} />
+      <BugComposeClient copy={copy} myCount={mine.loadFailed ? null : mine.reports.length} />
     </MobileShell>
   );
 }

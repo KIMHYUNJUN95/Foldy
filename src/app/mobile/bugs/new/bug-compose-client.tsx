@@ -37,7 +37,8 @@ const CHECK = (
   </svg>
 );
 
-export function BugComposeClient({ copy, myCount }: { copy: BugCopy; myCount: number }) {
+/** `myCount` 가 null = 내 신고를 못 읽음 → 숫자 없이 「내 신고」만(「0」은 거짓). */
+export function BugComposeClient({ copy, myCount }: { copy: BugCopy; myCount: number | null }) {
   const w = copy.white;
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -158,7 +159,7 @@ export function BugComposeClient({ copy, myCount }: { copy: BugCopy; myCount: nu
           <p>{w.formSub}</p>
         </div>
         <Link className="bgw-link" href="/mobile/bugs">
-          {w.myReports.replace("{n}", String(myCount))}
+          {myCount === null ? w.myReportsNoCount : w.myReports.replace("{n}", String(myCount))}
         </Link>
       </header>
 

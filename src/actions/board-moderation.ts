@@ -87,7 +87,8 @@ export async function reportBoardContent(
     if (input.targetType === "comment") existing = existing.eq("comment_id", input.commentId ?? "");
     const { data: prior } = await existing.maybeSingle();
     if (!prior || prior.status !== "withdrawn") return { error: "already_reported" };
-    const { error: reopenError } = await service
+    // 읽은 뒤 그 사이 다른 상태가 됐으면(다른 창에서 이미 다시 열었거나 관리자가 처리) 덮어쓰지 않는다(2026-11-25).
+    const { data: reopened, error: reopenError } = await service
       .from("board_reports")
       .update({
         status: "pending",
@@ -99,9 +100,11 @@ export async function reportBoardContent(
         created_at: new Date().toISOString(),
       })
       .eq("id", prior.id)
+      .eq("status", "withdrawn")
       .eq("organization_id", session.organization.id)
-      .eq("status", "withdrawn");
+      .select("id");
     if (reopenError) return { error: "save_failed" };
+    if (!reopened || reopened.length === 0) return { error: "already_reported" };
   }
 
   revalidateBoard(input.postId);
@@ -127,15 +130,14 @@ export async function withdrawBoardReport(reportId: string): Promise<ActionResul
   }
   if (report.status !== "pending" && report.status !== "dismissed") return { error: "invalid" };
 
-  // 읽은 뒤 관리자가 먼저 처리(removed · dismissed)했을 수 있다 — 지금도 대기 · 문제없음일 때만 거두고,
-  // 바뀐 줄이 없으면 관리자의 처리 기록(처리자 · 시각)을 덮어쓰지 않고 멈춘다.
+  // 읽은 뒤 관리자가 「삭제」로 처리했으면 그 기록을 「취소」로 덮지 않는다 — 상태 · 조직 · 본인을 쓰기에서 다시 건다(2026-11-25).
   const { data: withdrawn, error } = await service
     .from("board_reports")
     .update({ status: "withdrawn", resolved_at: new Date().toISOString(), resolved_by_user_id: session.user.id })
     .eq("id", reportId)
+    .in("status", ["pending", "dismissed"])
     .eq("organization_id", session.organization.id)
     .eq("reporter_user_id", session.user.id)
-    .in("status", ["pending", "dismissed"])
     .select("id");
   if (error) return { error: "save_failed" };
   if (!withdrawn || withdrawn.length === 0) return { error: "invalid" };
@@ -216,11 +218,13 @@ export async function resolveBoardReport(
     const target = await loadTarget(input, orgId);
     if (target) {
       if (input.targetType === "post") {
+        // 아직 안 지워진 글만 — 작성자가 먼저 지웠으면 그 시각을 덮어쓰지 않는다(2026-11-25).
         const { error } = await service
           .from("board_posts")
           .update({ deleted_at: now })
           .eq("id", input.postId)
-          .eq("organization_id", orgId);
+          .eq("organization_id", orgId)
+          .is("deleted_at", null);
         if (error) return { error: "save_failed" };
       } else {
         // 아직 안 지워진 댓글만 — 이미 쓴 사람이 지웠으면 그 기록(지운 사람 · 시각)을 덮어쓰지 않는다.

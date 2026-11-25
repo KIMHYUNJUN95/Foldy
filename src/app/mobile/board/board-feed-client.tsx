@@ -25,6 +25,7 @@ export function BoardFeedClient({
   tags,
   selectedCategory,
   pendingReportCount = 0,
+  loadFailed = false,
 }: {
   locale: Locale;
   copy: Dictionary["board"];
@@ -33,7 +34,10 @@ export function BoardFeedClient({
   tags: string[];
   selectedCategory: string | null;
   /** owner · office_admin 에게만 0보다 크다 — 신고 처리 화면 진입(2026-10-06). */
-  pendingReportCount?: number;
+  /** 처리 대기 신고 수. `null` = 못 셈 — 입구는 숫자 없이 보인다(2026-11-25). */
+  pendingReportCount?: number | null;
+  /** 첫 쪽을 못 읽음 — 「글 없음」 대신 「불러오지 못함」(2026-11-25). */
+  loadFailed?: boolean;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -120,9 +124,11 @@ export function BoardFeedClient({
       <header className="bdw-head">
         <div className="bdw-head__l">
           <h1>{copy.title}</h1>
-          {pendingReportCount > 0 ? (
+          {pendingReportCount === null || pendingReportCount > 0 ? (
             <Link className="bdw-head__rep num" href="/mobile/board/reports">
-              {copy.reportsPending.replace("{count}", String(pendingReportCount))}
+              {pendingReportCount === null
+                ? copy.reportsMobileTitle
+                : copy.reportsPending.replace("{count}", String(pendingReportCount))}
               <ChevronRight aria-hidden="true" strokeWidth={2.4} />
             </Link>
           ) : null}
@@ -144,10 +150,14 @@ export function BoardFeedClient({
       ) : null}
 
       {isEmpty ? (
-        <BoardEmptyState
-          subtitle={selectedCategory ? copy.emptyFilteredSubtitle : copy.emptySubtitle}
-          title={selectedCategory ? copy.emptyFilteredTitle : copy.emptyTitle}
-        />
+        loadFailed ? (
+          <BoardEmptyState subtitle={copy.loadFailedSub} title={copy.loadFailedTitle} />
+        ) : (
+          <BoardEmptyState
+            subtitle={selectedCategory ? copy.emptyFilteredSubtitle : copy.emptySubtitle}
+            title={selectedCategory ? copy.emptyFilteredTitle : copy.emptyTitle}
+          />
+        )
       ) : (
         <div className={`bdw-list${isPending ? " is-pending" : ""}`}>
           {ordered.map((post) => (

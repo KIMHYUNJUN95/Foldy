@@ -15,11 +15,11 @@ export default async function AdminBoardReportsPage() {
 
   const locale = session.user.preferredLanguage;
   const dictionary = getDictionary(locale);
-  const reports = await listPendingBoardReports(session);
+  const { reports, loadFailed } = await listPendingBoardReports(session);
 
   return (
     <AdminShell activeItem="board-reports" title={localizedNavigationLabels.admin.boardReports[locale]}>
-      <BoardReportsConsole copy={dictionary.board} reports={reports} w={dictionary.boardReportsWhite} />
+      <BoardReportsConsole copy={dictionary.board} loadFailed={loadFailed} reports={reports} w={dictionary.boardReportsWhite} />
     </AdminShell>
   );
 }

@@ -192,7 +192,7 @@ export async function getBoardFeed(params: {
   category?: string | null;
   limit: number;
   before?: string | null;
-}): Promise<{ posts: BoardPost[]; nextCursor: string | null }> {
+}): Promise<{ posts: BoardPost[]; nextCursor: string | null; loadFailed: boolean }> {
   const { session, category, limit, before } = params;
   const supabase = await getSupabaseServerClient();
   const orgId = session.organization.id;
@@ -209,7 +209,9 @@ export async function getBoardFeed(params: {
       .order("pinned_at", { ascending: false });
     if (category) pq = pq.contains("tags", [category]);
     const { data, error } = await pq;
-    if (!error) pinnedRows = (data ?? []) as PostRow[];
+    // 못 읽으면 「고정 글 없음」으로 조용히 넘기지 않는다 — 화면이 「불러오지 못함」을 보이게(2026-11-25).
+    if (error) return { posts: [], nextCursor: null, loadFailed: true };
+    pinnedRows = (data ?? []) as PostRow[];
   }
 
   // 고정되지 않은 글: (created_at, id) DESC 키셋 페이지네이션. `id` 동률 처리가 순서를
@@ -236,7 +238,8 @@ export async function getBoardFeed(params: {
       : nq.lt("created_at", beforeCreatedAt);
   }
   const { data: nData, error: nErr } = await nq;
-  const normalRows = (nErr ? [] : (nData ?? [])) as PostRow[];
+  if (nErr) return { posts: [], nextCursor: null, loadFailed: true };
+  const normalRows = (nData ?? []) as PostRow[];
 
   // 커서는 거르기 전 원본 행 기준 — 숨긴 글 때문에 한 페이지가 짧아질 수는 있어도 다음 페이지를 건너뛰지 않는다.
   const last = normalRows[normalRows.length - 1];
@@ -252,7 +255,7 @@ export async function getBoardFeed(params: {
     [...pinnedRows, ...normalRows].filter(visible),
     hidden,
   );
-  return { posts, nextCursor };
+  return { posts, nextCursor, loadFailed: false };
 }
 
 /** 조직의 삭제되지 않은 글 전체에서 고유한 태그 값 (필터 칩용), 개수 제한 + 정렬. */
@@ -275,9 +278,34 @@ export async function getBoardTags(session: AppSession): Promise<string[]> {
     .map(([tag]) => tag);
 }
 
+/** PostgREST 가 한 번에 돌려주는 최대 줄 수(Supabase 기본 max-rows). */
+const READ_PAGE_SIZE = 1000;
+/** 안전 상한 — 글 20만 개. 넘으면 거기까지만 센다(무한 반복 방지). */
+const READ_PAGE_LIMIT = 200;
+
+/**
+ * 1,000줄 상한을 넘는 읽기를 쪽으로 나눠 끝까지 읽는다. 질의는 정렬이 고정돼 있어야 한다(쪽 사이 빠짐 · 겹침 방지).
+ * 한 쪽이라도 실패하면 `null`.
+ */
+async function readAllPages<T>(
+  page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
+): Promise<T[] | null> {
+  const rows: T[] = [];
+  for (let i = 0; i < READ_PAGE_LIMIT; i += 1) {
+    const from = i * READ_PAGE_SIZE;
+    const { data, error } = await page(from, from + READ_PAGE_SIZE - 1);
+    if (error) return null;
+    const chunk = data ?? [];
+    rows.push(...chunk);
+    if (chunk.length < READ_PAGE_SIZE) break;
+  }
+  return rows;
+}
+
 /**
  * 현재 사용자의 안 읽은 게시글: 본인이 쓰지 않았고 읽음 행이 없는
  * 삭제되지 않은 조직 글. countUnreadAnnouncements 를 따르며, 스키마가 없으면 0 으로 닫힌다.
+ * 글 · 읽음은 1,000줄씩 나눠 끝까지 읽는다 — 예전엔 앞 1,000줄만 와서 글이 쌓이면 수가 틀렸다(2026-11-25).
  */
 export async function getBoardUnreadCount(session: AppSession): Promise<number> {
   try {
@@ -287,26 +315,33 @@ export async function getBoardUnreadCount(session: AppSession): Promise<number> 
 
     // 글 · 숨김 · 읽음 세 읽기를 한 번에 — 읽음은 글 id 목록을 기다리지 않고 「이 조직의 지워지지 않은 글」로
     // 조인해 거른다(결과는 예전 `.in(candidateIds)` 와 같다).
-    const [postsRes, hidden, readsRes] = await Promise.all([
-      supabase
-        .from("board_posts")
-        .select("id, created_by_user_id")
-        .eq("organization_id", orgId)
-        .is("deleted_at", null)
-        .returns<{ id: string; created_by_user_id: string }[]>(),
+    const [posts, hidden, reads] = await Promise.all([
+      readAllPages((from, to) =>
+        supabase
+          .from("board_posts")
+          .select("id, created_by_user_id")
+          .eq("organization_id", orgId)
+          .is("deleted_at", null)
+          .order("id", { ascending: true })
+          .range(from, to)
+          .returns<{ id: string; created_by_user_id: string }[]>(),
+      ),
       getBoardHiddenFor(session),
-      supabase
-        .from("board_post_reads")
-        .select("post_id, board_posts!inner(id)")
-        .eq("user_id", uid)
-        .eq("board_posts.organization_id", orgId)
-        .is("board_posts.deleted_at", null)
-        .returns<{ post_id: string }[]>(),
+      readAllPages((from, to) =>
+        supabase
+          .from("board_post_reads")
+          .select("post_id, board_posts!inner(id)")
+          .eq("user_id", uid)
+          .eq("board_posts.organization_id", orgId)
+          .is("board_posts.deleted_at", null)
+          .order("post_id", { ascending: true })
+          .range(from, to)
+          .returns<{ post_id: string }[]>(),
+      ),
     ]);
-    const { data: posts, error: postsError } = postsRes;
-    if (postsError) return 0;
+    if (!posts) return 0;
 
-    const candidateIds = (posts ?? [])
+    const candidateIds = posts
       .filter(
         (p) =>
           p.created_by_user_id !== uid &&
@@ -316,10 +351,9 @@ export async function getBoardUnreadCount(session: AppSession): Promise<number> 
       .map((p) => p.id);
     if (candidateIds.length === 0) return 0;
 
-    const { data: reads, error: readsError } = readsRes;
-    if (readsError) return 0;
+    if (!reads) return 0;
 
-    const readSet = new Set((reads ?? []).map((r) => r.post_id));
+    const readSet = new Set(reads.map((r) => r.post_id));
     return candidateIds.filter((id) => !readSet.has(id)).length;
   } catch {
     return 0;

@@ -21,7 +21,7 @@ export default async function BoardReportsPage() {
   if (!hasOrganizationContext(session)) redirect("/mobile/unavailable");
   if (!canModerateBoard(session)) redirect("/mobile/board");
 
-  const [reports, navBadges] = await Promise.all([listPendingBoardReports(session), navBadgesPromise]);
+  const [{ reports, loadFailed }, navBadges] = await Promise.all([listPendingBoardReports(session), navBadgesPromise]);
   const dictionary = getDictionary(session.user.preferredLanguage);
   const copy = dictionary.board;
 
@@ -30,6 +30,7 @@ export default async function BoardReportsPage() {
       <BoardReportsClient
         copy={copy}
         hint={dictionary.boardReportsWhite.hint}
+        loadFailed={loadFailed}
         reasonN={dictionary.boardReportsWhite.reasonN}
         reports={reports}
       />

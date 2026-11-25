@@ -1193,6 +1193,14 @@ Update/delete:
 
 마이그레이션 `202606250001_board.sql` (2026-06-25 적용).
 
+> **2026-11-25 `202611250004_board_bug_direct_write_revoke.sql` (운영 미적용 · 커밋 전): 쓰기는 서버 키만.**
+> 네 표와 `bug_reports` 에서 `authenticated` 의 INSERT · UPDATE · DELETE · TRUNCATE · REFERENCES · TRIGGER 를 거두고(`grant select` 만 남김),
+> `anon` 은 전부 거뒀다. 아래 INSERT · UPDATE · DELETE 정책 13개는 `drop policy if exists` 로 버렸다 — **SELECT 정책 5개만 남는다.**
+> 앱은 이미 모든 쓰기를 서버 액션 + service role 로 하므로(사용자 키로 쓰는 곳 없음) 앱 동작은 그대로다. 예전엔 공개 키로 바로 쓰면
+> 서버 액션 검사(`board.write` · 고정 · `bug_reports` 상태 제한 등)를 건너뛸 수 있었다.
+> 아래 INSERT · UPDATE · DELETE 줄은 **그 전 상태 기록**이다. 회귀 테스트: `src/lib/__tests__/board-bug-write-revoke.test.ts`(PGlite, 역할별 쓰기 42501).
+> 서버 액션의 쓰기 조건(조직 · `deleted_at is null` · 상태 · 0줄 처리)은 `docs/product/23-board-workflow.md` §4 · §12-C, `25-bug-report-workflow.md` 「Server Write Rules」.
+
 **board_posts**
 - SELECT: `deleted_at is null AND has_active_membership(organization_id)`
 - INSERT: `created_by_user_id = auth.uid() AND has_active_membership(organization_id)` — part_time_staff 포함 전체 활성 멤버
@@ -1228,6 +1236,10 @@ Update/delete:
 ## bug_reports
 
 **1차 구현 (2026-06-25).** Foldy 앱/시스템 버그 신고 테이블. Migration: `supabase/migrations/<timestamp>_bug_reports.sql` (DB engineer 결과 확인 후 파일명 갱신 필요). 모든 쓰기는 **서비스롤 서버 액션** 경유; RLS 는 코드 게이트와 이중으로 적용.
+
+> **2026-11-25 `202611250004` (운영 미적용): `authenticated` 는 SELECT 만.** 아래 INSERT · UPDATE · DELETE 정책은 버렸다(그 전 기록으로 남김).
+> 작성자 수정 · 삭제의 「`submitted` 만」 제한은 이제 서버 쿼리가 직접 건다 — `updateBugReport` · `deleteBugReport` 는 개발자가 아니면
+> `.eq("status","submitted")` 를 붙여 쓰고, 0줄이면 `not_editable`(개발자는 `not_found`). 읽은 뒤 리뷰어가 상태를 바꿔도 덮지 않는다.
 
 ### 리뷰어 정의 (1차 확정)
 

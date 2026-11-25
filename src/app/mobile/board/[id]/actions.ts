@@ -440,11 +440,16 @@ async function setPinned(postId: string, pinned: boolean): Promise<ActionResult>
         pinned_by_user_id: session.user.id,
       }
     : { is_pinned: false, pinned_at: null, pinned_by_user_id: null };
-  const { error } = await service
+  // 읽은 뒤 그 사이 지워졌으면 쓰지 않는다 — 조직 · 살아 있는 글 조건을 쓰기에서 다시 건다(2026-11-25).
+  const { data: updated, error } = await service
     .from("board_posts")
     .update(patch)
-    .eq("id", postId);
+    .eq("id", postId)
+    .eq("organization_id", session.organization.id)
+    .is("deleted_at", null)
+    .select("id");
   if (error) return { error: "save_failed" };
+  if (!updated || updated.length === 0) return { error: "not_found" };
 
   revalidateBoard(postId);
   return { ok: true };
@@ -533,7 +538,8 @@ export async function updateBoardPost(
     const canPin = isOrgTopAdminOrPlatform(session.user.role) || session.user.role === "office_admin";
     if (!canPin && input.isPinned !== post.is_pinned) return { error: "forbidden" };
   }
-  if (input.isPinned !== undefined) {
+  // 고정 여부가 실제로 바뀔 때만 쓴다 — 고정된 글의 본문만 고쳐도 고정 시각 · 고정한 사람이 바뀌던 것을 막는다(2026-11-25).
+  if (input.isPinned !== undefined && input.isPinned !== post.is_pinned) {
     if (input.isPinned) {
       patch.is_pinned = true;
       patch.pinned_at = new Date().toISOString();
@@ -546,11 +552,15 @@ export async function updateBoardPost(
   }
 
   const service = getSupabaseServiceClient();
-  const { error } = await service
+  const { data: updated, error } = await service
     .from("board_posts")
     .update(patch)
-    .eq("id", postId);
+    .eq("id", postId)
+    .eq("organization_id", session.organization.id)
+    .is("deleted_at", null)
+    .select("id");
   if (error) return { error: "save_failed" };
+  if (!updated || updated.length === 0) return { error: "not_found" };
 
   revalidateBoard(postId);
   return { ok: true };
@@ -572,8 +582,12 @@ export async function deleteBoardPost(postId: string): Promise<ActionResult> {
   const { error } = await service
     .from("board_posts")
     .update({ deleted_at: new Date().toISOString() })
-    .eq("id", postId);
+    .eq("id", postId)
+    .eq("organization_id", session.organization.id)
+    .is("deleted_at", null)
+    .select("id");
   if (error) return { error: "save_failed" };
+  // 0줄 = 그 사이 이미 지워짐(다른 기기 · 관리자). 지우려던 결과와 같으니 성공으로 두고 화면만 새로 그린다.
 
   revalidateBoard(postId);
   return { ok: true };

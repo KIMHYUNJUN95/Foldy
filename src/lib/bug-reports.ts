@@ -318,7 +318,7 @@ export async function updateBugReport(input: {
   if (existing.status !== "submitted" && !developer) throw new Error("not_editable");
 
   const service = getSupabaseServiceClient();
-  const { error } = await service
+  let update = service
     .from("bug_reports")
     .update({
       title,
@@ -328,7 +328,11 @@ export async function updateBugReport(input: {
     })
     .eq("id", input.id)
     .eq("organization_id", organizationId);
+  // 읽은 뒤 그 사이 검토가 시작됐으면 쓰지 않는다 — 접수 상태 조건을 쓰기에서 다시 건다(2026-11-25).
+  if (!developer) update = update.eq("status", "submitted");
+  const { data, error } = await update.select("id");
   if (error) throw new Error("save_failed");
+  if (!data || data.length === 0) throw new Error(developer ? "not_found" : "not_editable");
 }
 
 /**
@@ -350,12 +354,12 @@ export async function deleteBugReport(input: {
   if (existing.status !== "submitted" && !developer) throw new Error("not_editable");
 
   const service = getSupabaseServiceClient();
-  const { error } = await service
-    .from("bug_reports")
-    .delete()
-    .eq("id", input.id)
-    .eq("organization_id", organizationId);
+  let remove = service.from("bug_reports").delete().eq("id", input.id).eq("organization_id", organizationId);
+  // 수정과 같다 — 그 사이 검토가 시작된 신고는 지우지 않는다(2026-11-25).
+  if (!developer) remove = remove.eq("status", "submitted");
+  const { data, error } = await remove.select("id");
   if (error) throw new Error("save_failed");
+  if (!data || data.length === 0) throw new Error(developer ? "not_found" : "not_editable");
 }
 
 /**
@@ -396,12 +400,16 @@ export async function updateBugReportStatus(input: {
   }
 
   const service = getSupabaseServiceClient();
-  const { error } = await service
+  // 읽은 상태일 때만 바꾼다 — 그 사이 다른 검토자가 바꿨으면 덮어쓰지 않고, 작성자에게 엉뚱한 알림도 안 보낸다.
+  const { data: changed, error } = await service
     .from("bug_reports")
     .update(patch)
     .eq("id", id)
-    .eq("organization_id", organizationId);
+    .eq("organization_id", organizationId)
+    .eq("status", existing.status)
+    .select("id");
   if (error) throw new Error("save_failed");
+  if (!changed || changed.length === 0) throw new Error("status_changed");
 
   await notifyBugReportStatusChanged({
     reportId: id,
@@ -415,8 +423,11 @@ export async function updateBugReportStatus(input: {
 const SELECT_COLS =
   "id, organization_id, reported_by_user_id, title, description, image_urls, status, reviewed_by_user_id, closed_by_user_id, closed_at, created_at, updated_at";
 
+/** 목록 결과 — 못 읽음(`loadFailed`)과 「신고 없음」을 나눈다(2026-11-25). */
+export type BugReportListResult = { reports: BugReport[]; loadFailed: boolean };
+
 /** 현재 사용자가 소유한 리포트. RLS 가 (조직, 작성자)로 제한하고 코드가 둘 다 다시 적용한다. */
-export async function getMyBugReports(session: AppSession): Promise<BugReport[]> {
+export async function getMyBugReports(session: AppSession): Promise<BugReportListResult> {
   const organizationId = requireOrg(session);
   const supabase = await getSupabaseServerClient();
   const { data, error } = await supabase
@@ -425,8 +436,8 @@ export async function getMyBugReports(session: AppSession): Promise<BugReport[]>
     .eq("organization_id", organizationId)
     .eq("reported_by_user_id", session.user.id)
     .order("created_at", { ascending: false });
-  if (error) return [];
-  return hydrateReports(session, (data ?? []) as unknown as BugReportRow[]);
+  if (error) return { reports: [], loadFailed: true };
+  return { reports: await hydrateReports(session, (data ?? []) as unknown as BugReportRow[]), loadFailed: false };
 }
 
 /**
@@ -459,7 +470,7 @@ export async function getBugReportDetail(
 export async function getOrgBugReports(
   session: AppSession,
   filters?: { status?: BugStatus },
-): Promise<BugReport[]> {
+): Promise<BugReportListResult> {
   requireOrg(session);
   if (!isBugReportReviewer(session)) throw new Error("forbidden");
 
@@ -474,6 +485,6 @@ export async function getOrgBugReports(
   }
 
   const { data, error } = await query;
-  if (error) return [];
-  return hydrateReports(session, (data ?? []) as unknown as BugReportRow[]);
+  if (error) return { reports: [], loadFailed: true };
+  return { reports: await hydrateReports(session, (data ?? []) as unknown as BugReportRow[]), loadFailed: false };
 }

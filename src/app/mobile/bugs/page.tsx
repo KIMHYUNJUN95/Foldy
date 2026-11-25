@@ -32,7 +32,7 @@ export default async function MobileBugsPage() {
   const isReviewer = isBugReportReviewer(session);
   const copy = getDictionary(session.user.preferredLanguage).bugs;
 
-  const [reports, navBadges] = await Promise.all([
+  const [{ reports, loadFailed }, navBadges] = await Promise.all([
     isReviewer ? getOrgBugReports(session) : getMyBugReports(session),
     navBadgesPromise,
   ]);
@@ -40,7 +40,7 @@ export default async function MobileBugsPage() {
   return (
     <MobileShell activeItem="bugs" badges={navBadges} title={copy.title} split>
       <SplitList detail="bugs">
-        <BugsListClient copy={copy} reports={reports} isReviewer={isReviewer} />
+        <BugsListClient copy={copy} reports={reports} loadFailed={loadFailed} isReviewer={isReviewer} />
       </SplitList>
     </MobileShell>
   );

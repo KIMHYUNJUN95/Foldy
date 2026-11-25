@@ -32,19 +32,22 @@ const CHEVRON = (
 type Props = {
   copy: BugCopy;
   reports: BugReport[];
+  /** 목록을 못 읽음 — 「신고 없음」 대신 「불러오지 못함」(2026-11-25). */
+  loadFailed?: boolean;
   isReviewer: boolean;
 };
 
-export function BugsListClient({ copy, reports, isReviewer }: Props) {
+export function BugsListClient({ copy, reports, loadFailed = false, isReviewer }: Props) {
   const w = copy.white;
-  const sub = (isReviewer ? w.subAll : w.subMine).replace("{n}", String(reports.length));
+  // 못 읽었으면 건수 줄을 숨긴다 — 「0건」은 거짓이다(아래 빈 칸이 「불러오지 못함」을 알린다).
+  const sub = loadFailed ? null : (isReviewer ? w.subAll : w.subMine).replace("{n}", String(reports.length));
 
   return (
     <div className="bgw">
       <header className="bgw-h">
         <div className="bgw-h__t">
           <h1>{copy.title}</h1>
-          <p>{sub}</p>
+          {sub ? <p>{sub}</p> : null}
         </div>
         <Link className="bgw-cta" href="/mobile/bugs/new">
           + {w.newCta}
@@ -54,8 +57,8 @@ export function BugsListClient({ copy, reports, isReviewer }: Props) {
       <div className="bgw-list">
         {reports.length === 0 ? (
           <div className="bgw-empty">
-            <b>{w.emptyTitle}</b>
-            <span>{w.emptySub}</span>
+            <b>{loadFailed ? w.loadFailedTitle : w.emptyTitle}</b>
+            <span>{loadFailed ? w.loadFailedSub : w.emptySub}</span>
           </div>
         ) : (
           <LiveWash move sig={reports.map((b) => `${b.id}:${b.status}`).join(",")}>

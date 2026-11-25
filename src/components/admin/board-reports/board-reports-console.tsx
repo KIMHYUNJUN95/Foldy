@@ -32,7 +32,18 @@ function reasonSummary(r: PendingBoardReport, copy: Copy, w: W): string {
     .join(" · ");
 }
 
-export function BoardReportsConsole({ reports, copy, w }: { reports: PendingBoardReport[]; copy: Copy; w: W }) {
+export function BoardReportsConsole({
+  reports,
+  loadFailed = false,
+  copy,
+  w,
+}: {
+  reports: PendingBoardReport[];
+  /** 대기 신고를 못 읽음 — 건수 0 · 「신고 없음」 대신 「불러오지 못함」(2026-11-25). */
+  loadFailed?: boolean;
+  copy: Copy;
+  w: W;
+}) {
   const { toast, showToast, dismiss } = useAdminToast();
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const selected = reports.find((r) => r.key === selectedKey) ?? null;
@@ -41,15 +52,16 @@ export function BoardReportsConsole({ reports, copy, w }: { reports: PendingBoar
     <div className="brw">
       <p className="brw-top">
         <b>
-          {w.count} <span className={`num${reports.length > 0 ? " is-red" : ""}`}>{reports.length}</span>
+          {w.count}{" "}
+          <span className={`num${reports.length > 0 ? " is-red" : ""}`}>{loadFailed ? "—" : reports.length}</span>
         </b>
         <span>{w.hint}</span>
       </p>
 
       {reports.length === 0 ? (
         <div className="brw-empty">
-          <b>{w.empty}</b>
-          <span>{w.emptyHint}</span>
+          <b>{loadFailed ? copy.loadFailedTitle : w.empty}</b>
+          <span>{loadFailed ? copy.loadFailedSub : w.emptyHint}</span>
         </div>
       ) : (
         <>

@@ -21,11 +21,14 @@ import { boardDateTime } from "@/components/board/board-time";
  */
 export function BoardReportsClient({
   reports,
+  loadFailed = false,
   copy,
   hint,
   reasonN,
 }: {
   reports: PendingBoardReport[];
+  /** 대기 신고를 못 읽음 — 「처리할 신고 없음」 대신 「불러오지 못함」(2026-11-25). */
+  loadFailed?: boolean;
   copy: Dictionary["board"];
   /** 「같은 글에 들어온 신고는 한 줄로 묶어요」(PC 신고 콘솔과 같은 문구). */
   hint: string;
@@ -108,7 +111,9 @@ export function BoardReportsClient({
 
       {reports.length === 0 ? (
         <div className="bdw-empty">
-          <b>{copy.reportsEmpty}</b>
+          {/* 못 읽음은 「처리할 신고 없음」과 다르다 — 같은 모양, 다른 글(2026-11-25). */}
+          <b>{loadFailed ? copy.loadFailedTitle : copy.reportsEmpty}</b>
+          {loadFailed ? <span>{copy.loadFailedSub}</span> : null}
         </div>
       ) : (
         <div className="bdw-rep__list">

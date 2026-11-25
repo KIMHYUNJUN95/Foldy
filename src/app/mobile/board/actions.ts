@@ -18,11 +18,13 @@ export async function loadMoreBoardPosts(params: {
   const session = await getCurrentAppSession();
   if (!session || !hasOrganizationContext(session)) return { error: "no_org" };
 
-  const { posts, nextCursor } = await getBoardFeed({
+  const { posts, nextCursor, loadFailed } = await getBoardFeed({
     session,
     category: params.category,
     limit: PAGE_SIZE,
     before: params.before,
   });
+  // 못 읽었으면 빈 페이지(= 끝)로 알리지 않는다 — 화면은 「더 불러오지 못함」을 보이고 다시 시도할 수 있다(2026-11-25).
+  if (loadFailed) return { error: "load_failed" };
   return { posts, nextCursor };
 }

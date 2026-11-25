@@ -74,8 +74,11 @@ export function canModerateBoard(session: AppSession): boolean {
   return session.capabilities.includes("board.moderate");
 }
 
-/** 처리 대기 중인 신고 대상 수(같은 대상의 여러 신고는 1건). 처리 권한이 없으면 0. */
-export async function countPendingBoardReports(session: AppSession): Promise<number> {
+/**
+ * 처리 대기 중인 신고 대상 수(같은 대상의 여러 신고는 1건). 처리 권한이 없으면 0.
+ * 못 읽으면 `null` — 「대기 없음(0)」과 나눠, 화면이 신고 함 입구를 숨기지 않게 한다(2026-11-25).
+ */
+export async function countPendingBoardReports(session: AppSession): Promise<number | null> {
   if (!canModerateBoard(session)) return 0;
   try {
     const service = getSupabaseServiceClient();
@@ -84,10 +87,10 @@ export async function countPendingBoardReports(session: AppSession): Promise<num
       .select("target_type, post_id, comment_id")
       .eq("organization_id", session.organization.id)
       .eq("status", "pending");
-    if (error) return 0;
+    if (error) return null;
     return new Set((data ?? []).map((r) => `${r.target_type}:${r.comment_id ?? r.post_id}`)).size;
   } catch {
-    return 0;
+    return null;
   }
 }
 
@@ -121,12 +124,16 @@ export type PendingBoardReport = {
   commentCount: number | null;
 };
 
+export type PendingBoardReportsResult = { reports: PendingBoardReport[]; loadFailed: boolean };
+
 /**
  * 처리 대기 신고를 대상별로 묶어 최신순으로. 대상이 이미 지워졌으면(작성자 · 관리자 삭제) 그 신고는 「삭제됨」으로
  * 정리하고 목록에서 뺀다.
+ * 신고 · 글 · 댓글 중 하나라도 못 읽으면 `loadFailed` — 「지워짐」 판정과 정리를 하지 않는다. 예전엔 글 읽기가
+ * 실패하면 모든 대상을 지워진 것으로 보고 대기 신고를 전부 「삭제됨」으로 닫았다(2026-11-25 점검).
  */
-export async function listPendingBoardReports(session: AppSession): Promise<PendingBoardReport[]> {
-  if (!canModerateBoard(session)) return [];
+export async function listPendingBoardReports(session: AppSession): Promise<PendingBoardReportsResult> {
+  if (!canModerateBoard(session)) return { reports: [], loadFailed: false };
   const service = getSupabaseServiceClient();
   const orgId = session.organization.id;
 
@@ -136,7 +143,8 @@ export async function listPendingBoardReports(session: AppSession): Promise<Pend
     .eq("organization_id", orgId)
     .eq("status", "pending")
     .order("created_at", { ascending: false });
-  if (error || !data || data.length === 0) return [];
+  if (error) return { reports: [], loadFailed: true };
+  if (!data || data.length === 0) return { reports: [], loadFailed: false };
 
   const postIds = Array.from(new Set(data.map((r) => r.post_id)));
   const commentIds = Array.from(
@@ -167,6 +175,9 @@ export async function listPendingBoardReports(session: AppSession): Promise<Pend
       ? service.from("profiles").select("id, name").in("id", authorIds)
       : Promise.resolve({ data: [] as { id: string; name: string }[], error: null }),
   ]);
+
+  // 대상을 못 읽었으면 「없음 = 지워짐」으로 판정할 수 없다 — 정리하지 않고 실패로 알린다.
+  if (posts.error || comments.error) return { reports: [], loadFailed: true };
 
   // 글이 대상인 신고만 — 반응한 사람 수 · 남아 있는 댓글 수(상세 패널 메타 줄). 실패하면 null 로 둔다.
   const postTargetIds = Array.from(new Set(data.filter((r) => r.target_type !== "comment").map((r) => r.post_id)));
@@ -263,14 +274,17 @@ export async function listPendingBoardReports(session: AppSession): Promise<Pend
   for (const group of groups.values()) group.reasonCounts.sort((a, b) => b.count - a.count);
 
   if (goneReportIds.length > 0) {
-    // best-effort 정리 — 실패해도 다음 조회에서 다시 걸러진다.
+    // best-effort 정리 — 실패해도 다음 조회에서 다시 걸러진다. 읽은 뒤 그 사이 처리 · 취소된 신고는 덮어쓰지 않게
+    // 대기 상태 · 같은 조직 줄에만 쓴다(2026-11-25).
     await service
       .from("board_reports")
       .update({ status: "removed", resolved_at: new Date().toISOString() })
-      .in("id", goneReportIds);
+      .in("id", goneReportIds)
+      .eq("status", "pending")
+      .eq("organization_id", orgId);
   }
 
-  return Array.from(groups.values());
+  return { reports: Array.from(groups.values()), loadFailed: false };
 }
 
 export type BlockedUser = { id: string; name: string };

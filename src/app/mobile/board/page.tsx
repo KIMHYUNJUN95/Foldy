@@ -53,6 +53,7 @@ export default async function MobileBoardPage({ searchParams }: PageProps) {
           copy={getDictionary(session.user.preferredLanguage).board}
           initialPosts={feed.posts}
           initialCursor={feed.nextCursor}
+          loadFailed={feed.loadFailed}
           tags={tags}
           selectedCategory={category}
           pendingReportCount={pendingReportCount}

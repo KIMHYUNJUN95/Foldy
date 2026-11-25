@@ -170,41 +170,27 @@ CREATE TABLE board_reactions (
 
 ## 4. RLS (Row Level Security) 정책
 
-> 읽기는 RLS 직접 적용, 쓰기는 server actions에서 SERVICE_ROLE로 처리
+> **읽기만 RLS, 쓰기는 모두 서버 키(2026-11-25 `202611250004`).** 앱의 모든 쓰기(글 · 댓글 · 반응 · 읽음 · 고정 · 삭제)는
+> 서버 액션이 서버 키(service role)로 하고, 권한 · 조직 검사는 서버 액션이 한다. 그래서 로그인한 사용자(`authenticated`)의
+> 직접 쓰기 권한은 거뒀다 — 표 단위 INSERT · UPDATE · DELETE · TRUNCATE 권한을 빼고 쓰기 정책을 모두 버렸다.
+> 예전엔 휴대폰에서 공개 키로 바로 쓰면 서버 액션 검사(관리자만 글쓰기 · 고정 등)를 건너뛸 수 있었다. `anon` 은 아무 권한도 없다.
+> 운영 DB 적용 전(커밋 전) — 적용 순서는 앱 배포와 무관하다(앱은 이미 서버 키로만 쓴다).
 
-### `board_posts`
-| 조작 | 허용 조건 |
-|------|-----------|
-| SELECT | 같은 org 활성 멤버 + `deleted_at IS NULL` |
-| INSERT | 같은 org 활성 멤버 (전 직원, 작성 시 `is_pinned` 설정 포함) |
-| UPDATE | 작성자 본인 (내용·고정 수정) OR office_admin/owner (고정만) |
-| DELETE | 작성자 본인 OR org 내 office_admin/owner |
+| 표 | `authenticated` 가 할 수 있는 것 |
+|----|----------------------------------|
+| `board_posts` | SELECT — 같은 조직 활성 멤버 + `deleted_at IS NULL` |
+| `board_comments` | SELECT — 같은 조직 활성 멤버 + `deleted_at IS NULL` |
+| `board_reactions` | SELECT — 같은 조직 활성 멤버 |
+| `board_post_reads` | SELECT — 본인 줄(`user_id = auth.uid()`)만 |
+| 위 네 표 | INSERT · UPDATE · DELETE · TRUNCATE **없음**(서버 키만) |
 
-> **고정 권한**: 작성자는 자신의 글만 고정/해제. 관리자(office_admin/owner)는 모든 글 고정/해제 가능.
-
-### `board_comments`
-| 조작 | 허용 조건 |
-|------|-----------|
-| SELECT | 같은 org 활성 멤버 + `deleted_at IS NULL` |
-| INSERT | 같은 org 활성 멤버 + 해당 글의 `allow_comments = true` |
-| DELETE | 작성자 본인 OR org 내 office_admin/owner |
-
-> 댓글 수정 없음 — 삭제 후 재작성
-
-### `board_reactions`
-| 조작 | 허용 조건 |
-|------|-----------|
-| SELECT | 같은 org 활성 멤버 |
-| INSERT | `user_id = auth.uid()` + 같은 org 활성 멤버 |
-| DELETE | `user_id = auth.uid()` (본인 반응만 취소) |
-
-### `board_post_reads`
-| 조작 | 허용 조건 |
-|------|-----------|
-| INSERT/UPDATE | `user_id = auth.uid()` (본인 읽음만 기록) |
-| SELECT | `user_id = auth.uid()` |
-
----
+### 서버 액션의 쓰기 조건 (2026-11-25)
+읽은 뒤 쓰기 사이에 상태가 바뀌어도 덮어쓰지 않도록, 쓰기 쿼리에 조건을 다시 건다. 0줄이면 `not_found`(또는 아래 오류).
+- **고정 · 수정**(`setPinned` · `updateBoardPost`): `id` + 같은 조직 + `deleted_at IS NULL`. 수정은 고정 여부가 실제로 바뀔 때만
+  `is_pinned` · `pinned_at` 을 쓴다(같은 값이면 고정 시각을 새로 찍지 않는다).
+- **삭제**(`deleteBoardPost`): 같은 조직 + `deleted_at IS NULL` — 이미 지워진 글의 지운 시각을 덮지 않는다. 0줄(그 사이 다른 기기 ·
+  관리자가 먼저 지움)은 지우려던 결과와 같으니 **성공**으로 돌려주고 화면을 새로 그린다 — 오류를 띄우지 않는다.
+- **고정 권한**: 작성자는 자기 글, `board.manage` 는 모든 글(지금 동작 그대로 — 바꿀지는 사용자 결정 대기).
 
 ## 5. 서버 액션 (Server Actions)
 
@@ -353,6 +339,12 @@ getUnreadBoardPostCount(session)
 
 ### 읽지 않은 글 배지
 상단 탭 아이콘 옆에 미읽음 카운트 표시 (기존 `announcements` 배지 패턴과 동일).
+`getBoardUnreadCount` 는 글 · 읽음을 1,000줄씩(`.range()`, `id` · `post_id` 순 고정) 끝까지 나눠 읽는다(2026-11-25) — 예전엔 서버 상한
+1,000줄만 와서 글이 쌓이면 수가 틀렸다. 한 쪽이라도 못 읽으면 0(예전과 같음). 내 글 · 차단 · 신고 숨김 규칙은 그대로.
+
+### 「못 읽음」과 「비어 있음」 (2026-11-25)
+피드(`getBoardFeed` → `loadFailed`)는 고정 글 · 일반 글 중 하나라도 못 읽으면 「글이 없어요」 대신 「불러오지 못했어요」를 같은 빈 화면 모양으로
+보인다. 「더 불러오기」에서 못 읽으면 빈 페이지(= 끝)로 알리지 않고 `load_failed` 오류 → 「더 불러오지 못했어요」.
 
 ---
 
@@ -720,7 +712,14 @@ App Store(1.2) · Google Play(UGC 정책)는 사용자 작성 콘텐츠가 있�
 - 카드: 글/댓글 · 작성자 · 신고 수 · 미리보기 · 사유 칩 · 메모(최대 2) · 최근 신고 시각(도쿄). 「글 보기」 / 「문제없음」 / 「삭제」(확인 모달).
   - **삭제** = 대상 소프트 삭제(작성자 · 관리자 삭제와 같은 `deleted_at`) + 그 대상의 대기 신고 전부 `removed`.
   - **문제없음** = 대상은 두고 대기 신고 전부 `dismissed`. 신고한 사람에게는 계속 숨겨진다.
-  - 대상이 이미 지워졌으면 목록을 열 때 그 신고를 `removed` 로 정리한다.
+  - 대상이 이미 지워졌으면 목록을 열 때 그 신고를 `removed` 로 정리한다. **정리는 대기(`pending`) · 같은 조직 줄에만**
+    쓴다 — 읽은 뒤 그 사이 처리 · 취소된 신고는 덮지 않는다(2026-11-25).
+  - **글 · 댓글을 못 읽으면 정리하지 않는다(2026-11-25).** 예전엔 글 읽기가 실패하면 모든 대상을 「지워짐」으로 보고 대기 신고를
+    전부 `removed` 로 닫았다. 지금은 신고 · 글 · 댓글 중 하나라도 못 읽으면 아무것도 닫지 않고 화면에 「불러오지 못했어요」를 보인다
+    (빈 목록 「처리할 신고가 없어요」와 같은 모양, 다른 글). PC 콘솔은 건수 자리에 「—」.
+  - 피드 머리 칩: 대기 수를 못 세면 숫자 없이 「신고 처리」 입구만 보인다(0 으로 보고 숨기지 않는다).
+  - 쓰기 조건(2026-11-25): **신고 다시 열기**는 `withdrawn` · 같은 조직 줄에만(0줄 → `already_reported`), **신고 취소**는
+    `pending` · `dismissed` + 같은 조직 + 신고한 본인 줄에만(0줄 → `invalid`), **처리 「삭제」의 글 지우기**는 `deleted_at IS NULL` 줄에만.
 - 화면: `wide` — 폰 1열 · 폴드 2열 · 태블릿 3열 카드.
 - **관리 콘솔** `/admin/board-reports`(2026-10-06): 같은 데이터 · 같은 서버 액션을 표 + 우측 상세 패널로. 사이드바 「정보」 묶음, `board.moderate` 보유자만 보인다.
 - 알림(관리자에게 「새 신고」)은 붙이지 않았다 — 「알림은 막바지에 일괄 구현」 방침. 그때 함께 붙인다.

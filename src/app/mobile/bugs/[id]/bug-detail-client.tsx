@@ -84,6 +84,8 @@ export function BugDetailClient({ copy, bug, viewerIsAuthor, isReviewer, isDevel
         haptic("error");
         setStatusError(copy.statusChangeError);
         setPendingStatus(null);
+        // 그 사이 다른 검토자가 바꿨으면 지금 상태를 다시 보여 준다.
+        if (result.error === "status_changed") router.refresh();
         return;
       }
       router.refresh();

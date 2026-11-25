@@ -18,7 +18,6 @@ import {
 import { sortBuildings, toJstDateString } from "@/lib/admin-calendar-dashboard";
 import {
   detectOneNightGaps,
-  isActiveUnitMinStay,
   type OpsGapCellInput,
 } from "@/lib/ops-gap-detection";
 import {
@@ -28,8 +27,15 @@ import {
   type PriceHistoryRow,
 } from "@/lib/ops-price-history";
 import { buildGridRowData, type OpsGridRowData } from "@/lib/ops-calendar-rows";
-import { isAnyUnitBlackout, mergeOpsRateUnits, type OpsMergedRate } from "@/lib/ops-rate-merge";
+import {
+  activeNightsOf,
+  isAnyUnitBlackout,
+  mergeOpsRateUnits,
+  isGhostUnit,
+  type OpsMergedRate,
+} from "@/lib/ops-rate-merge";
 import { buildBlockRanges } from "@/lib/ops-block-ranges";
+import { loadUnitFullReadAt, withFullReadAt } from "@/lib/beds24/property-rates-state";
 import {
   attributePriceConversions,
   PRICE_ATTRIBUTION_WINDOW_HOURS,
@@ -187,6 +193,7 @@ type RateRow = Pick<
   | "max_stay"
   | "num_avail"
   | "override_kind"
+  | "synced_at"
 >;
 
 export type OpsCalendarChannel = "airbnb" | "booking" | "manual";
@@ -471,7 +478,7 @@ export async function readOpsRoomUnavailableNights(args: {
   excludeReservationId?: string;
 }): Promise<{ booked: string[]; unsellable: string[] }> {
   const { organizationId, supabase } = args;
-  const [roomCatalog, reservationsResult, ratesResult] = await Promise.all([
+  const [roomCatalog, reservationsResult, ratesResult, fullReadAt] = await Promise.all([
     getActiveRoomCatalog(organizationId, supabase, { includeNonOperationalProperties: true }),
     readAllPages<Record<string, unknown>>((from, to) =>
       supabase
@@ -487,13 +494,13 @@ export async function readOpsRoomUnavailableNights(args: {
     ).then(toReservationRows),
     args.roomIds.length === 0
       ? Promise.resolve({
-          data: [] as Array<Pick<RateRow, "room_id" | "stay_date" | "min_stay" | "override_kind">>,
+          data: [] as Array<Pick<RateRow, "room_id" | "stay_date" | "min_stay" | "override_kind" | "synced_at">>,
           error: null,
         })
-      : readAllPages<Pick<RateRow, "room_id" | "stay_date" | "min_stay" | "override_kind">>((from, to) =>
+      : readAllPages<Pick<RateRow, "room_id" | "stay_date" | "min_stay" | "override_kind" | "synced_at">>((from, to) =>
           supabase
             .from("room_daily_rates")
-            .select("room_id, stay_date, min_stay, override_kind")
+            .select("room_id, stay_date, min_stay, override_kind, synced_at")
             .eq("organization_id", organizationId)
             .in("room_id", args.roomIds)
             .gte("stay_date", args.from)
@@ -502,6 +509,7 @@ export async function readOpsRoomUnavailableNights(args: {
             .order("stay_date", { ascending: true })
             .range(from, to),
         ),
+    loadUnitFullReadAt(supabase, organizationId),
   ]);
   // 모르면 막는다 — 읽기에 실패했는데 「비어 있다」고 하면 그대로 초과예약이 된다.
   if (reservationsResult.error) throw new Error(reservationsResult.error.message);
@@ -523,11 +531,7 @@ export async function readOpsRoomUnavailableNights(args: {
       if (night >= row.check_in_date && night < row.check_out_date) booked.add(night);
     }
   }
-  const activeNights = new Set<string>();
-  for (const row of ratesResult.data) {
-    if (!isActiveUnitMinStay(row.min_stay)) continue;
-    activeNights.add(row.stay_date);
-  }
+  const activeNights = activeNightsOf(withFullReadAt(ratesResult.data, fullReadAt));
   const unsellable = nights.filter((night) => !booked.has(night) && !activeNights.has(night));
 
   return { booked: nights.filter((night) => booked.has(night)), unsellable };
@@ -548,7 +552,7 @@ export async function readOpsMoveTargets(args: {
 }): Promise<Map<string, { booked: string[]; unsellable: string[]; clashGuest: string | null }>> {
   const { organizationId, supabase } = args;
   const allRoomIds = [...new Set(args.rows.flatMap((row) => row.roomIds))];
-  const [roomCatalog, reservationsResult, ratesResult] = await Promise.all([
+  const [roomCatalog, reservationsResult, ratesResult, fullReadAt] = await Promise.all([
     getActiveRoomCatalog(organizationId, supabase, { includeNonOperationalProperties: true }),
     readAllPages<Record<string, unknown>>((from, to) =>
       supabase
@@ -562,11 +566,11 @@ export async function readOpsMoveTargets(args: {
         .range(from, to) as unknown as SlimReservationPage,
     ).then(toReservationRows),
     allRoomIds.length === 0
-      ? Promise.resolve({ data: [] as Array<Pick<RateRow, "room_id" | "stay_date" | "min_stay" | "override_kind">>, error: null })
-      : readAllPages<Pick<RateRow, "room_id" | "stay_date" | "min_stay" | "override_kind">>((from, to) =>
+      ? Promise.resolve({ data: [] as Array<Pick<RateRow, "room_id" | "stay_date" | "min_stay" | "override_kind" | "synced_at">>, error: null })
+      : readAllPages<Pick<RateRow, "room_id" | "stay_date" | "min_stay" | "override_kind" | "synced_at">>((from, to) =>
           supabase
             .from("room_daily_rates")
-            .select("room_id, stay_date, min_stay, override_kind")
+            .select("room_id, stay_date, min_stay, override_kind, synced_at")
             .eq("organization_id", organizationId)
             .in("room_id", allRoomIds)
             .gte("stay_date", args.from)
@@ -575,6 +579,7 @@ export async function readOpsMoveTargets(args: {
             .order("stay_date", { ascending: true })
             .range(from, to),
         ),
+    loadUnitFullReadAt(supabase, organizationId),
   ]);
   if (reservationsResult.error) throw new Error(reservationsResult.error.message);
   if (ratesResult.error) throw new Error(ratesResult.error.message);
@@ -599,8 +604,11 @@ export async function readOpsMoveTargets(args: {
       }
     }
     const ids = new Set(target.roomIds);
-    const activeNights = new Set(
-      ratesResult.data.filter((rate) => ids.has(rate.room_id) && isActiveUnitMinStay(rate.min_stay)).map((rate) => rate.stay_date),
+    const activeNights = activeNightsOf(
+      withFullReadAt(
+        ratesResult.data.filter((rate) => ids.has(rate.room_id)),
+        fullReadAt,
+      ),
     );
     out.set(target.roomKey, {
       booked: nights.filter((night) => booked.has(night)),
@@ -812,13 +820,15 @@ export async function getOpsCalendarData(
   for (let index = 0; index < rateRoomIds.length; index += rateChunkSize) {
     rateChunks.push(rateRoomIds.slice(index, index + rateChunkSize));
   }
+  // 유령 유닛 판정 기준(건물 마지막 전체 읽기). 상태 표는 service_role 전용이라 service 로 읽는다(조직으로 거름).
+  const fullReadAtPromise = loadUnitFullReadAt(getSupabaseServiceClient(), session.organization.id);
   const ratesPromise = Promise.all(
     rateChunks.map((chunkRoomIds) =>
       readAllPages<RateRow>((from, to) =>
         supabase
           .from("room_daily_rates")
           .select(
-            "room_id, stay_date, price1, price2, price3, min_stay, max_stay, num_avail, override_kind",
+            "room_id, stay_date, price1, price2, price3, min_stay, max_stay, num_avail, override_kind, synced_at",
           )
           .eq("organization_id", session.organization.id)
           .in("room_id", chunkRoomIds)
@@ -901,7 +911,7 @@ export async function getOpsCalendarData(
   /** 유닛 요금 칸이 **하나라도** 있는 칸 / 그중 어느 유닛이든 blackout 인 칸 — BLOCK 판정(`isAnyUnitBlackout`). */
   const unitRateCells = new Set<string>();
   const unitBlackoutCells = new Set<string>();
-  const ratesResult = await ratesPromise;
+  const [ratesResult, fullReadAt] = await Promise.all([ratesPromise, fullReadAtPromise]);
   if (ratesResult.error) {
     console.error("[ops-calendar] rate read failed", ratesResult.error);
   } else {
@@ -910,7 +920,7 @@ export async function getOpsCalendarData(
       const roomKey = roomKeyByUuid.get(row.room_id);
       if (!roomKey) continue;
       const cellKey = `${roomKey}|${row.stay_date}`;
-      const unit = { ...row, label: unitLabelById.get(row.room_id) };
+      const unit = { ...row, full_read_at: fullReadAt.get(row.room_id) ?? null, label: unitLabelById.get(row.room_id) };
       const bucket = unitsByCell.get(cellKey);
       if (bucket) bucket.push(unit);
       else unitsByCell.set(cellKey, [unit]);
@@ -1258,10 +1268,10 @@ export async function readOpsSalesInputs(args: {
       .order("id", { ascending: true })
       .range(from, to),
   );
-  const blackoutPromise = !withBlocks ? none<Pick<RateRow, "room_id" | "stay_date" | "min_stay">>() : readAllPages<Pick<RateRow, "room_id" | "stay_date" | "min_stay">>((from, to) =>
+  const blackoutPromise = !withBlocks ? none<Pick<RateRow, "room_id" | "stay_date" | "synced_at">>() : readAllPages<Pick<RateRow, "room_id" | "stay_date" | "synced_at">>((from, to) =>
     supabase
       .from("room_daily_rates")
-      .select("room_id, stay_date, min_stay")
+      .select("room_id, stay_date, synced_at")
       .eq("organization_id", organizationId)
       .ilike("override_kind", "blackout")
       .gte("stay_date", window.start)
@@ -1288,11 +1298,13 @@ export async function readOpsSalesInputs(args: {
     labelOfRoom.set(key, entry.displayRoomLabel);
   }
 
-  const [reservationsResult, blocksResult, blackoutResult, blockRoomKey] = await Promise.all([
+  const [reservationsResult, blocksResult, blackoutResult, blockRoomKey, fullReadAt] = await Promise.all([
     reservationsPromise,
     blocksPromise,
     blackoutPromise,
     withBlocks ? readBlockRoomKeyResolver(supabase, organizationId) : Promise.resolve(blockRoomAxisKey),
+    // 유령 유닛 판정 기준 — 상태 표는 service_role 전용이라 service 로 읽는다(조직으로 거름).
+    withBlocks ? loadUnitFullReadAt(getSupabaseServiceClient(), organizationId) : Promise.resolve(new Map<string, string | null>()),
   ]);
   if (reservationsResult.error) throw new Error(reservationsResult.error.message);
   if (blocksResult.error) throw new Error(blocksResult.error.message);
@@ -1344,8 +1356,10 @@ export async function readOpsSalesInputs(args: {
 
   // ── 차단 칸(격자 `isBlocked` 와 같은 규칙) ──
   const blocked = new Set<string>();
-  for (const row of blackoutResult.data) {
-    // 어느 유닛이든 blackout 이면 막힌 칸 — 격자와 같다(2026-10-01, `isAnyUnitBlackout`).
+  for (const row of withFullReadAt(blackoutResult.data, fullReadAt)) {
+    // 어느 유닛이든 blackout 이면 막힌 칸 — 격자와 같다(2026-10-01, `isAnyUnitBlackout`). 유령 유닛의 blackout 은 세지
+    // 않는다 — 행 하나로 판정되니(`isGhostUnit`) 같은 칸 다른 유닛을 더 읽을 필요가 없다.
+    if (isGhostUnit(row)) continue;
     const roomKey = roomKeyByUuid.get(row.room_id);
     if (roomKey && catalogKeys.has(roomKey) && inView(propertyOfRoom.get(roomKey) ?? "")) {
       blocked.add(`${roomKey}|${row.stay_date}`);

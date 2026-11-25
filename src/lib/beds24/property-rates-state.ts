@@ -188,3 +188,45 @@ export async function readMissedContext(
     lastWebhookAt: stateResult.data?.last_webhook_at ?? null,
   };
 }
+
+/**
+ * 유닛(`rooms.id`) → 그 건물의 마지막 전체 읽기 시작 시각. 판매 캘린더가 「Beds24 가 마지막 전체 읽기에서 돌려주지 않은
+ * 유닛」(유령)을 칸에서 뺄 때 쓴다(`isGhostUnit`, `src/lib/ops-rate-merge.ts`). 칸마다 유닛을 고르는 곳은 모두 이 함수
+ * 하나로 기준 시각을 붙인다.
+ *
+ * 상태 표는 service_role 전용이라 **service 클라이언트**를 넘겨야 한다(로그인 클라이언트면 빈 맵). 조직으로 거른다.
+ * 읽기에 실패하면 빈 맵 — 기준이 없으면 아무 유닛도 빼지 않는다(예전 동작). 화면 · 쓰기를 막을 일은 아니다.
+ */
+export async function loadUnitFullReadAt(supabase: Supabase, organizationId: string): Promise<Map<string, string | null>> {
+  const [roomsResult, statesResult] = await Promise.all([
+    supabase.from("rooms").select("id, properties(external_property_id)").eq("organization_id", organizationId),
+    supabase
+      .from("beds24_property_rates_state")
+      .select("external_property_id, last_full_read_at")
+      .eq("organization_id", organizationId),
+  ]);
+  if (roomsResult.error || statesResult.error) {
+    console.error("[beds24/property-rates-state] full read lookup failed", {
+      code: roomsResult.error?.code ?? statesResult.error?.code,
+    });
+    return new Map();
+  }
+  const readAtByProperty = new Map(
+    (statesResult.data ?? []).map((row) => [String(row.external_property_id), row.last_full_read_at]),
+  );
+  const out = new Map<string, string | null>();
+  for (const row of roomsResult.data ?? []) {
+    const property = Array.isArray(row.properties) ? row.properties[0] : row.properties;
+    const externalPropertyId = property?.external_property_id;
+    out.set(row.id, externalPropertyId ? (readAtByProperty.get(String(externalPropertyId)) ?? null) : null);
+  }
+  return out;
+}
+
+/** 요금 행마다 그 유닛 건물의 전체 읽기 시각을 붙인다(`loadUnitFullReadAt`). */
+export function withFullReadAt<T extends { room_id: string }>(
+  rows: readonly T[],
+  fullReadAt: ReadonlyMap<string, string | null>,
+): Array<T & { full_read_at: string | null }> {
+  return rows.map((row) => ({ ...row, full_read_at: fullReadAt.get(row.room_id) ?? null }));
+}

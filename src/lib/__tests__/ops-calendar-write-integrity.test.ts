@@ -99,6 +99,102 @@ describe("enqueueBeds24PriceJob — 1,000행 넘는 요금 읽기", () => {
     const queuedCells = job.room_updates.reduce((sum, update) => sum + Object.keys(update.dates).length, 0);
     expect(queuedCells).toBe(1200);
   });
+
+  /**
+   * 유령 유닛 — 건물 마지막 전체 읽기(18:11:34)에서 Beds24 가 돌려주지 않은 유닛(2026-11-25 오쿠보C 496532).
+   * 그 읽기는 돌려준 유닛의 창 안 행을 전부 읽기 시작 뒤로 찍는다.
+   */
+  const FULL_READ = "2026-11-25T09:11:34.015Z";
+  const FRESH = "2026-11-25T09:11:34.064Z";
+  const GONE = "2026-10-01T03:00:00.000Z";
+  const NIGHT = "2027-08-10";
+
+  function okuboRoom(id: string, externalRoomId: string, source: string | null = null) {
+    return {
+      external_price_source_room_id: source,
+      external_room_id: externalRoomId,
+      id,
+      organization_id: ORG,
+      preferred_min_stay_room_id: null,
+      properties: { external_property_id: "prop-okubo" },
+      property_id: "p1",
+    };
+  }
+
+  async function enqueueOkubo(args: {
+    jobType: "min_stay" | "price";
+    rates: Array<{ room_id: string; min_stay: number; synced_at: string }>;
+    fullReadAt?: string;
+  }) {
+    const rooms = [okuboRoom("u-main", "450096"), okuboRoom("u-cc", "648399", "450096"), okuboRoom("u-gone", "496532")];
+    const fake = createFakeSupabase({
+      beds24_price_jobs: [],
+      beds24_property_rates_state: [
+        { external_property_id: "prop-okubo", last_full_read_at: args.fullReadAt ?? FULL_READ, organization_id: ORG },
+      ],
+      room_daily_rates: args.rates.map((rate) => ({ ...rate, organization_id: ORG, stay_date: NIGHT })),
+      rooms,
+    });
+    const result = await enqueueBeds24PriceJob({
+      cells: [{ roomIds: ["u-main", "u-cc", "u-gone"], roomLabel: "오쿠보C", stayDate: NIGHT, values: args.jobType === "price" ? { p1: 80000 } : { m: 3 } }],
+      jobType: args.jobType,
+      organizationId: ORG,
+      requestedBy: null,
+      requestedByName: null,
+      supabase: fake.client as never,
+    });
+    expect(result.ok).toBe(true);
+    const job = fake.tables.beds24_price_jobs[0] as { room_updates: Array<{ externalRoomId: string }> };
+    return job.room_updates.map((update) => update.externalRoomId).sort();
+  }
+
+  it("유령 유닛에는 최소숙박을 쓰지 않는다 — 오쿠보C 496532 (2026-11-25)", async () => {
+    const targets = await enqueueOkubo({
+      jobType: "min_stay",
+      rates: [
+        { min_stay: 2, room_id: "u-main", synced_at: FRESH },
+        { min_stay: 99, room_id: "u-cc", synced_at: FRESH },
+        { min_stay: 1, room_id: "u-gone", synced_at: GONE },
+      ],
+    });
+    expect(targets).toEqual(["450096"]);
+  });
+
+  it("유령 유닛이 자기 가격 소스여도 가격을 쓰지 않는다", async () => {
+    const targets = await enqueueOkubo({
+      jobType: "price",
+      rates: [
+        { min_stay: 2, room_id: "u-main", synced_at: FRESH },
+        { min_stay: 99, room_id: "u-cc", synced_at: FRESH },
+        { min_stay: 1, room_id: "u-gone", synced_at: GONE },
+      ],
+    });
+    expect(targets).toEqual(["450096"]);
+  });
+
+  it("모든 유닛이 정상이면 대상은 그대로다", async () => {
+    const rates = [
+      { min_stay: 2, room_id: "u-main", synced_at: FRESH },
+      { min_stay: 99, room_id: "u-cc", synced_at: FRESH },
+      { min_stay: 1, room_id: "u-gone", synced_at: FRESH },
+    ];
+    expect(await enqueueOkubo({ jobType: "price", rates })).toEqual(["450096", "496532"]);
+    expect(await enqueueOkubo({ jobType: "min_stay", rates })).toEqual(["450096", "496532"]);
+  });
+
+  it("동기화가 멈춘 사이 앱이 한 유닛에만 써도 다른 유닛은 빠지지 않는다", async () => {
+    // 마지막 전체 읽기 11/20. 그 뒤 가격 작업이 소스(450096)만 새로 찍었다 — 판매 유닛(648399)은 그대로 남아야 한다.
+    const targets = await enqueueOkubo({
+      fullReadAt: "2026-11-20T00:00:00.000Z",
+      jobType: "min_stay",
+      rates: [
+        { min_stay: 99, room_id: "u-main", synced_at: "2026-11-25T09:00:00.000Z" },
+        { min_stay: 2, room_id: "u-cc", synced_at: "2026-11-20T00:00:05.000Z" },
+        { min_stay: 99, room_id: "u-gone", synced_at: GONE },
+      ],
+    });
+    expect(targets).toEqual(["648399"]);
+  });
 });
 
 /**

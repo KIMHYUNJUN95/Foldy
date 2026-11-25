@@ -21,7 +21,13 @@ import {
   releaseBeds24Lock,
 } from "@/lib/beds24/sync-locks";
 import { isActiveUnitMinStay } from "@/lib/ops-gap-detection";
-import { mergeOpsRateUnits, type OpsRateUnit } from "@/lib/ops-rate-merge";
+import { loadUnitFullReadAt, withFullReadAt } from "@/lib/beds24/property-rates-state";
+import {
+  activeExternalIdsByNight,
+  mergeOpsRateUnits,
+  type OpsRateUnit,
+  type UnitNightRate,
+} from "@/lib/ops-rate-merge";
 import { readAllPages } from "@/lib/supabase/read-all-pages";
 import {
   beds24UnsellableNights,
@@ -219,7 +225,7 @@ async function readServerCellPrices(
   const rates = await readAllPages<OpsRateUnit & { room_id: string; stay_date: string }>((from, to) =>
     supabase
       .from("room_daily_rates")
-      .select("room_id, stay_date, price1, price2, price3, min_stay, max_stay, num_avail, override_kind")
+      .select("room_id, stay_date, price1, price2, price3, min_stay, max_stay, num_avail, override_kind, synced_at")
       .eq("organization_id", organizationId)
       .in("room_id", roomIds)
       .in("stay_date", dates)
@@ -228,12 +234,13 @@ async function readServerCellPrices(
       .range(from, to),
   );
   if (rates.error) return null;
-  const byUnitDate = new Map(rates.data.map((row) => [`${row.room_id}|${row.stay_date}`, row]));
+  const fullReadAt = await loadUnitFullReadAt(supabase, organizationId);
+  const byUnitDate = new Map(withFullReadAt(rates.data, fullReadAt).map((row) => [`${row.room_id}|${row.stay_date}`, row]));
   const prices = new Map<string, number | null>();
   for (const cell of cells) {
     const units = cell.roomIds
       .map((id) => byUnitDate.get(`${id}|${cell.date}`))
-      .filter((row): row is OpsRateUnit & { room_id: string; stay_date: string } => !!row);
+      .filter((row) => !!row);
     prices.set(`${cell.roomKey}|${cell.date}`, mergeOpsRateUnits(units)?.price ?? null);
   }
   return prices;
@@ -848,26 +855,15 @@ async function submitManualBookingInScope(args: {
   // 「10월 3일에 이 유닛이 팔렸나」에는 답하지 못한다.
   const ratesResult = await supabase
     .from("room_daily_rates")
-    .select("room_id, stay_date, min_stay")
+    .select("room_id, stay_date, min_stay, synced_at")
     .eq("organization_id", session.organization.id)
     .in("room_id", units.map((unit) => unit.id))
     .in("stay_date", nights);
-  const minStayByKey = new Map<string, number | null>();
-  for (const row of (ratesResult.data ?? []) as Array<{
-    room_id: string;
-    stay_date: string;
-    min_stay: number | null;
-  }>) {
-    minStayByKey.set(`${row.room_id}|${row.stay_date}`, row.min_stay);
-  }
-
-  const activeByNight = new Map<string, string[]>();
-  for (const night of nights) {
-    const active = units
-      .filter((unit) => isActiveUnitMinStay(minStayByKey.get(`${unit.id}|${night}`) ?? null))
-      .map((unit) => String(unit.external_room_id));
-    activeByNight.set(night, active);
-  }
+  const activeByNight = activeExternalIdsByNight(
+    units,
+    withFullReadAt((ratesResult.data ?? []) as UnitNightRate[], await loadUnitFullReadAt(supabase, session.organization.id)),
+    nights,
+  );
 
   // 같은 요청 키를 **먼저** 본다 — 이미 만든 예약이면 그것을 돌려준다. 아래 겹침 확인보다 앞이어야 한다: 방금 만든 그 예약이
   // 자기 밤을 「찬 밤」으로 만들어, 다시 누른 사람에게 「이미 예약 있음」이 떴다(2026-10-19).
@@ -1701,22 +1697,16 @@ async function submitReservationMoveInScope(args: {
   const stayAhead = stayNights(next.arrival, next.departure).filter((night) => night >= today);
   const ratesResult = await supabase
     .from("room_daily_rates")
-    .select("room_id, stay_date, min_stay")
+    .select("room_id, stay_date, min_stay, synced_at")
     .eq("organization_id", session.organization.id)
     .in("room_id", units.map((unit) => unit.id))
     .in("stay_date", stayAhead);
   if (ratesResult.error) return { detail: ratesResult.error.message, error: "beds24_failed", ok: false };
-  const minStayByKey = new Map<string, number | null>();
-  for (const rate of (ratesResult.data ?? []) as Array<{ room_id: string; stay_date: string; min_stay: number | null }>) {
-    minStayByKey.set(`${rate.room_id}|${rate.stay_date}`, rate.min_stay);
-  }
-  const activeByNight = new Map<string, string[]>();
-  for (const night of stayAhead) {
-    activeByNight.set(
-      night,
-      units.filter((unit) => isActiveUnitMinStay(minStayByKey.get(`${unit.id}|${night}`) ?? null)).map((unit) => String(unit.external_room_id)),
-    );
-  }
+  const activeByNight = activeExternalIdsByNight(
+    units,
+    withFullReadAt((ratesResult.data ?? []) as UnitNightRate[], await loadUnitFullReadAt(supabase, session.organization.id)),
+    stayAhead,
+  );
   const keepCurrent = sameRow && stayAhead.every((night) => (activeByNight.get(night) ?? []).includes(currentRoomId));
   let targetRoomId = currentRoomId;
   if (!keepCurrent) {

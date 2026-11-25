@@ -9,6 +9,8 @@ import {
   resolvePriceWriteRoomIds,
   type WriteTargetUnit,
 } from "@/lib/beds24/write-target-room";
+import { loadUnitFullReadAt } from "@/lib/beds24/property-rates-state";
+import { isGhostUnit } from "@/lib/ops-rate-merge";
 import { readAllPages } from "@/lib/supabase/read-all-pages";
 import type { Database } from "@/types/database";
 
@@ -105,11 +107,16 @@ export async function enqueueBeds24PriceJob(args: {
   // **쪽을 나눠 끝까지 읽는다**(2026-10-19). 한 번에 읽으면 1,000행에서 잘려(`read-all-pages.ts`), 1,000칸 넘는 수정은
   // 뒤쪽 칸의 minStay 가 비어 「운영 중인 유닛 없음」으로 빠지거나 엉뚱한 유닛을 골랐다 — 최소숙박이 일부만 나갔다.
   const stayDates = [...new Set(args.cells.map((cell) => cell.stayDate))];
-  const ratesResult = await readAllPages<{ room_id: string; stay_date: string; min_stay: number | null }>(
+  const ratesResult = await readAllPages<{
+    room_id: string;
+    stay_date: string;
+    min_stay: number | null;
+    synced_at: string | null;
+  }>(
     (from, to) =>
       args.supabase
         .from("room_daily_rates")
-        .select("room_id, stay_date, min_stay")
+        .select("room_id, stay_date, min_stay, synced_at")
         .eq("organization_id", args.organizationId)
         .in("room_id", allRoomIds)
         .in("stay_date", stayDates)
@@ -123,10 +130,8 @@ export async function enqueueBeds24PriceJob(args: {
     console.error("[beds24/price-job] 요금 읽기 실패", ratesResult.error);
     return { error: "enqueue_failed", ok: false };
   }
-  const minStayByKey = new Map<string, number | null>();
-  for (const row of ratesResult.data) {
-    minStayByKey.set(`${row.room_id}|${row.stay_date}`, row.min_stay);
-  }
+  const rateByKey = new Map(ratesResult.data.map((row) => [`${row.room_id}|${row.stay_date}`, row]));
+  const fullReadAt = await loadUnitFullReadAt(args.supabase, args.organizationId);
 
   const datesByExternalRoom = new Map<string, Record<string, CalendarDateValues>>();
   const labelByExternalRoom = new Map<string, string | null>();
@@ -134,14 +139,24 @@ export async function enqueueBeds24PriceJob(args: {
   const skippedDates: string[] = [];
 
   for (const cell of args.cells) {
+    // 마지막 전체 읽기에서 Beds24 가 돌려주지 않은 유령 유닛은 쓰기 대상에서 뺀다 — 격자와 같은 `isGhostUnit`.
+    // 남겨 두면 그 유닛의 낡은 1박이 운영 중으로 잡히고(최소숙박), 가격은 없는 방에 써서 Beds24 가 거절한다.
     const units: WriteTargetUnit[] = cell.roomIds
       .map((roomId) => unitByRoomId.get(roomId))
       .filter((row): row is RoomUnitRow => !!row && !!row.external_room_id)
+      .filter(
+        (row) =>
+          !isGhostUnit({
+            full_read_at: fullReadAt.get(row.id) ?? null,
+            stay_date: cell.stayDate,
+            synced_at: rateByKey.get(`${row.id}|${cell.stayDate}`)?.synced_at ?? null,
+          }),
+      )
       .map((row) => ({
         externalPriceSourceRoomId: row.external_price_source_room_id,
         externalRoomId: String(row.external_room_id),
         id: row.id,
-        minStay: minStayByKey.get(`${row.id}|${cell.stayDate}`) ?? null,
+        minStay: rateByKey.get(`${row.id}|${cell.stayDate}`)?.min_stay ?? null,
       }));
     if (units.length === 0) {
       skippedDates.push(cell.stayDate);

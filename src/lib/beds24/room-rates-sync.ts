@@ -5,7 +5,8 @@ import { getOptionalBeds24ApiEnv } from "@/lib/env";
 import { detectExternalRateChanges, type RateSnapshot } from "@/lib/beds24/external-price-changes";
 import type { Database, Json } from "@/types/database";
 import { signalBeds24Change } from "@/lib/beds24/live-signal";
-import { tokyoDateOf, ymdShift } from "@/lib/tokyo-date";
+import { buildRoomRatesWindow, RECENT_WRITE_GUARD_MS } from "@/lib/beds24/room-rates-window";
+import { tokyoDateOf } from "@/lib/tokyo-date";
 import { findRowsContradictingRecentWrites, type RecentWrite } from "@/lib/beds24/recent-write-guard";
 
 /**
@@ -134,16 +135,8 @@ async function fetchCalendarPages(
  * (docs/product/32-ops-admin-area.md 「기간도 분리한다」). 어제를 포함하는 이유는 30일 뷰의
  * 시작일이 어제이기 때문이다.
  */
-/** 이 시간 안에 우리 작업이 쓴 칸은 동기화 값과 어긋나면 다시 읽는다(`recent-write-guard.ts`). */
-const RECENT_WRITE_GUARD_MS = 60 * 60 * 1000;
 
-export function buildRoomRatesWindow(now = new Date()): { from: string; to: string } {
-  const today = tokyoDateOf(now.toISOString()) as string;
-  const [year, month, day] = today.split("-").map(Number);
-  // 입력이 이미 도쿄 달력 날짜라 여기서의 UTC 는 시간대가 아니라 달력 계산용이다(`ymdShift` 와 같다).
-  const to = new Date(Date.UTC(year, month - 1 + 12, day)).toISOString().slice(0, 10);
-  return { from: ymdShift(today, -1), to };
-}
+export { buildRoomRatesWindow };
 
 function eachDate(from: string, to: string): string[] {
   const dates: string[] = [];

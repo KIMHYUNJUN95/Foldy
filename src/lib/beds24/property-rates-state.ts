@@ -195,9 +195,18 @@ export async function readMissedContext(
  * 하나로 기준 시각을 붙인다.
  *
  * 상태 표는 service_role 전용이라 **service 클라이언트**를 넘겨야 한다(로그인 클라이언트면 빈 맵). 조직으로 거른다.
- * 읽기에 실패하면 빈 맵 — 기준이 없으면 아무 유닛도 빼지 않는다(예전 동작). 화면 · 쓰기를 막을 일은 아니다.
+ * 읽기에 실패하면 빈 맵 — 기준이 없으면 아무 유닛도 빼지 않는다. **화면 전용**이다. 쓰기 · 예약 대상 유닛을 고르는 곳은
+ * `loadUnitFullReadAtOrNull` 을 쓰고 null 이면 멈춘다 — 빈 맵이면 Beds24 가 이미 지운 유닛에 쓰게 된다.
  */
 export async function loadUnitFullReadAt(supabase: Supabase, organizationId: string): Promise<Map<string, string | null>> {
+  return (await loadUnitFullReadAtOrNull(supabase, organizationId)) ?? new Map();
+}
+
+/** `loadUnitFullReadAt` 의 쓰기용 — 읽기에 실패하면 null(모르면 막는다). */
+export async function loadUnitFullReadAtOrNull(
+  supabase: Supabase,
+  organizationId: string,
+): Promise<Map<string, string | null> | null> {
   const [roomsResult, statesResult] = await Promise.all([
     supabase.from("rooms").select("id, properties(external_property_id)").eq("organization_id", organizationId),
     supabase
@@ -209,7 +218,7 @@ export async function loadUnitFullReadAt(supabase: Supabase, organizationId: str
     console.error("[beds24/property-rates-state] full read lookup failed", {
       code: roomsResult.error?.code ?? statesResult.error?.code,
     });
-    return new Map();
+    return null;
   }
   const readAtByProperty = new Map(
     (statesResult.data ?? []).map((row) => [String(row.external_property_id), row.last_full_read_at]),

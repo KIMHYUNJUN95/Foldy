@@ -21,7 +21,7 @@ import {
   releaseBeds24Lock,
 } from "@/lib/beds24/sync-locks";
 import { isActiveUnitMinStay } from "@/lib/ops-gap-detection";
-import { loadUnitFullReadAt, withFullReadAt } from "@/lib/beds24/property-rates-state";
+import { loadUnitFullReadAtOrNull, withFullReadAt } from "@/lib/beds24/property-rates-state";
 import {
   activeExternalIdsByNight,
   mergeOpsRateUnits,
@@ -234,7 +234,8 @@ async function readServerCellPrices(
       .range(from, to),
   );
   if (rates.error) return null;
-  const fullReadAt = await loadUnitFullReadAt(supabase, organizationId);
+  const fullReadAt = await loadUnitFullReadAtOrNull(supabase, organizationId);
+  if (!fullReadAt) return null;
   const byUnitDate = new Map(withFullReadAt(rates.data, fullReadAt).map((row) => [`${row.room_id}|${row.stay_date}`, row]));
   const prices = new Map<string, number | null>();
   for (const cell of cells) {
@@ -276,7 +277,8 @@ export async function submitPriceChange(args: {
   // 연 뒤 Beds24 에서 바뀐 가격이나 조작된 값이 그대로 기준이 됐다. 격자와 같은 병합(`mergeOpsRateUnits` — 운영 중
   // 유닛의 p1)으로 칸마다 다시 구한다. 요금 칸이 없으면 기준가가 없어 그 칸은 빠진다(격자의 빈 칸과 같다).
   const serverPrices = await readServerCellPrices(supabase, session.organization.id, args.cells);
-  if (!serverPrices) return { error: "no_priced_cells", ok: false };
+  // 읽기 실패는 「가격 없는 칸」이 아니다 — 일시 오류를 빈 칸으로 보이면 사람이 칸을 다시 고른다.
+  if (!serverPrices) return { error: "enqueue_failed", ok: false };
   const preview = buildAdjustmentPreview(
     args.cells.map(
       (cell): AdjustmentCellInput => ({
@@ -859,9 +861,11 @@ async function submitManualBookingInScope(args: {
     .eq("organization_id", session.organization.id)
     .in("room_id", units.map((unit) => unit.id))
     .in("stay_date", nights);
+  const fullReadAt = await loadUnitFullReadAtOrNull(supabase, session.organization.id);
+  if (!fullReadAt) return { detail: "full_read_lookup_failed", error: "beds24_failed", ok: false };
   const activeByNight = activeExternalIdsByNight(
     units,
-    withFullReadAt((ratesResult.data ?? []) as UnitNightRate[], await loadUnitFullReadAt(supabase, session.organization.id)),
+    withFullReadAt((ratesResult.data ?? []) as UnitNightRate[], fullReadAt),
     nights,
   );
 
@@ -1702,9 +1706,11 @@ async function submitReservationMoveInScope(args: {
     .in("room_id", units.map((unit) => unit.id))
     .in("stay_date", stayAhead);
   if (ratesResult.error) return { detail: ratesResult.error.message, error: "beds24_failed", ok: false };
+  const fullReadAt = await loadUnitFullReadAtOrNull(supabase, session.organization.id);
+  if (!fullReadAt) return { detail: "full_read_lookup_failed", error: "beds24_failed", ok: false };
   const activeByNight = activeExternalIdsByNight(
     units,
-    withFullReadAt((ratesResult.data ?? []) as UnitNightRate[], await loadUnitFullReadAt(supabase, session.organization.id)),
+    withFullReadAt((ratesResult.data ?? []) as UnitNightRate[], fullReadAt),
     stayAhead,
   );
   const keepCurrent = sameRow && stayAhead.every((night) => (activeByNight.get(night) ?? []).includes(currentRoomId));

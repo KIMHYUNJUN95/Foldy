@@ -9,7 +9,7 @@ import {
   resolvePriceWriteRoomIds,
   type WriteTargetUnit,
 } from "@/lib/beds24/write-target-room";
-import { loadUnitFullReadAt } from "@/lib/beds24/property-rates-state";
+import { loadUnitFullReadAtOrNull } from "@/lib/beds24/property-rates-state";
 import { isGhostUnit } from "@/lib/ops-rate-merge";
 import { readAllPages } from "@/lib/supabase/read-all-pages";
 import type { Database } from "@/types/database";
@@ -131,7 +131,8 @@ export async function enqueueBeds24PriceJob(args: {
     return { error: "enqueue_failed", ok: false };
   }
   const rateByKey = new Map(ratesResult.data.map((row) => [`${row.room_id}|${row.stay_date}`, row]));
-  const fullReadAt = await loadUnitFullReadAt(args.supabase, args.organizationId);
+  const fullReadAt = await loadUnitFullReadAtOrNull(args.supabase, args.organizationId);
+  if (!fullReadAt) return { error: "enqueue_failed", ok: false };
 
   const datesByExternalRoom = new Map<string, Record<string, CalendarDateValues>>();
   const labelByExternalRoom = new Map<string, string | null>();

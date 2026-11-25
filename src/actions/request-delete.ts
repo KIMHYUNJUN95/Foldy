@@ -3,7 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { canDeleteRequestRecord } from "@/lib/request-delete-rule";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
+import { isOwnStoragePublicUrl, storagePathFromPublicUrl } from "@/lib/storage-url-guard";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { REQUEST_IMAGE_BUCKET } from "@/lib/task-images";
 
 /**
  * 삭제 후 갱신돼야 하는 화면들.
@@ -20,6 +23,45 @@ function revalidateAfterDelete(kind: "lost-found" | "maintenance" | "orders") {
 type DeleteResult = { ok: true } | { ok: false; error: "unauthorized" | "not_found" | "delete_failed" };
 
 type RequestTable = "lost_items" | "maintenance_reports" | "order_requests";
+
+/** 열 → 사진이 올라가는 폴더(업로더가 `{조직}/{폴더}/{기록 id}/` 로 고정 — lost-item-create · maintenance-create · 처리 사진 액션). */
+const PHOTO_COLUMNS: Partial<Record<RequestTable, ReadonlyArray<{ column: string; folder: string }>>> = {
+  lost_items: [
+    { column: "image_urls", folder: "lost-items" },
+    { column: "handling_image_urls", folder: "lost-found-handling" },
+  ],
+  maintenance_reports: [
+    { column: "image_urls", folder: "maintenance-reports" },
+    { column: "resolution_image_urls", folder: "maintenance-resolutions" },
+  ],
+};
+
+/** 행을 지운 뒤 사진 파일을 지운다. 실패해도 삭제 결과는 바꾸지 않는다(파일이 남는 쪽이 안전). 이 기록의 폴더 아래 한 장짜리 경로만. */
+async function removeRequestPhotos(
+  row: Record<string, unknown>,
+  columns: ReadonlyArray<{ column: string; folder: string }>,
+  organizationId: string,
+  recordId: string,
+) {
+  const paths = new Set<string>();
+  for (const { column, folder } of columns) {
+    const urls = row[column];
+    if (!Array.isArray(urls)) continue;
+    const prefix = `${organizationId}/${folder}/${recordId}/`;
+    for (const url of urls) {
+      if (typeof url !== "string" || !isOwnStoragePublicUrl(url, REQUEST_IMAGE_BUCKET, prefix)) continue;
+      const path = storagePathFromPublicUrl(url, REQUEST_IMAGE_BUCKET);
+      if (path) paths.add(path);
+    }
+  }
+  if (paths.size === 0) return;
+  try {
+    const { error } = await getSupabaseServiceClient().storage.from(REQUEST_IMAGE_BUCKET).remove([...paths]);
+    if (error) console.error("[deleteRequestRow] storage remove failed:", error.message);
+  } catch (error) {
+    console.error("[deleteRequestRow] storage remove threw:", error instanceof Error ? error.message : "unknown");
+  }
+}
 
 function isValidUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
@@ -40,16 +82,21 @@ async function deleteRequestRow(table: RequestTable, id: string): Promise<Delete
     return { ok: false, error: "not_found" };
   }
   const supabase = await getSupabaseServerClient();
-  const { data: existing } = await supabase
+  const photoColumns = PHOTO_COLUMNS[table] ?? [];
+  const { data: existing, error: readError } = await supabase
     .from(table)
-    .select("id, reported_by_user_id, status")
+    .select(["id", "reported_by_user_id", "status", ...photoColumns.map((c) => c.column)].join(", "))
     .eq("id", id)
     .eq("organization_id", session.organization.id)
     .maybeSingle();
+  if (readError) {
+    console.error("[deleteRequestRow] read failed:", readError.message);
+    return { ok: false, error: "delete_failed" };
+  }
   if (!existing) {
     return { ok: false, error: "not_found" };
   }
-  const row = existing as { reported_by_user_id: string; status: string };
+  const row = existing as unknown as { reported_by_user_id: string; status: string } & Record<string, unknown>;
   const allowed = canDeleteRequestRecord({
     canDeleteAny: session.capabilities.includes("request.delete_any"),
     isOwner: row.reported_by_user_id === session.user.id,
@@ -78,6 +125,7 @@ async function deleteRequestRow(table: RequestTable, id: string): Promise<Delete
   if (!deleted || deleted.length === 0) {
     return { ok: false, error: "not_found" };
   }
+  if (photoColumns.length > 0) await removeRequestPhotos(row, photoColumns, session.organization.id, id);
   revalidateAfterDelete(table === "lost_items" ? "lost-found" : table === "maintenance_reports" ? "maintenance" : "orders");
   return { ok: true };
 }

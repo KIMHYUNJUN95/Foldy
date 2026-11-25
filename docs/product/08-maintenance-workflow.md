@@ -323,7 +323,7 @@ Default mobile behavior:
 
 ### Deletion behavior
 
-- Hard delete — record is permanently removed.
+- Hard delete — record is permanently removed. 삭제 성공 뒤 신고 사진 · 처리 사진도 스토리지(`request-images`)에서 지운다(그 기록 폴더 `조직/폴더/기록 id/` 안의 파일만, 실패해도 삭제는 성공 — best-effort, 2026-11-25, `src/actions/request-delete.ts`).
 - Show a confirmation modal before executing.
 - Confirmation modal must include the record title/name to prevent accidental deletion.
 - On success, navigate back to the list and refresh.

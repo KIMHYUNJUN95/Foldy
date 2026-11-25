@@ -35,7 +35,7 @@ import {
   type OpsMergedRate,
 } from "@/lib/ops-rate-merge";
 import { buildBlockRanges } from "@/lib/ops-block-ranges";
-import { loadUnitFullReadAt, withFullReadAt } from "@/lib/beds24/property-rates-state";
+import { loadUnitFullReadAt, loadUnitFullReadAtOrNull, withFullReadAt } from "@/lib/beds24/property-rates-state";
 import {
   attributePriceConversions,
   PRICE_ATTRIBUTION_WINDOW_HOURS,
@@ -509,11 +509,12 @@ export async function readOpsRoomUnavailableNights(args: {
             .order("stay_date", { ascending: true })
             .range(from, to),
         ),
-    loadUnitFullReadAt(supabase, organizationId),
+    loadUnitFullReadAtOrNull(supabase, organizationId),
   ]);
   // 모르면 막는다 — 읽기에 실패했는데 「비어 있다」고 하면 그대로 초과예약이 된다.
   if (reservationsResult.error) throw new Error(reservationsResult.error.message);
   if (ratesResult.error) throw new Error(ratesResult.error.message);
+  if (!fullReadAt) throw new Error("full_read_lookup_failed");
 
   const nights: string[] = [];
   for (let cursor = args.from; cursor < args.toExclusive; cursor = addDays(cursor, 1)) {
@@ -579,10 +580,11 @@ export async function readOpsMoveTargets(args: {
             .order("stay_date", { ascending: true })
             .range(from, to),
         ),
-    loadUnitFullReadAt(supabase, organizationId),
+    loadUnitFullReadAtOrNull(supabase, organizationId),
   ]);
   if (reservationsResult.error) throw new Error(reservationsResult.error.message);
   if (ratesResult.error) throw new Error(ratesResult.error.message);
+  if (!fullReadAt) throw new Error("full_read_lookup_failed");
 
   const nights: string[] = [];
   for (let cursor = args.from; cursor < args.toExclusive; cursor = addDays(cursor, 1)) nights.push(cursor);

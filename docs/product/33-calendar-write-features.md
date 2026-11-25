@@ -1708,7 +1708,11 @@ p2 는 메인 것으로 섞이는 것이 정상이다.
   service_role 전용 표라 서버 클라이언트로 읽고 조직으로 거른다)가 유닛마다 붙인다. 격자 병합 · 차단 표시 · 수기 예약 / 옮기기의
   겹침 · 팔 수 있는 유닛 고르기 · 매출 화면의 차단 칸 · 가격 / 최소숙박 쓰기 대상(`price-job-queue.ts`)이 모두 이것을 거친다
   — 사라진 유닛에 써서 Beds24 가 `invalid roomid` 로 거절하는 일도 없다.
-- 다카다노바바 401_2(556719)도 같은 모양이다. 테스트: `ops-rate-merge.test.ts` · `ops-calendar-write-integrity.test.ts`.
+- **기준 시각을 못 읽으면 (2026-11-25)**: 화면(격자 · 매출 차단 칸)은 빈 기준으로 넘어가 아무 유닛도 빼지 않는다. 쓰기 · 예약 대상 유닛을
+  고르는 곳 — 가격 / 최소숙박 큐(`enqueue_failed`) · 수기 예약 / 옮기기(`beds24_failed`, detail `full_read_lookup_failed`) · 가용 확인
+  · 옮길 곳 목록(던짐 → `read_failed`) · 가격 수정 기준가(`enqueue_failed` — 요금 읽기 실패도 같다. 「가격 없는 칸」`no_priced_cells` 은 읽혔는데 값이 없을 때만) — 는 `loadUnitFullReadAtOrNull` 로 읽고 **멈춘다**.
+  빈 기준으로 쓰면 Beds24 가 이미 지운 유닛이 대상으로 남는다.
+- 다카다노바바 401_2(556719)도 같은 모양이다. 테스트: `ops-rate-merge.test.ts` · `ops-calendar-write-integrity.test.ts` · `beds24-unit-full-read-strict.test.ts`.
 
 ### 쓰기 대상 유닛 — **가격과 최소숙박이 서로 다른 유닛으로 간다** (2026-09-24)
 

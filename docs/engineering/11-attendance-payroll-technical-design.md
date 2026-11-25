@@ -1545,12 +1545,24 @@ Notes:
 
 ### 교통비 영수증 저장소(2026-11-25)
 
-마이그레이션 `202611250002_transport_receipts_private_bucket.sql` — **운영 미적용 — 사용자 허락 대기.**
+마이그레이션 `202611250002_transport_receipts_private_bucket.sql` — **운영 적용 · 확인 완료(2026-11-25). 운영에 영수증 사진이 0장이라 옮기기 스크립트는 돌릴 것이 없었다(미리 보기 0건).**
 
 - **건물 이름은 서버가 정한다(2026-11-25)**: `createTransportItemAction` 은 직접 입력 항목의 `work_context.buildingLabel` 을 화면 값이 아니라
   출근지에서 정한다 — 건물은 같은 조직 `properties.name` → `getCanonicalPropertyName`, 사무실 · 기타는 한국어 사전 값, 그 밖은 비움
-  (`resolveBuildingLabel`). 없는 · 다른 조직 건물은 그대로 `invalid_link`. 자동 연결은 후보 값(근태 근무지 이름 · 청소 건물 이름)을 그대로 —
-  출처는 안 바꿨다. `updateTransportItemAction` 은 `buildingLabel` 을 받지 않는다(화면도 보내지 않음). 테스트: `transport-hardening.test.ts`.
+  (`resolveBuildingLabel`). 없는 · 다른 조직 건물은 그대로 `invalid_link`. 자동 연결도 화면 값을 받지 않는다 — 서버가 연결된 기록에서
+  `resolveLinkedTransportPlace`(`src/lib/transport-reimbursement.ts`)로 정한다: 근태 = 같은 조직
+  `attendance_sites.name`(세션의 `clock_in_site_id`), 청소 = 세션 `room_label` → 같은 조직 `rooms`(첫 줄) → 같은 조직 `properties` 의
+  `display_name_ko ?? name`. 못 찾으면 비움, 읽기 오류는 `read_failed`. 입력 타입에서 `buildingLabel` 을 뺐다(화면도 보내지 않음).
+  `updateTransportItemAction` 은 `buildingLabel` 을 받지 않는다(화면도 보내지 않음). 테스트: `transport-hardening.test.ts`.
+- **2026-11-25 추가 — 연결 항목의 장소는 한 판정**: 후보 목록(`getLinkedTransportCandidates`)과 저장(`resolveLinkedTransportPlace`)이
+  같은 조립 함수 `linkedAttendancePlace` · `linkedCleaningPlace` 를 쓴다(읽는 쿼리는 각자 — 후보는 `.in` 묶음, 저장은 한 줄).
+  만드는 값 = 이름 · 요약(근태 = 이름, 청소 = 「건물 · 방」, 방 `getDisplaySessionRoomLabel`) · 같은 조직 건물 id.
+  생성: 연결 항목은 `contextSummary` 화면 값을 버린다. `property_id` · `work_context.destinationKey` 는 연결 기록의 건물이 있으면 그것,
+  없으면(FK 빈 근무지) 화면 값을 같은 조직 확인 뒤 사용 — 금액 기억 키(`transport-destinations-server.ts`, `property_id ?? destinationKey`)를
+  지금 저장값과 같게 지키려는 것. 수정: 이 저장 뒤에도 `linked` 면 `contextSummary` 무시, 같은 저장에서 `manual` 로 바꾸면 받음(화면은 연결 항목의
+  「방」 칸 `readOnly`). 연결할 수 있는 기록 = `LINKABLE_ATTENDANCE_EXCLUDED_STATUS`(근태 `status <> 'invalid'`) ·
+  `LINKABLE_CLEANING_STATUS`(청소 `completed` + `closed_without_cleaning = false`) — 후보 쿼리와 저장 확인이 같이 쓴다.
+  후보 목록의 5개 읽기(근태 · 근무지 · 청소 · 방 · 건물) 오류는 던진다(예전엔 빈 목록 · 빈 이름으로 삼킴).
 
 - **버킷**: 새 업로드 = 비공개 `transport-receipts`(`TRANSPORT_RECEIPT_BUCKET`, `src/lib/transport-receipt-bucket.ts` — 브라우저도 쓰는 이름 상수).
   예전 파일 = 공개 `request-images`(`LEGACY_TRANSPORT_RECEIPT_BUCKET`). 서버 도우미 `src/lib/transport-receipt-storage.ts`(server-only):

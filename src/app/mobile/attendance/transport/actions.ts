@@ -20,6 +20,10 @@ import {
 import {
   getOrCreateTransportReport,
   getTransportReport,
+  LINKABLE_ATTENDANCE_EXCLUDED_STATUS,
+  LINKABLE_CLEANING_STATUS,
+  type LinkedTransportPlace,
+  resolveLinkedTransportPlace,
   syncReportTotalAmount,
   syncReportTotalAmountQuietly,
   type TransportEntryMode,
@@ -112,12 +116,17 @@ function isOwnItemImagePath(
 /**
  * 저장할 건물 이름(2026-11-25). 화면은 정규 이름을 보내지만 서버가 화면 값을 믿지 않는다 — 로케일 이름(`荒木町A`)이나
  * 엉뚱한 이름이 저장되면 관리자 화면 · 내보내기의 이름 바꾸기(`localizeStoredPlaceText`)가 안 걸린다.
- * - 자동 연결: 지금처럼 후보 값(근태 근무지 이름 · 청소 건물 이름)을 쓴다 — 출처를 바꾸지 않는다.
+ * - 자동 연결: 서버가 연결된 기록에서 정한 이름(`linkedLabel`, `resolveLinkedTransportPlace` — 근태 근무지 이름 ·
+ *   청소 건물 이름, 후보 목록과 같은 판정 함수). 화면 값은 받지 않는다.
  * - 직접 입력 · 건물: 같은 조직 `properties.name` → `getCanonicalPropertyName`(목적지 목록의 `canonicalLabel` 과 같은 값).
  * - 직접 입력 · 사무실 · 기타: 한국어 사전 값. 그 밖에는 비운다.
  */
-function resolveBuildingLabel(input: CreateTransportItemInput, propertyName: string | null): string | null {
-  if (input.entryMode === "linked") return input.buildingLabel?.trim() || null;
+function resolveBuildingLabel(
+  input: CreateTransportItemInput,
+  propertyName: string | null,
+  linkedLabel: string | null,
+): string | null {
+  if (input.entryMode === "linked") return linkedLabel?.trim() || null;
   if (propertyName) return getCanonicalPropertyName(propertyName);
   const key = input.destinationKey?.trim();
   const ko = getDictionary("ko");
@@ -137,12 +146,7 @@ export type CreateTransportItemInput = {
   propertyId?: string | null;
   /** 안 흔들리는 출근지 키. 건물이면 `property_id` 와 같고, 사무실·기타는 고정값. */
   destinationKey?: string;
-  /**
-   * 자동 연결 항목에서만 쓴다(근태 근무지 · 청소 건물 이름, 후보가 서버에서 만든 값). 직접 입력은 이 값을 **믿지 않고**
-   * 서버가 출근지에서 정규(한국어) 이름을 정한다(2026-11-25) — 건물은 `properties.name` → `getCanonicalPropertyName`,
-   * 사무실 · 기타는 한국어 사전 값.
-   */
-  buildingLabel?: string;
+  // 건물 이름(`buildingLabel`)은 받지 않는다(2026-11-25) — 직접 입력은 출근지에서, 자동 연결은 연결된 기록에서 서버가 정한다.
   contextSummary?: string;
   memo?: string | null;
 };
@@ -192,32 +196,53 @@ export async function createTransportItemAction(
 
   // 연결 대상은 **내 것 · 우리 조직 것 · 그날 것**만(2026-10-26, 날짜는 2026-11-11). 화면이 보낸 id 를 그대로
   // 저장하면 남의 근태 기록이나 다른 조직 건물에 이어진 행이 생긴다. DB 트리거와 같은 조건이다.
-  const propertyId = input.propertyId?.trim() || null;
+  // 연결 항목의 건물 정보(이름 · 요약 · 건물 id)는 서버가 연결 기록에서 정한다(2026-11-25, 후보 목록과 같은 판정).
   let linkedSource: { type: "attendance" | "cleaning"; id: string } | null = null;
+  let linkedPlace: LinkedTransportPlace | null = null;
   if (input.entryMode === "linked" && attendanceSessionId) {
     const sessionRes = await service
       .from("attendance_sessions")
-      .select("id")
+      .select("id, clock_in_site_id")
       .eq("id", attendanceSessionId)
       .eq("organization_id", organizationId)
       .eq("user_id", userId)
       .eq("operating_date", input.usageDate)
-      .neq("status", "invalid")
+      .neq("status", LINKABLE_ATTENDANCE_EXCLUDED_STATUS)
       .maybeSingle();
     if (sessionRes.error || !sessionRes.data) return { ok: false, error: "invalid_link" };
     linkedSource = { type: "attendance", id: attendanceSessionId };
+    const resolved = await resolveLinkedTransportPlace(service, organizationId, {
+      type: "attendance",
+      siteId: (sessionRes.data as { clock_in_site_id?: string | null }).clock_in_site_id ?? null,
+    });
+    if (!resolved.ok) return resolved;
+    linkedPlace = resolved.place;
   } else if (input.entryMode === "linked" && cleaningSessionId) {
     const cleaningRes = await service
       .from("cleaning_sessions")
-      .select("id")
+      .select("id, room_label")
       .eq("id", cleaningSessionId)
       .eq("organization_id", organizationId)
       .eq("staff_user_id", userId)
       .eq("cleaning_date", input.usageDate)
+      // 후보 목록과 같은 「청소한 기록」만 — 후보에 안 나오는 기록은 저장도 거절한다(2026-11-25).
+      .eq("status", LINKABLE_CLEANING_STATUS)
+      .eq("closed_without_cleaning", false)
       .maybeSingle();
     if (cleaningRes.error || !cleaningRes.data) return { ok: false, error: "invalid_link" };
     linkedSource = { type: "cleaning", id: cleaningSessionId };
+    const resolved = await resolveLinkedTransportPlace(service, organizationId, {
+      type: "cleaning",
+      roomLabel: (cleaningRes.data as { room_label?: string | null }).room_label ?? null,
+    });
+    if (!resolved.ok) return resolved;
+    linkedPlace = resolved.place;
   }
+  // 건물 id: 연결 기록이 건물을 가리키면(근무지 FK · 청소 방의 건물) 그것을 쓰고 화면 값은 버린다. 가리키지 않으면
+  // (FK 가 빈 근무지 — 화면이 이름으로 출근지를 맞춘 값) 지금처럼 화면 값을 아래에서 같은 조직인지 확인해 쓴다.
+  // 후보의 `propertyId` 도 같은 판정이라, 화면이 후보 값을 그대로 보내던 지금까지의 저장값 · 금액 기억 키와 같다.
+  const propertyId = linkedPlace?.propertyId ?? (input.propertyId?.trim() || null);
+  const destinationKey = linkedPlace?.propertyId ?? (input.destinationKey?.trim() || null);
   let propertyName: string | null = null;
   if (propertyId) {
     const propertyRes = await service
@@ -243,10 +268,12 @@ export async function createTransportItemAction(
 
   const workContext: Record<string, string> = {};
   // 라벨은 **표시용**이다(로케일마다 다르다). 기억·집계의 키는 `destinationKey` 다.
-  if (input.destinationKey?.trim()) workContext.destinationKey = input.destinationKey.trim();
-  const buildingLabel = resolveBuildingLabel(input, propertyName);
+  if (destinationKey) workContext.destinationKey = destinationKey;
+  const buildingLabel = resolveBuildingLabel(input, propertyName, linkedPlace?.buildingLabel ?? null);
   if (buildingLabel) workContext.buildingLabel = buildingLabel;
-  if (input.contextSummary?.trim()) workContext.contextSummary = input.contextSummary.trim();
+  // 요약: 연결 항목은 서버가 연결 기록에서 만든 글(후보 목록과 글자까지 같음), 직접 입력은 화면 값.
+  const contextSummary = linkedPlace ? linkedPlace.contextSummary : input.contextSummary?.trim() || "";
+  if (contextSummary) workContext.contextSummary = contextSummary;
   if (linkedSource) {
     workContext.linkedSourceType = linkedSource.type;
     workContext.linkedSourceId = linkedSource.id;
@@ -386,7 +413,10 @@ export async function updateTransportItemAction(
   } else if (input.entryMode !== undefined && input.entryMode !== "manual" && input.entryMode !== "linked") {
     return { ok: false, error: "invalid_entry_mode" };
   }
-  if (input.contextSummary !== undefined) {
+  // 연결 항목으로 남는 항목의 요약은 고치지 않는다(2026-11-25) — 연결 기록에서 서버가 만든 글이다. 화면은 연결 항목의
+  // 방 칸을 잠그고(직접 입력으로 바꾸면 풀림), 같은 저장에서 직접 입력으로 바꾸면 그때부터 화면 값을 받는다.
+  const staysLinked = (update.entry_mode ?? loaded.item.entry_mode) === "linked";
+  if (input.contextSummary !== undefined && !staysLinked) {
     workContext ??= { ...(loaded.item.work_context ?? {}) };
     if (input.contextSummary.trim()) workContext.contextSummary = input.contextSummary.trim();
     else delete workContext.contextSummary;

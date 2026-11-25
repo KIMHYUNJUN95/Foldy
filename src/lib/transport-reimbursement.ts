@@ -301,12 +301,133 @@ function monthBounds(targetMonthDate: string): { first: string; last: string } {
   return { first: `${ym}-01`, last: `${ym}-${String(lastDay).padStart(2, "0")}` };
 }
 
+// ── 자동 연결 항목 — 한 판정으로 정한다(2026-11-25) ─────────────────────────
+//
+// 「연결 항목의 건물 정보는 서버가 연결 기록에서 정한다.」 후보 목록(getLinkedTransportCandidates)과
+// 저장(createTransportItemAction → resolveLinkedTransportPlace)이 **아래 상수 · 함수를 같이 쓴다.** 예전에는 후보가 만든
+// 이름 · 요약 · 건물 id 를 화면이 그대로 돌려보냈고 서버는 그 값을 믿었다. 기준은 지금 저장된 값과 같다:
+// - 근태: 출근한 근무지(`clock_in_site_id`, 같은 조직 `attendance_sites`)의 `name` · `property_id`. 요약 = 건물 이름.
+// - 청소: 청소 방(`room_label`) → 같은 조직 `rooms`(첫 줄) → 같은 조직 `properties` 의 `display_name_ko ?? name` · id.
+//   요약 = 「건물 · 방」(방은 `getDisplaySessionRoomLabel`). 방이 다른 조직 건물을 가리키면 건물 없음.
+// 못 찾으면 빈 값. 읽는 쪽(`localizeStoredPlaceText` · 모바일 `useBuildingName`)이 한국어 이름을 보는 사람 언어로 바꾼다.
+
+/**
+ * 자동 연결할 수 있는 기록(2026-11-25, 문서 24 「후보 목록 자체가 실제 근무 기록이라, 목록에 없는 날은 애초에 자동
+ * 연결로 넣을 수 없다」). 후보 목록과 저장 확인이 같은 조건을 쓴다.
+ * - 근태: `invalid` 가 아닌 기록(DB 검사 트리거와 같은 조건).
+ * - 청소: 「청소한 기록」 = 완료 + 처리 끝 아님 (docs/product/45 표 3 · src/lib/cleaning-record-rules.ts). 취소 · 진행 중 ·
+ *   「못 했어요」로 닫은 날은 직접 입력.
+ */
+export const LINKABLE_ATTENDANCE_EXCLUDED_STATUS = "invalid";
+export const LINKABLE_CLEANING_STATUS = "completed";
+
+/** 근태 근무지 → 저장할 건물 이름. */
+export function transportSiteBuildingLabel(site: { name: string | null } | null | undefined): string {
+  return site?.name?.trim() ?? "";
+}
+
+/** 청소 건물 → 저장할 건물 이름. */
+export function transportPropertyBuildingLabel(
+  property: { name: string | null; display_name_ko: string | null } | null | undefined,
+): string {
+  if (!property) return "";
+  return (property.display_name_ko ?? property.name ?? "").trim();
+}
+
+/** 연결 기록에서 정한 장소 — 후보 · 저장 둘 다 이 모양. `propertyId` 는 같은 조직 건물일 때만. */
+export type LinkedTransportPlace = {
+  propertyId: string | null;
+  buildingLabel: string;
+  contextSummary: string;
+  /** 청소만 — 표시용 방(`getDisplaySessionRoomLabel`). */
+  roomLabel: string;
+};
+
+/** 근태 근무지(같은 조직에서 찾은 것, 없으면 null) → 장소. */
+export function linkedAttendancePlace(
+  site: { name: string | null; property_id: string | null } | null | undefined,
+): LinkedTransportPlace {
+  const buildingLabel = transportSiteBuildingLabel(site);
+  return { propertyId: site?.property_id ?? null, buildingLabel, contextSummary: buildingLabel, roomLabel: "" };
+}
+
+/** 청소 방 + 방이 가리키는 같은 조직 건물(없으면 null) → 장소. 요약은 「건물 · 방」. */
+export function linkedCleaningPlace(
+  rawRoomLabel: string | null | undefined,
+  property: { id: string; name: string | null; display_name_ko: string | null } | null | undefined,
+): LinkedTransportPlace {
+  const buildingLabel = transportPropertyBuildingLabel(property);
+  // 사용자 대상 명세서에서는 아라키초 하위 호실(201_2 → 201)을 합친다; 방 매칭은 원본을 쓴다.
+  const roomLabel = rawRoomLabel ? getDisplaySessionRoomLabel(rawRoomLabel) : "";
+  return {
+    propertyId: property?.id ?? null,
+    buildingLabel,
+    contextSummary: [buildingLabel, roomLabel].filter(Boolean).join(" · "),
+    roomLabel,
+  };
+}
+
+export type LinkedTransportSource =
+  | { type: "attendance"; siteId: string | null }
+  | { type: "cleaning"; roomLabel: string | null };
+
+/**
+ * 연결된 기록 하나의 장소. 기록 자체(내 것 · 같은 조직 · 그날 · 연결할 수 있는 상태)는 호출하는 쪽이 이미 확인했다.
+ * 읽기 오류는 `read_failed` — 빈 이름으로 저장하면 「이름 없음」과 「못 읽음」이 섞인다.
+ */
+export async function resolveLinkedTransportPlace(
+  service: Service,
+  organizationId: string,
+  source: LinkedTransportSource,
+): Promise<{ ok: true; place: LinkedTransportPlace } | { ok: false; error: "read_failed" }> {
+  if (source.type === "attendance") {
+    if (!source.siteId) return { ok: true, place: linkedAttendancePlace(null) };
+    const res = await service
+      .from("attendance_sites")
+      .select("id, name, property_id")
+      .eq("id", source.siteId)
+      .eq("organization_id", organizationId)
+      .maybeSingle();
+    if (res.error) return { ok: false, error: "read_failed" };
+    return {
+      ok: true,
+      place: linkedAttendancePlace(res.data as { name: string | null; property_id: string | null } | null),
+    };
+  }
+
+  if (!source.roomLabel) return { ok: true, place: linkedCleaningPlace(source.roomLabel, null) };
+  const roomRes = await service
+    .from("rooms")
+    .select("room_label, property_id")
+    .eq("organization_id", organizationId)
+    .eq("room_label", source.roomLabel)
+    .limit(1);
+  if (roomRes.error) return { ok: false, error: "read_failed" };
+  const propertyId = ((roomRes.data ?? []) as { property_id: string | null }[])[0]?.property_id ?? null;
+  if (!propertyId) return { ok: true, place: linkedCleaningPlace(source.roomLabel, null) };
+  const propRes = await service
+    .from("properties")
+    .select("id, name, display_name_ko")
+    .eq("id", propertyId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+  if (propRes.error) return { ok: false, error: "read_failed" };
+  return {
+    ok: true,
+    place: linkedCleaningPlace(
+      source.roomLabel,
+      propRes.data as { id: string; name: string | null; display_name_ko: string | null } | null,
+    ),
+  };
+}
+
 /**
  * 사용자-월의 연결된 교통비 후보, 두 운영 출처에서 가져온다:
  *   1. operating_date 가 그 달인 attendance_sessions → attendance_sites 로 현장 이름.
  *   2. cleaning_date 가 그 달인 cleaning_sessions → rooms(
  *      room_label 로 매칭) → properties 로 건물 이름.
  * 호출자가 고른 후보를 `linked` 항목으로 바꾼다. 날짜 ASC 정렬.
+ * 읽기 오류는 던진다(2026-11-25) — 조용히 빈 목록 · 빈 건물 이름이 되지 않게(화면은 오류 화면으로 간다).
  */
 export async function getLinkedTransportCandidates(
   service: Service,
@@ -317,15 +438,17 @@ export async function getLinkedTransportCandidates(
   const { first, last } = monthBounds(targetMonthDate);
   const candidates: LinkedTransportCandidate[] = [];
 
-  // 1) 그 달의 근태 세션.
+  // 1) 그 달의 근태 세션(연결할 수 있는 것만 — 저장 확인과 같은 조건).
   const attRes = await service
     .from("attendance_sessions")
     .select("id, operating_date, clock_in_site_id")
     .eq("organization_id", organizationId)
     .eq("user_id", userId)
+    .neq("status", LINKABLE_ATTENDANCE_EXCLUDED_STATUS)
     .gte("operating_date", first)
     .lte("operating_date", last)
     .order("operating_date", { ascending: true });
+  if (attRes.error) throw new Error(`transport candidates attendance read failed: ${attRes.error.message}`);
   const attRows = (attRes.data ?? []) as {
     id: string;
     operating_date: string;
@@ -335,38 +458,32 @@ export async function getLinkedTransportCandidates(
   const siteIds = Array.from(
     new Set(attRows.map((r) => r.clock_in_site_id).filter(Boolean) as string[]),
   );
-  const siteNames = new Map<string, string>();
   // 근무지에는 건물 FK 가 있다. 이것을 같이 들고 와야 교통비 항목이 `property_id` 를 채울 수 있고,
   // 그래야 「이 사람이 이 건물에 넣었던 금액」 기억이 자동 연결에서도 동작한다.
-  const siteProperties = new Map<string, string>();
+  const sites = new Map<string, { name: string | null; property_id: string | null }>();
   if (siteIds.length > 0) {
     const sitesRes = await service
       .from("attendance_sites")
       .select("id, name, property_id")
       .eq("organization_id", organizationId)
       .in("id", siteIds);
-    for (const s of (sitesRes.data ?? []) as {
-      id: string;
-      name: string;
-      property_id: string | null;
-    }[]) {
-      siteNames.set(s.id, s.name);
-      if (s.property_id) siteProperties.set(s.id, s.property_id);
+    if (sitesRes.error) throw new Error(`transport candidates sites read failed: ${sitesRes.error.message}`);
+    for (const s of (sitesRes.data ?? []) as { id: string; name: string | null; property_id: string | null }[]) {
+      sites.set(s.id, s);
     }
   }
 
   for (const row of attRows) {
-    const buildingLabel =
-      (row.clock_in_site_id ? siteNames.get(row.clock_in_site_id) : null) ?? "";
+    const place = linkedAttendancePlace(row.clock_in_site_id ? sites.get(row.clock_in_site_id) : null);
     candidates.push({
       key: `attendance:${row.id}`,
       type: "attendance",
       date: row.operating_date,
       attendanceSessionId: row.id,
-      propertyId: row.clock_in_site_id ? siteProperties.get(row.clock_in_site_id) : undefined,
-      buildingLabel,
-      contextSummary: buildingLabel,
-      workContext: buildingLabel ? { buildingLabel } : {},
+      propertyId: place.propertyId ?? undefined,
+      buildingLabel: place.buildingLabel,
+      contextSummary: place.contextSummary,
+      workContext: place.buildingLabel ? { buildingLabel: place.buildingLabel } : {},
     });
   }
 
@@ -377,13 +494,12 @@ export async function getLinkedTransportCandidates(
     .select("id, cleaning_date, room_label, task_label")
     .eq("organization_id", organizationId)
     .eq("staff_user_id", userId)
-    // 「청소한 기록」 = 완료 + 처리 끝 아님 (docs/product/45 표 3 · src/lib/cleaning-record-rules.ts).
-    // 취소 · 진행 중 · 처리 끝은 후보가 아니다(건물에 갔지만 「못 했어요」로 닫은 날은 직접 입력). 이미 저장된 항목은 건드리지 않는다.
-    .eq("status", "completed")
+    .eq("status", LINKABLE_CLEANING_STATUS)
     .eq("closed_without_cleaning", false)
     .gte("cleaning_date", first)
     .lte("cleaning_date", last)
     .order("cleaning_date", { ascending: true });
+  if (cleanRes.error) throw new Error(`transport candidates cleaning read failed: ${cleanRes.error.message}`);
   const cleanRows = (cleanRes.data ?? []) as {
     id: string;
     cleaning_date: string;
@@ -392,55 +508,48 @@ export async function getLinkedTransportCandidates(
   }[];
 
   const roomLabels = Array.from(new Set(cleanRows.map((r) => r.room_label).filter(Boolean)));
-  const roomByLabel = new Map<string, { propertyId: string }>();
-  const propertyNames = new Map<string, string>();
+  const propertyIdByRoom = new Map<string, string | null>();
+  const properties = new Map<string, { id: string; name: string | null; display_name_ko: string | null }>();
   if (roomLabels.length > 0) {
     const roomsRes = await service
       .from("rooms")
       .select("room_label, property_id")
       .eq("organization_id", organizationId)
       .in("room_label", roomLabels);
-    const roomRows = (roomsRes.data ?? []) as { room_label: string; property_id: string }[];
+    if (roomsRes.error) throw new Error(`transport candidates rooms read failed: ${roomsRes.error.message}`);
+    const roomRows = (roomsRes.data ?? []) as { room_label: string; property_id: string | null }[];
     for (const r of roomRows) {
-      if (!roomByLabel.has(r.room_label)) roomByLabel.set(r.room_label, { propertyId: r.property_id });
+      if (!propertyIdByRoom.has(r.room_label)) propertyIdByRoom.set(r.room_label, r.property_id);
     }
-    const propertyIds = Array.from(new Set(roomRows.map((r) => r.property_id).filter(Boolean)));
+    const propertyIds = Array.from(new Set(roomRows.map((r) => r.property_id).filter(Boolean) as string[]));
     if (propertyIds.length > 0) {
       const propRes = await service
         .from("properties")
         .select("id, name, display_name_ko")
         .eq("organization_id", organizationId)
         .in("id", propertyIds);
-      for (const p of (propRes.data ?? []) as {
-        id: string;
-        name: string;
-        display_name_ko: string | null;
-      }[]) {
-        propertyNames.set(p.id, p.display_name_ko ?? p.name);
+      if (propRes.error) throw new Error(`transport candidates properties read failed: ${propRes.error.message}`);
+      for (const p of (propRes.data ?? []) as { id: string; name: string | null; display_name_ko: string | null }[]) {
+        properties.set(p.id, p);
       }
     }
   }
 
   for (const row of cleanRows) {
-    const room = roomByLabel.get(row.room_label);
-    const propertyId = room?.propertyId;
-    const buildingLabel = (propertyId ? propertyNames.get(propertyId) : null) ?? "";
-    // 사용자 대상 명세서에서는 아라키초 하위 호실(201_2 → 201)을 합친다; 위의 매칭은 원본을 유지한다.
-    const displayRoomLabel = getDisplaySessionRoomLabel(row.room_label);
-    const summaryParts = [buildingLabel, displayRoomLabel].filter(Boolean);
-    const contextSummary = summaryParts.join(" · ");
+    const propertyId = propertyIdByRoom.get(row.room_label) ?? null;
+    const place = linkedCleaningPlace(row.room_label, propertyId ? properties.get(propertyId) : null);
     const workContext: Record<string, string> = {};
-    if (buildingLabel) workContext.buildingLabel = buildingLabel;
-    if (displayRoomLabel) workContext.roomLabel = displayRoomLabel;
+    if (place.buildingLabel) workContext.buildingLabel = place.buildingLabel;
+    if (place.roomLabel) workContext.roomLabel = place.roomLabel;
     if (row.task_label) workContext.taskLabel = row.task_label;
     candidates.push({
       key: `cleaning:${row.id}`,
       type: "cleaning",
       date: row.cleaning_date,
       cleaningSessionId: row.id,
-      propertyId,
-      buildingLabel,
-      contextSummary,
+      propertyId: place.propertyId ?? undefined,
+      buildingLabel: place.buildingLabel,
+      contextSummary: place.contextSummary,
       workContext,
     });
   }

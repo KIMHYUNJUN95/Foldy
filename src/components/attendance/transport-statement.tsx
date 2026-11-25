@@ -536,7 +536,6 @@ function AddItemSheet({
         cleaningSessionId: linked?.cleaningSessionId ?? null,
         propertyId: linked?.propertyId ?? destination?.propertyId ?? null,
         destinationKey: linked?.propertyId ?? (destinationKey || undefined),
-        buildingLabel: linked?.buildingLabel || destination?.canonicalLabel || undefined,
         contextSummary: linked?.contextSummary || undefined,
         memo: memo.trim() || null,
       });
@@ -1162,6 +1161,8 @@ function EditItemSheet({
                 className="trn-input"
                 value={context}
                 onChange={(e) => setContext(e.target.value)}
+                // 연결 항목의 「건물 · 방」은 서버가 연결 기록에서 정한다 — 직접 입력으로 바꾸면 고칠 수 있다(2026-11-25).
+                readOnly={mode === "linked"}
                 placeholder="201, 202"
                 aria-label={t.fieldContext}
               />

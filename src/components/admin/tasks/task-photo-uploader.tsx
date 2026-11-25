@@ -216,8 +216,10 @@ export function TaskPhotoUploader({
 
       <input
         accept="image/gif,image/jpeg,image/png,image/webp"
+        aria-hidden="true"
         className="sr-only"
         disabled={dropDisabled}
+        tabIndex={-1}
         multiple
         onChange={handlePick}
         ref={inputRef}

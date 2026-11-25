@@ -209,6 +209,8 @@ export function SuggestionCommentComposer({
         accept="image/gif,image/jpeg,image/png,image/webp"
         multiple
         style={{ display: "none" }}
+        aria-hidden="true"
+        tabIndex={-1}
         onChange={onPickFiles}
       />
     </div>

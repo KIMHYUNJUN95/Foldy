@@ -1,5 +1,6 @@
 import "server-only";
 
+import { escapeIlikeFragment } from "@/lib/guest-search";
 import { RESUME_BUCKET } from "@/lib/recruit/ingest";
 import type { JobApplicationStatus } from "@/lib/recruit/status";
 import { parseVisaExpiry, visaAlertOf, visaDaysLeft, type VisaAlert } from "@/lib/recruit/visa-expiry";
@@ -256,7 +257,7 @@ export async function listJobApplications(args: {
   if (args.filter.to) query = query.lt("applied_at", tokyoDayEndExclusive(args.filter.to));
   if (args.filter.withResumeOnly) query = query.not("resume_source_url", "is", null);
   if (args.filter.query) {
-    const escaped = args.filter.query.replace(/[%,]/g, "");
+    const escaped = escapeIlikeFragment(args.filter.query).trim();
     if (escaped.length > 0) {
       query = query.or(`applicant_name.ilike.%${escaped}%,phone.ilike.%${escaped}%`);
     }

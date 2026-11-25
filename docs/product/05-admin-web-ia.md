@@ -1603,7 +1603,7 @@ Management Console" → Current Implementation Note.
 
 - 배치(시안 1b): 위 집계 · 검색 → 왼쪽 건물 목록 → 가운데 객실 카드 → 오른쪽 상세 패널(건물 주소 · 지도 · 유닛별 Airbnb /
   Booking.com 링크 열기 · 복사 · 편집). 1180px 아래에서는 패널이 아래로 내려간다.
-- 스타일은 `src/components/admin/ops/room-links.css`(`.adm .rl__*`, 콘솔 토큰만). 문구는 `dictionary.roomLinks`(ko/ja/en).
+- 스타일은 `src/components/admin/ops/room-links-white.css`(`.adm .rl__*`, 콘솔 토큰만). 문구는 `dictionary.roomLinks`(ko/ja/en).
 - 도메인 계약: `docs/product/35-room-links.md`.
 
 ## 권한 없음 화면 (2026-10-21)

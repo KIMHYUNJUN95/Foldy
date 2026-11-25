@@ -106,3 +106,5 @@
 - 기록: 상태가 바뀔 때마다 `payroll_month_approval_events`(request · cancel_request · approve · undo_approve · return · revert · paid · unpaid · sent · unsent, 누가 · 언제 · 사유). 지급 체크 하나하나는 `audit_logs`(`payroll_payment_check`).
 - 테이블: `payroll_month_approvals`(회차 상태 · 스냅샷 · 결재 칸) · `payroll_month_approval_events` · `payroll_payment_checks`(사람 · 달마다 봉투 · 본인 확인 · 이체) — 마이그레이션 `202610260001_payroll_approvals.sql`, 데이터 모델 `docs/engineering/04-data-model.md`.
 - 서버: 순수 규칙 `src/lib/payroll-approval.ts` · 읽기 `src/lib/payroll-approval-server.ts` · 액션 `src/actions/payroll-approval.ts`(PC · 모바일 공용). 상태 바꾸기는 「지금 상태가 X 일 때만」 조건부 update — 동시에 두 사람이 누르면 하나는 `conflict`.
+
+- **결재 요청 순서 (2026-11-25)**: 지난 지급 체크 청소를 상태 전환보다 먼저 한다. 청소가 실패하면 회차는 준비 중 그대로 `error` 로 돌아가 다시 누를 수 있다(체크는 지급 중에만 생기므로 준비 중 회차에서 지우는 것은 안전).

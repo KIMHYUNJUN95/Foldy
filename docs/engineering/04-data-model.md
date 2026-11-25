@@ -2717,3 +2717,7 @@ INSERT · UPDATE 신호만, DELETE 는 오지 않는다. 대신 `task_occurrence
 - 함수 `guest_conversation_last_lines(uuid, uuid[])` 다시 정의 — 서명 · `stable` · `security definer` · `search_path = ''` · service_role 만 실행(public · anon · authenticated 회수)은 같다. `distinct on` 대신 대화마다 `cross join lateral (… order by sent_at desc, id desc limit 1)` — `guest_messages_conversation_sent_idx` 를 거꾸로 훑는다. 같은 입력에 같은 결과(로컬 시험 DB 대화 500개 · 462줄 일치).
 - CONCURRENTLY 없이 트랜잭션 안에서(표가 작음). 다시 돌려도 안전(`if not exists` · `create or replace`).
 - `set local lock_timeout = '5s'` — 긴 트랜잭션 뒤에 줄 서서 웹훅 쓰기를 막지 않게, 잠금을 5초 안에 못 잡으면 실패(다시 돌리면 됨).
+
+## 2026-11-25 `capability_policies` 타입 보강
+
+- `src/types/database.ts` 에 `capability_policies`(`202609100001` — `capability` text PK · `individual_grant` · `individual_deny` · `platform_bypass` boolean, 모두 not null · 기본값 없음)를 손으로 넣었다. 마이그레이션 표 중 타입에서 빠진 유일한 표였다. 표 · 정책은 그대로.

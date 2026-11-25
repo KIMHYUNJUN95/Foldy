@@ -295,7 +295,7 @@ The automated tests above cover pure-function and static-structure behavior. The
 | ID | Description | Notes |
 |---|---|---|
 | ~~R-04~~ | ~~Admin orders page links to mobile order detail (mobile layout on desktop)~~ | Resolved 2026-06-04: `/admin/orders/[id]` added |
-| ~~R-05~~ | ~~No hard-delete confirmation UX for lost-found / maintenance records~~ | Resolved 2026-06-04: `DeleteConfirmButton` added to admin detail pages |
+| ~~R-05~~ | ~~No hard-delete confirmation UX for lost-found / maintenance records~~ | Resolved 2026-06-04: `DeleteConfirmButton` added to admin detail pages (component removed 2026-11-25; the detail pages were replaced by console panels) |
 | ~~R-06~~ | ~~Google OAuth not implemented; login screen has disabled placeholder~~ | Resolved 2026-06-04: `signInWithGoogle` server action live; Supabase dashboard provider setup required for production |
 | R-07 | Map tab shows building cards with Google Maps deeplink, no embedded map | Sufficient for operational use |
 | R-08 | `<img>` used for client-side blob URL previews in order items (not Next.js Image) | Intentional; Next.js Image does not support blob URLs |

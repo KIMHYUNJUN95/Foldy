@@ -865,7 +865,19 @@ export async function shareTaskWithUsers(formData: FormData) {
   if (pError) {
     redirect(detailPath(id, "save_failed"));
   }
-  await supabase.from("tasks").update({ is_shared: true }).eq("id", id);
+  // 공유 표시(is_shared)가 안 켜지면 목록에서 공유된 일로 안 보인다 — 실패를 성공으로 돌려보내지 않는다.
+  const flagged = await mustWrite(
+    "task: set is_shared after share",
+    supabase.from("tasks").update({ is_shared: true }).eq("id", id),
+  );
+  if (!flagged) {
+    // 방금 넣은 참여자 줄을 되돌린다 — 안 그러면 다시 눌러도 「새로 추가할 사람 없음」으로 끝나 표시가 영영 안 켜진다.
+    await mustWrite(
+      "task: roll back participants after is_shared failure",
+      supabase.from("task_participants").delete().eq("task_id", id).in("user_id", newIds),
+    );
+    redirect(detailPath(id, "save_failed"));
+  }
   await bestEffortWrite(
     "task_updates: insert",
     supabase.from("task_updates").insert({

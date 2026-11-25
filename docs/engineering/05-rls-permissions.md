@@ -62,8 +62,8 @@ message. Two shared components exist for this: `PermissionDeniedSheet`
 (`src/components/shell/permission-denied-sheet.tsx`, canonical `BottomSheet`) for `/mobile/*`, and
 `AdminToast`/`useAdminToast` (`src/components/admin/shared/admin-toast.tsx`, bottom-center toast) for
 `/admin/*`. Copy lives in `dictionary.common.permissionDeniedTitle`/`permissionDeniedBody` (ko/ja/en).
-Not every forbidden-returning action is wired to these yet — `DeleteConfirmButton` and
-`OrderActionBar` are (see decision log 2026-07-09); other screens (daily report, attendance approval
+Not every forbidden-returning action is wired to these yet — `OrderActionBar` is (see decision log 2026-07-09;
+`DeleteConfirmButton` was wired then but the file was removed 2026-11-25 as unused — admin lost-found/maintenance deletes now live in their console detail panels); other screens (daily report, attendance approval
 queue, attendance correction form) already had their own equivalent messaging before this pass and
 were left as-is.
 

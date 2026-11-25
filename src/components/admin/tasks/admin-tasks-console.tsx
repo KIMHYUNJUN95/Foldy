@@ -3846,6 +3846,8 @@ export function AdminTasksConsole({
                     accept="image/gif,image/jpeg,image/png,image/webp"
                     multiple
                     hidden
+                    aria-hidden="true"
+                    tabIndex={-1}
                     disabled={busy}
                     onChange={(e) => {
                       addDetailPhotos(t, Array.from(e.target.files ?? []));

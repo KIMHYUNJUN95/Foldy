@@ -457,6 +457,8 @@ export function ComplaintCreatePanel({ labels, reservations, places, onClose }: 
               type="file"
               accept="image/*"
               style={{ display: "none" }}
+              aria-hidden="true"
+              tabIndex={-1}
               onChange={handleImageChange}
             />
           </div>

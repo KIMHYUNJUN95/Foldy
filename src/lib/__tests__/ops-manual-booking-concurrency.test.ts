@@ -197,6 +197,25 @@ describe("submitManualBooking — 같은 방 동시 생성", () => {
     expect(result).toEqual({ bookingId: "777", ok: true, reservationId: "res-9" });
     expect(fetchCalendar).not.toHaveBeenCalled();
   });
+
+  it("요금(유닛별 판매) 읽기가 실패하면 「파는 유닛 없음」이 아니라 읽기 실패로 돌리고 Beds24 를 부르지 않는다 (2026-11-25)", async () => {
+    const originalFrom = fake.client.from.bind(fake.client);
+    const failing = () => {
+      const chain: Record<string, unknown> = {};
+      for (const method of ["select", "eq", "in", "gte", "lt", "order", "range"]) chain[method] = () => chain;
+      chain.then = (onFulfilled: (value: unknown) => unknown) =>
+        Promise.resolve({ data: null, error: { code: "57014", message: "timeout" } }).then(onFulfilled);
+      return chain;
+    };
+    (fake.client as { from: (table: string) => unknown }).from = (table: string) =>
+      table === "room_daily_rates" ? failing() : originalFrom(table);
+
+    const result = await submitManualBooking(request("key-gggggggg"));
+
+    expect(result).toEqual({ detail: "timeout", error: "beds24_failed", ok: false });
+    expect(fetchCalendar).not.toHaveBeenCalled();
+    expect(postBooking).not.toHaveBeenCalled();
+  });
 });
 
 /**

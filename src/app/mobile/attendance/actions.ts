@@ -516,15 +516,26 @@ export async function endBreak(): Promise<BreakActionResult> {
     .order("started_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+  // 읽기 실패를 「열린 휴게 없음」으로 말하지 않는다 — 사용자는 휴게가 이미 끝났다고 오해한다.
+  if (openBreakRes.error) {
+    console.error("[attendance] endBreak read failed:", openBreakRes.error.message);
+    return { ok: false, reason: "error" };
+  }
   const openBreak = openBreakRes.data as { id: string } | null;
-  if (openBreakRes.error || !openBreak) return { ok: false, reason: "no_open_break" };
+  if (!openBreak) return { ok: false, reason: "no_open_break" };
 
   const upd = await service
     .from("attendance_breaks")
     .update({ ended_at: new Date().toISOString() })
     .eq("id", openBreak.id)
-    .is("ended_at", null);
-  if (upd.error) return { ok: false, reason: "error" };
+    .is("ended_at", null)
+    .select("id");
+  if (upd.error) {
+    console.error("[attendance] endBreak update failed:", upd.error.message);
+    return { ok: false, reason: "error" };
+  }
+  // 그 사이 다른 기기에서 먼저 끝냈다면 바뀐 줄이 없다 — 성공으로 돌려보내지 않는다.
+  if ((upd.data ?? []).length === 0) return { ok: false, reason: "no_open_break" };
 
   revalidatePath("/mobile/attendance");
   return { ok: true };

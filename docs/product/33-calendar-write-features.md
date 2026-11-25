@@ -1712,6 +1712,7 @@ p2 는 메인 것으로 섞이는 것이 정상이다.
   고르는 곳 — 가격 / 최소숙박 큐(`enqueue_failed`) · 수기 예약 / 옮기기(`beds24_failed`, detail `full_read_lookup_failed`) · 가용 확인
   · 옮길 곳 목록(던짐 → `read_failed`) · 가격 수정 기준가(`enqueue_failed` — 요금 읽기 실패도 같다. 「가격 없는 칸」`no_priced_cells` 은 읽혔는데 값이 없을 때만) — 는 `loadUnitFullReadAtOrNull` 로 읽고 **멈춘다**.
   빈 기준으로 쓰면 Beds24 가 이미 지운 유닛이 대상으로 남는다.
+- **수기 예약의 유닛별 요금 읽기 실패 (2026-11-25)**: `room_daily_rates` 를 못 읽으면 옮기기와 같이 `beds24_failed`(detail 은 DB 오류 문구)로 멈춘다 — 예전엔 빈 결과로 넘어가 「이 밤에 파는 유닛 없음」(`no_active_unit`)이 떴다. 테스트: `ops-manual-booking-concurrency.test.ts`.
 - 다카다노바바 401_2(556719)도 같은 모양이다. 테스트: `ops-rate-merge.test.ts` · `ops-calendar-write-integrity.test.ts` · `beds24-unit-full-read-strict.test.ts`.
 
 ### 쓰기 대상 유닛 — **가격과 최소숙박이 서로 다른 유닛으로 간다** (2026-09-24)

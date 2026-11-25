@@ -992,6 +992,19 @@ export async function dismissConsoleOverdue(taskIds: string[]): Promise<OverdueB
 }
 
 // ── 6. 공유 / 지시로 배정(작성자만) ──────────────────────────────────────
+/** 공유 표시를 못 켰을 때 방금 넣은 참여자를 되돌린다 — 안 그러면 다시 눌러도 추가할 사람이 없어 표시가 안 켜진다. */
+async function rollbackAddedParticipants(
+  supabase: ReturnType<typeof getSupabaseServiceClient>,
+  taskId: string,
+  userIds: string[],
+) {
+  if (userIds.length === 0) return;
+  await mustWrite(
+    "task: roll back participants after is_shared failure",
+    supabase.from("task_participants").delete().eq("task_id", taskId).in("user_id", userIds),
+  );
+}
+
 export async function shareConsoleTask(
   taskId: string,
   userIds: string[],
@@ -1027,11 +1040,11 @@ export async function shareConsoleTask(
 
   const supabase = getSupabaseServiceClient();
   if (toRemove.length > 0) {
-    await supabase
-      .from("task_participants")
-      .delete()
-      .eq("task_id", task.id)
-      .in("user_id", toRemove);
+    const removed = await mustWrite(
+      "task: remove participants (share)",
+      supabase.from("task_participants").delete().eq("task_id", task.id).in("user_id", toRemove),
+    );
+    if (!removed) return { ok: false, error: "save_failed" };
   }
   if (toAdd.length > 0) {
     // 첫 수신자는 남겨 둔(제거되지 않은) 참여자가 이미 가지고 있을 때만 그대로 남는다.
@@ -1063,17 +1076,31 @@ export async function shareConsoleTask(
    */
   if (isAuthor) {
     const isShared = desired.size > 0;
-    await supabase
-      .from("tasks")
-      .update({ is_shared: isShared, is_directive: asDirective && isShared })
-      .eq("id", task.id)
-      .eq("organization_id", session.organization.id);
+    const flagged = await mustWrite(
+      "task: set is_shared (share)",
+      supabase
+        .from("tasks")
+        .update({ is_shared: isShared, is_directive: asDirective && isShared })
+        .eq("id", task.id)
+        .eq("organization_id", session.organization.id),
+    );
+    if (!flagged) {
+      await rollbackAddedParticipants(supabase, task.id, toAdd);
+      return { ok: false, error: "save_failed" };
+    }
   } else if (toAdd.length > 0) {
-    await supabase
-      .from("tasks")
-      .update({ is_shared: true })
-      .eq("id", task.id)
-      .eq("organization_id", session.organization.id);
+    const flagged = await mustWrite(
+      "task: set is_shared (share, participant)",
+      supabase
+        .from("tasks")
+        .update({ is_shared: true })
+        .eq("id", task.id)
+        .eq("organization_id", session.organization.id),
+    );
+    if (!flagged) {
+      await rollbackAddedParticipants(supabase, task.id, toAdd);
+      return { ok: false, error: "save_failed" };
+    }
   }
 
   if (toAdd.length > 0) {

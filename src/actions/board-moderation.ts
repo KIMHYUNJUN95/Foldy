@@ -80,6 +80,7 @@ export async function reportBoardContent(
     let existing = service
       .from("board_reports")
       .select("id, status")
+      .eq("organization_id", session.organization.id)
       .eq("reporter_user_id", session.user.id)
       .eq("target_type", input.targetType)
       .eq("post_id", input.postId);
@@ -97,7 +98,9 @@ export async function reportBoardContent(
         resolved_at: null,
         created_at: new Date().toISOString(),
       })
-      .eq("id", prior.id);
+      .eq("id", prior.id)
+      .eq("organization_id", session.organization.id)
+      .eq("status", "withdrawn");
     if (reopenError) return { error: "save_failed" };
   }
 
@@ -124,11 +127,18 @@ export async function withdrawBoardReport(reportId: string): Promise<ActionResul
   }
   if (report.status !== "pending" && report.status !== "dismissed") return { error: "invalid" };
 
-  const { error } = await service
+  // 읽은 뒤 관리자가 먼저 처리(removed · dismissed)했을 수 있다 — 지금도 대기 · 문제없음일 때만 거두고,
+  // 바뀐 줄이 없으면 관리자의 처리 기록(처리자 · 시각)을 덮어쓰지 않고 멈춘다.
+  const { data: withdrawn, error } = await service
     .from("board_reports")
     .update({ status: "withdrawn", resolved_at: new Date().toISOString(), resolved_by_user_id: session.user.id })
-    .eq("id", reportId);
+    .eq("id", reportId)
+    .eq("organization_id", session.organization.id)
+    .eq("reporter_user_id", session.user.id)
+    .in("status", ["pending", "dismissed"])
+    .select("id");
   if (error) return { error: "save_failed" };
+  if (!withdrawn || withdrawn.length === 0) return { error: "invalid" };
 
   revalidateBoard(report.post_id);
   revalidatePath("/account");

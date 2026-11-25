@@ -9,6 +9,7 @@ import "server-only";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { memberCapabilities } from "@/lib/capabilities-server";
 import { displayRoleKey, fetchPlatformDeveloperIds } from "@/lib/platform-developers";
+import { escapeIlikeFragment } from "@/lib/guest-search";
 import type { AppSession } from "@/lib/session";
 import {
   computeAnnualLeaveSummary,
@@ -389,8 +390,11 @@ export async function getAdminLeaveQueue(
       query = query.eq("leave_type", opts.type);
     }
     if (opts.search && opts.search.trim().length > 0) {
-      const term = `%${opts.search.trim()}%`;
-      query = query.or(`applicant_name.ilike.${term},reason.ilike.${term}`);
+      const safe = escapeIlikeFragment(opts.search).trim();
+      if (safe.length > 0) {
+        const term = `%${safe}%`;
+        query = query.or(`applicant_name.ilike.${term},reason.ilike.${term}`);
+      }
     }
     return query
       .order("submitted_at", { ascending: false, nullsFirst: false })

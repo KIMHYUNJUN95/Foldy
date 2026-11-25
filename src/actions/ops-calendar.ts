@@ -861,6 +861,8 @@ async function submitManualBookingInScope(args: {
     .eq("organization_id", session.organization.id)
     .in("room_id", units.map((unit) => unit.id))
     .in("stay_date", nights);
+  // 못 읽었으면 「파는 유닛 없음」이 아니다 — 옮기기 경로와 같은 읽기 실패로 돌린다(2026-11-25).
+  if (ratesResult.error) return { detail: ratesResult.error.message, error: "beds24_failed", ok: false };
   const fullReadAt = await loadUnitFullReadAtOrNull(supabase, session.organization.id);
   if (!fullReadAt) return { detail: "full_read_lookup_failed", error: "beds24_failed", ok: false };
   const activeByNight = activeExternalIdsByNight(

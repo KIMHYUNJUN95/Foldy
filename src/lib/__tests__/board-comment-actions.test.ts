@@ -67,7 +67,7 @@ vi.mock("@/lib/board-queries", () => ({
 vi.mock("@/lib/board-moderation", () => ({ canModerateBoard: () => true, isBoardReportReason: () => true }));
 
 const { deleteBoardComment, restoreBoardComment } = await import("@/app/mobile/board/[id]/actions");
-const { resolveBoardReport } = await import("@/actions/board-moderation");
+const { reportBoardContent, resolveBoardReport, withdrawBoardReport } = await import("@/actions/board-moderation");
 
 const updates = () => calls.filter((c) => c.table === "board_comments" && c.op === "update");
 
@@ -174,5 +174,51 @@ describe("resolveBoardReport(remove) — 댓글", () => {
     route({ commentUpdate: { data: [] }, close: { error: { message: "boom" } } });
     expect(await resolveBoardReport(input)).toEqual({ error: "save_failed" });
     expect(updates()).toHaveLength(1);
+  });
+});
+
+describe("withdrawBoardReport — 관리자 처리와의 경합(2026-11-25)", () => {
+  const report = { data: { id: "r1", post_id: "p1", status: "pending", reporter_user_id: ME, organization_id: ORG } };
+
+  it("지금도 대기 · 문제없음일 때만 거두는 조건을 걸고 바뀐 줄을 확인한다", async () => {
+    handler = (c) => (c.op === "update" ? { data: [{ id: "r1" }] } : report);
+    expect(await withdrawBoardReport("r1")).toEqual({ ok: true });
+    const u = calls.find((c) => c.table === "board_reports" && c.op === "update")!;
+    expect(u.filters).toEqual(
+      expect.arrayContaining(["eq:id:r1", `eq:organization_id:${ORG}`, `eq:reporter_user_id:${ME}`, "in:status:pending,dismissed"]),
+    );
+    expect(u.selected).toBe(true);
+  });
+
+  it("읽은 뒤 관리자가 먼저 처리해 0줄이면 invalid — 처리 기록을 덮어쓰지 않는다", async () => {
+    handler = (c) => (c.op === "update" ? { data: [] } : report);
+    expect(await withdrawBoardReport("r1")).toEqual({ error: "invalid" });
+  });
+});
+
+describe("reportBoardContent — 취소한 신고 다시 열기(2026-11-25)", () => {
+  const input = { targetType: "post" as const, postId: "p1", reason: "spam" };
+  function route(prior: { id: string; status: string } | null) {
+    handler = (c) => {
+      if (c.table === "board_posts") return { data: { organization_id: ORG, created_by_user_id: "other", deleted_at: null } };
+      if (c.op === "insert") return { error: { code: "23505", message: "dup" } as { message: string } };
+      if (c.op === "update") return { data: [{ id: "r1" }] };
+      return { data: prior };
+    };
+  }
+
+  it("조회 · 갱신 모두 조직을 걸고, 갱신은 withdrawn 일 때만", async () => {
+    route({ id: "r1", status: "withdrawn" });
+    expect(await reportBoardContent(input)).toEqual({ ok: true });
+    const lookup = calls.find((c) => c.table === "board_reports" && c.op === "select")!;
+    expect(lookup.filters).toContain(`eq:organization_id:${ORG}`);
+    const u = calls.find((c) => c.table === "board_reports" && c.op === "update")!;
+    expect(u.filters).toEqual(expect.arrayContaining(["eq:id:r1", `eq:organization_id:${ORG}`, "eq:status:withdrawn"]));
+  });
+
+  it("withdrawn 이 아니면 다시 열지 않고 already_reported", async () => {
+    route({ id: "r1", status: "removed" });
+    expect(await reportBoardContent(input)).toEqual({ error: "already_reported" });
+    expect(calls.some((c) => c.table === "board_reports" && c.op === "update")).toBe(false);
   });
 });

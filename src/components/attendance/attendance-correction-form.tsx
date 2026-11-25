@@ -340,7 +340,7 @@ export function AttendanceCorrectionForm({
               </button>
             ) : null}
           </div>
-          <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={onPickFiles} />
+          <input ref={fileRef} type="file" accept="image/*" multiple hidden aria-hidden="true" tabIndex={-1} onChange={onPickFiles} />
         </div>
 
         {error ? (

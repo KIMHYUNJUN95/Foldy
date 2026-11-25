@@ -430,7 +430,7 @@ export function ComplaintCreate({
               </button>
             ) : null}
           </div>
-          <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleImageChange} />
+          <input ref={fileInputRef} type="file" accept="image/*" hidden aria-hidden="true" tabIndex={-1} onChange={handleImageChange} />
         </div>
       </section>
 

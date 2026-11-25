@@ -185,6 +185,18 @@ export async function requestPayrollApproval(ym: string): Promise<PayrollRoundAc
     sent_by: null,
     sent_at: null,
   };
+  // 지난 회차의 지급 체크가 남아 있으면 지운다(돌려보내기 뒤 다시 요청 — 체크가 있으면 되돌릴 수 없으니 보통 없음).
+  // **상태를 넘기기 전에** 지운다 — 지우다 실패해도 회차는 그대로 준비 중이라 다시 눌러 복구된다(문서 40 §4-3:
+  // 체크는 지급 중에만 생기고, 준비 중으로 돌아온 회차의 체크는 어차피 다음 요청이 지운다).
+  const cleared = await ctx.service
+    .from("payroll_payment_checks")
+    .delete()
+    .eq("organization_id", ctx.organizationId)
+    .eq("target_month", `${ym}-01`);
+  if (cleared.error) {
+    console.error("[payroll-approval] stale payment checks cleanup failed:", cleared.error.message);
+    return { ok: false, reason: "error" };
+  }
   if (row) {
     const r = await transition(ctx, ym, "preparing", values);
     if (r !== "ok") return { ok: false, reason: r };
@@ -198,12 +210,6 @@ export async function requestPayrollApproval(ym: string): Promise<PayrollRoundAc
     // 같은 달 줄이 막 생겼으면(동시에 두 번) 기본 키가 막는다.
     if (ins.error) return { ok: false, reason: ins.error.code === "23505" ? "conflict" : "error" };
   }
-  // 지난 회차의 지급 체크가 남아 있으면 지운다(돌려보내기 뒤 다시 요청 — 체크가 있으면 되돌릴 수 없으니 보통 없음).
-  await ctx.service
-    .from("payroll_payment_checks")
-    .delete()
-    .eq("organization_id", ctx.organizationId)
-    .eq("target_month", `${ym}-01`);
   await logEvent(ctx, ym, "request");
   revalidate();
   return { ok: true, status };

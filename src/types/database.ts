@@ -2887,6 +2887,27 @@ export type Database = {
           },
         ]
       }
+      capability_policies: {
+        Row: {
+          capability: string
+          individual_deny: boolean
+          individual_grant: boolean
+          platform_bypass: boolean
+        }
+        Insert: {
+          capability: string
+          individual_deny: boolean
+          individual_grant: boolean
+          platform_bypass: boolean
+        }
+        Update: {
+          capability?: string
+          individual_deny?: boolean
+          individual_grant?: boolean
+          platform_bypass?: boolean
+        }
+        Relationships: []
+      }
       capability_roles: {
         Row: {
           capability: string

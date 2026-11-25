@@ -888,3 +888,6 @@ App Store(1.2) · Google Play(UGC 정책)는 사용자 작성 콘텐츠가 있�
 | 파일 첨부 최대 개수 | 미정 — 현재 문서상 5개; 이미지 5장과 합산 vs 별도 제한인지 구현 시 결정 |
 | @멘션 검색 결과 정렬 | **디폴트: 가나다순**. 추후 최근 활동 기반(마지막 댓글 시각 순)으로 전환 검토 — 현재는 단순 정렬이 충분 |
 | @멘션 UI·DB·알림 구현 | **구현 중 (2026-06-25)** — DB 에이전트: `mentioned_user_ids` / `mention_all` 컬럼 + GIN 인덱스 마이그레이션. 백엔드 에이전트: `addBoardComment` 확장 + `notifyBoardMentions`. 프론트엔드 에이전트: 멘션 피커 바텀시트 컴포넌트. |
+
+- **신고 취소 경합 (2026-11-25)**: `withdrawBoardReport` 는 지금도 `pending`/`dismissed` 인 줄에만 쓰고 바뀐 줄이 0이면 `invalid` 로 멈춘다 — 관리자가 먼저 처리(`removed`)한 기록을 덮어쓰지 않는다.
+- 신고 취소 · 다시 열기의 조회 · 갱신은 모두 `organization_id` 를 함께 건다(2026-11-25).

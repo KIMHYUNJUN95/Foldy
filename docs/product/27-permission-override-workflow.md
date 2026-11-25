@@ -36,7 +36,7 @@ below. The schema was migrated 2026-07-09
   grant (rich key picker + required datetime-local expiry + reason), two-step inline revoke.
   **Reason became optional on 2026-09-30 (user decision)** — the grant saves with an empty reason; the column
   stays `not null` and stores `''`, and the active-override row hides an empty reason.
-  Component `src/components/admin/users/user-detail-client.tsx`.
+  Component `src/components/admin/users/users-console.tsx` (admin) · `src/components/mobile/users/mobile-member-detail.tsx` (mobile) — the old `user-detail-client.tsx` is gone.
 - Application-level `permission_key` whitelist: `src/config/permission-overrides.ts`
   (`order_processor`, `maintenance_status_change`, `property_room_manage`, `can_generate_report`).
   Labels/descriptions in i18n `admin.users.console.keys` (ko/ja/en).

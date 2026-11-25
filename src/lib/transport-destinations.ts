@@ -38,6 +38,8 @@ export type TransportDestination = {
   key: string;
   /** 화면에 보이는 이름(로케일 반영). 저장 키로 쓰지 말 것. */
   label: string;
+  /** 서버로 보내고 저장하는 한국어 기준 이름(`아라키초A`). 화면에는 `label` 을 쓰고, 값은 이쪽을 쓴다. */
+  canonicalLabel: string;
   /** 건물이면 `properties.id`, 사무실·기타는 null. */
   propertyId: string | null;
   kind: "property" | "office" | "other";

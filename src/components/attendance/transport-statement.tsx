@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Plus } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import "./transport.css";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
+import { ImageLightbox } from "@/components/shell/image-lightbox";
+import { useBuildingName } from "@/components/shared/building-names";
 import { CalendarPanel } from "./transport-date-sheet";
 import { getDictionary, type Dictionary } from "@/lib/i18n";
 import { getCanonicalPropertyName } from "@/lib/room-label-normalization";
@@ -20,6 +22,8 @@ import {
   updateTransportItemAction,
   deleteTransportItemAction,
   addTransportItemImageAction,
+  deleteTransportItemImageAction,
+  refreshTransportReceiptUrlsAction,
   submitTransportReportAction,
 } from "@/app/mobile/attendance/transport/actions";
 import type {
@@ -28,6 +32,22 @@ import type {
   LinkedTransportCandidate,
 } from "@/lib/transport-reimbursement";
 import { haptic } from "@/lib/haptics";
+import { TRANSPORT_RECEIPT_BUCKET } from "@/lib/transport-receipt-bucket";
+import {
+  canChangeEntryMode,
+  isReceiptUrlStale,
+  mergeChosenFiles,
+  removeReceiptImage,
+  receiptCountForm,
+  receiptSlotsLeft,
+  transportErrorKind,
+  TRANSPORT_MAX_RECEIPTS,
+} from "@/lib/transport-receipt-ui";
+
+/** 서명 주소는 10분 — 8분 넘게 묵었으면 사진을 열기 전에 새로 받는다. */
+const URL_STALE_MS = 8 * 60 * 1000;
+
+type ReceiptImage = { id: string; url: string | null };
 
 type TransportItem = {
   id: string;
@@ -40,6 +60,12 @@ type TransportItem = {
   missingReceipt?: boolean;
   rooms?: string;
   memo?: string;
+  /** 붙은 사진 — `url` 은 서버가 만든 10분짜리 서명 주소(못 받았으면 null). */
+  images: ReceiptImage[];
+  /** 사진 중 하나라도 주소를 못 받았다. */
+  imageUrlsFailed: boolean;
+  /** 주소를 받은 시각(ms) — 오래 묵었으면 열기 전에 새로 받는다. */
+  urlsAt: number;
 };
 
 type Props = {
@@ -70,6 +96,9 @@ function mapItemRow(row: TransportItemRow): TransportItem {
     missingReceipt: row.images.length === 0,
     rooms: ctx.roomLabel ?? undefined,
     memo: row.memo ?? undefined,
+    images: row.images.map((img) => ({ id: img.id, url: img.signedUrl ?? null })),
+    imageUrlsFailed: Boolean(row.imageUrlsFailed),
+    urlsAt: Date.now(),
   };
 }
 
@@ -90,7 +119,7 @@ async function uploadTransportImage(
 
   const supabase = getSupabaseBrowserClient();
   const { error } = await supabase.storage
-    .from("request-images")
+    .from(TRANSPORT_RECEIPT_BUCKET)
     .upload(storagePath, compressed, { contentType: compressed.type, upsert: false });
 
   if (error) throw new Error("upload_failed");
@@ -255,7 +284,136 @@ function getTodayTokyo(): string {
 }
 
 /** 영수증 사진 상한 — 항목마다 5장(서버 `addTransportItemImageAction` 도 같은 수로 막는다). */
-const MAX_RECEIPTS = 5;
+const MAX_RECEIPTS = TRANSPORT_MAX_RECEIPTS;
+
+/** 서버 오류 코드 → 이 화면 문구. 모르는 코드는 「저장하지 못했어요」. */
+function errorMessage(t: Dictionary["transport"], code: string | undefined): string {
+  switch (transportErrorKind(code)) {
+    case "locked":
+      return t.errLocked;
+    case "forbidden":
+      return t.errForbidden;
+    case "amount":
+      return t.amountRequired;
+    case "memo":
+      return t.destinationOtherMemoRequired;
+    case "date":
+      return t.errDate;
+    case "entryMode":
+      return t.errEntryMode;
+    case "auth":
+      return t.errAuth;
+    case "limit":
+      return t.receiptTruncated.replace("{max}", String(MAX_RECEIPTS));
+    default:
+      return t.saveFailed;
+  }
+}
+
+function receiptCountLabel(t: Dictionary["transport"], n: number): string {
+  return receiptCountForm(n) === "one" ? t.receiptOne : t.receiptN.replace("{n}", String(n));
+}
+
+/** 올린 뒤 항목의 사진 목록(주소 포함)을 새로 받는다. 못 받으면 null. */
+async function fetchItemImages(itemId: string): Promise<{ images: ReceiptImage[]; failed: boolean } | null> {
+  try {
+    const res = await refreshTransportReceiptUrlsAction(itemId);
+    if (!res.ok) return null;
+    return { images: res.images.map((i) => ({ id: i.id, url: i.url })), failed: res.imageUrlsFailed };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 고른 파일 한 장의 미리보기 — 파일마다 주소를 한 번만 만들고, 빠지면(unmount) 거둔다(`revokeObjectURL`).
+ * 다른 파일이 늘거나 빠져도 이 칸은 다시 그려지지 않는다.
+ */
+function ChosenPreview({ file }: { file: File }) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    const next = URL.createObjectURL(file);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 브라우저 자원(object URL)을 만들고 거두는 동기화
+    setUrl(next);
+    return () => URL.revokeObjectURL(next);
+  }, [file]);
+  // eslint-disable-next-line @next/next/no-img-element -- 고른 파일의 blob 미리보기
+  return url ? <img src={url} alt="" /> : null;
+}
+
+/**
+ * 붙은 사진 보기 — 썸네일 · 크게 보기 · 못 불러옴 · 다시 받기를 상세 · 수정 시트가 같이 쓴다.
+ * 주소가 없거나(`url` null) 그림이 깨지면(`onError`) 「사진을 불러오지 못했어요」+ 다시 불러오기.
+ */
+function useReceiptViewer(
+  item: TransportItem,
+  onRefreshUrls: (itemId: string) => Promise<boolean>,
+) {
+  const [broken, setBroken] = useState<Set<string>>(() => new Set());
+  const [refreshing, setRefreshing] = useState(false);
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const usable = item.images.filter((img) => img.url && !broken.has(img.id));
+  const hasFailed = item.imageUrlsFailed || usable.length < item.images.length;
+
+  const refreshOnce = useCallback(async () => {
+    if (refreshing) return false;
+    setRefreshing(true);
+    try {
+      return await onRefreshUrls(item.id);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [item.id, onRefreshUrls, refreshing]);
+
+  const retry = useCallback(async () => {
+    if (refreshing) return;
+    haptic("light");
+    const ok = await refreshOnce();
+    if (ok) setBroken(new Set());
+    else haptic("error");
+  }, [refreshOnce, refreshing]);
+
+  // 시트가 열릴 때 주소가 묵었으면 한 번만 새로 받는다(10분 만료) — 큰 화면을 열 때까지 기다리지 않는다.
+  const autoRefreshed = useRef(false);
+  useEffect(() => {
+    if (autoRefreshed.current || item.images.length === 0) return;
+    if (!isReceiptUrlStale(item.urlsAt, Date.now(), URL_STALE_MS)) return;
+    autoRefreshed.current = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 서버에서 새 주소를 받아 오는 동기화(열릴 때 한 번)
+    void refreshOnce().then((ok) => {
+      if (ok) setBroken(new Set());
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 열릴 때 한 번
+  }, []);
+
+  const open = useCallback(
+    async (imageId: string) => {
+      if (refreshing) return;
+      // 주소가 오래 묵었으면 먼저 새로 받는다. 못 받으면 만료된 주소로 열지 않는다.
+      if (isReceiptUrlStale(item.urlsAt, Date.now(), URL_STALE_MS)) {
+        const ok = await refreshOnce();
+        if (!ok) {
+          haptic("error");
+          return;
+        }
+        setBroken(new Set());
+      }
+      setOpenIndex(Math.max(0, usable.findIndex((img) => img.id === imageId)));
+    },
+    [item.urlsAt, refreshOnce, refreshing, usable],
+  );
+
+  return {
+    usable,
+    hasFailed,
+    refreshing,
+    retry,
+    open,
+    openIndex,
+    closeLightbox: () => setOpenIndex(null),
+    markBroken: (id: string) => setBroken((prev) => new Set(prev).add(id)),
+  };
+}
 
 /**
  * 정산서 달 안의 기본 사용일(2026-10-26). 이번 달이면 오늘, 지난달이면 그 달 말일, 다음 달이면 1일.
@@ -320,7 +478,7 @@ function AddItemSheet({
   const t = dict.transport;
   const [inputMode, setInputMode] = useState<"linked" | "manual">("manual");
   const [usageDate, setUsageDate] = useState(() => defaultUsageDateForMonth(monthKey));
-  const [saveErr, setSaveErr] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
   const [showCal, setShowCal] = useState(false);
   const [amount, setAmount] = useState("");
   // 라벨이 아니라 **키**를 들고 있는다. 라벨은 로케일마다 달라서 저장·기억의 키가 될 수 없다.
@@ -328,6 +486,7 @@ function AddItemSheet({
   const [showBuildingList, setShowBuildingList] = useState(false);
   const [memo, setMemo] = useState("");
   const [files, setFiles] = useState<File[]>([]);
+  const [truncated, setTruncated] = useState(false);
   const [pending, setPending] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const buildingWrapRef = useRef<HTMLDivElement>(null);
@@ -366,7 +525,7 @@ function AddItemSheet({
     if (!amountNum || amountNum <= 0) return;
     if (memoMissing || linkMissing) return;
     setPending(true);
-    setSaveErr(false);
+    setSaveErr(null);
     try {
       const result = await createTransportItemAction({
         targetMonth: monthKey,
@@ -377,13 +536,13 @@ function AddItemSheet({
         cleaningSessionId: linked?.cleaningSessionId ?? null,
         propertyId: linked?.propertyId ?? destination?.propertyId ?? null,
         destinationKey: linked?.propertyId ?? (destinationKey || undefined),
-        buildingLabel: linked?.buildingLabel || destination?.label || undefined,
+        buildingLabel: linked?.buildingLabel || destination?.canonicalLabel || undefined,
         contextSummary: linked?.contextSummary || undefined,
         memo: memo.trim() || null,
       });
       if (!result.ok) {
         haptic("error");
-        setSaveErr(true);
+        setSaveErr(errorMessage(t, result.error));
         setPending(false);
         return;
       }
@@ -392,23 +551,28 @@ function AddItemSheet({
       // 첫 항목이면 화면을 열 때는 보고서가 없었다(page.tsx 는 읽기만 한다).
       const uploaded = await uploadReceipts(files.slice(0, MAX_RECEIPTS), organizationId, result.reportId, itemId);
       const receiptCount = uploaded.ok;
+      // 올린 사진의 주소 — 새로 받는다(방금 올린 것은 아직 화면에 주소가 없다).
+      const fresh = uploaded.ok > 0 ? await fetchItemImages(itemId) : null;
       // 항목은 저장됐지만 영수증 일부가 빠졌으면 성공이 아니라 경고(햅틱 규칙: 부분 결과 = warning).
       haptic(uploaded.failed > 0 ? "warning" : "success");
       onCreated({
         id: itemId,
         date: usageDate,
-        building: linked?.buildingLabel || destination?.label || "",
+        building: linked?.buildingLabel || destination?.canonicalLabel || "",
         context: linked?.contextSummary ?? "",
         amount: amountNum,
         receiptCount,
         mode: inputMode,
         missingReceipt: receiptCount === 0,
         memo: memo.trim() || undefined,
+        images: fresh?.images ?? [],
+        imageUrlsFailed: uploaded.ok > 0 && (fresh === null || fresh.failed),
+        urlsAt: Date.now(),
       }, { reportId: result.reportId, failedReceipts: uploaded.failed });
       onClose();
     } catch {
       haptic("error");
-      setSaveErr(true);
+      setSaveErr(t.saveFailed);
       setPending(false);
     }
   }
@@ -523,16 +687,36 @@ function AddItemSheet({
           <div className="trn-tf-l">{t.fieldReceipt}</div>
           <div className="trn-shots">
             {files.map((f, i) => (
-              <div key={i} className="trn-shot" title={f.name} />
+              <div key={`${f.name}-${f.size}-${f.lastModified}`} className="trn-shot-wrap">
+                <div className="trn-shot" title={f.name}>
+                  <ChosenPreview file={f} />
+                </div>
+                <button
+                  type="button"
+                  className="trn-shot-x"
+                  aria-label={t.receiptChosenRemoveAria.replace("{n}", String(i + 1))}
+                  disabled={pending}
+                  onClick={() => {
+                    haptic("light");
+                    setTruncated(false);
+                    setFiles((prev) => prev.filter((_, idx) => idx !== i));
+                  }}
+                >
+                  <X aria-hidden="true" />
+                </button>
+              </div>
             ))}
-            <button
-              type="button"
-              className="trn-shot-add"
-              aria-label={t.addPhoto}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <CameraIcon />
-            </button>
+            {receiptSlotsLeft(0, files.length) > 0 ? (
+              <button
+                type="button"
+                className="trn-shot-add"
+                aria-label={t.addPhoto}
+                disabled={pending}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <CameraIcon />
+              </button>
+            ) : null}
             <input
               ref={fileInputRef}
               type="file"
@@ -542,12 +726,21 @@ function AddItemSheet({
               tabIndex={-1}
               className="sr-only"
               onChange={(e) => {
-                if (e.target.files) {
-                  setFiles((prev) => [...prev, ...Array.from(e.target.files!)].slice(0, MAX_RECEIPTS));
-                }
+                const picked = Array.from(e.target.files ?? []);
+                // 같은 파일을 다시 골라도 change 가 오도록 비운다.
+                e.target.value = "";
+                if (picked.length === 0) return;
+                const merged = mergeChosenFiles(0, files, picked);
+                setFiles(merged.files);
+                setTruncated(merged.truncated);
               }}
             />
           </div>
+          {truncated ? (
+            <div className="trn-shot-note" role="status">
+              {t.receiptTruncated.replace("{max}", String(MAX_RECEIPTS))}
+            </div>
+          ) : null}
           <div className="trn-hint">
             <AlertIcon />
             {t.fieldReceiptHint}
@@ -650,7 +843,7 @@ function AddItemSheet({
 
         {saveErr ? (
           <div className="trn-err" role="alert">
-            {t.saveFailed}
+            {saveErr}
           </div>
         ) : null}
         <button
@@ -694,6 +887,7 @@ function DetailSheet({
   onClose,
   onEdit,
   onDelete,
+  onRefreshUrls,
 }: {
   item: TransportItem;
   dict: Dictionary;
@@ -701,11 +895,14 @@ function DetailSheet({
   onClose: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onRefreshUrls: (itemId: string) => Promise<boolean>;
 }) {
   const t = dict.transport;
+  const buildingName = useBuildingName();
   const { full, weekday } = fmtDateParts(item.date, localeTag);
   const isLinked = item.mode === "linked";
-  const memo = item.memo ?? `${item.building} ${t.homeTransportSub}`;
+  const memo = item.memo ?? `${buildingName(item.building)} ${t.homeTransportSub}`;
+  const viewer = useReceiptViewer(item, onRefreshUrls);
 
   return (
     <BottomSheet onClose={onClose} className="max-h-[82dvh] flex flex-col">
@@ -716,11 +913,27 @@ function DetailSheet({
           {/* 영수증 사진 스트립 */}
           {item.receiptCount > 0 ? (
             <div className="trn-dshots">
-              {Array.from({ length: Math.min(item.receiptCount, 2) }).map((_, i) => (
-                <div key={i} className="trn-dshot" style={{ width: "50%" }}>
+              {viewer.usable.map((img, i) => (
+                <div key={img.id} className="trn-dshot">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- 서명 주소(10분) 사진 */}
+                  <img src={img.url ?? ""} alt="" onError={() => viewer.markBroken(img.id)} />
+                  <button
+                    type="button"
+                    className="trn-dshot-open"
+                    aria-label={t.receiptOpenAria.replace("{n}", String(i + 1))}
+                    onClick={() => void viewer.open(img.id)}
+                  />
                   <span className="trn-dshot__l">{t.receiptLabel(i + 1)}</span>
                 </div>
               ))}
+              {viewer.hasFailed ? (
+                <div className="trn-shot-fail" role="alert">
+                  {t.receiptLoadFailed}
+                  <button type="button" disabled={viewer.refreshing} onClick={() => void viewer.retry()}>
+                    {t.receiptRetry}
+                  </button>
+                </div>
+              ) : null}
             </div>
           ) : (
             <div className="trn-dshot-empty">{t.detailNoReceipt}</div>
@@ -734,7 +947,7 @@ function DetailSheet({
             {fmtYen(item.amount)}
           </DetailRow>
           <DetailRow icon={<BuildingIcon />} label={t.fieldBuilding}>
-            {item.building}
+            {buildingName(item.building)}
           </DetailRow>
           <DetailRow icon={<DoorIcon />} label={t.detailRoom}>
             {roomsLabel(item)}
@@ -774,6 +987,12 @@ function DetailSheet({
               {t.detailDelete}
             </button>
           </div>
+          <ImageLightbox
+            urls={viewer.usable.map((img) => img.url ?? "")}
+            openIndex={viewer.openIndex}
+            onClose={viewer.closeLightbox}
+            closeLabel={dict.common.close}
+          />
         </div>
       )}
     </BottomSheet>
@@ -789,6 +1008,10 @@ function EditItemSheet({
   reportId,
   onClose,
   onSaved,
+  onImagesChanged,
+  onImageRemoved,
+  onUrlsFailed,
+  onRefreshUrls,
 }: {
   item: TransportItem;
   dict: Dictionary;
@@ -797,27 +1020,66 @@ function EditItemSheet({
   reportId: string;
   onClose: () => void;
   onSaved: (patch: Pick<TransportItem, "amount" | "context" | "memo" | "mode" | "receiptCount">, failedReceipts: number) => void;
+  /** 사진을 지웠거나 새로 받았을 때 목록의 항목 사진을 맞춘다. */
+  onImagesChanged: (itemId: string, images: ReceiptImage[], failed: boolean) => void;
+  /** 지운 사진 하나만 현재 목록에서 뺀다(연달아 지워도 되살아나지 않게 부모가 최신 목록 기준으로). */
+  onImageRemoved: (itemId: string, imageId: string) => void;
+  /** 주소를 못 받았다고만 표시 — 사진 목록은 그대로. */
+  onUrlsFailed: (itemId: string) => void;
+  onRefreshUrls: (itemId: string) => Promise<boolean>;
 }) {
   const t = dict.transport;
+  const buildingName = useBuildingName();
   const { full, weekday } = fmtDateParts(item.date, localeTag);
   const [amount, setAmount] = useState(String(item.amount));
   const [context, setContext] = useState(item.context);
   const [memo, setMemo] = useState(item.memo ?? "");
   const [mode, setMode] = useState<"linked" | "manual">(item.mode);
   const [files, setFiles] = useState<File[]>([]);
+  const [truncated, setTruncated] = useState(false);
   const [pending, setPending] = useState(false);
-  /** amount = 금액 비었음/0, save = 서버 거절 · 네트워크. */
-  const [err, setErr] = useState<null | "amount" | "save">(null);
+  /** 화면에 보일 오류 문구(없으면 null). */
+  const [err, setErr] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  /** 지우는 중인 사진 id — 바로 접히고, 서버가 거절하면 다시 펴진다. */
+  const [leaving, setLeaving] = useState<Set<string>>(() => new Set());
+  const viewer = useReceiptViewer(item, onRefreshUrls);
   // 이미 붙은 영수증과 합쳐 5장까지만 더 받는다.
   const receiptRoom = Math.max(0, MAX_RECEIPTS - item.receiptCount);
+  // 자동 연결 → 직접 입력만 바꿀 수 있다(서버 invalid_entry_mode).
+  const canSwitchToLinked = canChangeEntryMode(item.mode, "linked");
+
+  async function handleDeleteImage(imageId: string) {
+    if (leaving.has(imageId) || pending) return;
+    haptic("light");
+    setErr(null);
+    setLeaving((prev) => new Set(prev).add(imageId));
+    let ok = false;
+    try {
+      const res = await deleteTransportItemImageAction(imageId);
+      ok = res.ok;
+      if (!res.ok) setErr(errorMessage(t, res.error) === t.saveFailed ? t.receiptDeleteFailed : errorMessage(t, res.error));
+    } catch {
+      setErr(t.receiptDeleteFailed);
+    }
+    if (ok) {
+      onImageRemoved(item.id, imageId);
+    } else {
+      haptic("error");
+    }
+    setLeaving((prev) => {
+      const next = new Set(prev);
+      next.delete(imageId);
+      return next;
+    });
+  }
 
   async function handleSave(close: () => void) {
     const amountNum = parseInt(amount.replace(/[^\d]/g, ""), 10) || 0;
     // 예전에는 빈 칸이 0 으로 바뀌어 그대로 보내졌고, 서버가 거절해도 아무 말이 없었다.
     if (amountNum <= 0) {
       haptic("error");
-      setErr("amount");
+      setErr(t.amountRequired);
       return;
     }
     setErr(null);
@@ -828,15 +1090,23 @@ function EditItemSheet({
         amountYen: amountNum,
         memo: memo.trim() || null,
         contextSummary: context.trim() || undefined,
+        entryMode: mode,
       });
       if (!result.ok) {
         haptic("error");
-        setErr("save");
+        // 서버가 입력 방식을 거절하면 화면도 저장된 값으로 되돌린다.
+        if (transportErrorKind(result.error) === "entryMode") setMode(item.mode);
+        setErr(errorMessage(t, result.error));
         setPending(false);
         return;
       }
       // 새 이미지 추가 — 일부가 빠지면 저장은 됐어도 경고.
       const uploaded = await uploadReceipts(files.slice(0, receiptRoom), organizationId, reportId, item.id);
+      if (uploaded.ok > 0) {
+        const fresh = await fetchItemImages(item.id);
+        if (fresh) onImagesChanged(item.id, fresh.images, fresh.failed);
+        else onUrlsFailed(item.id);
+      }
       haptic(uploaded.failed > 0 ? "warning" : "success");
       onSaved(
         { amount: amountNum, context: context.trim(), memo: memo.trim(), mode, receiptCount: item.receiptCount + uploaded.ok },
@@ -845,7 +1115,7 @@ function EditItemSheet({
       close();
     } catch {
       haptic("error");
-      setErr("save");
+      setErr(t.saveFailed);
       setPending(false);
     }
   }
@@ -882,7 +1152,7 @@ function EditItemSheet({
           <div className="trn-tf">
             <div className="trn-tf-l">{t.fieldBuilding}</div>
             <div className="trn-tf-in">
-              {item.building} <ChevDownIcon />
+              {buildingName(item.building)} <ChevDownIcon />
             </div>
           </div>
           <div className="trn-tf">
@@ -902,20 +1172,67 @@ function EditItemSheet({
         <div className="trn-tf">
           <div className="trn-tf-l">{t.fieldReceipt}</div>
           <div className="trn-shots">
-            {Array.from({ length: Math.max(1, Math.min(item.receiptCount, 2)) }).map((_, i) =>
-              i < item.receiptCount ? (
-                <div key={i} className="trn-shot" />
-              ) : (
-                <button key={i} type="button" className="trn-shot-add" aria-label={t.addPhoto} onClick={() => fileInputRef.current?.click()}>
-                  <CameraIcon />
+            {item.images.map((img, i) => {
+              const bad = !img.url || !viewer.usable.some((u) => u.id === img.id);
+              return (
+                <div key={img.id} className="trn-shot-wrap" data-leaving={leaving.has(img.id) ? "" : undefined}>
+                  <div className="trn-shot">
+                    {bad ? null : (
+                      // eslint-disable-next-line @next/next/no-img-element -- 서명 주소(10분) 사진
+                      <img src={img.url ?? ""} alt="" onError={() => viewer.markBroken(img.id)} />
+                    )}
+                    {bad ? null : (
+                      <button
+                        type="button"
+                        className="trn-shot-open"
+                        aria-label={t.receiptOpenAria.replace("{n}", String(i + 1))}
+                        onClick={() => void viewer.open(img.id)}
+                      />
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    className="trn-shot-x"
+                    aria-label={t.receiptRemoveAria.replace("{n}", String(i + 1))}
+                    disabled={pending || leaving.has(img.id)}
+                    onClick={() => void handleDeleteImage(img.id)}
+                  >
+                    <X aria-hidden="true" />
+                  </button>
+                </div>
+              );
+            })}
+            {files.map((f, i) => (
+              <div key={`${f.name}-${f.size}-${f.lastModified}`} className="trn-shot-wrap">
+                <div className="trn-shot" title={f.name}>
+                  <ChosenPreview file={f} />
+                </div>
+                <button
+                  type="button"
+                  className="trn-shot-x"
+                  aria-label={t.receiptChosenRemoveAria.replace("{n}", String(i + 1))}
+                  disabled={pending}
+                  onClick={() => {
+                    haptic("light");
+                    setTruncated(false);
+                    setFiles((prev) => prev.filter((_, idx) => idx !== i));
+                  }}
+                >
+                  <X aria-hidden="true" />
                 </button>
-              ),
-            )}
-            {item.receiptCount > 0 && item.receiptCount + files.length < MAX_RECEIPTS && (
-              <button type="button" className="trn-shot-add" aria-label={t.addPhoto} onClick={() => fileInputRef.current?.click()}>
+              </div>
+            ))}
+            {receiptSlotsLeft(item.receiptCount, files.length) > 0 ? (
+              <button
+                type="button"
+                className="trn-shot-add"
+                aria-label={t.addPhoto}
+                disabled={pending}
+                onClick={() => fileInputRef.current?.click()}
+              >
                 <CameraIcon />
               </button>
-            )}
+            ) : null}
             <input
               ref={fileInputRef}
               type="file"
@@ -925,12 +1242,28 @@ function EditItemSheet({
               tabIndex={-1}
               className="sr-only"
               onChange={(e) => {
-                if (e.target.files) {
-                  setFiles((prev) => [...prev, ...Array.from(e.target.files!)].slice(0, receiptRoom));
-                }
+                const picked = Array.from(e.target.files ?? []);
+                e.target.value = "";
+                if (picked.length === 0) return;
+                const merged = mergeChosenFiles(item.receiptCount, files, picked);
+                setFiles(merged.files);
+                setTruncated(merged.truncated);
               }}
             />
           </div>
+          {truncated ? (
+            <div className="trn-shot-note" role="status">
+              {t.receiptTruncated.replace("{max}", String(MAX_RECEIPTS))}
+            </div>
+          ) : null}
+          {viewer.hasFailed && item.images.length > 0 ? (
+            <div className="trn-shot-fail trn-shot-fail--wide" role="alert">
+              {t.receiptLoadFailed}
+              <button type="button" disabled={viewer.refreshing} onClick={() => void viewer.retry()}>
+                {t.receiptRetry}
+              </button>
+            </div>
+          ) : null}
         </div>
 
         <div className="trn-tf">
@@ -952,6 +1285,7 @@ function EditItemSheet({
             <button
               type="button"
               className={mode === "linked" ? "trn-on" : ""}
+              disabled={!canSwitchToLinked}
               onClick={() => setMode("linked")}
             >
               <LinkIcon />
@@ -966,11 +1300,12 @@ function EditItemSheet({
               {t.modeManual}
             </button>
           </div>
+          {!canSwitchToLinked ? <div className="trn-shot-note">{t.modeLockedHint}</div> : null}
         </div>
 
         {err ? (
           <div className="trn-err" role="alert">
-            {err === "amount" ? t.amountRequired : t.saveFailed}
+            {err}
           </div>
         ) : null}
         <button
@@ -982,6 +1317,12 @@ function EditItemSheet({
           {pending ? <span className="trn-spin" /> : null}
           {t.editSheetSubmit}
         </button>
+        <ImageLightbox
+          urls={viewer.usable.map((img) => img.url ?? "")}
+          openIndex={viewer.openIndex}
+          onClose={viewer.closeLightbox}
+          closeLabel={dict.common.close}
+        />
       </div>
       )}
     </BottomSheet>
@@ -1001,6 +1342,7 @@ function DeleteConfirmSheet({
   onConfirm: () => void;
 }) {
   const t = dict.transport;
+  const buildingName = useBuildingName();
   const [pending, setPending] = useState(false);
 
   return (
@@ -1025,7 +1367,7 @@ function DeleteConfirmSheet({
         <div className="trn">
           <div className="trn-confirm-card">
             <span className="k">
-              {shortDateLabel(item.date)} · {item.building}
+              {shortDateLabel(item.date)} · {buildingName(item.building)}
             </span>
             <span className="v">{fmtYen(item.amount)}</span>
           </div>
@@ -1119,6 +1461,7 @@ export function TransportStatement({
 }: Props) {
   const dict = getDictionary(locale);
   const t = dict.transport;
+  const buildingName = useBuildingName();
   const localeTag = locale === "ja" ? "ja-JP" : locale === "en" ? "en-US" : "ko-KR";
 
   const [items, setItems] = useState<TransportItem[]>(() => initialItems.map(mapItemRow));
@@ -1155,6 +1498,49 @@ export function TransportStatement({
     else if (intent === "delete") setShowDelete(true);
     else setSelectedId(null);
   }, []);
+
+  /** 사진 목록 · 주소를 항목에 맞춘다(지움 · 올림 · 새로 받음). */
+  const handleImagesChanged = useCallback((itemId: string, images: ReceiptImage[], failed: boolean) => {
+    setItems((prev) =>
+      prev.map((it) =>
+        it.id === itemId
+          ? {
+              ...it,
+              images,
+              imageUrlsFailed: failed,
+              urlsAt: Date.now(),
+              receiptCount: images.length,
+              missingReceipt: images.length === 0,
+            }
+          : it,
+      ),
+    );
+  }, []);
+
+  const handleImageRemoved = useCallback((itemId: string, imageId: string) => {
+    setItems((prev) =>
+      prev.map((it) => {
+        if (it.id !== itemId) return it;
+        const images = removeReceiptImage(it.images, imageId);
+        return { ...it, images, receiptCount: images.length, missingReceipt: images.length === 0 };
+      }),
+    );
+  }, []);
+
+  const handleUrlsFailed = useCallback((itemId: string) => {
+    setItems((prev) => prev.map((it) => (it.id === itemId ? { ...it, imageUrlsFailed: true } : it)));
+  }, []);
+
+  /** 서명 주소를 새로 받는다. 성공하면 true. */
+  const handleRefreshUrls = useCallback(
+    async (itemId: string) => {
+      const fresh = await fetchItemImages(itemId);
+      if (!fresh) return false;
+      handleImagesChanged(itemId, fresh.images, fresh.failed);
+      return !fresh.failed;
+    },
+    [handleImagesChanged],
+  );
 
   const handleSaved = useCallback(
     (patch: Pick<TransportItem, "amount" | "context" | "memo" | "mode" | "receiptCount">, failedReceipts: number) => {
@@ -1326,10 +1712,10 @@ export function TransportStatement({
             >
               <span className="trnw-line__d">{shortDateLabel(item.date)}</span>
               <span className="trnw-line__b">
-                <span className="trnw-line__t">{item.building}</span>
+                <span className="trnw-line__t">{buildingName(item.building)}</span>
                 <span className={`trnw-line__s${missing ? " is-danger" : ""}`}>
                   {item.context ? `${item.context} · ` : ""}
-                  {missing ? t.badgeMissing : t.receiptN.replace("{n}", String(item.receiptCount))}
+                  {missing ? t.badgeMissing : receiptCountLabel(t, item.receiptCount)}
                 </span>
               </span>
               <b className="trnw-line__v">{fmtYen(item.amount)}</b>
@@ -1373,6 +1759,7 @@ export function TransportStatement({
           onDelete={() => {
             intentRef.current = "delete";
           }}
+          onRefreshUrls={handleRefreshUrls}
         />
       )}
 
@@ -1389,6 +1776,10 @@ export function TransportStatement({
             setSelectedId(null);
           }}
           onSaved={handleSaved}
+          onImagesChanged={handleImagesChanged}
+          onImageRemoved={handleImageRemoved}
+          onUrlsFailed={handleUrlsFailed}
+          onRefreshUrls={handleRefreshUrls}
         />
       )}
 

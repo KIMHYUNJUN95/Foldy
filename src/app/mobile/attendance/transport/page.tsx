@@ -6,6 +6,7 @@ import { getOnboardingState } from "@/lib/onboarding";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getDictionary } from "@/lib/i18n";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { signTransportReceiptPaths } from "@/lib/transport-receipt-storage";
 import {
   getTransportReport,
   getTransportItems,
@@ -88,12 +89,24 @@ export default async function MobileTransportPage({
     updatedAt: "",
   };
 
-  const [items, linkedCandidates, destinations, recentAmounts] = await Promise.all([
+  // 정산서 · 항목 읽기 오류는 던진다(2026-11-25) — 빈 달로 보이지 않게 이 화면의 오류 화면으로 간다.
+  const [rawItems, linkedCandidates, destinations, recentAmounts] = await Promise.all([
     existingReport ? getTransportItems(service, existingReport.id) : Promise.resolve([]),
     getLinkedTransportCandidates(service, organizationId, userId, targetMonthDate),
     listTransportDestinations(service, organizationId, dict),
     getRecentTransportAmounts(service, organizationId, userId),
   ]);
+
+  // 영수증은 비공개 버킷이라 서버가 사진마다 10분짜리 서명 주소를 붙여 넘긴다(2026-11-25). 못 받으면 null + imageUrlsFailed.
+  const { urlByPath } = await signTransportReceiptPaths(
+    service,
+    rawItems.flatMap((item) => item.images.map((img) => img.storagePath)),
+  );
+  const items = rawItems.map((item) => ({
+    ...item,
+    images: item.images.map((img) => ({ ...img, signedUrl: urlByPath.get(img.storagePath) ?? null })),
+    imageUrlsFailed: item.images.some((img) => !urlByPath.has(img.storagePath)),
+  }));
 
   const monthLabel = new Intl.DateTimeFormat(localeTag, {
     year: "numeric",

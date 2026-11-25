@@ -175,8 +175,7 @@ async function removeDeckPeople({ sb }) {
     must(await sb.from("attendance_session_audits").delete().eq("organization_id", org.id).in("session_id", chunk), "감사");
   }
   must(await sb.from("attendance_correction_requests").delete().eq("organization_id", org.id).in("requested_by_user_id", ids), "정정");
-  const reports = must(await sb.from("transport_reimbursement_reports").select("id").eq("organization_id", org.id).in("user_id", ids), "교통비");
-  if (reports.length) must(await sb.from("transport_reimbursement_items").delete().eq("organization_id", org.id).in("report_id", reports.map((r) => r.id)), "교통비 항목");
+  // 교통비 항목 · 사진은 정산서를 지울 때 cascade 로 같이 지워진다 — 항목만 먼저 지우면 승인된 정산서에서 잠금 트리거(202611250002)에 막힌다.
   for (const [table, col] of [
     ["transport_reimbursement_reports", "user_id"],
     ["attendance_pay_allowances", "target_user_id"],

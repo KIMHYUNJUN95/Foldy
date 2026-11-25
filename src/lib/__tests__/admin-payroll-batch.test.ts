@@ -422,6 +422,7 @@ describe("admin payroll batch = per-user pay view", () => {
       linkedCount: 1,
       missingCount: 0,
       totalAmount: 1320,
+      loadError: false,
     });
     expect(detail.stats.totalDays).toBe(8);
   });

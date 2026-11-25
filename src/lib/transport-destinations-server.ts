@@ -1,6 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Dictionary } from "@/lib/i18n";
+import { getDictionary, type Dictionary } from "@/lib/i18n";
 import {
   getCanonicalPropertyName,
   isExcludedOperationalProperty,
@@ -40,6 +40,7 @@ export async function listTransportDestinations(
   }
 
   const buildingLabels = dict.cleaning.buildingLabels;
+  const ko = getDictionary("ko");
   const properties = (data ?? [])
     .filter((row) => !isExcludedOperationalProperty(row.name))
     .map<TransportDestination>((row) => ({
@@ -48,6 +49,7 @@ export async function listTransportDestinations(
       // 받아 로케일 라벨을 찾는다. Beds24 원본(`Arakicho A`)을 그대로 넘기면 매핑이 하나도
       // 안 걸려 원본이 그대로 보인다 — 캘린더는 한국어인데 교통비만 영어로 나왔다.
       label: localizePropertyName(getCanonicalPropertyName(row.name), buildingLabels),
+      canonicalLabel: getCanonicalPropertyName(row.name),
       propertyId: row.id,
       kind: "property",
     }))
@@ -58,12 +60,14 @@ export async function listTransportDestinations(
     {
       key: TRANSPORT_OFFICE_KEY,
       label: dict.transport.buildings.office,
+      canonicalLabel: ko.transport.buildings.office,
       propertyId: null,
       kind: "office",
     },
     {
       key: TRANSPORT_OTHER_KEY,
       label: dict.transport.destinationOther,
+      canonicalLabel: ko.transport.destinationOther,
       propertyId: null,
       kind: "other",
     },

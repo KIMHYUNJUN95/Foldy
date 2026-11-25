@@ -10,7 +10,13 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
-import { transportDestinationRequiresMemo } from "@/lib/transport-destinations";
+import { getDictionary } from "@/lib/i18n";
+import { getCanonicalPropertyName } from "@/lib/room-label-normalization";
+import {
+  TRANSPORT_OFFICE_KEY,
+  TRANSPORT_OTHER_KEY,
+  transportDestinationRequiresMemo,
+} from "@/lib/transport-destinations";
 import {
   getOrCreateTransportReport,
   getTransportReport,
@@ -20,9 +26,22 @@ import {
 } from "@/lib/transport-reimbursement";
 import { tokyoToday } from "@/lib/tokyo-date";
 import { transportMonthAllowed } from "@/lib/transport-month";
+import {
+  removeTransportReceiptFiles,
+  signTransportReceiptPaths,
+  transportReceiptExists,
+} from "@/lib/transport-receipt-storage";
 
 const TRANSPORT_PATH = "/mobile/attendance/transport";
-const IMAGE_BUCKET = "request-images";
+// 영수증 버킷은 src/lib/transport-receipt-storage.ts 한 곳에서 정한다(2026-11-25 — 새 비공개 버킷 → 예전 공개 버킷).
+
+/** DB 트리거 오류 문장 → 화면 오류 코드(202611110002 · 202611250002). */
+function triggerErrorCode(message: string | undefined, fallback: string): string {
+  const text = message ?? "";
+  if (text.includes("transport item image limit")) return "too_many_images";
+  if (text.includes("transport report is not editable")) return "report_not_editable";
+  return fallback;
+}
 
 type Service = ReturnType<typeof getSupabaseServiceClient>;
 
@@ -90,6 +109,23 @@ function isOwnItemImagePath(
 
 // ── 생성 ─────────────────────────────────────────────────────────────────
 
+/**
+ * 저장할 건물 이름(2026-11-25). 화면은 정규 이름을 보내지만 서버가 화면 값을 믿지 않는다 — 로케일 이름(`荒木町A`)이나
+ * 엉뚱한 이름이 저장되면 관리자 화면 · 내보내기의 이름 바꾸기(`localizeStoredPlaceText`)가 안 걸린다.
+ * - 자동 연결: 지금처럼 후보 값(근태 근무지 이름 · 청소 건물 이름)을 쓴다 — 출처를 바꾸지 않는다.
+ * - 직접 입력 · 건물: 같은 조직 `properties.name` → `getCanonicalPropertyName`(목적지 목록의 `canonicalLabel` 과 같은 값).
+ * - 직접 입력 · 사무실 · 기타: 한국어 사전 값. 그 밖에는 비운다.
+ */
+function resolveBuildingLabel(input: CreateTransportItemInput, propertyName: string | null): string | null {
+  if (input.entryMode === "linked") return input.buildingLabel?.trim() || null;
+  if (propertyName) return getCanonicalPropertyName(propertyName);
+  const key = input.destinationKey?.trim();
+  const ko = getDictionary("ko");
+  if (key === TRANSPORT_OFFICE_KEY) return ko.transport.buildings.office;
+  if (key === TRANSPORT_OTHER_KEY) return ko.transport.destinationOther;
+  return null;
+}
+
 export type CreateTransportItemInput = {
   targetMonth: string; // 'YYYY-MM'
   usageDate: string; // 'YYYY-MM-DD'
@@ -101,6 +137,11 @@ export type CreateTransportItemInput = {
   propertyId?: string | null;
   /** 안 흔들리는 출근지 키. 건물이면 `property_id` 와 같고, 사무실·기타는 고정값. */
   destinationKey?: string;
+  /**
+   * 자동 연결 항목에서만 쓴다(근태 근무지 · 청소 건물 이름, 후보가 서버에서 만든 값). 직접 입력은 이 값을 **믿지 않고**
+   * 서버가 출근지에서 정규(한국어) 이름을 정한다(2026-11-25) — 건물은 `properties.name` → `getCanonicalPropertyName`,
+   * 사무실 · 기타는 한국어 사전 값.
+   */
   buildingLabel?: string;
   contextSummary?: string;
   memo?: string | null;
@@ -177,24 +218,34 @@ export async function createTransportItemAction(
     if (cleaningRes.error || !cleaningRes.data) return { ok: false, error: "invalid_link" };
     linkedSource = { type: "cleaning", id: cleaningSessionId };
   }
+  let propertyName: string | null = null;
   if (propertyId) {
     const propertyRes = await service
       .from("properties")
-      .select("id")
+      .select("id, name")
       .eq("id", propertyId)
       .eq("organization_id", organizationId)
       .maybeSingle();
     if (propertyRes.error || !propertyRes.data) return { ok: false, error: "invalid_link" };
+    const name = (propertyRes.data as { name?: string | null }).name;
+    propertyName = typeof name === "string" && name.trim() ? name : null;
   }
 
   // 보고서 행은 **첫 항목을 넣을 때** 만든다 — 화면을 여는 것만으로는 만들지 않는다(page.tsx 는 읽기만).
-  const report = await getOrCreateTransportReport(service, organizationId, userId, targetMonthDate);
+  let report: Awaited<ReturnType<typeof getOrCreateTransportReport>>;
+  try {
+    report = await getOrCreateTransportReport(service, organizationId, userId, targetMonthDate);
+  } catch (error) {
+    console.error("[createTransportItemAction] report read/create failed:", error instanceof Error ? error.message : error);
+    return { ok: false, error: "insert_failed" };
+  }
   if (!EDITABLE_STATUSES.has(report.status)) return { ok: false, error: "report_not_editable" };
 
   const workContext: Record<string, string> = {};
   // 라벨은 **표시용**이다(로케일마다 다르다). 기억·집계의 키는 `destinationKey` 다.
   if (input.destinationKey?.trim()) workContext.destinationKey = input.destinationKey.trim();
-  if (input.buildingLabel?.trim()) workContext.buildingLabel = input.buildingLabel.trim();
+  const buildingLabel = resolveBuildingLabel(input, propertyName);
+  if (buildingLabel) workContext.buildingLabel = buildingLabel;
   if (input.contextSummary?.trim()) workContext.contextSummary = input.contextSummary.trim();
   if (linkedSource) {
     workContext.linkedSourceType = linkedSource.type;
@@ -218,7 +269,7 @@ export async function createTransportItemAction(
     })
     .select("id")
     .maybeSingle();
-  if (ins.error || !ins.data) return { ok: false, error: "insert_failed" };
+  if (ins.error || !ins.data) return { ok: false, error: triggerErrorCode(ins.error?.message, "insert_failed") };
 
   await syncReportTotalAmountQuietly(service, report.id);
   revalidatePath(TRANSPORT_PATH);
@@ -231,40 +282,42 @@ export type UpdateTransportItemInput = {
   itemId: string;
   amountYen?: number;
   memo?: string | null;
-  buildingLabel?: string;
+  // 건물 이름(`buildingLabel`)은 받지 않는다(2026-11-25) — 출근지는 수정에서 못 바꾸고, 이름은 만들 때 서버가 정한다.
   contextSummary?: string;
+  /**
+   * 입력 방식 바꾸기(2026-11-25). **자동 연결 → 직접 입력(`"manual"`)만** 받는다 — 연결 출처(linkedSourceType ·
+   * linkedSourceId)와 근태 칸(attendance_session_id)을 비운다. 직접 입력 → 자동 연결은 출처를 서버가 다시 확인해야 해서
+   * 여기서 받지 않는다(`invalid_entry_mode`) — 그때는 항목을 지우고 후보에서 다시 만든다. 같은 값이면 아무것도 안 한다.
+   */
+  entryMode?: TransportEntryMode;
 };
 
 export type TransportActionResult = { ok: true } | { ok: false; error: string };
 
+type OwnItem = {
+  id: string;
+  report_id: string;
+  work_context: Record<string, string> | null;
+  entry_mode: TransportEntryMode;
+};
+
 /**
- * 본인 소유 항목과 그 보고서 상태를 찾는다(조직 범위). 항목이 없거나, 다른 사람 소유이거나,
- * 보고서를 수정할 수 없으면 오류 코드를 돌려준다.
+ * 본인 소유 항목과 그 보고서 상태를 찾는다(조직 범위). 상태와 상관없이 돌려준다(다시 받기는 승인된 정산서도 본다).
+ * 읽기 오류는 `read_failed` — 「남의 것」(forbidden)과 섞지 않는다(2026-11-25).
  */
-async function loadEditableOwnItem(
+async function loadOwnItem(
   service: Service,
   organizationId: string,
   userId: string,
   itemId: string,
-): Promise<
-  | {
-      ok: true;
-      item: { id: string; report_id: string; work_context: Record<string, string> | null };
-    }
-  | { ok: false; error: string }
-> {
+): Promise<{ ok: true; item: OwnItem; reportStatus: string } | { ok: false; error: string }> {
   const res = await untyped(service)
     .from("transport_reimbursement_items")
-    .select("id, report_id, user_id, organization_id, work_context")
+    .select("id, report_id, user_id, organization_id, work_context, entry_mode")
     .eq("id", itemId)
     .maybeSingle();
-  const row = res.data as {
-    id: string;
-    report_id: string;
-    user_id: string;
-    organization_id: string;
-    work_context: Record<string, string> | null;
-  } | null;
+  if (res.error) return { ok: false, error: "read_failed" };
+  const row = res.data as (OwnItem & { user_id: string; organization_id: string }) | null;
   if (!row || row.organization_id !== organizationId || row.user_id !== userId) {
     return { ok: false, error: "forbidden" };
   }
@@ -275,14 +328,28 @@ async function loadEditableOwnItem(
     .eq("id", row.report_id)
     .eq("organization_id", organizationId)
     .maybeSingle();
+  if (reportRes.error) return { ok: false, error: "read_failed" };
   const report = reportRes.data as { status: string } | null;
   if (!report) return { ok: false, error: "forbidden" };
-  if (!EDITABLE_STATUSES.has(report.status)) return { ok: false, error: "report_not_editable" };
 
   return {
     ok: true,
-    item: { id: row.id, report_id: row.report_id, work_context: row.work_context },
+    item: { id: row.id, report_id: row.report_id, work_context: row.work_context, entry_mode: row.entry_mode },
+    reportStatus: report.status,
   };
+}
+
+/** loadOwnItem + 보고서를 고칠 수 있어야 한다. */
+async function loadEditableOwnItem(
+  service: Service,
+  organizationId: string,
+  userId: string,
+  itemId: string,
+): Promise<{ ok: true; item: OwnItem } | { ok: false; error: string }> {
+  const loaded = await loadOwnItem(service, organizationId, userId, itemId);
+  if (!loaded.ok) return loaded;
+  if (!EDITABLE_STATUSES.has(loaded.reportStatus)) return { ok: false, error: "report_not_editable" };
+  return { ok: true, item: loaded.item };
 }
 
 export async function updateTransportItemAction(
@@ -308,18 +375,23 @@ export async function updateTransportItemAction(
   if (input.memo !== undefined) {
     update.memo = input.memo?.trim() ? input.memo.trim() : null;
   }
-  if (input.buildingLabel !== undefined || input.contextSummary !== undefined) {
-    const workContext = { ...(loaded.item.work_context ?? {}) };
-    if (input.buildingLabel !== undefined) {
-      if (input.buildingLabel.trim()) workContext.buildingLabel = input.buildingLabel.trim();
-      else delete workContext.buildingLabel;
-    }
-    if (input.contextSummary !== undefined) {
-      if (input.contextSummary.trim()) workContext.contextSummary = input.contextSummary.trim();
-      else delete workContext.contextSummary;
-    }
-    update.work_context = workContext;
+  let workContext: Record<string, string> | null = null;
+  if (input.entryMode !== undefined && input.entryMode !== loaded.item.entry_mode) {
+    if (input.entryMode !== "manual") return { ok: false, error: "invalid_entry_mode" };
+    workContext = { ...(loaded.item.work_context ?? {}) };
+    delete workContext.linkedSourceType;
+    delete workContext.linkedSourceId;
+    update.entry_mode = "manual";
+    update.attendance_session_id = null;
+  } else if (input.entryMode !== undefined && input.entryMode !== "manual" && input.entryMode !== "linked") {
+    return { ok: false, error: "invalid_entry_mode" };
   }
+  if (input.contextSummary !== undefined) {
+    workContext ??= { ...(loaded.item.work_context ?? {}) };
+    if (input.contextSummary.trim()) workContext.contextSummary = input.contextSummary.trim();
+    else delete workContext.contextSummary;
+  }
+  if (workContext) update.work_context = workContext;
   if (Object.keys(update).length === 0) return { ok: true };
 
   const upd = await untyped(service)
@@ -328,7 +400,7 @@ export async function updateTransportItemAction(
     .eq("id", loaded.item.id)
     .eq("organization_id", organizationId)
     .eq("user_id", userId);
-  if (upd.error) return { ok: false, error: "update_failed" };
+  if (upd.error) return { ok: false, error: triggerErrorCode(upd.error.message, "update_failed") };
 
   await syncReportTotalAmountQuietly(service, loaded.item.report_id);
   revalidatePath(TRANSPORT_PATH);
@@ -348,31 +420,30 @@ export async function deleteTransportItemAction(itemId: string): Promise<Transpo
   if (!loaded.ok) return loaded;
   const reportId = loaded.item.report_id;
 
-  // 항목의 스토리지 파일을 먼저 완전 삭제한다(DB cascade 가 이미지 행을 지운다).
+  // 지울 파일 목록을 먼저 읽는다 — 못 읽으면 지우지 않는다(행만 지워지고 파일이 영영 남지 않게).
   const imgRes = await untyped(service)
     .from("transport_reimbursement_item_images")
     .select("storage_path")
     .eq("item_id", itemId)
     .eq("organization_id", organizationId);
+  if (imgRes.error) return { ok: false, error: "read_failed" };
   // 이 항목 폴더의 파일만 지운다 — 예전 검사가 느슨할 때 들어간 남의 경로가 있어도 건드리지 않는다.
   const paths = ((imgRes.data ?? []) as { storage_path: string }[])
     .map((r) => r.storage_path)
     .filter((path) => Boolean(path) && isOwnItemImagePath(path, organizationId, reportId, itemId));
-  if (paths.length > 0) {
-    const { error } = await service.storage.from(IMAGE_BUCKET).remove(paths);
-    if (error) {
-      // 치명적이지 않음: 남은 파일이 있어도 최악일 뿐이고, DB 행은 아래 cascade 로 지워진다.
-      console.error("[deleteTransportItemAction] storage remove failed:", error.message);
-    }
-  }
 
+  // 행 먼저(2026-11-25) — DB 잠금 트리거(제출 · 승인 뒤)에 걸리면 파일은 그대로 남아 증빙이 깨지지 않는다.
+  // 사진 행은 cascade 로 함께 지워진다.
   const del = await untyped(service)
     .from("transport_reimbursement_items")
     .delete()
     .eq("id", itemId)
     .eq("organization_id", organizationId)
     .eq("user_id", userId);
-  if (del.error) return { ok: false, error: "delete_failed" };
+  if (del.error) return { ok: false, error: triggerErrorCode(del.error.message, "delete_failed") };
+
+  // 파일은 그 뒤 두 버킷에서. 실패해도 행은 이미 없다 — 남은 파일은 기록만 남긴다(사용자에겐 성공).
+  if (paths.length > 0) await removeTransportReceiptFiles(service, paths);
 
   await syncReportTotalAmountQuietly(service, reportId);
   revalidatePath(TRANSPORT_PATH);
@@ -380,6 +451,27 @@ export async function deleteTransportItemAction(itemId: string): Promise<Transpo
 }
 
 // ── 항목 이미지 ────────────────────────────────────────────────────────────
+
+/**
+ * 거절된 업로드 정리 — 그 항목 폴더의 파일이고, 그 경로를 쓰는 사진 행이 없을 때만 두 버킷에서 지운다
+ * (이미 등록된 다른 사진의 파일을 지우지 않게).
+ */
+async function discardRejectedUpload(
+  service: Service,
+  organizationId: string,
+  item: OwnItem,
+  storagePath: string,
+): Promise<void> {
+  if (!isOwnItemImagePath(storagePath, organizationId, item.report_id, item.id)) return;
+  const used = await untyped(service)
+    .from("transport_reimbursement_item_images")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("storage_path", storagePath)
+    .limit(1);
+  if (used.error || ((used.data ?? []) as unknown[]).length > 0) return;
+  await removeTransportReceiptFiles(service, [storagePath]);
+}
 
 export async function addTransportItemImageAction(
   itemId: string,
@@ -391,34 +483,64 @@ export async function addTransportItemImageAction(
   const userId = session.user.id;
   const service = getSupabaseServiceClient();
 
-  const loaded = await loadEditableOwnItem(service, organizationId, userId, itemId);
+  const loaded = await loadOwnItem(service, organizationId, userId, itemId);
   if (!loaded.ok) return loaded;
+  const item = loaded.item;
 
-  if (!isOwnItemImagePath(storagePath, organizationId, loaded.item.report_id, loaded.item.id)) {
+  if (!isOwnItemImagePath(storagePath, organizationId, item.report_id, item.id)) {
     return { ok: false, error: "invalid_path" };
   }
 
-  // 다음 sort_order: 기존 이미지 뒤에 붙인다. 5장이 차 있으면 더 받지 않는다(서버가 상한을 다시 건다).
+  // 파일이 실제로 올라가 있어야 등록한다(2026-11-25) — 없는 경로로 사진 행만 생기면 증빙이 깨진 채 제출된다.
+  const exists = await transportReceiptExists(service, storagePath);
+  if (exists === "error") return { ok: false, error: "storage_failed" };
+  if (!exists) return { ok: false, error: "file_missing" };
+
+  const reject = async (error: string): Promise<TransportActionResult> => {
+    await discardRejectedUpload(service, organizationId, item, storagePath);
+    return { ok: false, error };
+  };
+
+  if (!EDITABLE_STATUSES.has(loaded.reportStatus)) return reject("report_not_editable");
+
+  // 같은 경로가 이미 등록돼 있으면(두 번 누름 · 응답을 못 받고 다시 시도) 새 행 없이 성공 — 파일은 그 행이 쓰고 있다(2026-11-25).
+  const already = await untyped(service)
+    .from("transport_reimbursement_item_images")
+    .select("id")
+    .eq("item_id", itemId)
+    .eq("organization_id", organizationId)
+    .eq("storage_path", storagePath)
+    .limit(1);
+  if (already.error) return { ok: false, error: "read_failed" };
+  if (((already.data ?? []) as unknown[]).length > 0) return { ok: true };
+
+  // 5장 상한 — 화면 · 여기 · DB 트리거(동시에 올릴 때) 세 곳에서 건다. 순서(sort_order)는 DB 트리거가 매긴다.
   const countRes = await untyped(service)
     .from("transport_reimbursement_item_images")
     .select("id")
     .eq("item_id", itemId)
     .eq("organization_id", organizationId);
-  if (countRes.error) return { ok: false, error: "insert_failed" };
-  const nextOrder = ((countRes.data ?? []) as { id: string }[]).length;
-  if (nextOrder >= MAX_ITEM_IMAGES) return { ok: false, error: "too_many_images" };
+  if (countRes.error) return { ok: false, error: "read_failed" };
+  if (((countRes.data ?? []) as unknown[]).length >= MAX_ITEM_IMAGES) return reject("too_many_images");
 
   const ins = await untyped(service)
     .from("transport_reimbursement_item_images")
     .insert({
       organization_id: organizationId,
-      report_id: loaded.item.report_id,
+      report_id: item.report_id,
       item_id: itemId,
       user_id: userId,
       storage_path: storagePath,
-      sort_order: nextOrder,
     });
-  if (ins.error) return { ok: false, error: "insert_failed" };
+  if (ins.error) {
+    // 동시에 같은 경로를 넣어 (item_id, storage_path) 유일 색인(202611250002)에 걸림 — 다른 요청이 이미 등록했다.
+    // 파일은 그 행이 쓰므로 지우지 않는다.
+    if ((ins.error as { code?: string }).code === "23505") {
+      revalidatePath(TRANSPORT_PATH);
+      return { ok: true };
+    }
+    return reject(triggerErrorCode(ins.error.message, "insert_failed"));
+  }
 
   revalidatePath(TRANSPORT_PATH);
   return { ok: true };
@@ -438,6 +560,7 @@ export async function deleteTransportItemImageAction(
     .select("id, item_id, storage_path, user_id, organization_id")
     .eq("id", imageId)
     .maybeSingle();
+  if (imgRes.error) return { ok: false, error: "read_failed" };
   const image = imgRes.data as {
     id: string;
     item_id: string;
@@ -453,27 +576,65 @@ export async function deleteTransportItemImageAction(
   const loaded = await loadEditableOwnItem(service, organizationId, userId, image.item_id);
   if (!loaded.ok) return loaded;
 
-  // 이 항목 폴더의 파일일 때만 Storage 에서 지운다(행은 아래에서 지운다).
-  if (
-    image.storage_path &&
-    isOwnItemImagePath(image.storage_path, organizationId, loaded.item.report_id, loaded.item.id)
-  ) {
-    const { error } = await service.storage.from(IMAGE_BUCKET).remove([image.storage_path]);
-    if (error) {
-      console.error("[deleteTransportItemImageAction] storage remove failed:", error.message);
-    }
-  }
-
+  // 행 먼저(2026-11-25) — DB 잠금 트리거에 걸리면 파일은 남는다. 파일을 먼저 지우면 행만 남아 깨진 증빙이 된다.
   const del = await untyped(service)
     .from("transport_reimbursement_item_images")
     .delete()
     .eq("id", imageId)
     .eq("organization_id", organizationId)
     .eq("user_id", userId);
-  if (del.error) return { ok: false, error: "delete_failed" };
+  if (del.error) return { ok: false, error: triggerErrorCode(del.error.message, "delete_failed") };
+
+  // 이 항목 폴더의 파일일 때만 두 버킷에서 지운다. 실패해도 행은 이미 없다 — 기록만 남긴다.
+  if (
+    image.storage_path &&
+    isOwnItemImagePath(image.storage_path, organizationId, loaded.item.report_id, loaded.item.id)
+  ) {
+    await removeTransportReceiptFiles(service, [image.storage_path]);
+  }
 
   revalidatePath(TRANSPORT_PATH);
   return { ok: true };
+}
+
+// ── 영수증 주소 다시 받기 ────────────────────────────────────────────────────
+
+export type TransportReceiptUrlsResult =
+  | { ok: true; images: Array<{ id: string; url: string | null }>; imageUrlsFailed: boolean }
+  | { ok: false; error: string };
+
+/**
+ * 본인 항목의 영수증 서명 주소를 새로 받는다(2026-11-25). 서명 주소는 10분이라, 화면을 오래 열어 둔 뒤 사진을 열 때 쓴다.
+ * 정산서 상태와 상관없이 본인 항목이면 된다(제출 · 승인된 것도 본다).
+ */
+export async function refreshTransportReceiptUrlsAction(itemId: string): Promise<TransportReceiptUrlsResult> {
+  const session = await getCurrentAppSession();
+  if (!session || !hasOrganizationContext(session)) return { ok: false, error: "auth" };
+  const organizationId = session.organization.id;
+  const userId = session.user.id;
+  const service = getSupabaseServiceClient();
+
+  const loaded = await loadOwnItem(service, organizationId, userId, itemId);
+  if (!loaded.ok) return loaded;
+
+  const imgRes = await untyped(service)
+    .from("transport_reimbursement_item_images")
+    .select("id, storage_path, sort_order, created_at")
+    .eq("item_id", itemId)
+    .eq("organization_id", organizationId)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
+  if (imgRes.error) return { ok: false, error: "read_failed" };
+  const rows = (imgRes.data ?? []) as { id: string; storage_path: string }[];
+  const { urlByPath, failedPaths } = await signTransportReceiptPaths(
+    service,
+    rows.map((r) => r.storage_path),
+  );
+  return {
+    ok: true,
+    images: rows.map((r) => ({ id: r.id, url: urlByPath.get(r.storage_path) ?? null })),
+    imageUrlsFailed: rows.some((r) => failedPaths.has(r.storage_path) || !urlByPath.has(r.storage_path)),
+  };
 }
 
 // ── 제출 ─────────────────────────────────────────────────────────────────
@@ -490,7 +651,13 @@ export async function submitTransportReportAction(
   const targetMonthDate = monthKeyToFirstDay(targetMonth);
   if (!targetMonthDate) return { ok: false, error: "invalid_month" };
 
-  const report = await getTransportReport(service, organizationId, userId, targetMonthDate);
+  let report: Awaited<ReturnType<typeof getTransportReport>>;
+  try {
+    report = await getTransportReport(service, organizationId, userId, targetMonthDate);
+  } catch (error) {
+    console.error("[submitTransportReportAction] report read failed:", error instanceof Error ? error.message : error);
+    return { ok: false, error: "submit_failed" };
+  }
   if (!report) return { ok: false, error: "no_report" };
   if (!EDITABLE_STATUSES.has(report.status)) return { ok: false, error: "report_not_editable" };
 

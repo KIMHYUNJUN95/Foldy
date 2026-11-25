@@ -99,6 +99,12 @@ const nextConfig: NextConfig = {
         pathname: "/storage/v1/object/sign/request-images/**",
         protocol: "https",
       },
+      // 교통비 영수증 — 비공개 버킷(2026-11-25). 10분 서명 주소(`sign`)로만 열리므로 `public` 패턴은 두지 않는다.
+      {
+        hostname: SUPABASE_HOSTNAME,
+        pathname: "/storage/v1/object/sign/transport-receipts/**",
+        protocol: "https",
+      },
     ],
   },
 };

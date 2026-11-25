@@ -49,10 +49,10 @@ describe("transportDestinationRequiresMemo", () => {
  */
 describe("matchDestinationByLabel", () => {
   const destinations: TransportDestination[] = [
-    { key: "uuid-arakicho-a", label: "아라키초A", propertyId: "uuid-arakicho-a", kind: "property" },
-    { key: "uuid-takada", label: "다카다노바바", propertyId: "uuid-takada", kind: "property" },
-    { key: TRANSPORT_OFFICE_KEY, label: "사무실", propertyId: null, kind: "office" },
-    { key: TRANSPORT_OTHER_KEY, label: "기타", propertyId: null, kind: "other" },
+    { key: "uuid-arakicho-a", label: "아라키초A", canonicalLabel: "아라키초A", propertyId: "uuid-arakicho-a", kind: "property" },
+    { key: "uuid-takada", label: "다카다노바바", canonicalLabel: "다카다노바바", propertyId: "uuid-takada", kind: "property" },
+    { key: TRANSPORT_OFFICE_KEY, label: "사무실", canonicalLabel: "사무실", propertyId: null, kind: "office" },
+    { key: TRANSPORT_OTHER_KEY, label: "기타", canonicalLabel: "기타", propertyId: null, kind: "other" },
   ];
   const match = (label: string) =>
     matchDestinationByLabel(destinations, label, getCanonicalPropertyName);

@@ -1541,7 +1541,41 @@ Notes:
 {org_id}/transport-reimbursements/{report_id}/{item_id}/{file}
 ```
 
-- bucket reuse is acceptable (`request-images`) if path/RLS policy stays explicit
+- ~~bucket reuse is acceptable (`request-images`)~~ → 2026-11-25 비공개 버킷으로 옮김(아래 절).
+
+### 교통비 영수증 저장소(2026-11-25)
+
+마이그레이션 `202611250002_transport_receipts_private_bucket.sql` — **운영 미적용 — 사용자 허락 대기.**
+
+- **건물 이름은 서버가 정한다(2026-11-25)**: `createTransportItemAction` 은 직접 입력 항목의 `work_context.buildingLabel` 을 화면 값이 아니라
+  출근지에서 정한다 — 건물은 같은 조직 `properties.name` → `getCanonicalPropertyName`, 사무실 · 기타는 한국어 사전 값, 그 밖은 비움
+  (`resolveBuildingLabel`). 없는 · 다른 조직 건물은 그대로 `invalid_link`. 자동 연결은 후보 값(근태 근무지 이름 · 청소 건물 이름)을 그대로 —
+  출처는 안 바꿨다. `updateTransportItemAction` 은 `buildingLabel` 을 받지 않는다(화면도 보내지 않음). 테스트: `transport-hardening.test.ts`.
+
+- **버킷**: 새 업로드 = 비공개 `transport-receipts`(`TRANSPORT_RECEIPT_BUCKET`, `src/lib/transport-receipt-bucket.ts` — 브라우저도 쓰는 이름 상수).
+  예전 파일 = 공개 `request-images`(`LEGACY_TRANSPORT_RECEIPT_BUCKET`). 서버 도우미 `src/lib/transport-receipt-storage.ts`(server-only):
+  `signTransportReceiptPaths`(새 → 예전, 던지지 않고 `failedPaths`) · `removeTransportReceiptFiles`(두 버킷) · `transportReceiptExists`(새 → 예전, 확인 못 하면 `"error"` — 「없음」은 data:false 이면서 상태 400 · 404 일 때만, 권한 403 · 서버 5xx · 상태 없는 오류 · 이상한 응답은 `"error"` → 화면 `storage_failed`).
+- **서명 주소 10분**(`TRANSPORT_RECEIPT_URL_TTL_SECONDS = 600`) — 새어 나가도 빨리 죽는다. 오래 열어 둔 화면은 다시 받기 액션
+  `refreshTransportReceiptUrlsAction(itemId)`(근무자 본인, 상태 무관) · `refreshAdminTransportReceiptUrlsAction(itemId)`(`transport.manage`, 같은 조직).
+- **읽기 오류는 던진다**: `getTransportReport` · `getTransportItems`(사진은 `selectInChunks`). 예전엔 오류가 「정산서 없음」 · 「증빙 없음」으로 보였다.
+  호출하는 곳: 모바일 화면(오류 화면) · 관리자 패널(`reason: "error"`) · 영수증 페이지(오류 화면) · 직원별 월 상세(`transport.loadError`) ·
+  개인 급여 내보내기(`error` — 예전엔 교통비 0엔으로 나갔다) · 월 내보내기(기존 try).
+- **사진 등록**(`addTransportItemImageAction`): 경로 검사 → 파일이 정말 있는지(`file_missing` · `storage_failed`) → 고칠 수 있는 상태 →
+  같은 경로가 이미 등록돼 있으면 새 행 없이 성공(두 번 누름 · 다시 시도) → 5장 → 넣기(`sort_order` 는 DB 트리거). 동시에 넣어 유일 색인
+  `(item_id, storage_path)` 에 걸리면(`23505`) 성공으로 보고 파일은 지우지 않는다. 거절되면 그 항목 폴더의 · 아직 행이 없는 파일만 두 버킷에서 지운다.
+- **잠금 순서**: 사진 넣기 · 사진 지우기 · 항목 지우기 트리거 모두 항목 → 정산서. 남는 경우 하나 — 같은 항목의 사진 지우기와 항목 지우기가
+  같은 순간에 오면 사진 행 ↔ 항목 행이 엇갈릴 수 있다(cascade 가 항목 → 사진 순서라 피할 수 없음). Postgres 가 교착을 알아채 한쪽을 실패시키고
+  화면은 `delete_failed` 를 보인다(멈추지는 않음).
+- **허용 형식**: 버킷은 jpeg · png · webp · gif · 8MB. 화면 압축(`compressImageFile`)은 png · webp 는 그대로, 그 밖은 jpeg 로 바꾸고 gif 는 그대로 보낸다.
+  압축이 못 여는 파일(일부 heic)은 원본 그대로 가서 버킷이 거절한다.
+- **사진 · 항목 삭제**: 행 먼저 → 파일(두 버킷). DB 잠금 트리거에 걸리면(`report_not_editable`) 파일은 그대로. 파일 지우기 실패는 기록만.
+- **입력 방식 바꾸기**(`updateTransportItemAction` `entryMode`): 자동 연결 → 직접 입력만(연결 출처 · 근태 칸을 비움). 직접 → 연결은 `invalid_entry_mode`.
+- **화면에 넘기는 모양**: 모바일 `TransportImageRow.signedUrl`(string | null) · `TransportItemRow.imageUrlsFailed`, 관리자 `imageCount` · `imageUrls` · `imageUrlsFailed`.
+- **배포 순서**: 마이그레이션 → 앱 배포 → `node scripts/dev/move-transport-receipts.mjs`(미리 보기) → `--apply --prod`(운영은 허락 뒤).
+  미리 보기는 예전 버킷의 교통비 폴더도 훑어 **사진 행이 없는 예전 파일** · **새 버킷이 받지 않는 형식 · 크기**(예: heic, 8MB 초과)를 세고 앞 20개 경로를 보인다.
+  둘 다 보여 주기만 한다 — `--apply` 에서도 지우지 않고, 받지 않는 형식은 옮기지 않고 예전 버킷에 남긴다(앱은 예전 버킷으로 계속 서명). 파일 확인이
+  「없음」이 아닌 오류면 멈춘다(없는 파일로 잘못 세지 않게).
+  배포 직후 캐시된 예전 화면이 `request-images` 로 올려도 등록 · 서명 · 삭제가 된다(두 버킷을 봄). 옮기기가 끝나면 예전 버킷 쪽 코드를 걷어낼 수 있다.
 
 ### Authorization Flag
 

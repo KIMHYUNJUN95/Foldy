@@ -22,6 +22,7 @@ import {
 import { getCurrentAppSession, hasOrganizationContext, type AppSession } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { attendanceCan } from "@/lib/attendance-review";
+import { signTransportReceiptPaths } from "@/lib/transport-receipt-storage";
 import {
   getFinalizationEligibility,
   getCurrentFinalizedSnapshot,
@@ -1443,12 +1444,18 @@ async function buildUserPayrollExportData(
   if (!payView) return { ok: false, reason: "error" };
 
   const transportByDate = new Map<string, number>();
-  const report = await getTransportReport(service, organizationId, userId, firstDay).catch(() => null);
-  if (report?.status === "approved") {
-    const items = await getTransportItems(service, report.id).catch(() => []);
-    for (const item of items) {
-      transportByDate.set(item.usageDate, (transportByDate.get(item.usageDate) ?? 0) + item.amountYen);
+  // 교통비를 못 읽으면 내보내지 않는다(2026-11-25) — 예전엔 0엔으로 조용히 빠진 명세서가 나갔다.
+  try {
+    const report = await getTransportReport(service, organizationId, userId, firstDay);
+    if (report?.status === "approved") {
+      const items = await getTransportItems(service, report.id);
+      for (const item of items) {
+        transportByDate.set(item.usageDate, (transportByDate.get(item.usageDate) ?? 0) + item.amountYen);
+      }
     }
+  } catch (error) {
+    console.error("[user payroll export] transport read failed:", error instanceof Error ? error.message : error);
+    return { ok: false, reason: "error" };
   }
 
   const cleaningByDate = new Map<string, Set<string>>();
@@ -1692,7 +1699,7 @@ export async function exportMonthlyPayrollReport(
 // 이것이 존재하는 실질적인 이유다. 보고서 자체의 `status` / `reviewed_*` / `review_note`
 // 열을 쓴다.
 
-const TRANSPORT_IMAGE_BUCKET = "request-images";
+// 영수증 버킷 · 서명은 src/lib/transport-receipt-storage.ts 한 곳에서(2026-11-25).
 
 export type TransportReviewResult =
   | { ok: true; status: TransportReportStatus }
@@ -1825,8 +1832,12 @@ export type AdminTransportItemView = {
   attendanceSessionId: string | null;
   contextSummary: string;
   buildingLabel: string | null;
+  /** 등록된 사진 수 — 주소를 못 받아도 「사진 없음」과 구별한다. */
   imageCount: number;
+  /** 받은 서명 주소(10분). 못 받은 사진은 빠진다. */
   imageUrls: string[];
+  /** 사진 중 하나라도 주소를 못 받았다(2026-11-25) → 「사진을 불러오지 못했어요 · 다시 받기」. */
+  imageUrlsFailed: boolean;
 };
 
 export type AdminTransportDetailResult =
@@ -1837,7 +1848,7 @@ export type AdminTransportDetailResult =
       missingCount: number;
       linkedCount: number;
     }
-  | { ok: false; reason: "forbidden" | "not_found" | "error" };
+  | { ok: false; reason: "forbidden" | "not_found" | "error" | "invalid_month" };
 
 // ── 시급 관리 (Slice 7) ─────────────────────────────────────────
 // 기존 `hourly_rate_history` 테이블을 쓰는 권한 있는(owner / attendance_payroll_admin)
@@ -2449,21 +2460,22 @@ export async function loadAdminTransportDetail(
     return { ok: false, reason: "forbidden" };
   }
 
+  if (!isValidYm(ym)) return { ok: false, reason: "invalid_month" };
+
   const targetMonthDate = `${ym}-01`;
-  const report = await getTransportReport(service, organizationId, userId, targetMonthDate);
-  if (!report) return { ok: false, reason: "not_found" };
-  const items = await getTransportItems(service, report.id);
+  let report: TransportReportRow | null;
+  let items: TransportItemRow[];
+  try {
+    report = await getTransportReport(service, organizationId, userId, targetMonthDate);
+    if (!report) return { ok: false, reason: "not_found" };
+    items = await getTransportItems(service, report.id);
+  } catch (error) {
+    console.error("[loadAdminTransportDetail] read failed:", error instanceof Error ? error.message : error);
+    return { ok: false, reason: "error" };
+  }
 
   const allPaths = items.flatMap((it) => it.images.map((img) => img.storagePath));
-  const urlByPath = new Map<string, string>();
-  if (allPaths.length > 0) {
-    const signed = await service.storage
-      .from(TRANSPORT_IMAGE_BUCKET)
-      .createSignedUrls(allPaths, 600);
-    for (const r of signed.data ?? []) {
-      if (r.path && r.signedUrl) urlByPath.set(r.path, r.signedUrl);
-    }
-  }
+  const { urlByPath } = await signTransportReceiptPaths(service, allPaths);
 
   const views: AdminTransportItemView[] = items.map((it: TransportItemRow) => {
     const wc = it.workContext ?? {};
@@ -2480,6 +2492,7 @@ export async function loadAdminTransportDetail(
       imageUrls: it.images
         .map((img) => urlByPath.get(img.storagePath))
         .filter((u): u is string => typeof u === "string"),
+      imageUrlsFailed: it.images.some((img) => !urlByPath.has(img.storagePath)),
     };
   });
 
@@ -2487,6 +2500,54 @@ export async function loadAdminTransportDetail(
   const linkedCount = items.filter((it) => it.entryMode === "linked").length;
 
   return { ok: true, report, items: views, missingCount, linkedCount };
+}
+
+export type AdminTransportReceiptUrlsResult =
+  | { ok: true; images: Array<{ id: string; url: string | null }>; imageUrlsFailed: boolean }
+  | { ok: false; reason: "forbidden" | "not_found" | "error" };
+
+/**
+ * 한 항목의 영수증 서명 주소를 새로 받는다(2026-11-25) — 주소는 10분이라 오래 열어 둔 검토 화면에서 사진을 열 때 쓴다.
+ * `transport.manage` 권한 + 같은 조직 항목만.
+ */
+export async function refreshAdminTransportReceiptUrlsAction(
+  itemId: string,
+): Promise<AdminTransportReceiptUrlsResult> {
+  const session = await getCurrentAppSession();
+  if (!session || !hasOrganizationContext(session)) return { ok: false, reason: "error" };
+  const organizationId = session.organization.id;
+  const service = getSupabaseServiceClient();
+  if (!(await attendanceCan(service, organizationId, session.user.id, "transport.manage"))) {
+    return { ok: false, reason: "forbidden" };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = service as any;
+  const itemRes = await db
+    .from("transport_reimbursement_items")
+    .select("id, organization_id")
+    .eq("id", itemId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+  if (itemRes.error) return { ok: false, reason: "error" };
+  const item = itemRes.data as { id: string; organization_id: string } | null;
+  if (!item || item.organization_id !== organizationId) return { ok: false, reason: "not_found" };
+
+  const imgRes = await db
+    .from("transport_reimbursement_item_images")
+    .select("id, storage_path, sort_order, created_at")
+    .eq("item_id", itemId)
+    .eq("organization_id", organizationId)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
+  if (imgRes.error) return { ok: false, reason: "error" };
+  const rows = (imgRes.data ?? []) as { id: string; storage_path: string }[];
+  const { urlByPath } = await signTransportReceiptPaths(service, rows.map((r) => r.storage_path));
+  return {
+    ok: true,
+    images: rows.map((r) => ({ id: r.id, url: urlByPath.get(r.storage_path) ?? null })),
+    imageUrlsFailed: rows.some((r) => !urlByPath.has(r.storage_path)),
+  };
 }
 
 // ── 교통비 정산 — 월별 내보내기 (Excel + PDF) ───────────────────

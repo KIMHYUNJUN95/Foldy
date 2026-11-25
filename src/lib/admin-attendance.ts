@@ -37,6 +37,7 @@ import {
   needsReviewRow,
 } from "@/lib/attendance";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { signTransportReceiptPaths } from "@/lib/transport-receipt-storage";
 import {
   breakSecondsBySession,
   calculateMonthlyPay,
@@ -1528,7 +1529,7 @@ export async function getAdminAttendanceTransport(
 // (항목 목록 + 큰 영수증 영역)로, 검토자가 항목마다 따로 열지 않고
 // 한 달 영수증을 한 화면에서 넘겨볼 수 있다.
 
-const TRANSPORT_RECEIPT_BUCKET = "request-images";
+// 버킷 · 서명은 src/lib/transport-receipt-storage.ts 한 곳에서(2026-11-25 — 새 비공개 버킷 → 예전 공개 버킷).
 
 export type AdminReceiptItem = {
   itemId: string;
@@ -1536,7 +1537,12 @@ export type AdminReceiptItem = {
   amountYen: number;
   buildingLabel: string | null;
   contextLabel: string | null;
+  /** 등록된 사진 수(2026-11-25) — 주소를 못 받아도 「사진 없음」과 구별한다. */
+  imageCount: number;
+  /** 받은 서명 주소(10분). 못 받은 사진은 빠진다. */
   imageUrls: string[];
+  /** 사진 중 하나라도 주소를 못 받았다 → 화면은 「사진을 불러오지 못했어요 · 다시 받기」. */
+  imageUrlsFailed: boolean;
 };
 
 export type AdminTransportReceiptsView = {
@@ -1591,19 +1597,12 @@ export async function getAdminTransportReceiptsForUser(
     };
   }
 
+  // 읽기 오류는 던진다(2026-11-25) — 빈 달 · 「사진 없음」으로 보이지 않게 페이지 오류 화면으로 간다.
   const rawItems = await getTransportItems(service, report.id);
 
-  // 이미지 경로마다 한 번씩 서명한 뒤 항목별로 다시 매핑한다.
+  // 이미지 경로마다 한 번씩 서명한 뒤 항목별로 다시 매핑한다(새 버킷 → 예전 버킷, 실패는 failedPaths).
   const allPaths = rawItems.flatMap((it) => it.images.map((img) => img.storagePath));
-  const urlByPath = new Map<string, string>();
-  if (allPaths.length > 0) {
-    const signed = await service.storage
-      .from(TRANSPORT_RECEIPT_BUCKET)
-      .createSignedUrls(allPaths, 600);
-    for (const r of (signed.data ?? []) as { path: string | null; signedUrl: string | null }[]) {
-      if (r.path && r.signedUrl) urlByPath.set(r.path, r.signedUrl);
-    }
-  }
+  const { urlByPath } = await signTransportReceiptPaths(service, allPaths);
 
   const items: AdminReceiptItem[] = rawItems.map((it) => {
     const wc = it.workContext ?? {};
@@ -1616,9 +1615,11 @@ export async function getAdminTransportReceiptsForUser(
         const label = wc.contextSummary ?? wc.taskLabel ?? wc.roomLabel ?? null;
         return label ? localizeStoredPlaceText(label, localeTag) : null;
       })(),
+      imageCount: it.images.length,
       imageUrls: it.images
         .map((img) => urlByPath.get(img.storagePath))
         .filter((u): u is string => typeof u === "string"),
+      imageUrlsFailed: it.images.some((img) => !urlByPath.has(img.storagePath)),
     };
   });
 
@@ -1688,6 +1689,8 @@ export type AdminStaffDetailData = {
     linkedCount: number;
     missingCount: number;
     totalAmount: number;
+    /** 교통비를 못 읽었다(2026-11-25) — 0건 · 「없음」으로 보이지 않게 화면이 「불러오지 못했어요」를 보인다. */
+    loadError: boolean;
   };
   /** 급여 칸(금액 · 시급)을 보여도 되는가 — `payroll.view`. 없으면 pay 는 근무 시간만 채운다. */
   canSeePay: boolean;
@@ -1784,6 +1787,7 @@ export async function getAdminStaffDetail(
       linkedCount: 0,
       missingCount: 0,
       totalAmount: 0,
+      loadError: false,
     },
     canSeePay: false,
     canSeeTransport: false,
@@ -1796,7 +1800,7 @@ export async function getAdminStaffDetail(
   const targetMonthDate = `${ym}-01`;
 
   // 권한 · 멤버 · 이름 · 그 달 급여 입력 · 교통비 신청서를 한 번에 시작한다. 결과는 권한 확인 뒤에만 쓴다.
-  const [caps, memberRes, profileRes, base, trReport] = await Promise.all([
+  const [caps, memberRes, profileRes, base, trReportRead] = await Promise.all([
     attendanceCapabilities(service, organizationId, session.user.id),
     service
       .from("memberships")
@@ -1806,8 +1810,17 @@ export async function getAdminStaffDetail(
       .maybeSingle(),
     service.from("profiles").select("name").eq("id", userId).maybeSingle(),
     loadPayrollMonthBase(service, organizationId, ym, userId),
-    getTransportReport(service, organizationId, userId, targetMonthDate).catch(() => null),
+    // 읽기 오류는 「없음」과 따로 표시한다(2026-11-25) — 예전엔 .catch(() => null) 로 「신청서 없음」이 됐다.
+    getTransportReport(service, organizationId, userId, targetMonthDate).then(
+      (report) => ({ report, failed: false as const }),
+      (error: unknown) => {
+        console.error("[getAdminStaffMonthDetail] transport report read failed:", error instanceof Error ? error.message : error);
+        return { report: null, failed: true as const };
+      },
+    ),
   ]);
+  const trReport = trReportRead.report;
+  let trLoadError = trReportRead.failed;
   // 근태 관리 또는 급여 보기 중 하나면 연다. 금액(급여 칸)은 급여 보기, 교통비 칸은 교통비 처리 권한이 있을 때만 채운다(2026-10-21).
   const canSeePay = caps.includes("payroll.view");
   const canSeeTransport = caps.includes("transport.manage");
@@ -1834,7 +1847,13 @@ export async function getAdminStaffDetail(
           .eq("organization_id", organizationId)
           .in("id", siteIds)
       : Promise.resolve({ data: [] as (AttendanceSiteDisplayRow & { id: string })[] }),
-    trReport ? getTransportItems(service, trReport.id).catch(() => []) : Promise.resolve([]),
+    trReport
+      ? getTransportItems(service, trReport.id).catch((error: unknown) => {
+          console.error("[getAdminStaffMonthDetail] transport items read failed:", error instanceof Error ? error.message : error);
+          trLoadError = true;
+          return [];
+        })
+      : Promise.resolve([]),
   ]);
 
   const { pay: payView, finalized } = computePayrollMonth(
@@ -1951,6 +1970,7 @@ export async function getAdminStaffDetail(
           linkedCount: trLinkedCount,
           missingCount: trMissingCount,
           totalAmount: trTotal,
+          loadError: trLoadError,
         }
       : baseEmpty.transport,
     canSeeTransport,

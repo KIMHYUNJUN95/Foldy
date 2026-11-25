@@ -23,6 +23,7 @@ import {
   exportMonthlyTransportReport,
   exportMonthlyTransportWorkbook,
   loadAdminTransportDetail,
+  refreshAdminTransportReceiptUrlsAction,
   setTransportReportReview,
   type AdminTransportDetailResult,
   type AdminTransportItemView,
@@ -31,6 +32,7 @@ import { AdminExportButtons } from "../shared/admin-export-buttons";
 import { AdminReasonModal } from "../shared/admin-reason-modal";
 import { AdminUndoToast } from "../shared/admin-undo-toast";
 import { ImageLightbox } from "@/components/shell/image-lightbox";
+import { receiptEvidenceState } from "@/lib/transport-receipt-ui";
 import { useAdminPanelA11y } from "../shared/use-admin-panel-a11y";
 import {
   adminTransportStatusPill,
@@ -301,6 +303,7 @@ export function AttendanceTransportClient({
           advanced={advanced}
           onClose={() => openPanel(null)}
           onApproved={handleApproved}
+          onToast={showToast}
           onStatusChange={(userId, status, msg) => {
             applyStatus(userId, status);
             showToast(msg);
@@ -340,6 +343,7 @@ function TransportPanel({
   onClose,
   onApproved,
   onStatusChange,
+  onToast,
 }: {
   ym: string;
   monthLabel: string;
@@ -350,6 +354,7 @@ function TransportPanel({
   onClose: () => void;
   onApproved: (row: AdminTransportRow, reportId: string) => void;
   onStatusChange: (userId: string, status: TransportReportStatus, toast: string) => void;
+  onToast: (msg: string) => void;
 }) {
   const [detail, setDetail] = useState<AdminTransportDetailResult | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -372,7 +377,8 @@ function TransportPanel({
         if (cancelled) return;
         setDetail(res);
         if (!res.ok && res.reason !== "not_found") {
-          setErr(c.trActionLoadFailed);
+          // 월 값이 잘못된 것(invalid_month)과 그 밖의 읽기 실패(forbidden · error)는 문구를 나눈다.
+          setErr(res.reason === "invalid_month" ? c.trDetailInvalidMonth : c.trActionLoadFailed);
         }
       })
       .catch(() => {
@@ -381,7 +387,7 @@ function TransportPanel({
     return () => {
       cancelled = true;
     };
-  }, [row.userId, ym, c.trActionLoadFailed]);
+  }, [row.userId, ym, c.trActionLoadFailed, c.trDetailInvalidMonth]);
 
   const pill = adminTransportStatusPill(row.status, c);
   const detailOk = detail && detail.ok ? detail : null;
@@ -393,6 +399,37 @@ function TransportPanel({
 
   // 항목 전체의 영수증 URL(평면) → 공용 ImageLightbox 캐러셀; URL 인덱스로 연다.
   const allReceiptUrls = items.flatMap((it) => it.imageUrls);
+  // 주소는 10분 — 못 받았거나 깨진 항목은 다시 받는다.
+  const [retrying, setRetrying] = useState<string | null>(null);
+  const retryItem = (itemId: string) => {
+    setRetrying(itemId);
+    refreshAdminTransportReceiptUrlsAction(itemId)
+      .then((res) => {
+        if (!res.ok) {
+          onToast(c.trReceiptRefreshFailed);
+          return;
+        }
+        setDetail((prev) =>
+          prev && prev.ok
+            ? {
+                ...prev,
+                items: prev.items.map((it) =>
+                  it.id === itemId
+                    ? {
+                        ...it,
+                        imageCount: res.images.length,
+                        imageUrls: res.images.flatMap((i) => (i.url ? [i.url] : [])),
+                        imageUrlsFailed: res.imageUrlsFailed,
+                      }
+                    : it,
+                ),
+              }
+            : prev,
+        );
+      })
+      .catch(() => onToast(c.trReceiptRefreshFailed))
+      .finally(() => setRetrying(null));
+  };
   const openImage = (url: string) => {
     const idx = allReceiptUrls.indexOf(url);
     if (idx >= 0) setLightboxIndex(idx);
@@ -573,7 +610,7 @@ function TransportPanel({
                   ) : null}
                 </div>
                 {items.length === 0 ? (
-                  <div className="locknote">{c.trItemNoEvidence}</div>
+                  <div className="locknote">{c.trReceiptEmptyNoItems}</div>
                 ) : (
                   <>
                     <div
@@ -587,6 +624,8 @@ function TransportPanel({
                           c={c}
                           localeTag={localeTag}
                           onOpenImage={openImage}
+                          onRetry={retryItem}
+                          retrying={retrying === it.id}
                         />
                       ))}
                       {itemsCollapsible && !itemsExpanded ? (
@@ -779,15 +818,28 @@ function TransportItemRow({
   c,
   localeTag,
   onOpenImage,
+  onRetry,
+  retrying,
 }: {
   item: AdminTransportItemView;
   c: Att;
   localeTag: string;
   onOpenImage: (url: string) => void;
+  onRetry: (itemId: string) => void;
+  retrying: boolean;
 }) {
-  const missing = item.imageCount === 0;
-  const thumbs = item.imageUrls.slice(0, 2);
-  const extra = item.imageUrls.length - thumbs.length;
+  // 깨진 그림(onError)은 이 줄에서만 빼고 「불러오지 못함」으로 본다.
+  const [brokenUrls, setBrokenUrls] = useState<Set<string>>(() => new Set());
+  const urls = item.imageUrls.filter((u) => !brokenUrls.has(u));
+  const state = receiptEvidenceState({
+    imageCount: item.imageCount,
+    imageUrlsFailed: item.imageUrlsFailed,
+    usableUrlCount: urls.length,
+  });
+  // 「증빙 누락」은 붙은 사진이 0장일 때만.
+  const missing = state === "missing";
+  const thumbs = urls.slice(0, 2);
+  const extra = urls.length - thumbs.length;
   return (
     <div className="trp-row">
       <span className="trp-row__d">{shortMd(item.usageDate)}</span>
@@ -799,19 +851,50 @@ function TransportItemRow({
         <span className="trp-row__miss">{c.trPanelMissingTag}</span>
       ) : (
         <span className="trthumbs">
+          {state === "failed" ? (
+            <span className="trp-row__miss trp-row__miss--wrap" role="alert">
+              {c.trReceiptLoadFailed}{" "}
+              <button
+                type="button"
+                className="chipbtn"
+                disabled={retrying}
+                onClick={() => {
+                  setBrokenUrls(new Set());
+                  onRetry(item.id);
+                }}
+              >
+                {c.trReceiptRetry}
+              </button>
+            </span>
+          ) : null}
           {thumbs.map((u, i) => (
             <button
               key={i}
               type="button"
               className="trthumb"
               onClick={() => onOpenImage(u)}
-              aria-label={c.trPanelEvidenceCount(item.imageCount)}
+              aria-label={c.trReceiptThumbAria
+                .replace("{n}", String(i + 1))
+                .replace("{total}", String(urls.length))
+                .replace("{date}", shortMd(item.usageDate))
+                .replace("{amount}", `${c.yenSym}${formatAdminYen(item.amountYen, localeTag)}`)}
             >
-              <Image src={u} alt="" width={28} height={28} />
+              <Image
+                src={u}
+                alt=""
+                width={28}
+                height={28}
+                onError={() => setBrokenUrls((prev) => new Set(prev).add(u))}
+              />
             </button>
           ))}
           {extra > 0 ? (
-            <button type="button" className="trthumb trthumb--more" onClick={() => onOpenImage(item.imageUrls[thumbs.length])}>
+            <button
+              type="button"
+              className="trthumb trthumb--more"
+              aria-label={extra === 1 ? c.trPanelMoreAriaOne : c.trPanelMoreAria.replace("{n}", String(extra))}
+              onClick={() => onOpenImage(urls[thumbs.length])}
+            >
               +{extra}
             </button>
           ) : null}

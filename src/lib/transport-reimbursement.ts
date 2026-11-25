@@ -61,6 +61,8 @@ export type TransportImageRow = {
   storagePath: string;
   sortOrder: number;
   createdAt: string;
+  /** 서버가 붙인 10분짜리 서명 주소(2026-11-25). 못 받았으면 null, 아직 서명하지 않았으면 없음. */
+  signedUrl?: string | null;
 };
 
 export type TransportItemWorkContext = {
@@ -88,6 +90,8 @@ export type TransportItemRow = {
   updatedAt: string;
   imageCount: number;
   images: TransportImageRow[];
+  /** 사진 중 하나라도 서명 주소를 못 받았다(2026-11-25). 서명한 화면에서만 채운다. */
+  imageUrlsFailed?: boolean;
 };
 
 export type LinkedTransportCandidate = {
@@ -220,6 +224,8 @@ export async function getTransportReport(
     .eq("user_id", userId)
     .eq("target_month", targetMonthDate)
     .maybeSingle();
+  // 읽기 오류는 던진다(2026-11-25) — 「정산서 없음」(null)과 섞이면 빈 달로 보이거나 새 정산서를 또 만들려 든다.
+  if (res.error) throw new Error(`transport report read failed: ${res.error.message}`);
   if (!res.data) return null;
   return mapReport(res.data as ReportDbRow);
 }
@@ -238,16 +244,23 @@ export async function getTransportItems(
     .eq("report_id", reportId)
     .order("usage_date", { ascending: true })
     .order("sort_order", { ascending: true });
+  // 읽기 오류는 던진다(2026-11-25) — 빈 목록 · 「증빙 없음」으로 보이면 사진이 사라진 것처럼 보인다.
+  if (itemsRes.error) throw new Error(`transport items read failed: ${itemsRes.error.message}`);
   const itemRows = (itemsRes.data ?? []) as ItemDbRow[];
   if (itemRows.length === 0) return [];
 
   const itemIds = itemRows.map((r) => r.id);
-  const imagesRes = await untyped(service)
-    .from("transport_reimbursement_item_images")
-    .select("id, item_id, storage_path, sort_order, created_at")
-    .in("item_id", itemIds)
-    .order("sort_order", { ascending: true });
-  const imageRows = (imagesRes.data ?? []) as ImageDbRow[];
+  const imageRows = await selectInChunks<ImageDbRow>(
+    itemIds,
+    (chunk) =>
+      untyped(service)
+        .from("transport_reimbursement_item_images")
+        .select("id, item_id, storage_path, sort_order, created_at")
+        .in("item_id", chunk)
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true }),
+    "transport item images",
+  );
 
   const imagesByItem = new Map<string, TransportImageRow[]>();
   for (const img of imageRows) {

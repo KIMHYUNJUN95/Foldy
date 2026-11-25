@@ -24,7 +24,11 @@ beforeEach(() => {
       { id: "att-other", organization_id: ORG, user_id: "user-2", operating_date: "2026-11-05", status: "approved" },
     ],
     cleaning_sessions: [{ id: "cl-1", organization_id: ORG, staff_user_id: USER, cleaning_date: "2026-11-06" }],
-    properties: [{ id: "prop-1", organization_id: ORG }],
+    properties: [
+      { id: "prop-1", organization_id: ORG },
+      { id: "prop-a", organization_id: ORG, name: "Arakicho A" },
+      { id: "prop-other-org", organization_id: "org-2", name: "Kabukicho" },
+    ],
     transport_reimbursement_reports: [],
     transport_reimbursement_items: [],
     transport_reimbursement_item_images: [],
@@ -92,6 +96,63 @@ describe("createTransportItemAction — 자동 연결(H2)", () => {
     const item = fake.tables.transport_reimbursement_items[0];
     expect(item.attendance_session_id).toBeNull();
     expect(item.work_context).not.toHaveProperty("linkedSourceType");
+  });
+});
+
+describe("건물 이름은 서버가 정한다 — 화면이 보낸 이름을 믿지 않는다(2026-11-25)", () => {
+  const manual = { targetMonth: "2026-11", amountYen: 400, entryMode: "manual" as const, usageDate: "2026-11-05" };
+  const label = () => (fake.tables.transport_reimbursement_items[0].work_context as Record<string, string>).buildingLabel;
+
+  it("건물: 다른 언어 이름을 보내도 정규(한국어) 이름으로 저장한다", async () => {
+    const { createTransportItemAction } = await import("@/app/mobile/attendance/transport/actions");
+    const res = await createTransportItemAction({ ...manual, propertyId: "prop-a", destinationKey: "prop-a", buildingLabel: "荒木町A" });
+    expect(res.ok).toBe(true);
+    expect(label()).toBe("아라키초A");
+  });
+
+  it("건물: 엉뚱한 이름을 보내도 정규 이름으로 저장한다", async () => {
+    const { createTransportItemAction } = await import("@/app/mobile/attendance/transport/actions");
+    await createTransportItemAction({ ...manual, propertyId: "prop-a", destinationKey: "prop-a", buildingLabel: "남의 집" });
+    expect(label()).toBe("아라키초A");
+  });
+
+  it("사무실 · 기타: 정규 이름(사무실 · 기타)으로 저장한다", async () => {
+    const { createTransportItemAction } = await import("@/app/mobile/attendance/transport/actions");
+    await createTransportItemAction({ ...manual, destinationKey: "office", buildingLabel: "Office" });
+    await createTransportItemAction({ ...manual, destinationKey: "other", buildingLabel: "아무거나", memo: "택시" });
+    const labels = fake.tables.transport_reimbursement_items.map(
+      (i) => (i.work_context as Record<string, string>).buildingLabel,
+    );
+    expect(labels).toEqual(["사무실", "기타"]);
+  });
+
+  it("출근지가 없으면 화면이 보낸 이름을 저장하지 않는다", async () => {
+    const { createTransportItemAction } = await import("@/app/mobile/attendance/transport/actions");
+    expect((await createTransportItemAction({ ...manual, buildingLabel: "가짜 건물" })).ok).toBe(true);
+    expect(label()).toBeUndefined();
+  });
+
+  it("다른 조직 · 없는 건물은 지금처럼 거절한다", async () => {
+    const { createTransportItemAction } = await import("@/app/mobile/attendance/transport/actions");
+    for (const propertyId of ["prop-other-org", "prop-missing"]) {
+      expect(await createTransportItemAction({ ...manual, propertyId, buildingLabel: "아라키초A" })).toEqual({
+        ok: false,
+        error: "invalid_link",
+      });
+    }
+    expect(fake.tables.transport_reimbursement_items).toHaveLength(0);
+  });
+
+  it("수정 액션은 건물 이름을 바꾸지 않는다(출근지는 수정에서 못 바꾼다)", async () => {
+    const { createTransportItemAction, updateTransportItemAction } = await import(
+      "@/app/mobile/attendance/transport/actions"
+    );
+    const created = await createTransportItemAction({ ...manual, propertyId: "prop-a", destinationKey: "prop-a" });
+    if (!created.ok) throw new Error("create failed");
+    expect(
+      await updateTransportItemAction({ itemId: created.itemId, buildingLabel: "가짜 건물" } as never),
+    ).toEqual({ ok: true });
+    expect(label()).toBe("아라키초A");
   });
 });
 

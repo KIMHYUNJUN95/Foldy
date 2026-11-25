@@ -997,6 +997,21 @@ Storage `request-images` 삭제: 교통비 경로는 본인 또는 `transport.ma
 (예전엔 같은 조직 구성원 누구나 지울 수 있었다). 서버 규칙: 연차 자기 승인 금지(`self_approval`), 교통비 자기 정산서 처리 금지(`self_review`),
 기준 잔여 본인 확인 금지(`self_confirm`).
 
+**2026-11-25 (`202611250002`, 운영 미적용 — 사용자 허락 대기) — 교통비 영수증 비공개 버킷.** 예전엔 공개 버킷 `request-images` 라 주소만 알면
+누구나 영수증을 볼 수 있었고, 올리기 정책은 경로 모양 · 조직 구성원만 봐서 남의 정산서 폴더 · 제출된 정산서 폴더에도 올릴 수 있었다.
+- 새 버킷 `transport-receipts`(**public = false**). `authenticated` 에는 **올리기(INSERT) 정책만** 있다 — 경로 5단계 · 안전한 파일 이름 ·
+  활성 구성원 · 그 보고서와 항목이 **본인 것 · 같은 조직 · 짝이 맞고 · 고칠 수 있는 상태**(draft · rejected · changes_requested)일 때만.
+  읽기 · 지우기 정책은 없다 → 보기는 서버(service_role)가 만든 10분 서명 주소로만, 지우기는 서버만.
+- `request-images` 의 교통비 올리기 정책(「org members can upload transport reimbursement images」)도 같은 조건으로 좁혔다(배포 직후 예전 화면이
+  예전 버킷으로 올려도 남의 폴더 · 잠긴 정산서에는 못 올리게). platform admin 가지는 뺐다.
+- `request-images` 의 교통비 **지우기** 정책(「org members can delete transport reimbursement images」, 202611110002)은 **버렸다**(다시 만들지 않음).
+  올린 사람 · `transport.manage` 가 정산서 상태와 상관없이 지울 수 있어, 제출 · 승인된 정산서의 영수증 파일을 브라우저에서 바로 지울 수 있었다.
+  앱은 브라우저에서 교통비 파일을 지우지 않는다 — 지우기는 서버(service_role, `removeTransportReceiptFiles`)만. 연차 증빙 지우기 정책 ·
+  다른 기능의 `request-images` 지우기 정책(4칸 경로)은 그대로다.
+- 트리거 함수 3개(`guard_transport_item_image_insert` · `guard_transport_item_image_delete` · `guard_transport_item_delete`)는 security invoker,
+  `public` · `anon` · `authenticated` 실행 회수. 잠금 순서는 셋 다 항목 → 정산서(교착 방지). 사진 행 `(item_id, storage_path)` 유일 색인.
+  시험 `transport-receipts-private-bucket.test.ts`(PGlite, 실제 역할로 — 예전 지우기 정책을 넣어 두고 지우기가 막히는지 · 겹친 행 정리 · 다시 돌리기까지).
+
 **Membership permission overrides — implemented (schema 2026-07-09; UI/actions/enforcement 2026-07-13).**
 `membership_permission_overrides` is **read-only RLS, no write policies** (same service-role write
 boundary as attendance/transport/annual-leave above). Single SELECT policy
@@ -1194,7 +1209,7 @@ Update/delete:
 **스토리지 RLS**
 - `request-images`: `board-posts` / `board-comments` 폴더 추가 (part_time_staff 허용). `202606250001_board.sql`에서 "org members can upload/delete request images" 정책 재생성.
 - `board-attachments` (새 버킷, private): org 멤버 SELECT·INSERT; 업로드한 본인만 DELETE (owner = auth.uid()).
-- `request-images`: 교통비 증빙용 **5단계 경로** 정책 추가 (`202606260001_transport_reimbursement.sql`). 경로 `{org}/transport-reimbursements/{report_id}/{item_id}/{file}`. 기존 정책은 4단계 경로를 강제하므로, "org members can upload/delete transport reimbursement images" 정책을 별도로 추가 (permissive 정책은 OR 결합 → 4단계·5단계 공존). org_id·report_id·item_id 모두 UUID 형식 검증, 활성 org 멤버(part_time_staff 포함) 또는 platform admin 허용.
+- `request-images`: 교통비 증빙용 **5단계 경로** 정책 추가 (`202606260001_transport_reimbursement.sql`). 경로 `{org}/transport-reimbursements/{report_id}/{item_id}/{file}`. 기존 정책은 4단계 경로를 강제하므로, "org members can upload/delete transport reimbursement images" 정책을 별도로 추가 (permissive 정책은 OR 결합 → 4단계·5단계 공존). org_id·report_id·item_id 모두 UUID 형식 검증, 활성 org 멤버(part_time_staff 포함) 또는 platform admin 허용. **(2026-11-25 `202611250002`: 올리기는 본인 · 고칠 수 있는 정산서로 좁히고, 지우기 정책은 버림 — 위 「교통비 영수증 비공개 버킷」.)**
 
 ## bug_reports
 

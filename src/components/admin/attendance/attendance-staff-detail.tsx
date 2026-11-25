@@ -163,8 +163,14 @@ export function AttendanceStaffDetail({
           {data.canSeeTransport ? (
             <div className="uhead__stat">
               <div className="uhead__sv">
-                {c.yenSym}
-                {formatAdminYen(data.transport.totalAmount, localeTag)}
+                {data.transport.loadError ? (
+                  c.trLoadFailedValue
+                ) : (
+                  <>
+                    {c.yenSym}
+                    {formatAdminYen(data.transport.totalAmount, localeTag)}
+                  </>
+                )}
               </div>
               <div className="uhead__sk">{c.staffStatTransport}</div>
             </div>
@@ -371,6 +377,12 @@ export function AttendanceStaffDetail({
             </div>
           </div>
           <div className="card__body" style={{ paddingTop: 6 }}>
+            {data.transport.loadError ? (
+              <div className="locknote" role="alert">
+                {c.trLoadFailedValue}
+              </div>
+            ) : (
+              <>
             <div className="psum">
               <span className="psum__amt">
                 <span className="yen">{c.yenSym}</span>
@@ -403,6 +415,8 @@ export function AttendanceStaffDetail({
                 </span>
               </div>
             </div>
+              </>
+            )}
           </div>
         </div>
         ) : null}

@@ -369,6 +369,7 @@
 /* 영수증 썸네일 */
 .trn-shots {
   display: flex;
+  flex-wrap: wrap; /* 5장 + 추가 버튼이 좁은 폭 · 큰 글씨에서도 줄바꿈으로 버틴다 */
   gap: 8px;
 }
 .trn-shot {
@@ -402,6 +403,106 @@
 .trn-shot-add svg {
   width: 18px;
   height: 18px;
+}
+/* 사진 한 칸 — 실제 썸네일(2026-11-25). 칸 전체가 「크게 보기」 버튼이고, 지우기 버튼이 오른쪽 위에 얹힌다. */
+.trn-shot-wrap {
+  position: relative;
+  width: 60px;
+  flex: none;
+  transition:
+    width 260ms var(--ease-out),
+    margin 260ms var(--ease-out),
+    opacity 200ms ease;
+}
+/* 지우는 중 — 옆 사진이 당겨 오도록 폭이 0 으로, 안쪽도 같이 줄고(폭 100%) 흐려진다. 가려야 하니 이때만 overflow 를 자른다. */
+.trn-shot-wrap[data-leaving] {
+  width: 0;
+  margin-inline-end: -8px; /* 사이 간격(gap 8px)까지 접는다 */
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.trn-shot img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.trn-shot-open {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.trn-shot-x {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(20 24 32 / 0.66);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.trn-shot-x::after {
+  content: "";
+  position: absolute;
+  inset: -8px; /* 눌리는 자리를 40px 쯤으로 */
+}
+.trn-shot-x svg {
+  width: 12px;
+  height: 12px;
+}
+/* 사진을 못 불러왔을 때 — 칸 안 다시 불러오기 */
+.trn-shot-fail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  min-height: 60px;
+  padding: 6px;
+  border: 1.5px dashed var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--miss);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.35;
+}
+.trn-shot-fail button {
+  border: 0;
+  background: none;
+  padding: 2px 6px;
+  font: inherit;
+  font-weight: 800;
+  color: var(--att-primary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.trn-shot-fail--wide {
+  flex: 1 1 100%;
+}
+.trn-shot-note {
+  margin-top: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--att-muted);
+}
+.trn-seg button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 .trn-hint {
   font-size: 10.5px;
@@ -475,9 +576,31 @@
 }
 /* 영수증 사진 띠 */
 .trn-dshots {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
   gap: 8px;
   margin-bottom: 6px;
+}
+.trn-dshots > .trn-shot-fail {
+  grid-column: 1 / -1;
+  min-height: 96px;
+}
+.trn-dshot img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.trn-dshot-open {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
 }
 .trn-dshot {
   position: relative;

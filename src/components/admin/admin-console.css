@@ -2929,6 +2929,8 @@
 .adm .panel .trp-row__t { color: #16141f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .adm .panel .trp-row__s { font-size: 12px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .adm .panel .trp-row__miss { font-size: 12px; font-weight: 600; color: #c5282e; white-space: nowrap; }
+/* 불러오지 못함 + 다시 불러오기 — ja/en 에서 길어지므로 줄바꿈을 허용한다(누락 태그는 위 규칙 그대로). */
+.adm .panel .trp-row__miss.trp-row__miss--wrap { white-space: normal; display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; justify-content: flex-end; text-align: right; }
 .adm .panel .trp-row__v { font-weight: 600; color: #16141f; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .adm .panel .trp-row .trthumb { width: 28px; height: 28px; }
 .adm .panel .trp-items-h { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }

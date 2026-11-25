@@ -3,10 +3,13 @@
 /* eslint-disable @next/next/no-img-element */
 
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, ExternalLink, ImageOff, Receipt, X } from "lucide-react";
 import type { AdminReceiptItem, AdminTransportReceiptsView } from "@/lib/admin-attendance";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import { refreshAdminTransportReceiptUrlsAction } from "@/app/admin/attendance/actions";
+import { useBodyScrollLock } from "@/components/shell/use-body-scroll-lock";
+import { receiptEvidenceState } from "@/lib/transport-receipt-ui";
 import { adminTransportStatusPill } from "../shared/admin-format";
 import "@/components/admin/admin-console.css";
 import "@/components/admin/shared/adm-dropdown.css";
@@ -41,30 +44,123 @@ export function TransportReceiptView({
   const yen = useCallback((n: number) => `${c.yenSym}${nf.format(n)}`, [c.yenSym, nf]);
   const pill = adminTransportStatusPill(data.reportStatus, c);
 
+  // 서명 주소는 10분 — 다시 받으면 항목별로 갈아 끼운다. 그림이 깨진 주소는 `broken` 에 모아 「불러오지 못함」으로 본다.
+  const [items, setItems] = useState<AdminReceiptItem[]>(data.items);
+  const [broken, setBroken] = useState<Set<string>>(() => new Set());
+  const [refreshing, setRefreshing] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ id: number; msg: string } | null>(null);
+  const itemsRef = useRef(items);
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+  useEffect(() => {
+    if (!notice) return;
+    const t = window.setTimeout(() => setNotice(null), 2400);
+    return () => window.clearTimeout(t);
+  }, [notice]);
+  // 서버가 새 목록을 주면(달 바꾸기 · 새로고침) 렌더 중에 맞춘다 — 효과 안 setState 를 피한다.
+  const [seenItems, setSeenItems] = useState(data.items);
+  if (seenItems !== data.items) {
+    setSeenItems(data.items);
+    setItems(data.items);
+    setBroken(new Set());
+  }
+
+  const refreshItem = useCallback(async (itemId: string) => {
+    setRefreshing(itemId);
+    try {
+      const res = await refreshAdminTransportReceiptUrlsAction(itemId).catch(() => null);
+      if (!res || !res.ok) {
+        setNotice((prev) => ({ id: (prev?.id ?? 0) + 1, msg: c.trReceiptRefreshFailed }));
+        return;
+      }
+      const old = itemsRef.current.find((it) => it.itemId === itemId);
+      setItems((prev) =>
+        prev.map((it) =>
+          it.itemId === itemId
+            ? {
+                ...it,
+                imageCount: res.images.length,
+                imageUrls: res.images.flatMap((i) => (i.url ? [i.url] : [])),
+                imageUrlsFailed: res.imageUrlsFailed,
+              }
+            : it,
+        ),
+      );
+      // 이 항목의 옛 주소만 깨짐 목록에서 뺀다 — 다른 항목의 표시는 그대로.
+      if (old) {
+        const gone = new Set(old.imageUrls);
+        setBroken((prev) => new Set([...prev].filter((u) => !gone.has(u))));
+      }
+    } finally {
+      setRefreshing(null);
+    }
+  }, [c.trReceiptRefreshFailed]);
+
   // 모든 영수증 사진을 순서 있는 하나의 시퀀스로 펼쳐 그리드 + 포커스 탐색에 쓴다.
   const photos = useMemo<PhotoCell[]>(
     () =>
-      data.items.flatMap((item) =>
-        item.imageUrls.map((url, k) => ({
-          url,
-          item,
-          photoNo: k + 1,
-          photoCount: item.imageUrls.length,
-        })),
-      ),
-    [data.items],
+      items.flatMap((item) => {
+        const urls = item.imageUrls.filter((u) => !broken.has(u));
+        return urls.map((url, k) => ({ url, item, photoNo: k + 1, photoCount: urls.length }));
+      }),
+    [items, broken],
   );
-  const missingItems = useMemo(
-    () => data.items.filter((it) => it.imageUrls.length === 0),
-    [data.items],
+  // 「누락」은 붙은 사진이 0장일 때만. 사진은 있는데 주소를 못 받았거나 깨진 것은 「불러오지 못함」(다시 받기).
+  const evidence = useMemo(
+    () =>
+      items.map((it) => ({
+        item: it,
+        state: receiptEvidenceState({
+          imageCount: it.imageCount,
+          imageUrlsFailed: it.imageUrlsFailed,
+          usableUrlCount: it.imageUrls.filter((u) => !broken.has(u)).length,
+        }),
+      })),
+    [items, broken],
   );
+  const missingItems = evidence.filter((e) => e.state === "missing").map((e) => e.item);
+  const failedItems = evidence.filter((e) => e.state === "failed").map((e) => e.item);
 
   const [focusIdx, setFocusIdx] = useState<number | null>(null);
-  const [zoom, setZoom] = useState(false);
+  // 확대는 「어느 사진을 확대했나」로 둔다 — 다른 사진으로 넘기면 저절로 풀린다.
+  const [zoomIdx, setZoomIdx] = useState<number | null>(null);
+  const zoom = focusIdx !== null && zoomIdx === focusIdx;
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  // 사진이 줄어(깨짐 · 다시 받기) 가리키던 자리가 사라지면 겹침 · 잠금도 같이 끝난다.
+  useBodyScrollLock(focusIdx !== null && photos[focusIdx] !== undefined);
+
+  const closeFocus = useCallback(() => setFocusIdx(null), []);
+
+  // 사진이 줄어 가리키던 자리가 사라지면 마지막 사진으로 당기고, 하나도 없으면 닫는다(렌더 중 맞춤).
+  if (focusIdx !== null && photos[focusIdx] === undefined) {
+    setFocusIdx(photos.length > 0 ? photos.length - 1 : null);
+  }
+  // 닫히면(직접 · 사진이 모두 사라져서) 눌렀던 썸네일로 포커스를 돌려준다.
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (focusIdx !== null) {
+      wasOpen.current = true;
+    } else if (wasOpen.current) {
+      wasOpen.current = false;
+      returnFocusRef.current?.focus();
+    }
+  }, [focusIdx]);
+
+  const thumbLabel = useCallback(
+    (cell: PhotoCell, i: number) =>
+      c.trReceiptThumbAria
+        .replace("{n}", String(i + 1))
+        .replace("{total}", String(photos.length))
+        .replace("{date}", fmtDate(cell.item.usageDate, localeTag))
+        .replace("{amount}", yen(cell.item.amountYen)),
+    [c.trReceiptThumbAria, photos.length, localeTag, yen],
+  );
 
   const move = useCallback(
     (delta: number) => {
-      setZoom(false);
       setFocusIdx((i) => {
         if (i === null) return i;
         return Math.min(photos.length - 1, Math.max(0, i + delta));
@@ -76,13 +172,35 @@ export function TransportReceiptView({
   useEffect(() => {
     if (focusIdx === null) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setFocusIdx(null);
+      if (e.key === "Escape") closeFocus();
       else if (e.key === "ArrowLeft") move(-1);
       else if (e.key === "ArrowRight") move(1);
+      else if (e.key === "Tab") {
+        // 포커스 가두기 — 대화상자 안의 버튼 · 링크만 돈다.
+        const nodes = dialogRef.current?.querySelectorAll<HTMLElement>("button:not([disabled]), a[href]");
+        if (!nodes || nodes.length === 0) return;
+        const first = nodes[0];
+        const last = nodes[nodes.length - 1];
+        const active = document.activeElement;
+        if (e.shiftKey && (active === first || !dialogRef.current?.contains(active))) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && (active === last || !dialogRef.current?.contains(active))) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [focusIdx, move]);
+  }, [focusIdx, move, closeFocus]);
+
+  // 열리면 닫기 버튼으로 포커스를 옮긴다.
+  useEffect(() => {
+    if (focusIdx === null) return;
+    closeBtnRef.current?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 처음 열릴 때만(←/→ 로 넘길 때는 그대로)
+  }, [focusIdx === null]);
 
   const focus = focusIdx !== null ? photos[focusIdx] : null;
 
@@ -93,7 +211,8 @@ export function TransportReceiptView({
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 12,
+          flexWrap: "wrap",
+          gap: "6px 12px",
           padding: "14px 22px",
           borderBottom: "1px solid var(--line)",
           background: "var(--adm-surface)",
@@ -105,21 +224,23 @@ export function TransportReceiptView({
         <span className="ic" style={{ color: "var(--adm-primary)" }}>
           <Receipt />
         </span>
-        <div style={{ fontSize: 16, fontWeight: 600, color: "var(--ink)" }}>{data.staffName}</div>
+        <div style={{ fontSize: 16, fontWeight: 600, color: "var(--ink)", minWidth: 0, maxWidth: "100%", overflowWrap: "anywhere" }}>
+          {data.staffName}
+        </div>
         <span className={`pill ${pill.cls}`}>
           <span className="d" />
           {pill.label}
         </span>
         <span style={{ color: "var(--adm-muted)", fontSize: 13 }}>{data.monthLabel}</span>
         <span style={{ marginLeft: "auto", fontSize: 13, color: "var(--adm-muted)" }}>
-          {c.trReceiptCount(data.items.length)} · {c.trReceiptPhotoCount(photos.length)}
+          {c.trReceiptCount(items.length)} · {c.trReceiptPhotoCount(photos.length)}
         </span>
         <span className="mono" style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)" }}>
           {yen(data.totalAmount)}
         </span>
       </div>
 
-      {data.items.length === 0 ? (
+      {items.length === 0 ? (
         <div style={{ flex: 1, display: "grid", placeItems: "center" }}>
           <div className="state">
             <span className="state__ic empty">
@@ -127,7 +248,9 @@ export function TransportReceiptView({
                 <ImageOff />
               </span>
             </span>
-            <div className="state__s">{c.trReceiptNoImages}</div>
+            <div className="state__s">
+              {data.reportStatus === "none" ? c.trReceiptEmptyNone : c.trReceiptEmptyNoItems}
+            </div>
           </div>
         </div>
       ) : (
@@ -143,8 +266,10 @@ export function TransportReceiptView({
               <button
                 key={`${cell.item.itemId}-${cell.photoNo}`}
                 type="button"
-                onClick={() => {
-                  setZoom(false);
+                aria-label={thumbLabel(cell, i)}
+                onClick={(e) => {
+                  returnFocusRef.current = e.currentTarget;
+                  setZoomIdx(null);
                   setFocusIdx(i);
                 }}
                 style={{
@@ -165,6 +290,7 @@ export function TransportReceiptView({
                     fill
                     sizes="180px"
                     style={{ objectFit: "cover" }}
+                    onError={() => setBroken((prev) => new Set(prev).add(cell.url))}
                   />
                   {cell.photoCount > 1 ? (
                     <span
@@ -198,6 +324,51 @@ export function TransportReceiptView({
                   </div>
                 </div>
               </button>
+            ))}
+
+            {/* 사진은 있는데 주소를 못 받았거나 깨진 항목 — 「누락」이 아니라 다시 받기. */}
+            {failedItems.map((item) => (
+              <div
+                key={`failed-${item.itemId}`}
+                role="alert"
+                style={{
+                  border: "1px dashed var(--line)",
+                  borderRadius: 12,
+                  background: "var(--adm-surface)",
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
+                <div style={{ aspectRatio: "3 / 4", display: "grid", placeItems: "center", color: "var(--warn)", padding: 10 }}>
+                  <span style={{ display: "grid", placeItems: "center", gap: 8, fontSize: 12, fontWeight: 700, textAlign: "center" }}>
+                    <span className="ic">
+                      <ImageOff />
+                    </span>
+                    {c.trReceiptLoadFailed}
+                    <button
+                      type="button"
+                      className="chipbtn"
+                      disabled={refreshing === item.itemId}
+                      onClick={() => void refreshItem(item.itemId)}
+                    >
+                      {c.trReceiptRetry}
+                    </button>
+                  </span>
+                </div>
+                <div style={{ padding: "8px 10px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: "var(--ink)" }}>
+                      {fmtDate(item.usageDate, localeTag)}
+                    </span>
+                    <span className="mono" style={{ fontSize: 12, fontWeight: 700, color: "var(--ink)" }}>
+                      {yen(item.amountYen)}
+                    </span>
+                  </div>
+                  <div style={{ marginTop: 2, fontSize: 11, color: "var(--adm-muted)" }}>
+                    {item.buildingLabel || item.contextLabel || "—"}
+                  </div>
+                </div>
+              </div>
             ))}
 
             {/* 영수증이 없는 항목 — 빠진 날이 회계 쪽에서 눈에 안 띄는 일이 없도록 보여준다. */}
@@ -242,7 +413,13 @@ export function TransportReceiptView({
       {/* 포커스 오버레이 */}
       {focus ? (
         <div
-          onClick={() => setFocusIdx(null)}
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label={c.trReceiptDialogLabel
+            .replace("{date}", fmtDate(focus.item.usageDate, localeTag))
+            .replace("{amount}", yen(focus.item.amountYen))}
+          onClick={closeFocus}
           style={{
             position: "fixed",
             inset: 0,
@@ -255,7 +432,7 @@ export function TransportReceiptView({
           {/* 포커스 상단 바 */}
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 18px", color: "#fff" }}
+            style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "6px 12px", padding: "14px 18px", color: "#fff" }}
           >
             <span style={{ fontSize: 14, fontWeight: 800 }}>{fmtDate(focus.item.usageDate, localeTag)}</span>
             <span className="mono" style={{ fontSize: 14, fontWeight: 700 }}>{yen(focus.item.amountYen)}</span>
@@ -275,7 +452,7 @@ export function TransportReceiptView({
               <span className="ic"><ExternalLink /></span>
               {c.trReceiptOpenOriginal}
             </a>
-            <button type="button" onClick={() => setFocusIdx(null)} aria-label={c.panelClose} style={FOCUS_ICON_BTN}>
+            <button ref={closeBtnRef} type="button" onClick={closeFocus} aria-label={c.panelClose} style={FOCUS_ICON_BTN}>
               <span className="ic"><X /></span>
             </button>
           </div>
@@ -298,8 +475,9 @@ export function TransportReceiptView({
             >
               <img
                 src={focus.url}
-                alt=""
-                onClick={() => setZoom((z) => !z)}
+                alt={thumbLabel(focus, focusIdx ?? 0)}
+                onError={() => setBroken((prev) => new Set(prev).add(focus.url))}
+                onClick={() => setZoomIdx((z) => (z === focusIdx ? null : focusIdx))}
                 title={c.trReceiptOpenHint}
                 style={{
                   display: "block",
@@ -326,6 +504,11 @@ export function TransportReceiptView({
               <span className="ic"><ChevronRight /></span>
             </button>
           </div>
+        </div>
+      ) : null}
+      {notice ? (
+        <div key={notice.id} role="status" className="adm-toast" onClick={() => setNotice(null)}>
+          {notice.msg}
         </div>
       ) : null}
     </div>

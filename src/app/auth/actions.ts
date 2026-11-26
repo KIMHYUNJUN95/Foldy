@@ -13,6 +13,7 @@ import {
 } from "@/lib/surface-routing";
 import { forgetTrustedDevice } from "@/lib/attendance-trusted-device";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { clientIpFromHeaders, takeAuthAttempt, type AuthAttemptAction } from "@/lib/auth-attempt-limit";
 
 const LOCALE_COOKIE = "stayops_locale";
 
@@ -33,6 +34,12 @@ async function getAppUrl() {
     return `${proto}://${host}`;
   }
   return process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+}
+
+/** Supabase Auth 를 부르기 전 시도 제한(202611260005). 한도면 `too_many_attempts` 로 돌려보낸다. */
+async function enforceAuthAttemptLimit(action: AuthAttemptAction, email: string, errorUrl: string) {
+  const allowed = await takeAuthAttempt(action, { email, ip: clientIpFromHeaders(await headers()) });
+  if (!allowed) redirect(`${errorUrl}&error=too_many_attempts`);
 }
 
 async function getCurrentSurface() {
@@ -164,6 +171,8 @@ export async function signInWithEmailPassword(formData: FormData) {
   if (!email) redirect(`${errorBase}&error=missing_email`);
   if (!password) redirect(`${errorBase}&error=missing_password`);
 
+  await enforceAuthAttemptLimit("sign_in", email, errorBase);
+
   const supabase = await getSupabaseServerClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
@@ -222,6 +231,8 @@ export async function signUpWithEmail(formData: FormData) {
   if (confirm !== null && String(confirm) !== password) redirect(`${errorBase}&error=password_mismatch`);
   if (!isValidPassword(password, email)) redirect(`${errorBase}&error=weak_password`);
 
+  await enforceAuthAttemptLimit("sign_up", email, errorBase);
+
   const callbackNext = preserveOnboardingLang(next, lang);
 
   const supabase = await getSupabaseServerClient();
@@ -270,6 +281,8 @@ export async function resendSignupConfirmation(formData: FormData) {
 
   if (!email) redirect(`/auth/login?view=email&mode=signup&next=${encodeURIComponent(next)}${langParam}&error=missing_email`);
 
+  await enforceAuthAttemptLimit("resend_signup", email, base);
+
   const callbackNext = preserveOnboardingLang(next, lang);
   const supabase = await getSupabaseServerClient();
   const { error } = await supabase.auth.resend({
@@ -297,6 +310,9 @@ export async function requestPasswordReset(formData: FormData) {
   const errorBase = `/auth/login?view=email&mode=reset&next=${encodeURIComponent(next)}${langParam}`;
 
   if (!email) redirect(`${errorBase}&error=missing_email`);
+
+  // 한도 판정은 계정이 있든 없든 같다 — 이 오류로 가입 여부가 드러나지 않는다.
+  await enforceAuthAttemptLimit("password_reset", email, errorBase);
 
   const supabase = await getSupabaseServerClient();
   const { error } = await supabase.auth.resetPasswordForEmail(email, {

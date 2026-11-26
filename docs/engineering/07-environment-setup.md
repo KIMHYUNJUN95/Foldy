@@ -72,6 +72,12 @@ Implementation note:
 - Browser client uses only `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 - Server/service clients must not be imported into client components.
 
+Auth 시도 제한 (2026-11-26, `202611260005`):
+
+- 로그인 · 가입 · 확인 메일 다시 보내기 · 비밀번호 재설정은 앱이 먼저 `public.auth_attempts` 로 센다(`src/lib/auth-attempt-limit.ts`). 새 환경 변수 없음 — 기존 `SUPABASE_SERVICE_ROLE_KEY` 로 부른다.
+- 마이그레이션이 없는 환경(로컬 등)에서는 함수 호출이 실패해 fail open(로그 `[auth-attempt-limit]` 만)으로 동작한다.
+- Supabase 대시보드 Auth → Rate Limits 의 「IP Address Forwarding」(`Sb-Forwarded-For`)은 앱이 아직 쓰지 않는다. 쓰려면 비밀 키(`sb_secret_…`) 전용 Auth 클라이언트가 필요해 결정 대기(`05-rls-permissions.md` 같은 날 항목).
+
 ## App URL
 
 Required variables:
@@ -256,7 +262,7 @@ CRON_SECRET=
 Usage:
 
 - `BEDS24_WEBHOOK_SECRET`: verifies incoming Beds24 webhook deliveries (`/api/beds24/webhook`). **Required in production (2026-11-13)** — unset means the webhook answers `503 not_configured` and nothing is stored. See 「API 라우트별 비밀값」 below.
-- `BEDS24_PRICE_WEBHOOK_FORWARD_URL`: 선택. 받은 Beds24 배달을 그대로 넘길 주소(줄바꿈/쉼표로 여러 개). **미설정이 기본이고 그때는 아무 데도 넘기지 않는다.** 전환기에만 쓴다 — 아래 「Beds24 재고(가격) 웹훅 전환」 참고
+- `BEDS24_PRICE_WEBHOOK_FORWARD_URL`: 선택. 받은 Beds24 **가격** 배달만 그대로 넘길 주소 — 예약 배달(손님 정보)은 넘기지 않는다(2026-11-26)(줄바꿈/쉼표로 여러 개). **미설정이 기본이고 그때는 아무 데도 넘기지 않는다.** 전환기에만 쓴다 — 아래 「Beds24 재고(가격) 웹훅 전환」 참고
 - `BEDS24_WEBHOOK_CAPTURE_MESSAGES`: 선택 · **임시**(2026-11-12, `docs/product/47-guest-messaging.md` §3-4 V1). `1` 이면 손님 메시지(`messages` 배열)가 실린 예약 웹훅 원문을 `beds24_webhook_events.raw_payload` 에 남긴다(모드 `messages_capture`, 첨부는 길이만 · 6만 자 상한). 기본 꺼짐. **끄는 법**: 이 환경변수를 지우고 재배포 → 사용자 컨펌 뒤 SQL Editor 에서 `delete from public.beds24_webhook_events where 'messages_capture' = any(modes) and failed_count = 0;`(원문에 손님 개인정보가 있다 — 47 §3-4)
 - `GUEST_MESSAGES_SEND_ENABLED`: 선택 · 코드 기본 꺼짐(2026-11-13, `docs/product/47-guest-messaging.md` §5-4). **운영은 켜져 있다**(2026-11-26 운영 DB 확인 — 첫 발송 2026-11-16, 11-24 까지 Airbnb 답장 19건 모두 `sent` · Beds24 메시지 번호 받음 · 오류 0. 켠 날짜 기록은 없어 첫 발송일 기준). **`1` 일 때만** 손님 메시지 답장을 실제로 Beds24 로 보낸다. 꺼져 있으면 답장은 발송 큐에 `queued` 로 쌓이기만 하고 화면에 「보낼 차례 기다림 · 발송이 아직 꺼져 있어요」가 보인다. 켜기 전에 47 §3-4 V1~V4 확인 + 사용자 허락. 발송 작업은 보내기 · 다시 보내기 뒤 `after()` 로만 돌고(목록 · 대화 읽기는 부작용 없음), 10분 넘게 `sending` 인 줄은 다시 보내지 않고 `uncertain` 으로 푼다. 수동 실행은 `POST /api/guest-messages/outbox`(`Authorization: Bearer $CRON_SECRET`, 정기 실행은 아직 안 붙임).
 - `BEDS24_API_BASE_URL`: Beds24 API base URL
@@ -321,7 +327,7 @@ Usage:
   2. 배포(코드 + 워크플로가 같은 커밋 — 배포 전에 워크플로가 먼저 돌아도 옛 라우트가 `CRON_SECRET` Bearer 를 이미 받으므로 끊기지 않는다).
   3. **배포 직후** — Actions 탭에서 5개 워크플로(`Beds24 reconcile` · `Beds24 reviews sync` · `Beds24 rates sync` · `Beds24 price job worker` · recruit sync 를 `full` 로)를 수동 실행해 HTTP 200(워커는 200/202) 확인.
   4. 확인 뒤 저장소 시크릿 `BEDS24_WEBHOOK_SECRET` 은 워크플로가 더 쓰지 않는다 — 지워도 된다(Vercel 쪽 값은 웹훅용으로 그대로).
-- 웹훅 로그에는 본문 표본을 남기지 않고(키 · 길이만), 저장하는 거절 본문은 20,000자 상한(넘으면 표본 4,000자 + 길이). `/api/recruit/sync` 최신분(`mode=recent`)은 `{ok, count}` 만 돌려준다.
+- 웹훅 로그에는 본문 표본을 남기지 않고(키 · 길이만), 저장하는 거절 본문 · 실패 배치 본문은 20,000자 상한(넘으면 표본 4,000자 + 길이, 실패 배치 2026-11-26). 웹훅의 순서 · 되읽기 확인(못 읽으면 본문 적용 · 자동 안내 없음, 429 차단기) · 예약 수 · 처리 시간(20초) 상한 · `?secret=` 를 헤더로 옮기는 방법은 `01-beds24-integration.md` 「2026-11-26 웹훅 순서 · 확인 · 상한」. `/api/recruit/sync` 최신분(`mode=recent`)은 `{ok, count}` 만 돌려준다.
 - Existing Beds24-linked properties can be backfilled locally through `POST /api/dev/beds24/backfill-inventory`
 
 ### Beds24 토큰 재발급 (rotation)

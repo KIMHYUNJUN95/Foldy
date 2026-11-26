@@ -2206,3 +2206,27 @@ Supabase advisor `anon_security_definer_function_executable` 정리. 운영 `pg_
   `reservation_internal_notes` 에 붙였다(트리거 이름 `<표>_forbid_org_change`, 모든 역할 · 42501). 7개 모두 `organization_id` 칸이 있고
   (`guest_message_channel_state` 는 기본 키) 전에 붙은 잠금은 없었다.
 - **배포 순서**: 마이그레이션 먼저 적용해도 지금 코드와 맞는다(앱은 시작 시각을 안 보내고, 끝 값은 트리거가 덮음). 코드만 먼저 나가도 문제없다.
+
+## 로그인 · 메일 보내기 시도 제한(2026-11-26) (`202611260005_auth_attempt_limits`, **운영 적용 전**)
+
+- **빈틈**: `src/app/auth/actions.ts` 는 서버에서 Supabase Auth 를 부른다. Supabase 의 IP 별 제한은 Vercel 서버 IP 를 보므로, 손님마다 막히지
+  않거나(무작위 대입 · 아무 주소로 가입 · 재설정 · 다시 보내기 메일 폭탄 → 프로젝트 메일 한도 소진) 한 사람이 모든 직원 로그인을 429 로 막을 수 있었다.
+- **앱 제한**: 네 액션이 Supabase 를 부르기 전에 `takeAuthAttempt()`(`src/lib/auth-attempt-limit.ts`)를 거친다. 한도면 `error=too_many_attempts`
+  (ko · ja · en `auth.errors.too_many_attempts`)로 같은 화면에 돌려보낸다.
+  - 로그인: 이메일당 15분 10번 · IP 당 15분 30번. 가입 · 확인 메일 다시 보내기 · 비밀번호 재설정: 동작마다 이메일당 1시간 3번 · IP 당 1시간 10번.
+  - IP = `x-forwarded-for` 첫 값(Vercel 이 넣음) → `x-real-ip`. 없으면 IP 한도는 건너뛴다(모두를 한 통에 몰지 않도록).
+  - **fail open**: 함수 오류 · 네트워크 오류면 `console.error("[auth-attempt-limit]")` 만 남기고 진행 — 제한기 장애로 로그인이 막히지 않는다.
+  - 가입 여부를 드러내지 않음: 한도 판정은 계정이 있든 없든 같다. 재설정 · 다시 보내기는 한도 안에선 늘 같은 「보냈어요」 화면 그대로.
+- **표 · 함수 권한**: `public.auth_attempts` RLS 켬 · 정책 없음 · public/anon/authenticated 전부 회수 · service_role 만. 함수
+  `public.take_auth_attempt(...)` 는 SECURITY INVOKER · `search_path = ''` · service_role 만 실행(같은 키는 advisory lock 으로 줄 세움).
+- **Supabase 쪽 IP 전달(`Sb-Forwarded-For`)은 아직 안 씀**: Supabase 문서상 비밀 키(`sb_secret_…`)로 부르고 대시보드에서
+  「IP Address Forwarding」을 켜야 한다. 쿠키 세션 클라이언트는 공개 키라 맞지 않고, 비밀 키를 세션 클라이언트에 넣으면 실수 한 번에
+  RLS 를 건너뛰는 위험이 커서 결정 대기. 앱 제한이 먼저 막는다.
+- **알려진 남은 점**: 가입의 `email_already_exists` · `resume_existing_account` 는 「이미 가입된 이메일」을 알려 주므로 가입 여부 확인에 쓸 수 있다
+  (제품 결정으로 유지 — 이제 이메일당 1시간 3번 · IP 당 10번으로 묶임). 이메일 한도는 남의 이메일로도 채울 수 있어 특정 직원을 15분 · 1시간
+  막을 수 있다(무작위 대입 차단과 맞바꾼 것).
+- **알려진 남은 점 2**: 공개 anon 키로 Supabase Auth 엔드포인트를 바로 부르면 이 앱 제한을 건너뛴다 — 그쪽은 Supabase 자체 IP 별 제한만 걸리고
+  이메일별 제한은 없다.
+- **알려진 남은 점 3**: `x-forwarded-for` 첫 값을 믿는 건 Vercel 이 그 헤더를 덮어쓰기 때문이다. 앞에 Cloudflare 같은 프록시를 두게 되면
+  (예: 도메인 이전 때) `clientIpFromHeaders`(`src/lib/auth-attempt-limit.ts`)를 다시 볼 것.
+- 테스트: `src/lib/__tests__/auth-attempt-limit.test.ts` · `auth-actions-attempt-limit.test.ts`.

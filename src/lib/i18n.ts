@@ -5774,6 +5774,7 @@ const FALLBACK_DICTIONARY = {
         "New password must be different from your current one.",
       rate_limit:
         "Too many emails were sent in a short time. Please try again in about an hour.",
+      too_many_attempts: "Too many attempts. Please wait a while and try again.",
       rate_limit_dev:
         "Email login is off in local dev. Use the dev login buttons instead.",
     } as Record<string, string>,
@@ -15842,6 +15843,7 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
           "현재 비밀번호와 다른 새 비밀번호를 입력해주세요.",
         rate_limit:
           "짧은 시간에 메일을 너무 많이 보냈어요. 1시간쯤 뒤에 다시 시도해 주세요.",
+        too_many_attempts: "시도가 너무 많아요. 잠시 뒤에 다시 시도해 주세요.",
         rate_limit_dev:
           "로컬 개발에서는 이메일 로그인을 쓰지 않습니다. 아래 개발 로그인 버튼을 사용하세요.",
       },
@@ -25780,6 +25782,7 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
           "現在のパスワードとは異なる新しいパスワードを入力してください。",
         rate_limit:
           "短時間にメールを送りすぎました。1時間ほどしてからもう一度お試しください。",
+        too_many_attempts: "試行回数が多すぎます。しばらくしてからもう一度お試しください。",
         rate_limit_dev:
           "ローカル開発ではメールログインは使えません。下の開発ログインボタンを使ってください。",
       },

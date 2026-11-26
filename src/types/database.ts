@@ -1932,6 +1932,30 @@ export type Database = {
           },
         ]
       }
+      auth_attempts: {
+        Row: {
+          action: string
+          attempted_at: string
+          id: number
+          key_hash: string
+          key_kind: string
+        }
+        Insert: {
+          action: string
+          attempted_at?: string
+          id?: never
+          key_hash: string
+          key_kind: string
+        }
+        Update: {
+          action?: string
+          attempted_at?: string
+          id?: never
+          key_hash?: string
+          key_kind?: string
+        }
+        Relationships: []
+      }
       beds24_block_logs: {
         Row: {
           action: string
@@ -9021,6 +9045,17 @@ export type Database = {
           p_user_id: string
         }
         Returns: string
+      }
+      take_auth_attempt: {
+        Args: {
+          p_action: string
+          p_email_hash: string | null
+          p_email_limit: number
+          p_ip_hash: string | null
+          p_ip_limit: number
+          p_window_seconds: number
+        }
+        Returns: boolean
       }
       update_staff_suggestion: {
         Args: {

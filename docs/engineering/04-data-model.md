@@ -2754,3 +2754,14 @@ INSERT · UPDATE 신호만, DELETE 는 오지 않는다. 대신 `task_occurrence
 ## 2026-11-25 `capability_policies` 타입 보강
 
 - `src/types/database.ts` 에 `capability_policies`(`202609100001` — `capability` text PK · `individual_grant` · `individual_deny` · `platform_bypass` boolean, 모두 not null · 기본값 없음)를 손으로 넣었다. 마이그레이션 표 중 타입에서 빠진 유일한 표였다. 표 · 정책은 그대로.
+
+## 2026-11-26 `auth_attempts` · `take_auth_attempt` — 로그인 · 메일 보내기 시도 제한 (`202611260005_auth_attempt_limits.sql`, **운영 미적용**)
+
+- `public.auth_attempts`: `id` bigint identity PK · `action` text(`sign_in` · `sign_up` · `resend_signup` · `password_reset`) · `key_kind` text
+  (`email` · `ip`) · `key_hash` text(sha256 hex 64자 — 이메일(소문자) · IP 원문은 두지 않음) · `attempted_at` timestamptz 기본 `now()`.
+  색인 `(action, key_kind, key_hash, attempted_at desc)` · `(attempted_at)`. 조직 범위가 아닌 전역 표(로그인 전이라 조직이 없다).
+- `public.take_auth_attempt(p_action, p_email_hash, p_ip_hash, p_window_seconds, p_email_limit, p_ip_limit) → boolean`: 창 안 횟수가 한도 이상이면
+  false(남기지 않음), 아니면 키마다 한 줄 남기고 true. null 해시는 세지 않는다. 한도 값은 앱(`AUTH_ATTEMPT_LIMITS`, `src/lib/auth-attempt-limit.ts`)이 넘긴다.
+- 정리: pg_cron `auth-attempts-cleanup`(매시 23분)이 하루 지난 줄을 지운다.
+- 권한 · 이유: `05-rls-permissions.md` 「로그인 · 메일 보내기 시도 제한」. 타입: `src/types/database.ts` 에 표 · 함수 추가.
+- 배포 순서: 마이그레이션 먼저. 코드만 먼저 나가면 함수가 없어 오류 → fail open(제한 없이 지금처럼 동작, 로그만 남음).

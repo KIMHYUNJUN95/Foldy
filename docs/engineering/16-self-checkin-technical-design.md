@@ -140,7 +140,7 @@ Foldy(루트) src/app/admin/checkin · src/app/mobile/checkin · src/actions/che
   - **자동 삭제는 `audit_log` 에 쓰지 않는다** — `audit_log` 은 `actor_user_id` · `device_id` 둘 중 하나가 꼭 있어야 하는데(check) 크론에는 둘 다 없다. 자동 삭제 기록은 `deletions` 가 맡는다.
   - 양: 50개씩, 한 번에 stay 500개 · 작업 예산 40초(라우트 `maxDuration` 60초) — 끝 5초는 `claim_attempts` 정리 몫으로 남겨 stay 정리가 다 써도 굶지 않음. id 순으로 넘어가 실패한 stay 를 같은 실행에서 다시 고르지 않는다. 다 못 하면 결과 `done: false`, 다음 날 이어서. 응답은 건수만(`staysDeleted` · `staysFailed` · `filesDeleted` · `claimAttemptsDeleted` · `done`).
   - **`claim_attempts`**: `attempted_at` 이 48시간보다 오래된 줄을 500개씩 지운다 — 잠금 판정의 가장 긴 창이 같은 이름 하루(`NAME_DAY_MS` 24시간, `lib/guest/limits.ts`)라 24시간 여유를 더 둠(`CLAIM_ATTEMPT_KEEP_MS`). 기기 등록 · PIN 키도 같은 표라 같이 지워진다(창 10분).
-  - 부르는 쪽: sync-stays 와 같은 **pg_cron + pg_net + Vault**(`202611260007_checkin_retention_cron.sql`, **운영 미적용**). 크론 `checkin-retention` `0 19 * * *` UTC(= 도쿄 04:00), 함수 `checkin.retention_tick()`(service_role 만). Vault 는 주소 `checkin_retention_url` 만 새로 넣고 토큰은 `checkin_sync_token` 을 같이 씀 — **새 비밀값 · 환경 변수 없음**(라우트는 같은 `CRON_SECRET`). 확인은 sync-stays 와 같음(`cron.job_run_details.return_message` 'fired' · `net._http_response.status_code` 200).
+  - 부르는 쪽: sync-stays 와 같은 **pg_cron + pg_net + Vault**(`202611260007_checkin_retention_cron.sql`, **운영 적용 완료 2026-11-26**). 크론 `checkin-retention` `0 19 * * *` UTC(= 도쿄 04:00), 함수 `checkin.retention_tick()`(service_role 만). Vault 는 주소 `checkin_retention_url` 만 새로 넣고 토큰은 `checkin_sync_token` 을 같이 씀 — **새 비밀값 · 환경 변수 없음**(라우트는 같은 `CRON_SECRET`). 확인은 sync-stays 와 같음(`cron.job_run_details.return_message` 'fired' · `net._http_response.status_code` 200).
 
 ## 4. API (서버 라우트, `apps/checkin`)
 

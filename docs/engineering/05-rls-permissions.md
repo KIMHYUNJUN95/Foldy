@@ -2207,7 +2207,7 @@ Supabase advisor `anon_security_definer_function_executable` 정리. 운영 `pg_
   (`guest_message_channel_state` 는 기본 키) 전에 붙은 잠금은 없었다.
 - **배포 순서**: 마이그레이션 먼저 적용해도 지금 코드와 맞는다(앱은 시작 시각을 안 보내고, 끝 값은 트리거가 덮음). 코드만 먼저 나가도 문제없다.
 
-## 로그인 · 메일 보내기 시도 제한(2026-11-26) (`202611260005_auth_attempt_limits`, **운영 적용 전**)
+## 로그인 · 메일 보내기 시도 제한(2026-11-26) (`202611260005_auth_attempt_limits`, **운영 적용 완료 2026-11-26**)
 
 - **빈틈**: `src/app/auth/actions.ts` 는 서버에서 Supabase Auth 를 부른다. Supabase 의 IP 별 제한은 Vercel 서버 IP 를 보므로, 손님마다 막히지
   않거나(무작위 대입 · 아무 주소로 가입 · 재설정 · 다시 보내기 메일 폭탄 → 프로젝트 메일 한도 소진) 한 사람이 모든 직원 로그인을 429 로 막을 수 있었다.

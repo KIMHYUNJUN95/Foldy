@@ -2755,7 +2755,7 @@ INSERT · UPDATE 신호만, DELETE 는 오지 않는다. 대신 `task_occurrence
 
 - `src/types/database.ts` 에 `capability_policies`(`202609100001` — `capability` text PK · `individual_grant` · `individual_deny` · `platform_bypass` boolean, 모두 not null · 기본값 없음)를 손으로 넣었다. 마이그레이션 표 중 타입에서 빠진 유일한 표였다. 표 · 정책은 그대로.
 
-## 2026-11-26 `auth_attempts` · `take_auth_attempt` — 로그인 · 메일 보내기 시도 제한 (`202611260005_auth_attempt_limits.sql`, **운영 미적용**)
+## 2026-11-26 `auth_attempts` · `take_auth_attempt` — 로그인 · 메일 보내기 시도 제한 (`202611260005_auth_attempt_limits.sql`, **운영 적용 완료 2026-11-26**)
 
 - `public.auth_attempts`: `id` bigint identity PK · `action` text(`sign_in` · `sign_up` · `resend_signup` · `password_reset`) · `key_kind` text
   (`email` · `ip`) · `key_hash` text(sha256 hex 64자 — 이메일(소문자) · IP 원문은 두지 않음) · `attempted_at` timestamptz 기본 `now()`.

@@ -49,7 +49,7 @@
   border-radius: 10px;
   font: inherit;
   font-size: 12.5px;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: -0.01em;
   cursor: pointer;
   display: inline-flex;
@@ -98,7 +98,7 @@
 }
 .trn-dt {
   font-size: 15px;
-  font-weight: 900;
+  font-weight: 600;
   letter-spacing: -0.01em;
 }
 .trn-dm {
@@ -106,7 +106,7 @@
   gap: 14px;
   margin-top: 8px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--att-muted);
 }
 .trn-tot {
@@ -117,14 +117,14 @@
 }
 .trn-tot .trn-l {
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--att-muted);
 }
 .trn-tot .trn-v {
   font-size: 24px;
-  font-weight: 900;
+  font-weight: 600;
   letter-spacing: -0.03em;
 }
 
@@ -139,7 +139,7 @@
 .trn-no {
   font-family: var(--mono);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--faint);
   width: 20px;
   flex: 0 0 auto;
@@ -151,16 +151,16 @@
 }
 .trn-c1 {
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
 }
 .trn-c1 .trn-dt-label {
   color: var(--att-muted);
-  font-weight: 700;
+  font-weight: 600;
   margin-right: 6px;
 }
 .trn-c2 {
   font-size: 10.5px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--att-muted);
   margin-top: 2px;
 }
@@ -177,7 +177,7 @@
   flex: 0 0 auto;
   font-family: var(--mono);
   font-size: 13.5px;
-  font-weight: 800;
+  font-weight: 600;
   padding-top: 1px;
 }
 .trn-amt.trn-miss {
@@ -194,12 +194,12 @@
 }
 .trn-sum .trn-sl {
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
 }
 .trn-sum .trn-sv {
   font-family: var(--mono);
   font-size: 16px;
-  font-weight: 900;
+  font-weight: 600;
   letter-spacing: -0.02em;
 }
 
@@ -220,7 +220,7 @@
   color: #fff;
   font: inherit;
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 600;
   cursor: pointer;
   transition: opacity 0.12s var(--ease-out);
 }
@@ -242,7 +242,7 @@
 }
 .trn-sh-h {
   font-size: 16px;
-  font-weight: 900;
+  font-weight: 600;
   letter-spacing: -0.02em;
   margin: 2px 2px 16px;
 }
@@ -251,7 +251,7 @@
 }
 .trn-tf-l {
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--att-muted);
@@ -278,12 +278,12 @@
 }
 .trn-tf-in.trn-amt-in {
   font-family: var(--mono);
-  font-weight: 800;
+  font-weight: 600;
 }
 .trn-tf-in .trn-un {
   margin-left: auto;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--faint);
 }
 .trn-tf-in svg {
@@ -347,7 +347,7 @@
   border-radius: 9px;
   font: inherit;
   font-size: 12.5px;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--att-muted);
   cursor: pointer;
   display: inline-flex;
@@ -477,7 +477,7 @@
   background: var(--bg);
   color: var(--miss);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   text-align: center;
   line-height: 1.35;
 }
@@ -486,7 +486,7 @@
   background: none;
   padding: 2px 6px;
   font: inherit;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--att-primary);
   text-decoration: underline;
   cursor: pointer;
@@ -497,7 +497,7 @@
 .trn-shot-note {
   margin-top: 6px;
   font-size: 10.5px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--att-muted);
 }
 .trn-seg button:disabled {
@@ -506,7 +506,7 @@
 }
 .trn-hint {
   font-size: 10.5px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--miss);
   margin-top: 6px;
   display: flex;
@@ -529,7 +529,7 @@
   color: #fff;
   font: inherit;
   font-size: 13.5px;
-  font-weight: 800;
+  font-weight: 600;
   cursor: pointer;
   margin-top: 4px;
   box-shadow: 0 14px 26px -12px rgb(122 82 230 / 0.5);
@@ -570,7 +570,7 @@
 }
 .trn-detail-title {
   font-size: 17px;
-  font-weight: 900;
+  font-weight: 600;
   letter-spacing: -0.02em;
   margin-bottom: 12px;
 }
@@ -619,7 +619,7 @@
 }
 .trn-dshot__l {
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   font-family: var(--mono);
   color: hsl(40 8% 52%);
   letter-spacing: 0.02em;
@@ -636,7 +636,7 @@
   border: 1.5px dashed var(--line);
   background: var(--bg);
   font-size: 11.5px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--miss);
   margin-bottom: 6px;
 }
@@ -646,7 +646,7 @@
   align-items: center;
   gap: 4px;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
   padding: 3px 9px;
   border-radius: 999px;
 }
@@ -687,7 +687,7 @@
 }
 .trn-rk {
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.03em;
   text-transform: uppercase;
   color: var(--att-muted);
@@ -697,14 +697,14 @@
 .trn-rv {
   flex: 1;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   text-align: right;
   min-width: 0;
   overflow-wrap: anywhere;
 }
 .trn-rv.trn-rv-amt {
   font-family: var(--mono);
-  font-weight: 800;
+  font-weight: 600;
 }
 /* 상세 액션 */
 .trn-dacts {
@@ -718,7 +718,7 @@
   border-radius: 14px;
   font: inherit;
   font-size: 13.5px;
-  font-weight: 800;
+  font-weight: 600;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -758,7 +758,7 @@
 }
 .trn-input.trn-input-amt {
   font-family: var(--mono);
-  font-weight: 800;
+  font-weight: 600;
 }
 .trn-input::placeholder {
   color: var(--faint);
@@ -795,7 +795,7 @@
 }
 .trn-confirm-title {
   font-size: 18px;
-  font-weight: 900;
+  font-weight: 600;
   letter-spacing: -0.02em;
 }
 .trn-confirm-body {
@@ -818,7 +818,7 @@
 }
 .trn-confirm-card .k {
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: -0.01em;
   min-width: 0;
   overflow: hidden;
@@ -828,7 +828,7 @@
 .trn-confirm-card .v {
   font-family: var(--mono);
   font-size: 14px;
-  font-weight: 900;
+  font-weight: 600;
   flex: 0 0 auto;
 }
 .trn-confirm-acts {
@@ -842,7 +842,7 @@
   border-radius: 14px;
   font: inherit;
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 600;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -898,7 +898,7 @@
   background: #16141f;
   color: #ffffff;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.01em;
   box-shadow: 0 16px 38px -14px rgba(20, 28, 40, 0.6);
   animation: trn-toast-in 0.26s cubic-bezier(0.32, 0.72, 0, 1);
@@ -968,7 +968,7 @@
 }
 .trn-cal-title {
   font-size: 16px;
-  font-weight: 900;
+  font-weight: 600;
   letter-spacing: -0.02em;
   color: var(--ink);
   min-width: 116px;
@@ -1002,7 +1002,7 @@
 .trn-cal-wk-c {
   text-align: center;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.02em;
   color: var(--att-muted);
   padding: 4px 0;
@@ -1029,7 +1029,7 @@
   border-radius: 11px;
   font: inherit;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ink);
   cursor: pointer;
   transition: background 0.12s var(--ease-out), color 0.12s var(--ease-out), transform 0.1s var(--ease-out);
@@ -1066,7 +1066,7 @@
 .trn-cal-day.sel.sat {
   background: linear-gradient(160deg, var(--primary-lift), var(--primary-ink));
   color: #fff;
-  font-weight: 800;
+  font-weight: 600;
   box-shadow: 0 8px 18px -10px rgb(122 82 230 / 0.7);
 }
 .trn-cal-foot {
@@ -1085,7 +1085,7 @@
   color: var(--ink-soft);
   font: inherit;
   font-size: 13.5px;
-  font-weight: 800;
+  font-weight: 600;
   cursor: pointer;
   transition: background 0.12s var(--ease-out);
 }
@@ -1098,7 +1098,7 @@
   color: #fff;
   font: inherit;
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 600;
   cursor: pointer;
   transition: opacity 0.12s var(--ease-out);
 }
@@ -1233,20 +1233,20 @@
  */
 .trn-req {
   color: var(--danger, #dc2626);
-  font-weight: 900;
+  font-weight: 600;
 }
 
 .trn-err {
   margin-top: 5px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--danger, #dc2626);
 }
 
 .trn-prefill {
   margin-top: 5px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--muted-foreground, #64748b);
 }
 
@@ -1281,7 +1281,7 @@
   background: var(--surface, #fff);
   text-align: left;
   font-size: 12.5px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--foreground, #0f172a);
   cursor: pointer;
 }
@@ -1311,7 +1311,7 @@
   border-radius: 999px;
   background: var(--surface2, #f1f5f9);
   font-size: 10.5px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--muted-foreground, #64748b);
 }
 
@@ -1351,7 +1351,7 @@
 .trnw .trnw-line__t { font-size: 15px; color: #16141f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .trnw .trnw-line__s { font-size: 12px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .trnw .trnw-line__s.is-danger { color: #c5282e; }
-.trnw .trnw-line__v { font-size: 15px; font-weight: 700; color: #16141f; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.trnw .trnw-line__v { font-size: 15px; font-weight: 600; color: #16141f; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .trnw .trnw-actions { order: 3; }
 .trnw .trnw-warn { display: flex; align-items: center; gap: 8px; margin: 18px 0 0; font-size: 13px; color: #3a3746; }
 .trnw .trnw-warn svg { width: 16px; height: 16px; flex: none; color: #b7791f; }
@@ -1378,7 +1378,7 @@
   .trnw .trnw-add-wide { display: block; width: 100%; height: 46px; margin-top: 12px; border: 0; border-radius: 14px; background: #f4f1fd; color: #5a30cf; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
   .trnw .trnw-right { margin-top: 0; }
   .trnw .trnw-right__h { display: flex; justify-content: space-between; align-items: baseline; padding: 8px 0 10px; }
-  .trnw .trnw-right__h b { font-size: 17px; font-weight: 700; color: #16141f; }
+  .trnw .trnw-right__h b { font-size: 17px; font-weight: 600; color: #16141f; }
   .trnw .trnw-right__h span { font-size: 12px; color: var(--text-3); }
 }
 /* HIG 다듬기 2차 — 교통비 정산(2026-10-20, HIG 캔버스 A2Trn-* · 지금 A2TrnNow-*). 기능 · 배치 그대로.
@@ -1404,3 +1404,10 @@
 }
 /* 리디자인 틀은 셸 여백을 그대로 쓴다(옛 정산서 카드의 -14px 끌어당김 없앰). */
 .trn.trnw { margin: 0; padding: 0 0 24px; }
+
+/* 빈 달 — 제출 대신 추가가 주 단추 (2026-11-26) */
+.trnw .trnw-empty-cta { display: block; width: 100%; height: 50px; margin-top: 14px; border: 0; border-radius: 14px; background: #7a52e6; color: #fff; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; transition: transform 160ms ease-out; }
+.trnw .trnw-empty-cta:active { transform: scale(0.97); }
+@media (prefers-reduced-motion: reduce) { .trnw .trnw-empty-cta:active { transform: none; } }
+.trnw .trnw-empty { margin: 28px 0 0; }
+.trnw .trnw-empty-help { margin: 6px 0 0; text-align: center; font-size: 13px; color: #8b8898; }

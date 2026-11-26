@@ -64,13 +64,13 @@
 }
 .lv .pagehead__crumb {
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.04em;
   color: var(--faint);
 }
 .lv .pagehead__t {
   font-size: 19px;
-  font-weight: 900;
+  font-weight: 600;
   letter-spacing: -0.02em;
   color: var(--ink);
 }
@@ -81,7 +81,7 @@
   align-items: center;
   gap: 5px;
   font-size: 11.5px;
-  font-weight: 800;
+  font-weight: 600;
   padding: 4px 10px;
   border-radius: 999px;
   white-space: nowrap;
@@ -129,14 +129,14 @@
 }
 .lv .balcard__k {
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--att-muted);
   white-space: nowrap;
 }
 .lv .balcard__yr {
   margin-left: auto;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
   padding: 4px 10px;
   border-radius: 999px;
   background: var(--att-surface);
@@ -150,7 +150,7 @@
 }
 .lv .balcard__big {
   font-size: 52px;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: -0.03em;
   line-height: 0.9;
   font-family: var(--mono);
@@ -158,7 +158,7 @@
 }
 .lv .balcard__big small {
   font-size: 20px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--faint);
   letter-spacing: 0;
 }
@@ -187,7 +187,7 @@
   display: flex;
   justify-content: space-between;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--att-muted);
   margin-top: 8px;
 }
@@ -216,7 +216,7 @@
 .lv .mstat + .mstat { border-left: 1px solid var(--line-soft); }
 .lv .mstat__v {
   font-size: 20px;
-  font-weight: 900;
+  font-weight: 600;
   letter-spacing: -0.02em;
   font-family: var(--mono);
 }
@@ -225,7 +225,7 @@
 .lv .mstat__v.done { color: var(--done); }
 .lv .mstat__k {
   font-size: 10.5px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--att-muted);
   margin-top: 4px;
 }
@@ -236,7 +236,7 @@
   align-items: center;
   gap: 8px;
   font-size: 11.5px;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--att-muted);
@@ -245,7 +245,7 @@
 .lv .slabel .more {
   margin-left: auto;
   font-size: 11.5px;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--att-primary);
   text-transform: none;
   letter-spacing: 0;
@@ -303,7 +303,7 @@
 .lv .lswipe__delbtn:active { background-color: hsl(0 0% 100% / 0.12); }
 .lv .lswipe__delbtn svg { width: 18px; height: 18px; }
 .lv .lswipe__delbtn:disabled { opacity: 0.6; cursor: default; }
-.lv .lswipe__dellabel { font-size: 10.5px; font-weight: 800; letter-spacing: -0.01em; }
+.lv .lswipe__dellabel { font-size: 10.5px; font-weight: 600; letter-spacing: -0.01em; }
 /* 변환되는 레이어 자체에 불투명 배경을 둔다 — `transform` 은 이 요소를 자기 합성 레이어로 올리고,
    브라우저가 그 레이어와 부모의 `overflow: hidden` 클립 사이에 서브픽셀 헤어라인 틈을
    남길 수 있어서 빨간 .lswipe__del 레이어가 가장자리로 희미하게 비쳐 보인다.
@@ -329,7 +329,7 @@
 }
 .lv .lrow__ic svg { width: 20px; height: 20px; }
 .lv .lrow__b { flex: 1; min-width: 0; }
-.lv .lrow__t { font-size: 14px; font-weight: 800; letter-spacing: -0.01em; }
+.lv .lrow__t { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
 .lv .lrow__s {
   font-size: 11.5px;
   font-weight: 600;
@@ -346,7 +346,7 @@
 }
 .lv .lrow__days {
   font-size: 13px;
-  font-weight: 900;
+  font-weight: 600;
   font-family: var(--mono);
 }
 
@@ -375,7 +375,7 @@
 .lv .rulerow .ic svg { width: 15px; height: 15px; }
 .lv .rulerow span:last-child {
   font-size: 12.5px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ink-soft);
 }
 
@@ -402,7 +402,7 @@
   border-radius: 15px;
   font: inherit;
   font-size: 14.5px;
-  font-weight: 800;
+  font-weight: 600;
   border: none;
   display: inline-flex;
   align-items: center;
@@ -433,7 +433,7 @@
   gap: 6px;
   flex-wrap: nowrap;
   font-size: 12.5px;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--ink-soft);
   margin-bottom: 8px;
 }
@@ -442,7 +442,7 @@
 .lv .field__l .auto {
   margin-left: auto;
   font-size: 10.5px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--faint);
   white-space: nowrap;
   flex: 0 0 auto;
@@ -457,7 +457,7 @@
   padding: 0 14px;
   font: inherit;
   font-size: 14.5px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ink);
   outline: none;
   display: flex;
@@ -484,7 +484,7 @@
 .lv .ro-badge {
   margin-left: auto;
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--att-muted);
   background: var(--att-surface);
   border-radius: 999px;
@@ -503,7 +503,7 @@
   gap: 5px;
   margin-top: 9px;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--att-primary);
   background: var(--primary-soft);
   border: 1px solid color-mix(in oklab, var(--att-primary) 16%, transparent);
@@ -527,7 +527,7 @@
   background: none;
   font: inherit;
   font-size: 12.5px;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--att-muted);
   border-radius: 9px;
 }
@@ -566,7 +566,7 @@
   color: transparent;
 }
 .lv .ftype__box svg { width: 14px; height: 14px; }
-.lv .ftype__l { font-size: 13.5px; font-weight: 800; color: var(--ink-soft); }
+.lv .ftype__l { font-size: 13.5px; font-weight: 600; color: var(--ink-soft); }
 .lv .ftype.on {
   border-color: var(--att-primary);
   background: var(--primary-soft);
@@ -598,13 +598,13 @@
 .lv .fcount {
   text-align: right;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--faint);
   margin-top: 5px;
   font-family: var(--mono);
 }
 .lv .fhint { font-size: 11.5px; font-weight: 600; color: var(--att-muted); margin-top: 6px; line-height: 1.4; }
-.lv .ferr { font-size: 11.5px; font-weight: 700; color: var(--danger); margin-top: 6px; }
+.lv .ferr { font-size: 11.5px; font-weight: 600; color: var(--danger); margin-top: 6px; }
 /* 직접 입력을 받는 입력란(비상 연락처) */
 .lv .finput input {
   border: none;
@@ -613,7 +613,7 @@
   font: inherit;
   /* 최소 16px — .lv .ftext 주석 참고(iOS 포커스 자동 확대 방지). */
   font-size: 16px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ink);
   width: 100%;
 }
@@ -639,7 +639,7 @@
   margin-bottom: 16px;
 }
 .lv .doneburst__ic svg { width: 38px; height: 38px; }
-.lv .doneburst__t { font-size: 22px; font-weight: 900; letter-spacing: -0.025em; margin: 0; }
+.lv .doneburst__t { font-size: 22px; font-weight: 600; letter-spacing: -0.025em; margin: 0; }
 .lv .doneburst__s {
   font-size: 13px;
   font-weight: 600;
@@ -666,7 +666,7 @@
 .lv .reqcard__no {
   font-family: var(--mono);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--att-muted);
 }
 .lv .reqcard__body { padding: 4px 15px; }
@@ -679,7 +679,7 @@
 }
 .lv .reqrow + .reqrow { border-top: 0.5px solid var(--separator); }
 .lv .reqrow__k { color: var(--att-muted); font-weight: 600; }
-.lv .reqrow__v { font-weight: 800; }
+.lv .reqrow__v { font-weight: 600; }
 .lv .reqrow__v.mono { font-family: var(--mono); }
 
 /* 승인 타임라인 */
@@ -715,12 +715,12 @@
   border-color: var(--att-primary);
   box-shadow: 0 0 0 4px var(--primary-soft);
 }
-.lv .apstep__t { font-size: 13.5px; font-weight: 800; letter-spacing: -0.01em; }
+.lv .apstep__t { font-size: 13.5px; font-weight: 600; letter-spacing: -0.01em; }
 .lv .apstep.pending .apstep__t { color: var(--faint); }
 .lv .apstep__s { font-size: 11.5px; font-weight: 600; color: var(--att-muted); margin-top: 2px; }
 .lv .apstep__time {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--faint);
   font-family: var(--mono);
   margin-top: 2px;
@@ -744,7 +744,7 @@
   background: none;
   font: inherit;
   font-size: 12.5px;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--att-muted);
   border-radius: 9px;
 }
@@ -760,18 +760,18 @@
   font: inherit;
   cursor: pointer;
 }
-.lv .lrow__t .mono { font-family: var(--mono); font-weight: 800; }
+.lv .lrow__t .mono { font-family: var(--mono); font-weight: 600; }
 .lv .histempty {
   text-align: center;
   padding: 40px 20px;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--att-muted);
 }
 
 /* ── L5 · 연차 캘린더 ── */
 .lv .lcal__nav { display: flex; align-items: center; gap: 10px; margin: 2px 2px 14px; }
-.lv .lcal__month { font-size: 17px; font-weight: 900; letter-spacing: -0.01em; }
+.lv .lcal__month { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
 .lv .lcal__navsp { flex: 1; }
 .lv .lcal__navbtn {
   width: 34px;
@@ -786,7 +786,7 @@
 }
 .lv .lcal__navbtn svg { width: 17px; height: 17px; }
 .lv .lcal__wk { display: grid; grid-template-columns: repeat(7, 1fr); margin-bottom: 4px; }
-.lv .lcal__wd { text-align: center; font-size: 10.5px; font-weight: 800; color: var(--faint); padding: 0 0 6px; }
+.lv .lcal__wd { text-align: center; font-size: 10.5px; font-weight: 600; color: var(--faint); padding: 0 0 6px; }
 .lv .lcal__wd.sun { color: color-mix(in oklab, var(--danger) 60%, var(--faint)); }
 .lv .lcal__wd.sat { color: color-mix(in oklab, var(--info) 60%, var(--faint)); }
 .lv .lcal__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
@@ -810,7 +810,7 @@
   justify-content: center;
   font-family: var(--mono);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--ink-soft);
 }
 .lv .lcal__cell.today .lcal__d { background: var(--att-primary); color: #fff; }
@@ -822,7 +822,7 @@
 .lv .lcal-paid { background: var(--done); }
 .lv .lcal-other { background: var(--att-muted); }
 .lv .lcal__legend { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 2px 4px; }
-.lv .lcal__lg { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; color: var(--att-muted); }
+.lv .lcal__lg { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; color: var(--att-muted); }
 .lv .lcal__lgdot { width: 9px; height: 9px; border-radius: 3px; }
 .lv .lcal__auto {
   display: flex;
@@ -847,7 +847,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 800;
+  font-weight: 600;
   font-size: 14px;
   flex: 0 0 auto;
 }
@@ -878,13 +878,13 @@
 .lv .ic-done { background: var(--done-bg); color: var(--done); }
 .lv .exwrap__ey {
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--att-muted);
   margin: 0 0 8px;
 }
-.lv .exwrap__t { font-size: 21px; font-weight: 900; letter-spacing: -0.025em; margin: 0; line-height: 1.2; }
+.lv .exwrap__t { font-size: 21px; font-weight: 600; letter-spacing: -0.025em; margin: 0; line-height: 1.2; }
 .lv .exwrap__s {
   font-size: 13.5px;
   font-weight: 600;
@@ -913,7 +913,7 @@
 }
 .lv .exrow + .exrow { border-top: 0.5px solid var(--separator); }
 .lv .exrow__k { color: var(--att-muted); font-weight: 600; }
-.lv .exrow__v { font-weight: 800; }
+.lv .exrow__v { font-weight: 600; }
 .lv .exrow__v.mono { font-family: var(--mono); }
 .lv .exrow__v.pri { color: var(--att-primary); }
 .lv .exwrap__cta { width: 100%; margin-top: auto; padding-top: 22px; }
@@ -924,7 +924,7 @@
   border: none;
   font: inherit;
   font-size: 15px;
-  font-weight: 800;
+  font-weight: 600;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -944,7 +944,7 @@
   align-items: center;
   gap: 5px;
   font-size: 11.5px;
-  font-weight: 800;
+  font-weight: 600;
   padding: 4px 10px;
   border-radius: 999px;
   white-space: nowrap;
@@ -973,8 +973,8 @@
   flex: 0 0 auto;
 }
 .lv-sheet .lsheet__ic svg { width: 20px; height: 20px; }
-.lv-sheet .lsheet__t { font-size: 16px; font-weight: 900; letter-spacing: -0.02em; }
-.lv-sheet .lsheet__no { margin-left: auto; font-family: var(--mono); font-size: 11px; font-weight: 800; color: var(--faint); }
+.lv-sheet .lsheet__t { font-size: 16px; font-weight: 600; letter-spacing: -0.02em; }
+.lv-sheet .lsheet__no { margin-left: auto; font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--faint); }
 .lv-sheet .lsheet__chips { display: flex; gap: 6px; margin-bottom: 12px; }
 .lv-sheet .lsheet__recap {
   background: var(--bg);
@@ -992,7 +992,7 @@
 }
 .lv-sheet .reqrow + .reqrow { border-top: 0.5px solid var(--separator); }
 .lv-sheet .reqrow__k { color: var(--att-muted); font-weight: 600; }
-.lv-sheet .reqrow__v { font-weight: 800; }
+.lv-sheet .reqrow__v { font-weight: 600; }
 .lv-sheet .reqrow__v.mono { font-family: var(--mono); }
 .lv-sheet .lsheet__note {
   display: flex;
@@ -1014,7 +1014,7 @@
   border-radius: 15px;
   font: inherit;
   font-size: 14.5px;
-  font-weight: 800;
+  font-weight: 600;
   border: none;
   display: inline-flex;
   align-items: center;
@@ -1045,19 +1045,19 @@
 .lv-sheet .dpick__sumcol { display: flex; flex-direction: column; gap: 3px; }
 .lv-sheet .dpick__sumk {
   font-size: 10.5px;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--att-muted);
 }
-.lv-sheet .dpick__sumv { font-size: 14px; font-weight: 800; color: var(--ink); white-space: nowrap; }
-.lv-sheet .dpick__sumv.ph { color: var(--faint); font-weight: 700; }
+.lv-sheet .dpick__sumv { font-size: 14px; font-weight: 600; color: var(--ink); white-space: nowrap; }
+.lv-sheet .dpick__sumv.ph { color: var(--faint); font-weight: 600; }
 .lv-sheet .dpick__sumar { color: var(--faint); }
 .lv-sheet .dpick__sumar svg { width: 16px; height: 16px; }
 .lv-sheet .dpick__sumd {
   margin-left: auto;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--att-primary);
   background: var(--primary-soft);
   border: 1px solid color-mix(in oklab, var(--att-primary) 16%, transparent);
@@ -1065,7 +1065,7 @@
   padding: 5px 11px;
 }
 .lv-sheet .dpick__nav { display: flex; align-items: center; gap: 10px; margin: 2px 2px 10px; }
-.lv-sheet .lcal__month { font-size: 17px; font-weight: 900; letter-spacing: -0.01em; }
+.lv-sheet .lcal__month { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
 .lv-sheet .lcal__navsp { flex: 1; }
 .lv-sheet .lcal__navbtn {
   width: 34px;
@@ -1080,7 +1080,7 @@
 }
 .lv-sheet .lcal__navbtn svg { width: 17px; height: 17px; }
 .lv-sheet .dpick__wkrow { display: grid; grid-template-columns: repeat(7, 1fr); margin-bottom: 2px; }
-.lv-sheet .dpick__wd { text-align: center; font-size: 10.5px; font-weight: 800; color: var(--faint); padding: 0 0 6px; }
+.lv-sheet .dpick__wd { text-align: center; font-size: 10.5px; font-weight: 600; color: var(--faint); padding: 0 0 6px; }
 .lv-sheet .dpick__wd.sun { color: color-mix(in oklab, var(--danger) 60%, var(--faint)); }
 .lv-sheet .dpick__wd.sat { color: color-mix(in oklab, var(--info) 60%, var(--faint)); }
 .lv-sheet .dpick__grid { display: grid; grid-template-columns: repeat(7, 1fr); }
@@ -1107,7 +1107,7 @@
   justify-content: center;
   font-family: var(--mono);
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--ink-soft);
   position: relative;
   z-index: 1;
@@ -1145,7 +1145,7 @@
   color: var(--ink);
 }
 .lv-sheet .dpick__yrnav { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 2px 2px 16px; }
-.lv-sheet .dpick__yr { font-family: var(--mono); font-size: 17px; font-weight: 900; min-width: 60px; text-align: center; }
+.lv-sheet .dpick__yr { font-family: var(--mono); font-size: 17px; font-weight: 600; min-width: 60px; text-align: center; }
 .lv-sheet .dpick__mgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 4px; }
 .lv-sheet .dpick__mcell {
   height: 46px;
@@ -1154,7 +1154,7 @@
   background: var(--card);
   font: inherit;
   font-size: 12.5px;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--ink-soft);
   cursor: pointer;
 }
@@ -1216,7 +1216,7 @@
 .lvw .lvw-title--row > :last-child:not(:first-child) { margin-left: auto; }
 .lvw .lvw-hero { display: flex; flex-direction: column; gap: 4px; margin-top: 18px; }
 .lvw .lvw-hero__k { font-size: 13px; color: #6b6878; }
-.lvw .lvw-hero__v { font-size: 40px; font-weight: 700; letter-spacing: -0.03em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.lvw .lvw-hero__v { font-size: 40px; font-weight: 600; letter-spacing: -0.03em; color: var(--ink); font-variant-numeric: tabular-nums; }
 .lvw .lvw-hero__v small { margin-left: 4px; font-size: 18px; font-weight: 600; color: var(--text-3); }
 .lvw .lvw-hero__s { font-size: 13px; color: var(--text-3); }
 .lvw .lvw-bar { display: flex; gap: 2px; height: 8px; margin-top: 10px; border-radius: 4px; overflow: hidden; }
@@ -1232,7 +1232,7 @@
 .lvw .lvw-row__b { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .lvw .lvw-row__t { font-size: 15px; color: var(--ink); }
 .lvw .lvw-row__s { font-size: 12px; color: var(--text-3); }
-.lvw .lvw-row__n { font-size: 14px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.lvw .lvw-row__n { font-size: 14px; font-weight: 600; color: var(--ink); white-space: nowrap; }
 .lvw .lvw-row__v { font-size: 13px; font-weight: 600; color: #6b6878; white-space: nowrap; }
 .lvw .lvw-row__v.is-requested, .lvw .lvw-row__v.is-review { color: #5a30cf; }
 .lvw .lvw-row__v.is-rejected { color: #c5282e; }
@@ -1243,7 +1243,7 @@
 .lvw .lvw-links { display: flex; gap: 18px; margin-top: 14px; }
 .lvw .lvw-links a { font-size: 14px; font-weight: 600; color: #6b6878; text-decoration: none; }
 .lvw .lvw-sec { display: flex; justify-content: space-between; align-items: baseline; margin-top: 22px; padding-bottom: 6px; }
-.lvw .lvw-sec b { font-size: 15px; font-weight: 700; color: var(--ink); }
+.lvw .lvw-sec b { font-size: 15px; font-weight: 600; color: var(--ink); }
 .lvw .lvw-sec a, .lvw .lvw-sec span { font-size: 14px; font-weight: 600; color: #7a52e6; text-decoration: none; }
 .lvw .lvw-empty { margin: 18px 0; font-size: 14px; color: var(--text-3); }
 .lvw .lvw-rules-h, .lvw .lvw-rules { display: none; }
@@ -1296,7 +1296,7 @@
 .lvw .lvw-chip.on { background: #7a52e6; color: #fff; font-weight: 600; }
 .lvw .lvw-days { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 18px; }
 .lvw .lvw-days span { flex: none; white-space: nowrap; font-size: 13px; color: #6b6878; } /* en 「Days used」가 두 줄로 접히지 않게 — 긴 값(「Bereavement leave · 3 days fixed」)이 오른쪽에서 줄바꿈 */
-.lvw .lvw-days b { min-width: 0; text-align: right; font-size: 18px; font-weight: 700; color: var(--ink); }
+.lvw .lvw-days b { min-width: 0; text-align: right; font-size: 18px; font-weight: 600; color: var(--ink); }
 .lvw .lvw-err { margin: 6px 0 0; font-size: 12px; color: #c5282e; }
 .lvw .lvw-hint { margin: 12px 0 0; font-size: 12px; line-height: 1.5; color: var(--text-3); }
 /* 안 A(2026-11-11) — 기간 날짜 줄. 원래 휴무로 뺀 날은 옅게 + 「원래 휴무」 이름표. 칸이 좁으면 줄바꿈. */
@@ -1317,7 +1317,7 @@
 .lvw .lvw-btn--ghost:hover { background: #ececf0; }
 .lvw .lvw-preview { display: none; }
 .lvw .lvw-after { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-.lvw .lvw-after b { font-size: 34px; font-weight: 700; letter-spacing: -0.03em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.lvw .lvw-after b { font-size: 34px; font-weight: 600; letter-spacing: -0.03em; color: var(--ink); font-variant-numeric: tabular-nums; }
 .lvw .lvw-after b small { margin-left: 3px; font-size: 16px; color: var(--text-3); }
 .lvw .lvw-after span { font-size: 13px; color: var(--text-3); }
 @media (min-width: 1000px) and (min-height: 600px) {
@@ -1329,7 +1329,7 @@
 .lvw .lvw-tabs { display: flex; gap: 20px; margin-top: 16px; border-bottom: 0.5px solid var(--separator); }
 .lvw .lvw-tabs button { height: 40px; padding: 0; border: 0; background: none; font: inherit; font-size: 14px; color: var(--text-3); cursor: pointer; }
 .lvw .lvw-tabs button span { margin-left: 4px; }
-.lvw .lvw-tabs button.on { color: var(--ink); font-weight: 700; box-shadow: inset 0 -2px 0 var(--ink); }
+.lvw .lvw-tabs button.on { color: var(--ink); font-weight: 600; box-shadow: inset 0 -2px 0 var(--ink); }
 .lvw .lvw-row--btn { width: 100%; padding: 0; border: 0; border-top: 0.5px solid var(--separator); background: none; font: inherit; text-align: left; cursor: pointer; }
 .lvw--hist .lrow-outer { margin: 0; }
 .lvw--hist .lrow-outer:first-of-type .lvw-row { border-top: 0; }
@@ -1352,7 +1352,7 @@
 .lvw .lvw-cal__wd.is-sun { color: #c4364b; }
 .lvw .lvw-cal__cell { height: 46px; display: flex; align-items: center; justify-content: center; }
 .lvw .lvw-cal__d { width: 38px; height: 40px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 14px; color: var(--ink); font-variant-numeric: tabular-nums; }
-.lvw .lvw-cal__d.is-today { background: #7a52e6; color: #fff; font-weight: 700; }
+.lvw .lvw-cal__d.is-today { background: #7a52e6; color: #fff; font-weight: 600; }
 .lvw .lvw-cal__dot { display: flex; height: 5px; }
 .lvw .lvw-cal__dot i { width: 5px; height: 5px; border-radius: 50%; background: #7a52e6; }
 .lvw .lvw-cal__dot i.is-past { background: #c9c6d3; }

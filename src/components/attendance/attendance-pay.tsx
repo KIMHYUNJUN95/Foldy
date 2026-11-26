@@ -324,7 +324,15 @@ export function AttendancePay({
         <div className="payw-chart" ref={chartRef} style={colPx ? ({ "--col": `${colPx}px` } as React.CSSProperties) : undefined}>
           <div className="payw-chart__h">
             <b>{copy.payChartTitle}</b>
-            <span>{copy.payChartLegend}</span>
+            <span className="payw-legend">
+              {/* 사전 문장 「색 = 뜻 · 색 = 뜻」을 색 점 + 뜻으로 나눠 그린다(두 번째가 빨강). */}
+              {copy.payChartLegend.split(" · ").map((part, i) => (
+                <span key={part}>
+                  <i aria-hidden="true" className={i === 1 ? "is-danger" : undefined} />
+                  {part.split(" = ")[1] ?? part}
+                </span>
+              ))}
+            </span>
           </div>
           <div className="payw-bars">
             {bars.map(({ n, date, d, isRunning, isExcluded }) =>

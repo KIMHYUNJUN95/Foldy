@@ -1687,7 +1687,11 @@ export function TransportStatement({
               {(sentBack ? t.missingFixLine : t.missingLine).replace("{n}", String(missingN))}
             </p>
           ) : null}
-          {isEditable ? (
+          {isEditable && items.length === 0 && !submitting ? (
+            <button type="button" className="trnw-empty-cta" onClick={() => setShowAddSheet(true)}>
+              {t.addLong}
+            </button>
+          ) : isEditable ? (
             <button type="button" className={`trnw-submit${submitting ? " is-busy" : ""}`} disabled={submitting || items.length === 0} onClick={handleSubmit}>
               {submitting ? <span className="trn-spin" /> : null}
               {sentBack ? t.resubmitBtn : t.submitMonthBtn.replace("{month}", monthShort)}
@@ -1695,7 +1699,7 @@ export function TransportStatement({
           ) : (
             <p className="trnw-locked">{t.lockedNote}</p>
           )}
-          {isEditable ? (
+          {isEditable && items.length > 0 ? (
             <button type="button" className="trnw-add-wide" onClick={() => setShowAddSheet(true)}>
               {t.addLong}
             </button>

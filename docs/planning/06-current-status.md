@@ -5,7 +5,9 @@
 > 2026-11-17: 손님 메시지 목록 순서를 손님 말 · 우리 답장 기준으로(리뷰 알림 system 줄 · 직원 메모는 올리지 않음) — `ingest-plan.ts` + 마이그레이션 `202611170001`(2026-11-17 운영 적용 · 어긋남 0). 커밋 · main 푸시.
 > 2026-10-25: 남은 일 전체(결정 대기 · 개발 순서 · 사용자 할 일 · 출시 일정)는 `docs/planning/19-open-tasks.md` 한곳에 모았다. 운영 마이그레이션은 `202610230008` 까지 전부 적용 확인.
 
-**2026-11-26 서버 코드 보안 점검 묶음 (sec-server 작업 폴더 · 커밋 전)** (05-rls 「2026-11-26 서버 코드 보안 점검 묶음」 · 39 · 41) — 본인 급여 계좌 확정은 대표 계열만 · 재류카드 확인 문을 view + 사용자 관리로 통일 · `/api/tasks/reminders` `?secret=` 제거 · `canHandleMaintenance` lib 로 이동 · 게시판 태그 10개/30자 · ops 내보내기 줄/칸 상한 · 손님 메시지 propertyName 200자 · 채용 동기화 스로틀 선점 · 초대 코드 시도 제한(메모리, 최선 노력) + 최소 6자. 새 문구 `onboarding.errors.invite_rate_limited`(ko/ja/en).
+**2026-11-26 서버 코드 보안 점검 묶음** (05-rls 「2026-11-26 서버 코드 보안 점검 묶음」 · 39 · 41) — 본인 급여 계좌 확정은 대표 계열만 · 재류카드 확인 문을 view + 사용자 관리로 통일 · `/api/tasks/reminders` `?secret=` 제거 · `canHandleMaintenance` lib 로 이동 · 게시판 태그 10개/30자 · ops 내보내기 줄/칸 상한 · 손님 메시지 propertyName 200자 · 채용 동기화 스로틀 선점 · 초대 코드 시도 제한(메모리, 최선 노력) + 최소 6자. 새 문구 `onboarding.errors.invite_rate_limited`(ko/ja/en).
+
+**2026-11-26 보안 점검 1 · 13 — 청소 기록 시각 · 기록 칸 서버 고정 + organization_id 잠금 7개 표 (마이그레이션 `202611260003`, 운영 적용 전)** (05-rls 「청소 시각 서버 고정 · organization_id 잠금」 · 04 · 07) — 작업자(authenticated) 쓰기의 `started_at` · `completed_at` · `duration_seconds` 는 트리거가 서버 시각으로 계산하고, 주인 · 날짜 · 방 · 종류 변경은 42501. service_role(관리자 경로)은 그대로. `forbid_organization_id_change` 를 announcements · cleaning_sessions · tasks · guest_conversations · guest_message_channel_state · property_operation_infos · reservation_internal_notes 에. 테스트 `cleaning-timing-org-guard.test.ts`.
 
 **2026-11-26 로그인 · 오류 · 막힌 화면 다듬기 구현 (main 푸시 완료)** — 캔버스 https://claude.ai/artifact/1EhsSW33yrgy54xehSvj6v. 오류 · 404 · 사용할 수 없음을 `FallbackScreen` 하나로, 문구는 `dictionary.appShell` 과 같게(테스트), 404 언어 선택을 `<html lang>` 과 같은 `resolveRequestLocale()` 로 모음, 로그인 막힌 계정 단추 세로 · 역할 글자 앞 세로선 제거. 문서 16 · 05 갱신.
 

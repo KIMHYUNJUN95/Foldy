@@ -205,16 +205,18 @@ export async function completeSessionCore(
 
   // 지난 날 기록을 여기로 끝내도 소요는 0초 — 어떤 화면에서 와도 같은 규칙(문서 45 C12).
   const fields = sessionCloseFields({ cleaned: true, cleaningDate: activeSession.cleaning_date, now: new Date(), startedAt: activeSession.started_at, today: getCleaningOperatingDateKey() });
-  const durationSeconds = fields.duration_seconds;
+  // 끝 시각 · 소요는 DB 트리거(`cleaning_sessions_timing_guard`, 202611260003)가 같은 규칙으로 다시 계산해 덮는다 —
+  // 작업자가 값을 지어 넣지 못하게. 화면에 보여 줄 소요도 저장된 값을 돌려받아 쓴다(앱 계산과 1초 안쪽으로 다를 수 있다).
   const { data: updated, error: updateError } = await supabase
     .from("cleaning_sessions")
     .update({ ...fields, notes: notes || null })
     .eq("id", activeSession.id)
     .eq("status", "in_progress")
-    .select("id");
+    .select("id, duration_seconds");
   if (updateError) return fail("complete_failed");
   // 0행 = 그 사이에 끝났거나 취소됨 — 「끝냈어요」라고 하지 않는다.
   if (!updated || updated.length === 0) return fail("active_not_found");
+  const durationSeconds = updated[0].duration_seconds ?? fields.duration_seconds;
 
   await signal(session.organization.id);
   return { ok: true, durationSeconds };

@@ -549,9 +549,9 @@ room_label text not null          -- canonical "PropertyName RoomLabel" string, 
 task_label text not null          -- task type key (checkout_cleaning, simple_cleaning, long_stay_cleaning)
 status cleaning_status not null
 cleaning_date date not null       -- JST operating date (Asia/Tokyo)
-started_at timestamptz not null
-completed_at timestamptz
-duration_seconds integer
+started_at timestamptz not null   -- 시작 시각. 작업자(authenticated) insert 는 트리거가 now() 로 덮는다(202611260003)
+completed_at timestamptz          -- 작업자 진행 중 → 완료/취소 전이 때 트리거가 다시 계산(아래 「시각 서버 고정」)
+duration_seconds integer          -- 〃. 작업자는 그 밖에 시작 · 끝 · 소요를 바꾸지 못한다(42501)
 notes text
 completed_by_admin uuid references profiles(id) on delete set null  -- admin id when force-completed on
                                                                      -- behalf of staff (202607150001); null
@@ -574,6 +574,18 @@ room_key text                     -- 실제 방 키(배정 cleaning_assignments.
 created_at timestamptz not null
 updated_at timestamptz not null
 ```
+
+시각 서버 고정(2026-11-26, `202611260003_cleaning_timing_guard_and_org_id_locks.sql`) — 트리거
+`cleaning_sessions_timing_guard`(BEFORE INSERT · UPDATE, 함수 `enforce_cleaning_session_timing()`). 허용 목록(`service_role` ·
+`postgres` · `supabase_admin`)은 `202611250003` 가드와 같고 그대로 통과(관리자 강제 완료 · 완료 취소 · 처리 끝 · 2분 되돌리기). 그 밖 역할:
+
+- insert: `started_at := now()`, `completed_at` · `duration_seconds` 가 있으면 42501.
+- update 진행 중 → 완료/취소: 보낸 값 대신 `sessionCloseFields` 와 같은 규칙으로 덮는다 — 지난 날(`cleaning_date` < 도쿄 오늘)
+  완료 = 끝 `started_at` · 0초, 지난 날 취소 = 끝 `now()` · 0초, 오늘 = 끝 `now()` · `round(now() - started_at)` 초.
+- 그 밖 update: `started_at` · `completed_at` · `duration_seconds` 변경 42501. `started_at` 은 어떤 update 로도 못 바꾼다.
+- update 로 `staff_user_id` · `cleaning_date` · `room_label` · `room_key` · `task_label` · `closed_without_cleaning` 변경 42501(같은 값은 허용).
+
+`organization_id` 는 바꿀 수 없다 — 트리거 `cleaning_sessions_forbid_org_change`(202611260003, 모든 역할).
 
 Status values (cleaning_status enum):
 
@@ -782,6 +794,8 @@ Tokyo date. See `docs/engineering/05-rls-permissions.md` → `lost_items` for th
 
 ## reservation_internal_notes
 
+> `organization_id` 는 바꿀 수 없다 — 트리거 `reservation_internal_notes_forbid_org_change`(`forbid_organization_id_change()`, 202611260003, 모든 역할 · 42501).
+
 Per-reservation internal operator memo used by the admin reservation calendar inspector.
 
 Migration: `supabase/migrations/202607090003_reservation_calendar_linking_and_notes.sql`
@@ -852,6 +866,8 @@ order_request_urgency: normal | high
 Note: per-transition audit columns are not in the MVP schema. The `status` enum value tracks workflow state. Per-item photo URLs are stored inside `items[].imageUrls` within the JSONB column. `admin_memo` (added 2026-07-19, part of the `/admin/orders` operations-console rebuild) is nullable and RLS policies are unchanged by the migration; the admin console (`getAdminOrders`, `src/lib/admin-orders.ts`) displays the DB `received` status as `ordered` (an inactive step) and does not surface a distinct `received` state in the UI.
 
 ## announcements
+
+> `organization_id` 는 바꿀 수 없다 — 트리거 `announcements_forbid_org_change`(`forbid_organization_id_change()`, 202611260003, 모든 역할 · 42501).
 
 Internal notices.
 
@@ -1153,6 +1169,8 @@ Trigger `linen_return_record_items_same_org` (2026-11-10) rejects a line whose `
 different organization than the record.
 
 ## tasks
+
+> `organization_id` 는 바꿀 수 없다 — 트리거 `tasks_forbid_org_change`(`forbid_organization_id_change()`, 202611260003, 모든 역할 · 42501).
 
 Implemented (migration `202606100003_todo_tasks.sql`). One canonical task + `task_participants`
 (one set, author + participants) + `task_updates` (unified log). Private by default; sharing adds
@@ -1958,6 +1976,8 @@ Basic rules:
 
 ### `public.property_operation_infos`
 
+> `organization_id` 는 바꿀 수 없다 — 트리거 `property_operation_infos_forbid_org_change`(`forbid_organization_id_change()`, 202611260003, 모든 역할 · 42501).
+
 Organization-scoped shared building-operation metadata used by both admin and mobile calendars.
 
 - `organization_id`
@@ -2548,6 +2568,8 @@ INSERT · UPDATE 신호만, DELETE 는 오지 않는다. 대신 `task_occurrence
 - `audit_log.action` 추가: `staff_call_started` · `staff_call_accepted` · `staff_call_no_answer` · `staff_call_canceled` · `staff_call_ended`. `meta` 는 `call_id` · `property_key` 만.
 
 ## 2026-11-12 손님 메시지 — `guest_conversations` · `guest_messages` · `guest_message_outbox` · `guest_message_channel_state` (`202611120002`, 운영 적용 2026-11-12)
+
+> `guest_conversations` · `guest_message_channel_state` 의 `organization_id` 는 바꿀 수 없다 — 트리거 `guest_conversations_forbid_org_change` · `guest_message_channel_state_forbid_org_change`(`forbid_organization_id_change()`, 202611260003, 모든 역할 · 42501).
 
 기준 문서: `docs/product/47-guest-messaging.md` §4 · §7. 메시지의 원본은 이 표들이고 Beds24 는 통로(`provider = 'beds24'`) 하나다. 모두 조직 범위 + RLS(05 「손님 메시지」). 하드 삭제 — 조직 · 대화가 지워지면 따라 지워지고, 보관 기간(Q7)이 정해지기 전에는 지우는 작업이 없다.
 

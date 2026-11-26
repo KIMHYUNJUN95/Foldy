@@ -443,7 +443,7 @@ Additional implementation note (2026-07-09):
   `cleaning_sessions_admin_complete_guard`(BEFORE INSERT · UPDATE)를 더한다 — **허용 목록**: `current_user` 가 `service_role` ·
   `postgres` · `supabase_admin` 이면 통과, 그 밖의 모든 역할(authenticated · anon · 앞으로 생길 역할)은 검사(2차 점검 8).
   **이 표에 쓰는 SECURITY DEFINER 함수를 만들면 트리거를 다시 볼 것** — 함수 안에선 current_user 가 주인(postgres)이라 통과한다
-  (2026-11-25 기준 그런 함수 없음).
+  (2026-11-25 기준 그런 함수 없음). 같은 허용 목록으로 시각 칸도 막는다(2026-11-26, 아래 「청소 시각 서버 고정」).
   작업자가 RLS 로 허용된 자기 줄 완료 쓰기에 `completed_by_admin` · `admin_complete_snapshot` 을 null 아닌 값으로 넣으면 42501
   (비우기는 허용, service-role 은 그대로). 함수는 `search_path = ''`, 실행 권한은 public · anon · authenticated 에서 뺐다.
   서버는 스냅샷 모양(진행 중 · 끝난 시각 모름 완료 두 가지만)과 속 사람(**활성** 조직 구성원 · 관리자는 `cleaning.force_complete`)도 다시 본다.
@@ -1940,7 +1940,7 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 | office_admin 이 memberships 를 직접 고쳐 owner 로 승격 | memberships 쓰기 정책 삭제 + 쓰기 권한 회수(위 「memberships」) |
 | 정지 · 제외된 사람의 개인 부여 권한이 계속 통함(재류카드 열람 등) | `has_capability` — 개인 부여는 활성 멤버(또는 플랫폼 개발자)일 때만 |
 | 출퇴근 등록 기기의 `token_hash` · 만료 · 해지를 직접 바꿈 | `attendance_trusted_devices` UPDATE 정책 삭제 + 쓰기 권한 회수(등록 · 해지는 service role) |
-| 작성자가 글 · 기록의 `organization_id` 를 바꿔 다른 조직에 넣음 | `board_posts` · `bug_reports` · `linen_return_records` 에 `forbid_organization_id_change` 트리거 |
+| 작성자가 글 · 기록의 `organization_id` 를 바꿔 다른 조직에 넣음 | `board_posts` · `bug_reports` · `linen_return_records` 에 `forbid_organization_id_change` 트리거 (2026-11-26 표 7개 더함 — 아래 「청소 시각 서버 고정 · organization_id 잠금」) |
 | 로그인 후 주소 `next` 에 탭 · 줄바꿈을 넣어 외부로 보냄 | `sanitizeNextPath` 제어 문자 거부 + 해석 후 origin 확인(테스트 `safe-redirect.test.ts`) |
 | 아무 직원이나 동료 입사일 · 연차 잔여 조회 | `getApplicantLeaveSummary` — 본인 또는 연차 결재자만 |
 | `src/lib/auth-invite.ts` 가 `"use server"` 라 service role 가입 함수가 공개 액션 | `"use server"` → `server-only` |
@@ -2179,3 +2179,28 @@ Supabase advisor `anon_security_definer_function_executable` 정리. 운영 `pg_
 - **ops 내보내기 3곳**(가동률 · 매출 · 두 기간 비교): 줄 20000 · 칸 60 상한(`src/lib/admin-export-limits.ts`), 넘으면 `error`. 손님 메시지 `propertyName` 200자 상한.
 - **`/api/recruit/sync`** 최신분 스로틀: 조건부 update 로 `last_run_at` 을 먼저 잡은 요청만 실행(동시 요청 중 하나).
 - **초대 코드 시도 제한**: 사용자당 10분 10번(미리보기 + 가입 합산) + 6자 미만 즉시 invalid(`src/lib/invite-attempt-limiter.ts`). **서버 인스턴스 메모리라 인스턴스마다 따로 센다(최선 노력)** — 확실한 제한은 시도 기록 표(마이그레이션)가 필요해 결정 대기.
+
+## 청소 시각 서버 고정 · organization_id 잠금(2026-11-26) (`202611260003_cleaning_timing_guard_and_org_id_locks`, **운영 적용 전**)
+
+보안 점검 1 · 13. RLS 정책 · GRANT 는 바꾸지 않았다(트리거만). 테스트: `src/lib/__tests__/cleaning-timing-org-guard.test.ts`
+(파일 정적 확인 + `FOLDY_PGLITE_DIR` 있을 때 PGlite 로 authenticated · service_role 실제 쓰기).
+
+- **빈틈**: `cleaning_sessions` 의 작업자 insert/update 정책은 담당자 · 상태 · 칸이 비었는지/찼는지만 본다. 그래서 `cleaning.work` 작업자가
+  PostgREST 로 바로 `started_at` 을 앞당기거나 끝낼 때 `duration_seconds` 를 부풀릴 수 있었다(청소 기록 · 사람별 달력 · 급여 내보내기 근거).
+- **정상 흐름이 쓰는 길**(`src/lib/cleaning-session-ops.ts`): 시작 · 끝내기 · 지난 기록 닫기 · 본인 취소는 **사용자 클라이언트**(RLS),
+  2분 되돌리기 · 개발자의 남의 청소 취소 · 관리자 강제 완료 · 완료 취소 · 처리 끝은 **service-role**. 사용자 클라이언트가 이 칸을 쓰므로
+  막지 않고 **서버(트리거)가 값을 정한다**: 트리거 `cleaning_sessions_timing_guard`(BEFORE INSERT · UPDATE, `enforce_cleaning_session_timing()`,
+  SECURITY INVOKER · `search_path = ''` · public/anon/authenticated 실행 권한 회수).
+  - 허용 목록은 `202611250003` 와 같다 — `current_user` 가 `service_role` · `postgres` · `supabase_admin` 이면 통과(관리자 경로 그대로).
+  - 그 밖 역할 insert: `started_at := now()`(보낸 값 무시 — 앱은 원래 안 보냄), 끝 시각 · 소요가 있으면 42501.
+  - 그 밖 역할 진행 중 → 완료/취소: 보낸 끝 시각 · 소요를 버리고 `sessionCloseFields` 와 같은 규칙으로 다시 계산(도쿄 날짜 기준,
+    지난 날 = 0초). 앱 `completeSessionCore` 는 화면 소요를 저장된 값으로 돌려받는다.
+  - 그 밖 update 로 `started_at` · `completed_at` · `duration_seconds` 변경 → 42501.
+  - 그 밖 역할 update 로 기록 주인 · 날짜 · 방 · 종류(`staff_user_id` · `cleaning_date` · `room_label` · `room_key` · `task_label` ·
+    `closed_without_cleaning`) 변경 → 42501(독립 감사 2026-11-26). 정상 흐름(끝내기 · 닫기 · 취소)은 이 칸을 보내지 않는다.
+  - 이 표에 쓰는 SECURITY DEFINER 함수를 만들면 이 트리거도 다시 볼 것(함수 안에선 current_user 가 주인이라 통과).
+- **organization_id 잠금**: `forbid_organization_id_change()`(202610280002, 다시 만들지 않음)를 `before update of organization_id` 로
+  `announcements` · `cleaning_sessions` · `tasks` · `guest_conversations` · `guest_message_channel_state` · `property_operation_infos` ·
+  `reservation_internal_notes` 에 붙였다(트리거 이름 `<표>_forbid_org_change`, 모든 역할 · 42501). 7개 모두 `organization_id` 칸이 있고
+  (`guest_message_channel_state` 는 기본 키) 전에 붙은 잠금은 없었다.
+- **배포 순서**: 마이그레이션 먼저 적용해도 지금 코드와 맞는다(앱은 시작 시각을 안 보내고, 끝 값은 트리거가 덮음). 코드만 먼저 나가도 문제없다.

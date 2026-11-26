@@ -475,6 +475,7 @@ Implemented on 2026-05-21:
 - Added real database-backed `cleaning_sessions` persistence.
 - Mobile field roles can select from a small room/task list, choose Checkout Cleaning, Simple Cleaning, or Long-stay Cleaning, start a cleaning session, see an active timer, add an optional completion note, review room/task/start time/elapsed time in a confirmation step, and then complete the session.
 - Completion records `completed_at` and `duration_seconds`.
+- 작업자 쓰기(사용자 클라이언트)의 시각 · 소요는 DB 트리거가 서버 시각으로 계산한다(`cleaning_sessions_timing_guard`, 202611260003) — 앱이 보낸 값은 쓰지 않고, 시작 뒤 주인 · 날짜 · 방 · 종류 변경은 막는다. 화면의 소요는 저장된 값(`completeSessionCore` 가 돌려받음). 관리자 경로(service-role)는 그대로.
 - Cleaning "today" uses the defined UTC+9 local operating date (`Asia/Seoul`, matching Korea/Japan operating date) instead of raw UTC date slicing.
 - A partial unique database index enforces the first rule of one active cleaning timer per organization/user.
 - Admin web has a first cleaning status view for the current organization/date with room, task, staff, status, start time, and duration.

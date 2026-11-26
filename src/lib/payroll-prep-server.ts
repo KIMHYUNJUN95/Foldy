@@ -24,7 +24,7 @@ import { requireRead } from "@/lib/attendance-read";
 import { breakSecondsBySession } from "@/lib/attendance-pay-calculation";
 import { computePayrollKintai, type KintaiAudit } from "@/lib/payroll-kintai";
 import { loadMemberBanks } from "@/lib/payroll-bank-server";
-import type { MemberBank } from "@/lib/payroll-bank";
+import { canConfirmBank, type MemberBank } from "@/lib/payroll-bank";
 
 /**
  * 알바 급여 P3 — 급여 준비 읽기(서버 전용, service role). PC 근태 › 급여 · 모바일 급여 준비가 같이 쓴다.
@@ -57,6 +57,8 @@ export type PayrollPrepData = {
    * 이체 목록 · 「계좌 바뀜」 확인에 쓴다. docs/product/39 §3-A
    */
   banks: Record<string, MemberBank>;
+  /** 줄마다 「확인함」 단추를 보일지 — 서버가 `canConfirmBank` 로 계산한다(본인 계좌는 대표 계열만). */
+  bankConfirmable: Record<string, boolean>;
 };
 
 type InputRow = {
@@ -129,6 +131,7 @@ function emptyData(ym: string, payday: Payday): PayrollPrepData {
     rows: [],
     totals: prepTotals([]),
     banks: {},
+    bankConfirmable: {},
   };
 }
 
@@ -150,6 +153,10 @@ export async function getPayrollPrep(session: AppSession, ym: string): Promise<P
   const { round, snapshot } = await loadPayrollRound(service, organizationId, ym, session.user.id, org, canApprove);
   const banksFor = async (rows: readonly PrepRow[]): Promise<Record<string, MemberBank>> =>
     canViewPayroll ? Object.fromEntries(await loadMemberBanks(service, organizationId, rows.map((r) => r.userId))) : {};
+  const confirmableFor = (rows: readonly PrepRow[]): Record<string, boolean> =>
+    Object.fromEntries(
+      rows.map((r) => [r.userId, canConfirmBank({ role: session.user.role, isSelf: r.userId === session.user.id, canManage })]),
+    );
   if (snapshot) {
     // 잠긴 달 — 요청 때 굳힌 값 그대로(근태 · 설정이 그 뒤 바뀌어도 결재한 숫자가 안 바뀐다).
     return {
@@ -165,6 +172,7 @@ export async function getPayrollPrep(session: AppSession, ym: string): Promise<P
       totals: snapshot.totals,
       round,
       banks: await banksFor(snapshot.rows),
+      bankConfirmable: confirmableFor(snapshot.rows),
     };
   }
   const prep = await loadPrepRows(service, organizationId, ym, payday, org.employmentInsuranceRates);
@@ -176,6 +184,7 @@ export async function getPayrollPrep(session: AppSession, ym: string): Promise<P
     canApprove,
     round,
     banks: await banksFor(prep.rows),
+    bankConfirmable: confirmableFor(prep.rows),
   };
 }
 
@@ -186,7 +195,7 @@ export async function loadPrepRows(
   ym: string,
   payday: Payday,
   insuranceRates: Record<string, number>,
-): Promise<Omit<PayrollPrepData, "canView" | "canManage" | "canApprove" | "companyName" | "round" | "banks">> {
+): Promise<Omit<PayrollPrepData, "canView" | "canManage" | "canApprove" | "companyName" | "round" | "banks" | "bankConfirmable">> {
   const firstDay = `${ym}-01`;
   const today = tokyoToday();
   const [membersRes, base, transportRes, inputsRes] = await Promise.all([

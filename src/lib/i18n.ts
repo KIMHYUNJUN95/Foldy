@@ -8659,6 +8659,7 @@ const FALLBACK_DICTIONARY = {
       membership_blocked:
         "This account cannot join with an invite code. Please contact an administrator.",
       invite_join_failed: "Could not join with this invite code. Please try again.",
+      invite_rate_limited: "Too many attempts. Please try again in a few minutes.",
       membership_failed: "Could not join the organization. Please try again.",
       invite_update_failed: "Invite code update failed. Please try again.",
       missing_profile_fields: "Please fill in all required fields.",
@@ -18652,6 +18653,7 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
         membership_blocked:
           "이 계정은 초대 코드로 가입할 수 없어요. 관리자에게 문의해 주세요",
         invite_join_failed: "초대 코드로 조직에 참여하지 못했어요. 다시 시도해 주세요",
+        invite_rate_limited: "너무 여러 번 시도했어요. 잠시 뒤에 다시 해 주세요",
         membership_failed: "조직 참여에 실패했습니다. 다시 시도해 주세요.",
         invite_update_failed: "초대 코드를 처리하지 못했어요. 다시 시도해 주세요",
         missing_invite: "초대 코드를 입력해 주세요",
@@ -28588,6 +28590,7 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
         membership_blocked:
           "このアカウントは招待コードで参加できません。管理者にお問い合わせください。",
         invite_join_failed: "招待コードで組織に参加できませんでした。もう一度お試しください。",
+        invite_rate_limited: "試行回数が多すぎます。しばらくしてからもう一度お試しください。",
         membership_failed: "組織への参加に失敗しました。もう一度お試しください。",
         invite_update_failed: "招待コードの処理に失敗しました。もう一度お試しください。",
         missing_invite: "招待コードを入力してください",

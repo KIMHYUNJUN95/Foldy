@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
+import { canReviewStaffDocuments } from "@/lib/staff-documents/review-access";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { readIdCardPhotos, type OcrResult } from "@/lib/staff-documents/ocr";
 import { STAFF_DOCUMENT_BUCKET } from "@/lib/staff-documents/server";
@@ -208,10 +209,10 @@ export async function submitIdCard(input: SubmitIdCardInput): Promise<SubmitIdCa
 
 export type ReviewIdDocumentInput = { documentId: string; decision: "confirm" | "return"; reason?: string };
 
-/** 관리자 확인 — 「확인함」 또는 「다시 요청(사유)」. `staff_documents.view` 가 있는 같은 조직 사람만. */
+/** 관리자 확인 — 「확인함」 또는 「다시 요청(사유)」. `staff_documents.view` + 사용자 관리가 있는 같은 조직 사람만(대신 올리기와 같은 문). */
 export async function reviewIdDocument(input: ReviewIdDocumentInput): Promise<{ ok: boolean; errorKey?: "forbidden" | "reason_required" | "failed" }> {
   const session = await memberSession();
-  if (!session || !session.capabilities.includes("staff_documents.view")) return { ok: false, errorKey: "forbidden" };
+  if (!session || !(await canReviewStaffDocuments(session))) return { ok: false, errorKey: "forbidden" };
   if (!UUID.test(input.documentId)) return { ok: false, errorKey: "forbidden" };
   const reason = (input.reason ?? "").trim().slice(0, 300);
   if (input.decision === "return" && !reason) return { ok: false, errorKey: "reason_required" };
@@ -234,7 +235,8 @@ export async function reviewIdDocument(input: ReviewIdDocumentInput): Promise<{ 
         ? { status: "confirmed", confirmed_by: session.user.id, confirmed_at: new Date().toISOString(), return_reason: null }
         : { status: "returned", confirmed_by: session.user.id, confirmed_at: new Date().toISOString(), return_reason: reason },
     )
-    .eq("id", input.documentId);
+    .eq("id", input.documentId)
+    .eq("organization_id", session.organization.id);
   if (error) return { ok: false, errorKey: "failed" };
   // 「직원 서류」 탭(`/admin/users/documents` · `/mobile/users/documents`, R4)까지 — 그 아래 전부.
   revalidatePath("/admin/users", "layout");

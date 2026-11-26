@@ -1,5 +1,7 @@
 "use server";
 
+import { INVITE_CODE_MIN_LENGTH } from "@/lib/invite-code-gen";
+import { takeInviteAttempt } from "@/lib/invite-attempt-limiter";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { roleToInviteCategory } from "@/config/roles";
@@ -110,6 +112,8 @@ export async function previewInviteCode(
 
   const trimmed = code.trim();
   if (!trimmed) return { ok: false, errorKey: "missing_invite" };
+  if (trimmed.length < INVITE_CODE_MIN_LENGTH) return { ok: false, errorKey: "invalid_invite" };
+  if (!takeInviteAttempt(user.id)) return { ok: false, errorKey: "invite_rate_limited" };
 
   // 없음 · 만료 · 꺼짐 · 다 씀 · 정지 조직을 **같은 오류**로 돌려준다(2026-11-11) — 이 액션에는 횟수 제한이 없어, 사유가 갈리면
   // 「이 코드는 있다(만료됐을 뿐)」를 하나씩 맞혀 볼 수 있다. 가입하는 사람에게는 「코드를 다시 확인해 달라」 한 문구면 충분하다.
@@ -138,6 +142,8 @@ async function joinInviteCode(userId: string, code: string, next: string) {
   if (!code) {
     return null;
   }
+  if (code.length < INVITE_CODE_MIN_LENGTH) onboardingError("invalid_invite", next);
+  if (!takeInviteAttempt(userId)) onboardingError("invite_rate_limited", next);
 
   const service = getSupabaseServiceClient();
   const { data, error } = await (service as unknown as RpcClient).rpc(

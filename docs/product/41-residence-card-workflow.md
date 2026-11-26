@@ -90,6 +90,7 @@
 ## 4. 권한
 
 - **새 키 `staff_documents.view`(직원 서류 보기 · 인쇄 · 확인)** — 기본 대표 · 전무(개발자는 항상). 인사 담당 등은 사람마다 켬.
+  - 확인 · 다시 요청 · 관리자 대신 올리기의 서버 문은 **`staff_documents.view` + 사용자 관리** 한 판정(`canReviewStaffDocuments`, `src/lib/staff-documents/review-access.ts`) — 화면 문과 같다(2026-11-26 점검: 예전엔 확인만 view 단독이었다).
 - 본인은 자기 카드만 올리기 · 보기. 다른 사람 것은 위 키 없이는 서버가 막음(UI 숨김만으로 막지 않는다).
 - 가타카나 이름 · 국적은 급여 담당(`wages.manage` · `payroll.view`)도 봄 — 명세서에 필요.
 

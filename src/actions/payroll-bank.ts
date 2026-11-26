@@ -1,16 +1,17 @@
 "use server";
 
+import type { Role } from "@/config/roles";
 import { revalidatePath } from "next/cache";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { attendanceCan } from "@/lib/attendance-review";
 import { bestEffortWrite } from "@/lib/db-write-guard";
-import { last4, parseBankInput, sameAccount, type BankChange, type BankField, type MemberBank } from "@/lib/payroll-bank";
+import { canConfirmBank, last4, parseBankInput, sameAccount, type BankChange, type BankField, type MemberBank } from "@/lib/payroll-bank";
 import { loadBankHistory, MEMBER_BANK_SELECT, rowToMemberBank, type MemberBankRow } from "@/lib/payroll-bank-server";
 
 /**
  * 급여 계좌 — 읽기 · 쓰기 · 확인(본인 내 계정 · PC 근태 › 시급 패널 · 모바일 사용자 상세 · 급여 준비가 같이 부른다 → src/actions).
- * 보기 = 본인 또는 `payroll.view`. 고치기 = 본인 또는 `payroll.manage`. 확인 = `payroll.manage`.
+ * 보기 = 본인 또는 `payroll.view`. 고치기 = 본인 또는 `payroll.manage`. 확인 = `payroll.manage`(본인 계좌는 owner 계열만 — `canConfirmBank`).
  * 본인이 바꾸면 확인 전(`pending`), 관리자가 바꾸면 바로 확인됨. 막히면 redirect 대신 `forbidden`. docs/product/39 §3-A
  */
 
@@ -31,6 +32,7 @@ type Ctx = {
   service: ReturnType<typeof getSupabaseServiceClient>;
   organizationId: string;
   viewerId: string;
+  viewerRole: Role;
   isSelf: boolean;
   canView: boolean;
   canManage: boolean;
@@ -46,7 +48,7 @@ async function context(userId: unknown): Promise<Ctx | null> {
     attendanceCan(service, organizationId, session.user.id, "payroll.view"),
     attendanceCan(service, organizationId, session.user.id, "payroll.manage"),
   ]);
-  return { service, organizationId, viewerId: session.user.id, isSelf, canView, canManage };
+  return { service, organizationId, viewerId: session.user.id, viewerRole: session.user.role, isSelf, canView, canManage };
 }
 
 async function isMember(ctx: Ctx, userId: string): Promise<boolean | null> {
@@ -77,7 +79,7 @@ async function detail(ctx: Ctx, userId: string, row: MemberBankRow | null): Prom
     bank: row ? rowToMemberBank(row) : null,
     history: await loadBankHistory(ctx.service, ctx.organizationId, userId),
     canEdit: ctx.isSelf || ctx.canManage,
-    canConfirm: ctx.canManage,
+    canConfirm: canConfirmBank({ role: ctx.viewerRole, isSelf: ctx.isSelf, canManage: ctx.canManage }),
   };
 }
 
@@ -181,7 +183,7 @@ export async function saveMemberBank(input: { userId: string; account: unknown }
 export async function confirmMemberBank(input: { userId: string }): Promise<MemberBankResult> {
   const ctx = await context(input?.userId);
   if (!ctx) return { ok: false, reason: "forbidden" };
-  if (!ctx.canManage) return { ok: false, reason: "forbidden" };
+  if (!canConfirmBank({ role: ctx.viewerRole, isSelf: ctx.isSelf, canManage: ctx.canManage })) return { ok: false, reason: "forbidden" };
   const read = await readBank(ctx, input.userId);
   if (!read.ok) return { ok: false, reason: "error" };
   if (!read.row) return { ok: false, reason: "invalid" };

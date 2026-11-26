@@ -108,7 +108,29 @@ async function readState() {
   // 읽기 실패는 「스로틀 없음」으로 흘러가므로 조용하면 안 된다. 처음 배포에서 grant 누락으로
   // 이 자리가 계속 실패했고, 오류를 삼키고 있어 스로틀이 안 걸리는 것을 늦게 알아챘다.
   if (error) console.warn("[recruit/sync] state read failed:", error.message);
-  return { lastRunAt: data?.last_run_at ?? null, lastSuccessAt: data?.last_success_at ?? null };
+  return { lastRunAt: data?.last_run_at ?? null, lastSuccessAt: data?.last_success_at ?? null, exists: !!data };
+}
+
+/**
+ * 최신분 실행 자리를 먼저 잡는다 — 조건부 update 로 `last_run_at` 을 지금으로 옮기고, 바뀐 줄이 있는 요청만 돈다.
+ * 읽고 → 판단 → 실행 사이에 동시 요청이 끼면 둘 다 창을 통과하므로, 판정과 선점을 한 쿼리로 합친다(2026-11-26 점검).
+ * 상태 줄이 없거나 쿼리가 실패하면 예전처럼 통과시킨다(쓰기 실패가 동기화를 막지 않는다).
+ */
+async function claimRecentRun(): Promise<boolean> {
+  const supabase = getSupabaseServiceClient();
+  const now = Date.now();
+  const cutoff = new Date(now - THROTTLE_SECONDS * 1000).toISOString();
+  const { data, error } = await supabase
+    .from("recruit_sync_state")
+    .update({ last_run_at: new Date(now).toISOString() })
+    .eq("id", true)
+    .or(`last_run_at.is.null,last_run_at.lte.${cutoff}`)
+    .select("id");
+  if (error) {
+    console.warn("[recruit/sync] claim failed:", error.message);
+    return true;
+  }
+  return (data ?? []).length > 0;
 }
 
 async function writeState(args: { ok: boolean; result: Json }) {
@@ -162,13 +184,11 @@ export async function POST(request: NextRequest) {
   }
   const apiKey = process.env.RECRUIT_FIRESTORE_API_KEY?.trim() || null;
 
-  const { lastRunAt, lastSuccessAt } = await readState();
-  if (lastRunAt) {
-    const elapsed = (Date.now() - new Date(lastRunAt).getTime()) / 1000;
-    // 전량 훑기는 하루 1회라 창을 적용하지 않는다 — 최신분 호출에 밀려 영원히 건너뛰면 안 된다.
-    if (mode === "recent" && elapsed < THROTTLE_SECONDS) {
-      return NextResponse.json({ ok: true, skipped: "throttled", elapsedSeconds: Math.round(elapsed) });
-    }
+  const { lastRunAt, lastSuccessAt, exists } = await readState();
+  // 전량 훑기는 하루 1회라 창을 적용하지 않는다 — 최신분 호출에 밀려 영원히 건너뛰면 안 된다.
+  if (mode === "recent" && exists && !(await claimRecentRun())) {
+    const elapsed = lastRunAt ? Math.round((Date.now() - new Date(lastRunAt).getTime()) / 1000) : 0;
+    return NextResponse.json({ ok: true, skipped: "throttled", elapsedSeconds: elapsed });
   }
 
   const summary: SyncSummary = {

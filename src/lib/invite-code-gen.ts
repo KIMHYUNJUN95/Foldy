@@ -17,6 +17,8 @@ const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 
 export const INVITE_CODE_SUFFIX_LENGTH = 6;
 export const INVITE_CODE_PREFIX_LENGTH = 6;
+/** 가입 쪽이 이보다 짧은 입력은 조회 없이 거절한다 — 직접 입력 코드 규칙(`isValidManualInviteCode`)의 가장 짧은 길이이고, 자동 생성은 8자 이상이다. */
+export const INVITE_CODE_MIN_LENGTH = 6;
 export const DEFAULT_INVITE_MAX_USES = 10;
 export const DEFAULT_INVITE_EXPIRY_DAYS = 30;
 

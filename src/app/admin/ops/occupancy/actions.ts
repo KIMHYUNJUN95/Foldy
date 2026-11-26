@@ -6,6 +6,7 @@ import { tokyoToday } from "@/lib/tokyo-date";
 import type { AdminReportExportResult, AdminWorkbookExportResult } from "@/lib/admin-export-result";
 import { buildAdminTableReportHtml } from "@/lib/admin-table-report";
 import { buildAdminTableWorkbookBase64, type AdminTableSheet } from "@/lib/admin-table-workbook";
+import { opsOccupancyPayloadFits } from "@/lib/admin-export-limits";
 import { getDictionary } from "@/lib/i18n";
 import { canAccessOpsAdmin } from "@/lib/ops-admin";
 import { occupancyGrade } from "@/lib/ops-occupancy";
@@ -127,6 +128,7 @@ async function requireOccupancyExport() {
 export async function exportOpsOccupancyWorkbook(payload: OpsOccupancyExportPayload): Promise<AdminWorkbookExportResult> {
   const session = await requireOccupancyExport();
   if (!session) return { ok: false, reason: "error" };
+  if (!opsOccupancyPayloadFits(payload)) return { ok: false, reason: "error" };
   if (payload.rows.length === 0) return { ok: false, reason: "empty" };
   try {
     const meta = buildAdminExportMeta(session);
@@ -149,6 +151,7 @@ export async function exportOpsOccupancyWorkbook(payload: OpsOccupancyExportPayl
 export async function exportOpsOccupancyReport(payload: OpsOccupancyExportPayload): Promise<AdminReportExportResult> {
   const session = await requireOccupancyExport();
   if (!session) return { ok: false, reason: "error" };
+  if (!opsOccupancyPayloadFits(payload)) return { ok: false, reason: "error" };
   if (payload.rows.length === 0) return { ok: false, reason: "empty" };
   try {
     const meta = buildAdminExportMeta(session);

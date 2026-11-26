@@ -2168,3 +2168,14 @@ Supabase advisor `anon_security_definer_function_executable` 정리. 운영 `pg_
 - 읽기 액션 · PC 상단 게이지는 같은 판정 `canViewBeds24Credit`(조직 있음 · `ops_admin.access` · `admin_web.access`). 플랫폼 계정은 `forbidden`.
 - 화면은 서버 액션 `loadBeds24CreditSummary` · `loadBeds24CreditDetail`(`src/actions/beds24-credit.ts`, `ops_admin.access`, 못 하면 `forbidden` 결과)이
   service_role + **세션 조직**으로 읽는다 — 「이 조직 줄 + 조직 없는 줄」만. 다른 조직 사용량은 줄로는 안 보이고 「Foldy 밖」 합으로만 보인다.
+
+## 2026-11-26 서버 코드 보안 점검 묶음 (마이그레이션 없음)
+
+- **급여 계좌 확인**: 본인 계좌(`isSelf`)는 대표 · 전무 · 개발자(`isOrgTopAdminOrPlatform`)만 확인한다. 남의 계좌는 그대로 `payroll.manage`. 판정 `canConfirmBank`(`src/lib/payroll-bank.ts`) 한 곳을 서버 액션과 화면(`canConfirm`)이 같이 쓴다.
+- **재류카드 확인 · 다시 요청 · 대신 올리기**: `staff_documents.view` + 사용자 관리 한 판정 `canReviewStaffDocuments`.
+- **`/api/tasks/reminders`**: `?secret=` 쿼리 인증 제거 — `Authorization: Bearer` 만. (호출하는 곳은 vercel.json 크론뿐이라 영향 없음.)
+- **`canHandleMaintenance`**: `"use server"` 파일에서 `src/lib/maintenance-access.ts` 로 이동(내보낸 함수는 누구나 부르는 액션이 된다).
+- **게시판 태그**: 서버가 정리 — 개수 10 · 길이 30(`normalizeBoardTags`, `src/lib/board.ts`).
+- **ops 내보내기 3곳**(가동률 · 매출 · 두 기간 비교): 줄 20000 · 칸 60 상한(`src/lib/admin-export-limits.ts`), 넘으면 `error`. 손님 메시지 `propertyName` 200자 상한.
+- **`/api/recruit/sync`** 최신분 스로틀: 조건부 update 로 `last_run_at` 을 먼저 잡은 요청만 실행(동시 요청 중 하나).
+- **초대 코드 시도 제한**: 사용자당 10분 10번(미리보기 + 가입 합산) + 6자 미만 즉시 invalid(`src/lib/invite-attempt-limiter.ts`). **서버 인스턴스 메모리라 인스턴스마다 따로 센다(최선 노력)** — 확실한 제한은 시도 기록 표(마이그레이션)가 필요해 결정 대기.

@@ -364,7 +364,7 @@ export function PayrollPrepClient({
                 <button type="button" className="ppr-lnk" onClick={() => setSelectedId(r.userId)}>
                   {copy.bankView}
                 </button>
-                {data.canManage ? (
+                {data.bankConfirmable[r.userId] ? (
                   <button
                     type="button"
                     className="ppr-btn sm"

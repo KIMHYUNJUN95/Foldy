@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { maskedNumber, parseBankInput, sameAccount, usableAccount, type BankAccount } from "@/lib/payroll-bank";
+import { canConfirmBank, maskedNumber, parseBankInput, sameAccount, usableAccount, type BankAccount } from "@/lib/payroll-bank";
 import { getPayrollBankCopy } from "@/lib/payroll-bank-i18n";
 
 /** 급여 계좌 규칙(docs/product/39 §3-A). 계좌는 모두 가짜. */
@@ -80,5 +80,19 @@ describe("isYuchoBank", () => {
     expect(isYuchoBank("ﾕｳﾁｮ")).toBe(true); // 반각도 NFKC 로
     expect(isYuchoBank("Japan Post Bank")).toBe(true);
     expect(isYuchoBank("三井住友銀行")).toBe(false);
+  });
+});
+
+describe("canConfirmBank — 본인 계좌 확정은 대표(owner 계열)만", () => {
+  it("남의 계좌는 payroll.manage 만 있으면 확정", () => {
+    expect(canConfirmBank({ role: "office_admin", isSelf: false, canManage: true })).toBe(true);
+    expect(canConfirmBank({ role: "office_admin", isSelf: false, canManage: false })).toBe(false);
+  });
+  it("본인 계좌는 owner · 전무 · 개발자만", () => {
+    expect(canConfirmBank({ role: "office_admin", isSelf: true, canManage: true })).toBe(false);
+    expect(canConfirmBank({ role: "owner", isSelf: true, canManage: true })).toBe(true);
+    expect(canConfirmBank({ role: "senior_managing_director", isSelf: true, canManage: true })).toBe(true);
+    expect(canConfirmBank({ role: "developer_super_admin", isSelf: true, canManage: true })).toBe(true);
+    expect(canConfirmBank({ role: "owner", isSelf: true, canManage: false })).toBe(false);
   });
 });

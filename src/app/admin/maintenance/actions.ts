@@ -22,7 +22,7 @@ function isValidUUID(value: string) {
 // 일반 처리는 현장(모바일)이 한다. 여기는 오래 방치된 건을 관리자가 닫거나, 잘못된·중복 신고를 무효로
 // 남기는 예외 경로다. 권한은 모바일 상태 바꾸기와 같은 키 `maintenance_status_change` 하나다(2026-11-10 — 그 전엔 청소
 // 강제완료 게이트를 잘못 써서 모바일에서 못 바꾸는 사람이 콘솔에서는 닫을 수 있었다). 세션의 권한 목록은 역할 기본 + 개인 부여 ·
-// 차단을 이미 계산한 값이라 모바일 `canHandleMaintenance` 와 같은 결론이다.
+// 차단을 이미 계산한 값이라 `canHandleMaintenance` 와 같은 결론이다.
 
 export type MaintenanceExceptionKind = "force" | "void";
 

@@ -28,8 +28,8 @@ export const maxDuration = 60;
 function authorize(request: NextRequest): { ok: true } | { ok: false; status: number } {
   const cronSecret = process.env.CRON_SECRET?.trim();
   if (!cronSecret) return { ok: false, status: 404 };
-  // 비교는 상수 시간 · 길이 무관(api-secret). 헤더와 쿼리 중 하나라도 맞으면 통과한다(2026-10-26).
-  if (!requestMatchesSecret(request, [cronSecret], { query: true })) return { ok: false, status: 403 };
+  // 비교는 상수 시간 · 길이 무관(api-secret). 헤더만 받는다 — 주소의 ?secret= 은 기록에 남는다(2026-11-26).
+  if (!requestMatchesSecret(request, [cronSecret])) return { ok: false, status: 403 };
   return { ok: true };
 }
 

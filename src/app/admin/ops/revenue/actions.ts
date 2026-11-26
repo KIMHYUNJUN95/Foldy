@@ -6,6 +6,7 @@ import { tokyoToday } from "@/lib/tokyo-date";
 import type { AdminReportExportResult, AdminWorkbookExportResult } from "@/lib/admin-export-result";
 import { buildAdminTableReportHtml } from "@/lib/admin-table-report";
 import { buildAdminTableWorkbookBase64, type AdminTableSheet } from "@/lib/admin-table-workbook";
+import { opsRevenuePayloadFits } from "@/lib/admin-export-limits";
 import { getDictionary } from "@/lib/i18n";
 import { canAccessOpsAdmin } from "@/lib/ops-admin";
 import { changePct } from "@/lib/ops-revenue";
@@ -116,6 +117,7 @@ async function requireRevenueExport() {
 export async function exportOpsRevenueWorkbook(payload: OpsRevenueExportPayload): Promise<AdminWorkbookExportResult> {
   const session = await requireRevenueExport();
   if (!session) return { ok: false, reason: "error" };
+  if (!opsRevenuePayloadFits(payload)) return { ok: false, reason: "error" };
   if (payload.rows.length === 0) return { ok: false, reason: "empty" };
   try {
     const meta = buildAdminExportMeta(session);
@@ -138,6 +140,7 @@ export async function exportOpsRevenueWorkbook(payload: OpsRevenueExportPayload)
 export async function exportOpsRevenueReport(payload: OpsRevenueExportPayload): Promise<AdminReportExportResult> {
   const session = await requireRevenueExport();
   if (!session) return { ok: false, reason: "error" };
+  if (!opsRevenuePayloadFits(payload)) return { ok: false, reason: "error" };
   if (payload.rows.length === 0) return { ok: false, reason: "empty" };
   try {
     const meta = buildAdminExportMeta(session);

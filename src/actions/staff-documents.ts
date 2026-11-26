@@ -5,7 +5,7 @@ import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { STAFF_DOCUMENT_BUCKET } from "@/lib/staff-documents/server";
 import { loadUploadTarget } from "@/lib/staff-documents/roster-server";
-import { actorCanManageUsersInOrg } from "@/lib/user-management-access";
+import { canReviewStaffDocuments } from "@/lib/staff-documents/review-access";
 import {
   EMPTY_ID_FIELDS,
   adminUploadFields,
@@ -36,9 +36,7 @@ type Side = "front" | "back";
 async function reviewerSession() {
   const session = await getCurrentAppSession();
   if (!session || !hasOrganizationContext(session)) return null;
-  if (!session.capabilities.includes("staff_documents.view")) return null;
-  // 보기 권한만 따로 받은 사람이 액션을 직접 불러 「확인함」을 쓰지 못하게 화면 문과 맞춘다.
-  if (!(await actorCanManageUsersInOrg(session.user.id, session.user.role, session.organization.id))) return null;
+  if (!(await canReviewStaffDocuments(session))) return null;
   return session;
 }
 

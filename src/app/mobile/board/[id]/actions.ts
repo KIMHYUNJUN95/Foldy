@@ -13,7 +13,7 @@ import {
   validateMentionTargets,
 } from "@/lib/board-queries";
 import { canPinBoardPosts, isPlatformDeveloper } from "@/config/roles";
-import { BOARD_MAX_FILES, BOARD_MAX_IMAGES } from "@/lib/board";
+import { BOARD_MAX_FILES, BOARD_MAX_IMAGES, normalizeBoardTags } from "@/lib/board";
 import type { AvatarColor, FileAttachment } from "@/components/board/board-types";
 import type { Database, Json } from "@/types/database";
 import { bestEffortWrite } from "@/lib/db-write-guard";
@@ -494,7 +494,7 @@ export async function updateBoardPost(
     if (!c) return { error: "content_required" };
     patch.content = c;
   }
-  if (input.tags !== undefined) patch.tags = input.tags;
+  if (input.tags !== undefined) patch.tags = normalizeBoardTags(input.tags);
   // 작성과 같은 상한을 **서버에서 다시** 건다. 폼이 막고 있더라도 액션은 폼을 신뢰하지 않는다.
   // 경로도 다시 본다(2026-10-26): 이미 이 글에 있던 것은 그대로 두고, 새로 넣는 것은 이 조직 · 이 글 폴더의 업로드 모양만.
   if (input.imageUrls !== undefined || input.fileAttachments !== undefined) {

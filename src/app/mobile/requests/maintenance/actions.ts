@@ -19,7 +19,7 @@ import {
   MAINTENANCE_RESOLUTION_IMAGE_LIMIT,
   type MaintenanceStatus,
 } from "@/lib/maintenance-constants";
-import { memberCapabilities } from "@/lib/capabilities-server";
+import { canHandleMaintenance } from "@/lib/maintenance-access";
 import { getCurrentAppSession } from "@/lib/session";
 import { isOwnStoragePublicUrl } from "@/lib/storage-url-guard";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
@@ -49,20 +49,6 @@ function isValidUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
 
-/**
- * 상태 변경 권한 = 권한 키 `maintenance_status_change`(역할 기본 + 개인 부여 · 차단). 아르바이트 · 아르바이트 리더는 역할로 못 받는다.
- * PC 콘솔 강제 완료 · 무효(`applyMaintenanceException`)도 같은 키다(2026-11-10).
- */
-export async function canHandleMaintenance(
-  organizationId: string,
-  userId: string,
-  role: string,
-): Promise<boolean> {
-  // 권한 키 하나로(역할 기본: 아르바이트 빼고 + 개인 부여 · 차단, 2026-10-21 — 예전엔 차단을 무시했다).
-  void role;
-  return (await memberCapabilities(organizationId, userId)).includes("maintenance_status_change");
-}
-
 /** 완료 사진 URL이 반드시 우리 Storage 의 {orgId}/maintenance-resolutions/{reportId}/{file} 아래인지 검증한다. */
 function isOwnResolutionImage(url: string, organizationId: string, reportId: string): boolean {
   return isOwnStoragePublicUrl(url, REQUEST_IMAGE_BUCKET, `${organizationId}/${RESOLUTION_FOLDER}/${reportId}/`);
@@ -76,7 +62,7 @@ export async function updateMaintenanceHandling(
   // 파트타임은 상태를 바꿀 수 없다 (기존 규칙 + `maintenance_status_change` 오버라이드 예외).
   // RLS도 같은 결론을 내지만 여기서 먼저 끊는다.
   if (
-    !(await canHandleMaintenance(session.organization.id, session.user.id, session.user.role))
+    !(await canHandleMaintenance(session.organization.id, session.user.id))
   ) {
     return { ok: false, error: "forbidden" };
   }

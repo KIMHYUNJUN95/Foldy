@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
+import { normalizeBoardTags } from "@/lib/board";
 import { canPinBoardPosts } from "@/config/roles";
 import type { FileAttachment } from "@/components/board/board-types";
 import { areOwnBoardImageUrls, isBoardUuid, sanitizeBoardAttachments } from "@/app/mobile/board/board-storage-guard";
@@ -62,7 +63,7 @@ export async function createBoardPost(
     created_by_user_id: user.id,
     title: title?.trim() || null,
     content: content.trim(),
-    tags,
+    tags: normalizeBoardTags(tags),
     image_urls: imageUrls,
     file_attachments: safeAttachments as unknown as Json,
     is_pinned: shouldPin,

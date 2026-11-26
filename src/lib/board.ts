@@ -31,6 +31,21 @@ function fileExt(file: File): string {
  */
 export const BOARD_MAX_IMAGES = 5;
 export const BOARD_MAX_FILES = 5;
+export const BOARD_MAX_TAGS = 10;
+export const BOARD_TAG_MAX_LENGTH = 30;
+
+/** 태그 서버 정리 — 앞 # · 공백을 걷고, 빈 값 · 중복을 버리고, 길이 30 · 개수 10 으로 자른다(폼 상한은 개수 10 만 있었다). */
+export function normalizeBoardTags(tags: unknown): string[] {
+  if (!Array.isArray(tags)) return [];
+  const out: string[] = [];
+  for (const raw of tags) {
+    if (typeof raw !== "string") continue;
+    const tag = raw.trim().replace(/^#+/, "").trim().slice(0, BOARD_TAG_MAX_LENGTH);
+    if (tag && !out.includes(tag)) out.push(tag);
+    if (out.length >= BOARD_MAX_TAGS) break;
+  }
+  return out;
+}
 
 export function validateBoardImageList(files: File[]): string | null {
   if (files.length > BOARD_MAX_IMAGES) return "too_many_photos";

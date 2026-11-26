@@ -6,6 +6,7 @@ import { tokyoToday } from "@/lib/tokyo-date";
 import type { AdminReportExportResult, AdminWorkbookExportResult } from "@/lib/admin-export-result";
 import { buildAdminTableReportHtml } from "@/lib/admin-table-report";
 import { buildAdminTableWorkbookBase64, type AdminTableSheet } from "@/lib/admin-table-workbook";
+import { opsComparePayloadFits } from "@/lib/admin-export-limits";
 import { getDictionary } from "@/lib/i18n";
 import { canAccessOpsAdmin } from "@/lib/ops-admin";
 import { changePctOrNull } from "@/lib/ops-revenue-compare";
@@ -116,6 +117,7 @@ async function requireCompareExport() {
 export async function exportOpsCompareWorkbook(payload: OpsCompareExportPayload): Promise<AdminWorkbookExportResult> {
   const session = await requireCompareExport();
   if (!session) return { ok: false, reason: "error" };
+  if (!opsComparePayloadFits(payload)) return { ok: false, reason: "error" };
   if (payload.rows.length === 0) return { ok: false, reason: "empty" };
   try {
     const meta = buildAdminExportMeta(session);
@@ -129,6 +131,7 @@ export async function exportOpsCompareWorkbook(payload: OpsCompareExportPayload)
 export async function exportOpsCompareReport(payload: OpsCompareExportPayload): Promise<AdminReportExportResult> {
   const session = await requireCompareExport();
   if (!session) return { ok: false, reason: "error" };
+  if (!opsComparePayloadFits(payload)) return { ok: false, reason: "error" };
   if (payload.rows.length === 0) return { ok: false, reason: "empty" };
   try {
     const meta = buildAdminExportMeta(session);

@@ -537,4 +537,14 @@ describe("onboarding", () => {
     }
     expect(await previewInviteCode("ok-1111")).toMatchObject({ ok: true, organizationName: "Haru" });
   });
+
+  it("초대 미리보기 — 6자 미만은 바로 invalid, 한 사용자가 10분에 10번 넘게 시도하면 막는다", async () => {
+    const { previewInviteCode } = await import("@/app/onboarding/actions");
+    const { resetInviteAttempts } = await import("@/lib/invite-attempt-limiter");
+    resetInviteAttempts();
+    expect(await previewInviteCode("AB12")).toEqual({ ok: false, errorKey: "invalid_invite" });
+    for (let i = 0; i < 10; i += 1) await previewInviteCode(`NOPE-${i}00`);
+    expect(await previewInviteCode("NOPE-999")).toEqual({ ok: false, errorKey: "invite_rate_limited" });
+    resetInviteAttempts();
+  });
 });

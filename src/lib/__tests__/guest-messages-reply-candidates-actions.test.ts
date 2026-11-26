@@ -388,6 +388,12 @@ describe("추가 · 넣기 · 되돌리기", () => {
     expect(await markGuestInfoCandidatesSaved("아라키초A", [info.id])).toEqual({ ok: true, marked: [info.id] });
     expect(info.status).toBe("added");
   });
+
+  it("건물 이름이 200자를 넘으면 invalid", async () => {
+    await runOnce();
+    const info = candidates("guest_info")[0];
+    expect(await markGuestInfoCandidatesSaved("가".repeat(201), [info.id])).toEqual({ ok: false, errorKey: "invalid" });
+  });
 });
 
 describe("권한 · 조직 — 서버에서 판정", () => {

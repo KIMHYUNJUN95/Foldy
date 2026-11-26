@@ -15,6 +15,7 @@
  */
 
 import { revalidatePath } from "next/cache";
+import { GUEST_PROPERTY_NAME_MAX } from "@/lib/guest-messages/limits";
 import { createComplaint } from "@/lib/complaints";
 import { loadConversationRow } from "@/lib/guest-messages/inbox-server";
 import { UUID_RE } from "@/lib/guest-messages/inbox-model";
@@ -277,6 +278,7 @@ export async function createTaskFromGuestMessage(input: CreateTaskFromMessageInp
   let targetId: string;
   if (input.kind === "maintenance" || input.kind === "lost_found") {
     const chosenProperty = typeof input.propertyName === "string" ? input.propertyName.trim() : "";
+    if (chosenProperty.length > GUEST_PROPERTY_NAME_MAX) return { ok: false, errorKey: "invalid" };
     const chosenRoom = typeof input.roomLabel === "string" ? input.roomLabel.trim() : "";
     const buildingOnly = input.kind === "maintenance" && input.buildingOnly === true;
     // 예약은 직원이 고른 자리가 예약의 자리와 같을 때만 잇는다(다르면 기능의 검사가 저장을 막으므로 잇지 않고 만든다).

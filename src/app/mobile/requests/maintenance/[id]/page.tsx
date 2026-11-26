@@ -2,7 +2,7 @@ import { GuestMessageBackLink } from "@/components/guest-messages/guest-message-
 import { notFound, redirect } from "next/navigation";
 import { MaintenancePhotoStrip } from "@/components/requests/maintenance-photo-strip";
 import { MaintenanceHandlingForm } from "@/components/requests/maintenance-handling-form";
-import { canHandleMaintenance } from "@/app/mobile/requests/maintenance/actions";
+import { canHandleMaintenance } from "@/lib/maintenance-access";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { getMobileNavBadges } from "@/lib/nav-badges";
 import { getDictionary, type Locale } from "@/lib/i18n";
@@ -91,11 +91,7 @@ export default async function MobileMaintenanceDetailPage({ params, searchParams
   // 상태 변경 = part_time_staff 제외 전원 (docs/product/08-maintenance-workflow.md → Status Change
   // Permission) + `maintenance_status_change` 권한 예외를 받은 파트타이머. 서버 액션과 RLS가 최종
   // 게이트고, 여기서는 UI만 감춘다 — 판정은 서버 액션 모듈과 같은 함수를 쓴다.
-  const canHandle = await canHandleMaintenance(
-    session.organization.id,
-    session.user.id,
-    session.user.role,
-  );
+  const canHandle = await canHandleMaintenance(session.organization.id, session.user.id);
   const showCreatedBanner = query.created === "1";
 
   const navBadges = await navBadgesPromise;

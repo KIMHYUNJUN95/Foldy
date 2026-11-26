@@ -6,6 +6,8 @@
  * - 보기: 본인 + `payroll.view`. 목록에선 끝 4자리만, 패널 · 이체 목록에선 전체.
  */
 
+import { isOrgTopAdminOrPlatform, type Role } from "@/config/roles";
+
 export type BankAccountType = "ordinary" | "current";
 export const BANK_ACCOUNT_TYPES: readonly BankAccountType[] = ["ordinary", "current"];
 
@@ -105,4 +107,10 @@ export function sameAccount(a: BankAccount | null, b: BankAccount | null): boole
 /** 유초은행인지 — 입력 칸에 「이체용 지점명 · 7자리」 안내 한 줄을 띄울 때(은행 이름은 데이터라 일본어 그대로 본다). */
 export function isYuchoBank(bankName: string): boolean {
   return /ゆうちょ|ユウチョ|郵便貯金|유초|yucho|japan post/i.test(bankName.normalize("NFKC"));
+}
+
+/** 계좌 확정 판정 한 곳 — 서버 액션과 화면 단추가 같이 쓴다. 본인 계좌는 대표(owner 계열)만 확정한다(2026-11-26 사용자 결정). */
+export function canConfirmBank(input: { role: Role; isSelf: boolean; canManage: boolean }): boolean {
+  if (!input.canManage) return false;
+  return !input.isSelf || isOrgTopAdminOrPlatform(input.role);
 }

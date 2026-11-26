@@ -14,6 +14,7 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
+import { GUEST_PROPERTY_NAME_MAX } from "@/lib/guest-messages/limits";
 import { UUID_RE } from "@/lib/guest-messages/inbox-model";
 import {
   addSavedReplyCandidate,
@@ -216,7 +217,7 @@ export type MarkAppliedResult = { ok: true; marked: string[] } | { ok: false; er
 export async function markGuestInfoCandidatesSaved(propertyName: string, ids: unknown): Promise<MarkAppliedResult> {
   const auth = await gate();
   if (!auth.ok || !auth.kinds.includes("guest_info")) return { ok: false, errorKey: "forbidden" };
-  if (typeof propertyName !== "string" || !propertyName.trim()) return { ok: false, errorKey: "invalid" };
+  if (typeof propertyName !== "string" || !propertyName.trim() || propertyName.length > GUEST_PROPERTY_NAME_MAX) return { ok: false, errorKey: "invalid" };
   if (!Array.isArray(ids) || ids.length > 50 || !ids.every(validId)) return { ok: false, errorKey: "invalid" };
   try {
     const result = await markGuestInfoCandidatesApplied(getSupabaseServiceClient(), auth.organizationId, auth.userId, propertyName, ids);

@@ -88,6 +88,10 @@ export function fakeCheckinDb(seed: Record<string, Row[]> = {}) {
         filters.push((row) => String(row[column]) >= String(value));
         return builder;
       },
+      lt(column: string, value: unknown) {
+        filters.push((row) => row[column] != null && String(row[column]) < String(value));
+        return builder;
+      },
       insert(values: Row | Row[]) {
         action = { kind: "insert", values: Array.isArray(values) ? values : [values] };
         return builder;

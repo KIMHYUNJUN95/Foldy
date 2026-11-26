@@ -21,6 +21,17 @@ import {
   type SearchRpcRow,
 } from "@/lib/guest-messages/inbox-search";
 import { dictionaries } from "@/lib/i18n";
+import {
+  afterCursorClauses,
+  channelSql,
+  combineOrGroups,
+  DONE_PAGE_SIZE,
+  DONE_RELOAD_MAX,
+  encodeDoneCursor,
+  statusIncludesDone,
+  untilCursorClauses,
+  type DoneCursor,
+} from "@/lib/guest-messages/inbox-paging";
 import { buildingBaseFor, loadBuildingGuestInfo, loadBuildingGuestInfos, type BuildingGuestInfo } from "@/lib/guest-messages/guest-info-server";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -76,9 +87,10 @@ export type ConversationDbRow = {
   last_message_at: string | null;
 };
 
-/** 열린 대화(기다림 · 나중에)는 다 읽고, 처리 끝은 최근 것만. */
+/** 열린 대화(기다림 · 나중에)는 다 읽고, 처리 끝은 한 묶음(`DONE_PAGE_SIZE`)씩 — 더 내리면 `loadDonePage`(2026-11-26). */
 const OPEN_LIMIT = 500;
-const DONE_LIMIT = 200;
+/** 건물 고르기 목록을 만들 때 읽는 대화 수 — 처리 끝을 묶음으로 나눠 읽어도 건물 목록은 그대로 보이게. */
+const BUILDING_SCAN_LIMIT = 1000;
 const THREAD_MESSAGE_LIMIT = 300;
 const IN_CHUNK = 100;
 
@@ -197,9 +209,11 @@ export async function loadInboxList(
   },
   now: Date = new Date(),
   visibility: CodeVisibility = { canSeeCodes: true, canManageAuto: true },
+  /** 화면이 이미 「더 불러오기」로 펼친 처리 끝의 끝(커서) — 따라잡기 다시 읽기에서 그 범위까지 다시 채운다. */
+  options: { doneUntil?: DoneCursor | null } = {},
 ): Promise<InboxListData> {
-  const channelFilter = filter.channel ?? "all";
-  const [open, done] = await Promise.all([
+  const fullFilter = { ...filter, channel: filter.channel ?? "all" };
+  const [open, donePage, buildingScan] = await Promise.all([
     db
       .from("guest_conversations")
       .select(CONVERSATION_COLUMNS)
@@ -208,22 +222,44 @@ export async function loadInboxList(
       .order("last_message_at", { ascending: false, nullsFirst: false })
       .order("id", { ascending: true })
       .limit(OPEN_LIMIT),
+    readDoneWindow(db, organizationId, fullFilter, options.doneUntil ?? null),
     db
       .from("guest_conversations")
-      .select(CONVERSATION_COLUMNS)
+      .select("property_name")
       .eq("organization_id", organizationId)
-      .eq("status", "done")
       .order("last_message_at", { ascending: false, nullsFirst: false })
-      .order("id", { ascending: true })
-      .limit(DONE_LIMIT),
+      .limit(BUILDING_SCAN_LIMIT),
   ]);
   if (open.error) throw new Error(`conversation read failed: ${open.error.message}`);
-  if (done.error) throw new Error(`conversation read failed: ${done.error.message}`);
-  const all = [...((open.data ?? []) as ConversationDbRow[]), ...((done.data ?? []) as ConversationDbRow[])];
+  if (buildingScan.error) throw new Error(`conversation read failed: ${buildingScan.error.message}`);
+  const openRows = (open.data ?? []) as ConversationDbRow[];
 
-  const buildings = [...new Set(all.map((row) => row.property_name).filter((name): name is string => !!name))].sort();
-  const visible = all.filter((row) => matchesInboxFilter(row, { ...filter, channel: channelFilter }, now));
+  const buildingNames = [
+    ...openRows.map((row) => row.property_name),
+    ...((buildingScan.data ?? []) as Array<{ property_name: string | null }>).map((row) => row.property_name),
+    filter.building,
+  ];
+  const buildings = [...new Set(buildingNames.filter((name): name is string => !!name))].sort();
+  const visible = [...openRows, ...donePage.rows].filter((row) => matchesInboxFilter(row, fullFilter, now));
+  const rows = await decorateRows(db, organizationId, visible, now, visibility);
 
+  return {
+    rows,
+    ...headerCounts(openRows, filter, now),
+    buildings,
+    doneCursor: donePage.cursor,
+    doneHasMore: donePage.hasMore,
+  };
+}
+
+/** DB 줄 → 목록 줄(마지막 한 줄 · 발송 상태 · 코드 가리기 · 정렬). 목록 · 더 불러오기가 같은 길을 쓴다. */
+async function decorateRows(
+  db: Client,
+  organizationId: string,
+  visible: ConversationDbRow[],
+  now: Date,
+  visibility: CodeVisibility,
+): Promise<InboxConversationRow[]> {
   const ids = visible.map((row) => row.id);
   const [lastLines, outbox, buildingMap] = await Promise.all([
     loadLastLines(db, organizationId, ids),
@@ -231,20 +267,95 @@ export async function loadInboxList(
     visibility.canSeeCodes ? null : loadBuildingMap(db, organizationId),
   ]);
   if (!visibility.canSeeCodes) maskHostLines(buildingMap, visible, lastLines);
-  const rows = sortInboxRows(
+  return sortInboxRows(
     visible.map((row) =>
-      toInboxRow(
-        row,
-        {
-          lastLine: lastLines.get(row.id) ?? null,
-          outboxStatuses: outbox.get(row.id) ?? [],
-        },
-        now,
-      ),
+      toInboxRow(row, { lastLine: lastLines.get(row.id) ?? null, outboxStatuses: outbox.get(row.id) ?? [] }, now),
     ),
   );
+}
 
-  return { rows, ...headerCounts(all, filter, now), buildings };
+type DoneFilter = { building: string | null; channel: InboxChannelFilter };
+
+/**
+ * 처리 끝 읽기 — 건물 · 채널 필터를 SQL 로(`channelSql`), 커서 범위는 `.or()` 한 번에(`combineOrGroups`).
+ * 순서는 목록 창과 같은 `last_message_at desc nulls last, id asc`(인덱스 guest_conversations_org_status_last_message_idx).
+ */
+function doneQuery(db: Client, organizationId: string, columns: string, filter: DoneFilter, range: string[]) {
+  let query = db.from("guest_conversations").select(columns).eq("organization_id", organizationId).eq("status", "done");
+  if (filter.building) query = query.eq("property_name", filter.building);
+  const channel = channelSql(filter.channel);
+  if (channel && "eq" in channel) query = query.eq("channel", channel.eq);
+  const expression = combineOrGroups([channel && "clauses" in channel ? channel.clauses : [], range]);
+  if (expression) query = query.or(expression);
+  return query.order("last_message_at", { ascending: false, nullsFirst: false }).order("id", { ascending: true });
+}
+
+type DoneWindowRead = { rows: ConversationDbRow[]; cursor: string | null; hasMore: boolean };
+
+/** 처리 끝 창 — 처음은 첫 묶음, 따라잡기(`until`)는 이미 펼친 범위까지(상한 `DONE_RELOAD_MAX`). 상태 탭이 처리 끝을 빼면 비어 있다. */
+async function readDoneWindow(
+  db: Client,
+  organizationId: string,
+  filter: { status: InboxStatusFilter } & DoneFilter,
+  until: DoneCursor | null,
+): Promise<DoneWindowRead> {
+  if (!statusIncludesDone(filter.status)) return { rows: [], cursor: null, hasMore: false };
+  if (!until) return readDonePage(db, organizationId, filter, null);
+  const [within, beyond] = await Promise.all([
+    doneQuery(db, organizationId, CONVERSATION_COLUMNS, filter, untilCursorClauses(until)).limit(DONE_RELOAD_MAX + 1),
+    doneQuery(db, organizationId, "id", filter, afterCursorClauses(until)).limit(1),
+  ]);
+  if (within.error) throw new Error(`conversation read failed: ${within.error.message}`);
+  if (beyond.error) throw new Error(`conversation read failed: ${beyond.error.message}`);
+  const rows = (within.data ?? []) as unknown as ConversationDbRow[];
+  if (rows.length > DONE_RELOAD_MAX) {
+    const kept = rows.slice(0, DONE_RELOAD_MAX);
+    return { rows: kept, cursor: encodeDoneCursor(kept[kept.length - 1]), hasMore: true };
+  }
+  return { rows, cursor: encodeDoneCursor({ last_message_at: until.lastMessageAt, id: until.id }), hasMore: (beyond.data ?? []).length > 0 };
+}
+
+/** 처리 끝 한 묶음 — 한 줄 더 읽어 다음이 있는지 안다. 커서는 받은 마지막 줄. */
+async function readDonePage(
+  db: Client,
+  organizationId: string,
+  filter: DoneFilter,
+  after: DoneCursor | null,
+): Promise<DoneWindowRead> {
+  const result = await doneQuery(db, organizationId, CONVERSATION_COLUMNS, filter, after ? afterCursorClauses(after) : []).limit(
+    DONE_PAGE_SIZE + 1,
+  );
+  if (result.error) throw new Error(`conversation read failed: ${result.error.message}`);
+  const all = (result.data ?? []) as unknown as ConversationDbRow[];
+  const rows = all.slice(0, DONE_PAGE_SIZE);
+  const last = rows[rows.length - 1];
+  return {
+    rows,
+    cursor: last ? encodeDoneCursor(last) : after ? encodeDoneCursor({ last_message_at: after.lastMessageAt, id: after.id }) : null,
+    hasMore: all.length > DONE_PAGE_SIZE,
+  };
+}
+
+export type InboxDonePage = { rows: InboxConversationRow[]; doneCursor: string | null; doneHasMore: boolean };
+
+/**
+ * 처리 끝 다음 묶음(무한 스크롤, 2026-11-26) — 목록과 같은 조직 필터 · 코드 가리기 · 줄 모양. 상태 탭이 처리 끝을 빼면 빈 묶음.
+ * 열린 대화는 첫 읽기에 다 있으므로 여기서는 처리 끝만.
+ */
+export async function loadDonePage(
+  db: Client,
+  organizationId: string,
+  filter: { status: InboxStatusFilter; building: string | null; channel?: InboxChannelFilter },
+  after: DoneCursor,
+  now: Date = new Date(),
+  visibility: CodeVisibility = { canSeeCodes: true, canManageAuto: true },
+): Promise<InboxDonePage> {
+  if (!statusIncludesDone(filter.status)) return { rows: [], doneCursor: null, doneHasMore: false };
+  const fullFilter = { ...filter, channel: filter.channel ?? "all" };
+  const page = await readDonePage(db, organizationId, fullFilter, after);
+  const visible = page.rows.filter((row) => matchesInboxFilter(row, fullFilter, now));
+  const rows = await decorateRows(db, organizationId, visible, now, visibility);
+  return { rows, doneCursor: page.cursor, doneHasMore: page.hasMore };
 }
 
 type InboxFilter = { status: InboxStatusFilter; building: string | null; channel?: InboxChannelFilter };
@@ -346,11 +457,17 @@ export async function loadInboxRowsByIds(
   filter: InboxFilter,
   now: Date = new Date(),
   visibility: CodeVisibility = { canSeeCodes: true, canManageAuto: true },
+  /**
+   * 화면이 이미 받은 처리 끝 범위(2026-11-26 무한 스크롤). `hasMore` 가 거짓이면 처리 끝 전부가 창 안, 참이면 커서까지.
+   * 없으면(예전 화면) 지금 필터의 첫 묶음 경계(`DONE_PAGE_SIZE` 번째 줄)를 읽어 쓴다.
+   */
+  doneWindow: { cursor: DoneCursor | null; hasMore: boolean } | null = null,
 ): Promise<InboxRowsResult> {
-  // 목록과 같은 창 — 열린 대화는 최근 메시지 500개, 처리 끝은 최근 200개. 그 밖의 줄은 목록에도 없으니 `matches` 도 아니다.
+  // 목록과 같은 창 — 열린 대화는 최근 메시지 500개, 처리 끝은 화면이 받은 범위. 그 밖의 줄은 목록에도 없으니 `matches` 도 아니다.
   // 2026-11-19 성능: 창 전체(전체 칸 500줄 + id 200줄)를 다시 읽지 않는다.
   //  - 열린 대화: 머리 숫자(끝난 · 시각 없는 「나중에」 = 기다림, 건물 · 채널 필터)와 창 판정에 필요한 **좁은 칸**만 — 열린 대화는 작은 집합.
-  //  - 처리 끝: 200번째 줄(경계) **한 줄**만 읽고, 신호 온 줄이 그 앞이면 창 안(목록과 같은 순서 · 같은 동점 규칙).
+  //  - 처리 끝: 화면이 보낸 커서와 비교(읽기 없음). 커서가 없으면 경계 **한 줄**만 읽는다(목록과 같은 순서 · 같은 동점 규칙).
+  const channelFilter = filter.channel ?? "all";
   const [found, open, doneEdge] = await Promise.all([
     db.from("guest_conversations").select(CONVERSATION_COLUMNS).eq("organization_id", organizationId).in("id", [...ids]),
     db
@@ -361,24 +478,28 @@ export async function loadInboxRowsByIds(
       .order("last_message_at", { ascending: false, nullsFirst: false })
       .order("id", { ascending: true })
       .limit(OPEN_LIMIT),
-    db
-      .from("guest_conversations")
-      .select("id, last_message_at")
-      .eq("organization_id", organizationId)
-      .eq("status", "done")
-      .order("last_message_at", { ascending: false, nullsFirst: false })
-      .order("id", { ascending: true })
-      .range(DONE_LIMIT - 1, DONE_LIMIT - 1)
-      .maybeSingle(),
+    doneWindow || !statusIncludesDone(filter.status)
+      ? Promise.resolve({ data: null, error: null })
+      : doneQuery(db, organizationId, "id, last_message_at", { building: filter.building, channel: channelFilter }, [])
+          .range(DONE_PAGE_SIZE - 1, DONE_PAGE_SIZE - 1)
+          .maybeSingle(),
   ]);
   if (found.error) throw new Error(`conversation read failed: ${found.error.message}`);
   if (open.error) throw new Error(`conversation read failed: ${open.error.message}`);
   if (doneEdge.error) throw new Error(`conversation read failed: ${doneEdge.error.message}`);
   const openRows = (open.data ?? []) as Array<Pick<ConversationDbRow, OpenWindowColumn>>;
   const openIds = new Set(openRows.map((row) => row.id));
-  const edge = (doneEdge.data ?? null) as WindowKey | null;
+  const edge: WindowKey | null = doneWindow
+    ? doneWindow.cursor
+      ? { id: doneWindow.cursor.id, last_message_at: doneWindow.cursor.lastMessageAt }
+      : null
+    : ((doneEdge.data ?? null) as unknown as WindowKey | null);
+  // 창 끝이 없으면(처리 끝을 다 받았거나 하나도 없음) 모든 처리 끝이 창 안. 화면이 「더 있음」인데 커서가 없으면 그럴 수 없는 값 — 창 밖으로.
+  const doneOpenEnded = doneWindow ? !doneWindow.hasMore : !edge;
   const inWindow = (row: ConversationDbRow) =>
-    row.status === "done" ? !edge || compareWindowKey(row, edge) <= 0 : openIds.has(row.id);
+    row.status === "done"
+      ? doneOpenEnded || (edge !== null && compareWindowKey(row, edge) <= 0)
+      : openIds.has(row.id);
   const rows = (found.data ?? []) as ConversationDbRow[];
   const foundIds = rows.map((row) => row.id);
   const [lastLines, outbox, buildings] = await Promise.all([

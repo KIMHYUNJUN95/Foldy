@@ -424,7 +424,13 @@ describe("손님 메시지 구독 묶음", () => {
 });
 
 describe("목록 상태 리듀서 — 순서 · 접힘 (리뷰 반영)", () => {
-  const listOf = (rows: InboxConversationRow[], awaitingCount = rows.length): InboxListData => ({ rows, awaitingCount, buildings: [] });
+  const listOf = (rows: InboxConversationRow[], awaitingCount = rows.length): InboxListData => ({
+    rows,
+    awaitingCount,
+    buildings: [],
+    doneCursor: null,
+    doneHasMore: false,
+  });
   const ids = (state: ReturnType<typeof initialInboxLive>) => state.list?.rows.map((r) => r.id) ?? [];
 
   it("서버가 준 새 목록에서 빠진 줄은 접힘 → drop 으로 빠지고, 되돌리기로 다시 오면 접힘이 풀린다", () => {

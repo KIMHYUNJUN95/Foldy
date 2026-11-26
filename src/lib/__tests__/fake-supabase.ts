@@ -18,6 +18,74 @@ function valueOf(row: Row, column: string): unknown {
   return undefined;
 }
 
+/** 맨 바깥 쉼표로 나누기(괄호 안 쉼표는 그대로). */
+function splitTopLevel(text: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    if (ch === "(") depth += 1;
+    else if (ch === ")") depth -= 1;
+    else if (ch === "," && depth === 0) {
+      out.push(text.slice(start, i));
+      start = i + 1;
+    }
+  }
+  out.push(text.slice(start));
+  return out.filter((part) => part.length > 0);
+}
+
+/**
+ * PostgREST 논리 식(`.or()` 안) 흉내 — `칸.연산.값` · `칸.not.연산.값` · `and(…)` · `or(…)`.
+ * 연산은 eq · neq · lt · lte · gt · gte · is(null · true · false) · in((a,b)). 칸 값이 NULL 이면 비교는 거짓(SQL 처럼, `is` 만 예외).
+ */
+function logicFilter(term: string): Filter {
+  const nested = /^(and|or)\((.*)\)$/.exec(term);
+  if (nested) {
+    const parts = splitTopLevel(nested[2]).map(logicFilter);
+    return nested[1] === "and" ? (row) => parts.every((f) => f(row)) : (row) => parts.some((f) => f(row));
+  }
+  const first = term.indexOf(".");
+  const column = term.slice(0, first);
+  let rest = term.slice(first + 1);
+  let negate = false;
+  if (rest.startsWith("not.")) {
+    negate = true;
+    rest = rest.slice(4);
+  }
+  const dot = rest.indexOf(".");
+  const operator = rest.slice(0, dot);
+  const raw = rest.slice(dot + 1).replace(/^"(.*)"$/, "$1");
+  const base: Filter = (row) => {
+    const value = valueOf(row, column) ?? null;
+    if (operator === "is") return raw === "null" ? value === null : String(value) === raw;
+    if (value === null) return false;
+    const text = String(value);
+    switch (operator) {
+      case "eq":
+        return text === raw;
+      case "neq":
+        return text !== raw;
+      case "lt":
+        return text < raw;
+      case "lte":
+        return text <= raw;
+      case "gt":
+        return text > raw;
+      case "gte":
+        return text >= raw;
+      case "in":
+        return splitTopLevel(raw.replace(/^\((.*)\)$/, "$1")).includes(text);
+      default:
+        return true;
+    }
+  };
+  if (!negate) return base;
+  // SQL 처럼 NOT(NULL 비교) 도 NULL — `is` 가 아니면 NULL 칸은 빠진다.
+  return (row) => (operator !== "is" && (valueOf(row, column) ?? null) === null ? false : !base(row));
+}
+
 export function createFakeSupabase(
   tables: Record<string, Row[]>,
   /** 이름별 가짜 DB 함수(없으면 `{ data: true }`). 같은 표 묶음을 받아 직접 고친다. */
@@ -174,6 +242,12 @@ export function createFakeSupabase(
             return !Object.entries(needle).every(([key, expected]) => (json as Row)[key] === expected);
           });
         }
+        return api;
+      },
+      /** `or("a.eq.1,and(b.is.null,c.gt.2)")` — 맨 바깥은 OR. 여러 번 부르면 서로 AND(PostgREST 처럼). */
+      or(expression: string) {
+        const parts = splitTopLevel(expression).map(logicFilter);
+        filters.push((row) => parts.some((f) => f(row)));
         return api;
       },
       order(column: string, options?: { ascending?: boolean }) {

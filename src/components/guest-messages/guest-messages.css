@@ -452,6 +452,18 @@
   max-width: 100%;
 }
 .gm-mrows { display: flex; flex-direction: column; margin: 0 -8px; }
+
+/* 목록 끝 — 지난 대화 더 불러오기 · 끝 줄(2026-11-26, 47 §5). 줄 사이 구분선은 달지 않는다(목록 줄이 아님). */
+.gm-scroll > .gm-more::before { content: none; }
+.gm-more { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 56px; padding: 12px 16px; font-size: 13px; color: var(--gm-muted); text-align: center; }
+.gm-more[data-end] { min-height: 48px; font-size: 12px; }
+.gm-more__loading { display: inline-flex; align-items: center; gap: 8px; }
+.gm-more__dot { width: 14px; height: 14px; border-radius: 999px; border: 2px solid #e4e3e9; border-top-color: #7a52e6; animation: gm-more-spin 0.8s linear infinite; }
+.gm-more__fail { color: #c4364b; }
+.gm-more__btn { min-height: 36px; padding: 0 14px; border-radius: 999px; background: transparent; color: #7a52e6; font-size: 13px; font-weight: 600; }
+.gm-more__btn:focus-visible { outline: 2px solid #7a52e6; outline-offset: 2px; }
+@keyframes gm-more-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .gm-more__dot { animation: none; } }
 .gm-mrows .gm-row { padding: 12px 8px; }
 /* 태블릿 2분할: 고른 줄은 옅은 보라 바탕만(공용 칸 테두리 대신 — 왼쪽 막대 · 테두리 금지 규칙). 키보드 초점 고리는 남긴다. */
 .split-list a.gm-row[data-split-active] { outline: none; background: var(--gm-select); }

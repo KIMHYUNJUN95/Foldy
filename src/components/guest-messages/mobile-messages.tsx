@@ -26,6 +26,7 @@ import {
   ConversationRowBody,
   InboxEmpty,
   InboxError,
+  InboxMore,
   ReservationRows,
   ThreadMessages,
   errorText,
@@ -43,6 +44,7 @@ import {
 } from "@/components/guest-messages/gm-format";
 import { useThread } from "@/components/guest-messages/use-thread";
 import { useInboxLive } from "@/components/guest-messages/use-inbox-live";
+import { statusIncludesDone } from "@/lib/guest-messages/inbox-paging";
 import { useInboxSearchContext } from "@/components/guest-messages/inbox-search-provider";
 import { InboxSearchBox, InboxSearchState, searchRows } from "@/components/guest-messages/inbox-search-view";
 import { NewMessagesPill, useThreadFollow } from "@/components/guest-messages/thread-follow";
@@ -287,6 +289,18 @@ export function MobileInbox({
           ))}
         </div>
       )}
+      {list && !search.active ? (
+        <InboxMore
+          showsDone={statusIncludesDone(status)}
+          hasDone={list.rows.some((row) => row.status === "done")}
+          hasMore={list.doneHasMore}
+          cursor={list.doneCursor}
+          round={inbox.moreRound}
+          state={inbox.more}
+          onMore={() => void inbox.loadMore()}
+          copy={copy}
+        />
+      ) : null}
       {toast ? <TaskToast key={toast.id} message={toast.message} action={toast.action} onDismiss={dismiss} /> : null}
     </div>
   );

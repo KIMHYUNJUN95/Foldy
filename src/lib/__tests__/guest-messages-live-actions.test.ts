@@ -107,7 +107,30 @@ describe("getGuestConversationRows — 실시간 목록 줄 다시 읽기", () =
     expect(result.updates[0].matches).toBe(false);
     expect(result.missing).toEqual([THEIRS]);
     expect(result.awaitingCount).toBe(1);
-    // 메뉴 숫자 — 못 세면(이 가짜 DB 는 `.or` 가 없다) 싣지 않는다: 화면이 0 으로 메뉴 숫자를 덮지 않게(2026-11-20).
+    // 메뉴 숫자 — 이 조직 답장 기다림 1(가짜 DB 가 2026-11-26 부터 `.or` 를 흉내 낸다).
+    expect(result.navAwaitingCount).toBe(1);
+  });
+
+  it("메뉴 숫자를 못 세면 싣지 않는다 — 화면이 0 으로 메뉴 숫자를 덮지 않게(2026-11-20)", async () => {
+    state.session = sessionWith(["guest_messages.view", "guest_messages.manage"]);
+    // `.or()` 를 부르면 깨지는 DB — 메뉴 숫자 세기만 `.or` 를 쓴다(필터 없는 줄 다시 읽기는 안 씀).
+    const inner = state.db as { from: (table: string) => unknown };
+    const breakOr = (builder: unknown): unknown =>
+      new Proxy(builder as object, {
+        get(target, key, receiver) {
+          if (key === "or") return () => { throw new Error("or unsupported"); };
+          const value = Reflect.get(target, key, receiver);
+          return typeof value === "function" && key !== "then"
+            ? (...args: unknown[]) => {
+                const out = (value as (...a: unknown[]) => unknown).apply(target, args);
+                return out && typeof out === "object" && "then" in (out as object) ? breakOr(out) : out;
+              }
+            : value;
+        },
+      });
+    state.db = { ...inner, from: (table: string) => breakOr(inner.from(table)) } as typeof state.db;
+    const result = await getGuestConversationRows({ ids: [MINE], status: "done" });
+    expect(result.ok).toBe(true);
     expect(result).not.toHaveProperty("navAwaitingCount");
   });
 });

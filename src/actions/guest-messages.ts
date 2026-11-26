@@ -37,8 +37,10 @@ import {
 } from "@/lib/guest-messages/inbox-model";
 import {
   loadConversationRow,
+  loadDonePage,
   loadInboxList,
   loadInboxRowsByIds,
+  type InboxDonePage,
   loadInboxThread,
   searchInbox,
   type InboxRowsResult,
@@ -46,6 +48,7 @@ import {
   countAwaitingOrNull,
 } from "@/lib/guest-messages/inbox-server";
 import { normalizeSearchQuery } from "@/lib/guest-messages/inbox-search";
+import { parseDoneCursor, type DoneCursor } from "@/lib/guest-messages/inbox-paging";
 import { isGuestMessageSendEnabled, runGuestOutbox } from "@/lib/guest-messages/outbox-runner";
 import { createTranslationBudget, deeplTranslate } from "@/lib/review-translate";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
@@ -156,29 +159,81 @@ function logFailure(where: string, error: unknown) {
 
 export type ListGuestConversationsResult = ({ ok: true } & InboxListData & NavAwaitingCount) | Failure;
 
+function parseStatusFilter(raw: unknown): InboxStatusFilter {
+  return typeof raw === "string" && (INBOX_STATUS_FILTERS as readonly string[]).includes(raw) ? (raw as InboxStatusFilter) : "all";
+}
+
+function parseBuilding(raw: unknown): string | null {
+  return typeof raw === "string" && raw.trim() ? raw.trim().slice(0, 120) : null;
+}
+
+/** 화면이 보낸 처리 끝 커서 — 없으면(undefined · null) null, 모양이 틀리면 `false`(그때 `invalid`). */
+function optionalCursor(raw: unknown): DoneCursor | null | false {
+  if (raw === undefined || raw === null) return null;
+  return parseDoneCursor(raw) ?? false;
+}
+
 export async function listGuestConversations(
   input: {
     status?: string | null;
     building?: string | null;
     channel?: string | null;
+    /** 따라잡기 — 이미 펼친 처리 끝의 끝(커서). 그 범위까지 다시 채운다(2026-11-26). */
+    doneUntil?: string | null;
   } = {},
 ): Promise<ListGuestConversationsResult> {
   const auth = await gate(false);
   if (!auth.ok) return auth;
-  const status = (INBOX_STATUS_FILTERS as readonly string[]).includes(input.status ?? "")
-    ? (input.status as InboxStatusFilter)
-    : "all";
-  const building = typeof input.building === "string" && input.building.trim() ? input.building.trim().slice(0, 120) : null;
+  const doneUntil = optionalCursor(input.doneUntil);
+  if (doneUntil === false) return { ok: false, errorKey: "invalid" };
   try {
-    const data = await withNavCount(auth.organizationId, loadInboxList(db(), auth.organizationId, {
-      status,
-      building,
-      channel: parseChannelFilter(input.channel),
-    }, new Date(), visibilityOf(auth.capabilities)));
+    const data = await withNavCount(
+      auth.organizationId,
+      loadInboxList(
+        db(),
+        auth.organizationId,
+        { status: parseStatusFilter(input.status), building: parseBuilding(input.building), channel: parseChannelFilter(input.channel) },
+        new Date(),
+        visibilityOf(auth.capabilities),
+        { doneUntil },
+      ),
+    );
     // 읽기에는 부작용이 없다 — 밀린 줄(429 뒤 등)은 다음 보내기 · 발송 작업 경로(/api/guest-messages/outbox)가 보낸다.
     return { ok: true, ...data };
   } catch (error) {
     logFailure("list", error);
+    return { ok: false, errorKey: "failed" };
+  }
+}
+
+export type ListMoreGuestConversationsResult = ({ ok: true } & InboxDonePage) | Failure;
+
+/**
+ * 처리 끝 다음 묶음(무한 스크롤, 47 §5 · §6-1, 2026-11-26) — 권한 · 조직 · 코드 가리기는 목록 읽기와 같다(`guest_messages.view`, 조직은 세션).
+ * 커서는 화면이 받은 마지막 처리 끝 줄의 열쇠 — 모양(시각 · uuid)을 확인하고, 읽기는 언제나 세션 조직 안에서만.
+ */
+export async function listMoreGuestConversations(input: {
+  status?: string | null;
+  building?: string | null;
+  channel?: string | null;
+  cursor: string;
+}): Promise<ListMoreGuestConversationsResult> {
+  const auth = await gate(false);
+  if (!auth.ok) return auth;
+  const cursor = parseDoneCursor(input?.cursor);
+  if (!cursor) return { ok: false, errorKey: "invalid" };
+  try {
+    const page = await loadDonePage(
+      db(),
+      auth.organizationId,
+      { status: parseStatusFilter(input.status), building: parseBuilding(input.building), channel: parseChannelFilter(input.channel) },
+      cursor,
+      new Date(),
+      visibilityOf(auth.capabilities),
+    );
+    return { ok: true, ...page };
+  } catch (error) {
+    logFailure("list more", error);
     return { ok: false, errorKey: "failed" };
   }
 }
@@ -191,12 +246,15 @@ export type GetGuestConversationRowsResult = ({ ok: true } & InboxRowsResult & N
 /**
  * 실시간 — 신호가 온 대화 몇 개만 목록 줄로 다시 읽는다(47 §5-9). 권한 · 조직은 목록 읽기와 같다(`guest_messages.view`, 조직은 세션).
  * id 는 신호에서 온 힌트일 뿐이라 조직 밖 id 는 `missing` 으로만 돌아온다.
+ * `doneHasMore`(+ `doneCursor`)가 오면 화면이 받은 처리 끝 범위로 창을 판정한다(더 불러온 줄도 실시간으로 고쳐지게).
  */
 export async function getGuestConversationRows(input: {
   ids: readonly string[];
   status?: string | null;
   building?: string | null;
   channel?: string | null;
+  doneCursor?: string | null;
+  doneHasMore?: boolean;
 }): Promise<GetGuestConversationRowsResult> {
   const auth = await gate(false);
   if (!auth.ok) return auth;
@@ -204,10 +262,9 @@ export async function getGuestConversationRows(input: {
   if (ids.length === 0 || ids.length > LIVE_ROWS_LIMIT || !ids.every((id) => typeof id === "string" && UUID_RE.test(id))) {
     return { ok: false, errorKey: "invalid" };
   }
-  const status = (INBOX_STATUS_FILTERS as readonly string[]).includes(input.status ?? "")
-    ? (input.status as InboxStatusFilter)
-    : "all";
-  const building = typeof input.building === "string" && input.building.trim() ? input.building.trim().slice(0, 120) : null;
+  const doneCursor = optionalCursor(input.doneCursor);
+  if (doneCursor === false) return { ok: false, errorKey: "invalid" };
+  const doneWindow = typeof input.doneHasMore === "boolean" ? { cursor: doneCursor, hasMore: input.doneHasMore } : null;
   try {
     const result = await withNavCount(
       auth.organizationId,
@@ -215,9 +272,10 @@ export async function getGuestConversationRows(input: {
         db(),
         auth.organizationId,
         ids.map((id) => id.toLowerCase()),
-        { status, building, channel: parseChannelFilter(input.channel) },
+        { status: parseStatusFilter(input.status), building: parseBuilding(input.building), channel: parseChannelFilter(input.channel) },
         new Date(),
         visibilityOf(auth.capabilities),
+        doneWindow,
       ),
     );
     return { ok: true, ...result };

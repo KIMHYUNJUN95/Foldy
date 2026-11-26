@@ -403,6 +403,7 @@ describe("정렬 · 막힘 판정", () => {
   const base = (over: Partial<InboxConversationRow>): InboxConversationRow =>
     ({
       id: "x",
+      status: "awaiting",
       state: "awaiting",
       snoozeUntil: null,
       lastGuestAt: "2026-11-12T00:00:00.000Z",
@@ -410,13 +411,13 @@ describe("정렬 · 막힘 판정", () => {
       ...over,
     }) as InboxConversationRow;
 
-  it("상태 · 기다림과 상관없이 마지막 메시지가 최신인 줄이 위", () => {
+  it("열린 대화(답장 기다림 · 나중에)가 먼저, 그 안에서 마지막 메시지가 최신인 줄이 위 — 처리 끝은 아래(2026-11-26)", () => {
     const rows = sortInboxRows([
       base({ id: "old-over", lastMessageAt: "2026-11-10T00:00:00.000Z" }),
-      base({ id: "done-new", state: "done", lastMessageAt: "2026-11-16T00:00:00.000Z" }),
-      base({ id: "snoozed-mid", state: "snoozed", lastMessageAt: "2026-11-13T00:00:00.000Z" }),
+      base({ id: "done-new", status: "done", state: "done", lastMessageAt: "2026-11-16T00:00:00.000Z" }),
+      base({ id: "snoozed-mid", status: "snoozed", state: "snoozed", lastMessageAt: "2026-11-13T00:00:00.000Z" }),
     ]);
-    expect(rows.map((row) => row.id)).toEqual(["done-new", "snoozed-mid", "old-over"]);
+    expect(rows.map((row) => row.id)).toEqual(["snoozed-mid", "old-over", "done-new"]);
   });
 
   it("직원이 답장하면(lastMessageAt 갱신) 그 대화가 맨 위로", () => {
@@ -425,8 +426,11 @@ describe("정렬 · 막힘 판정", () => {
       base({ id: "b", lastMessageAt: "2026-11-14T00:00:00.000Z" }),
     ];
     expect(sortInboxRows(before).map((row) => row.id)).toEqual(["a", "b"]);
-    const after = [before[0], base({ id: "b", state: "done", lastMessageAt: "2026-11-16T00:00:00.000Z" })];
+    const after = [before[0], base({ id: "b", lastMessageAt: "2026-11-16T00:00:00.000Z" })];
     expect(sortInboxRows(after).map((row) => row.id)).toEqual(["b", "a"]);
+    // 답장으로 처리 끝이 되면 열린 대화 아래로 내려간다.
+    const doneAfter = [before[0], base({ id: "b", status: "done", state: "done", lastMessageAt: "2026-11-16T00:00:00.000Z" })];
+    expect(sortInboxRows(doneAfter).map((row) => row.id)).toEqual(["a", "b"]);
   });
 
   it("lastMessageAt 이 없는 줄은 맨 아래, 같으면 id 순", () => {

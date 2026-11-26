@@ -1744,3 +1744,97 @@ export function InboxError({
     </div>
   );
 }
+
+// ── 목록 끝 · 지난 대화 더 불러오기(무한 스크롤, 2026-11-26) ─────────────────
+
+/** 가장 가까운 세로 스크롤 칸(PC `.gm-scroll` · 태블릿 목록 칸). 없으면 null = 화면(폰은 창이 스크롤). */
+function scrollParentOf(node: HTMLElement): HTMLElement | null {
+  let parent = node.parentElement;
+  while (parent) {
+    const overflowY = getComputedStyle(parent).overflowY;
+    if ((overflowY === "auto" || overflowY === "scroll") && parent.scrollHeight > parent.clientHeight) return parent;
+    parent = parent.parentElement;
+  }
+  return null;
+}
+
+/**
+ * 목록 맨 아래 — 처리 끝 대화가 더 있으면 보이기 직전에(`rootMargin`) 다음 묶음을 부른다. 47 §5
+ * 관찰 기준은 목록이 실제로 스크롤되는 칸(창이 아니라). 화면 읽기 · 키보드용으로 「더 보기」 단추를 같이 둔다.
+ * 실패하면 다시 해 보기 단추. 다 받았으면 조용한 끝 줄(처리 끝이 하나라도 있을 때만). 상태 탭이 처리 끝을 빼면 아무것도 없다.
+ */
+export function InboxMore({
+  showsDone,
+  hasDone,
+  hasMore,
+  cursor,
+  round,
+  state,
+  onMore,
+  copy,
+}: {
+  showsDone: boolean;
+  hasDone: boolean;
+  hasMore: boolean;
+  cursor: string | null;
+  /** 요청이 끝난 횟수 — 바뀌면 다시 관찰(끝 줄이 아직 보이면 다음 묶음). */
+  round: number;
+  state: "idle" | "loading" | "error";
+  onMore: () => void;
+  copy: GmCopy;
+}) {
+  const sentinel = useRef<HTMLDivElement>(null);
+  const onMoreRef = useRef(onMore);
+  useEffect(() => {
+    onMoreRef.current = onMore;
+  });
+  const watching = showsDone && hasMore && state === "idle";
+  // 커서 · 요청 회차가 바뀔 때마다 다시 관찰 — 붙인 뒤에도 끝 줄이 아직 보이면 바로 다음 묶음.
+  useEffect(() => {
+    const node = sentinel.current;
+    if (!watching || !node || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) onMoreRef.current();
+      },
+      { root: scrollParentOf(node), rootMargin: "0px 0px 600px 0px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [watching, cursor, round]);
+
+  if (!showsDone) return null;
+  if (!hasMore) {
+    return hasDone ? (
+      <div className="gm-more" data-end="">
+        {copy.listEnd}
+      </div>
+    ) : null;
+  }
+  return (
+    <div className="gm-more" ref={sentinel}>
+      <span className="sr-only" aria-live="polite">
+        {state === "loading" ? copy.listLoadingMore : state === "error" ? copy.listMoreFailed : ""}
+      </span>
+      {state === "loading" ? (
+        <span className="gm-more__loading" aria-hidden="true">
+          <span className="gm-more__dot" />
+          {copy.listLoadingMore}
+        </span>
+      ) : state === "error" ? (
+        <>
+          <span className="gm-more__fail" aria-hidden="true">
+            {copy.listMoreFailed}
+          </span>
+          <button type="button" className="gm-more__btn" onClick={() => onMore()}>
+            {copy.retryLoad}
+          </button>
+        </>
+      ) : (
+        <button type="button" className="gm-more__btn" onClick={() => onMore()}>
+          {copy.listLoadMore}
+        </button>
+      )}
+    </div>
+  );
+}

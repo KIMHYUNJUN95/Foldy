@@ -270,6 +270,9 @@ export function mergeRuleCounts<T extends { id: string; nextSendAt: string | nul
  * - 목록 통째 읽기(`replace` — 따라잡기 · 서버가 새 목록을 줌): 더 나중에 보낸 줄 읽기가 가진 id 는 지금 값을 둔다.
  *   통째 읽기끼리는 마지막 것만(`replaceSeq`).
  * - 접힘(`leaving`): 필터에서 빠지면 넣고, 다시 들어오면(목록에 다시 · `matches`) 바로 뺀다. 빼는 시각은 화면이 정한다(`drop`).
+ * - 처리 끝 더 불러오기(`appendDone`, 2026-11-26): 보낸 뒤 통째 읽기가 있었거나 커서가 달라졌으면 버린다. 이미 있는 줄 · 그 뒤에 보낸
+ *   줄 읽기가 가진 id 는 지금 값을 둔다(id 로 겹침 없이). 붙인 줄은 그 요청 번호를 가져 — 더 옛날 줄 읽기 응답이 그 줄을 접지 못한다.
+ *   `paged` 는 첫 묶음보다 더 펼쳤는가 — 따라잡기 다시 읽기가 그 범위까지(`doneUntil`) 다시 채운다. 필터가 바뀐 통째 읽기는 거짓으로.
  */
 export type InboxLiveState = {
   list: InboxListData | null;
@@ -278,6 +281,7 @@ export type InboxLiveState = {
   seqs: ReadonlyMap<string, number>;
   countsSeq: number;
   replaceSeq: number;
+  paged: boolean;
 };
 
 export type InboxRowsPayload = {
@@ -289,14 +293,21 @@ export type InboxRowsPayload = {
 export type InboxLiveAction =
   | { type: "claim"; ids: readonly string[]; seq: number }
   | { type: "rows"; seq: number; result: InboxRowsPayload }
-  | { type: "replace"; seq: number; data: InboxListData }
+  | { type: "replace"; seq: number; data: InboxListData; keepPaged?: boolean }
+  | { type: "appendDone"; seq: number; sinceReplace: number; from: string; page: InboxDonePagePayload }
   | { type: "drop"; ids: readonly string[] }
   | { type: "settleEntered"; ids: readonly string[] };
+
+export type InboxDonePagePayload = {
+  rows: readonly InboxConversationRow[];
+  doneCursor: string | null;
+  doneHasMore: boolean;
+};
 
 const EMPTY_SET: ReadonlySet<string> = new Set();
 
 export function initialInboxLive(data: InboxListData | null): InboxLiveState {
-  return { list: data, leaving: EMPTY_SET, entered: EMPTY_SET, seqs: new Map(), countsSeq: 0, replaceSeq: 0 };
+  return { list: data, leaving: EMPTY_SET, entered: EMPTY_SET, seqs: new Map(), countsSeq: 0, replaceSeq: 0, paged: false };
 }
 
 function withAll(set: ReadonlySet<string>, add: readonly string[], remove: Iterable<string> = []): ReadonlySet<string> {
@@ -340,7 +351,14 @@ export function inboxLiveReducer(state: InboxLiveState, action: InboxLiveAction)
       if (!state.list) {
         const seqs = new Map(state.seqs);
         for (const row of data.rows) if ((seqs.get(row.id) ?? 0) < action.seq) seqs.set(row.id, action.seq);
-        return { ...state, list: data, seqs, countsSeq: Math.max(state.countsSeq, action.seq), replaceSeq: action.seq };
+        return {
+          ...state,
+          list: data,
+          seqs,
+          countsSeq: Math.max(state.countsSeq, action.seq),
+          replaceSeq: action.seq,
+          paged: !!action.keepPaged && state.paged,
+        };
       }
       // 이 통째 읽기보다 나중에 보낸 줄 읽기가 가진 id — 지금 값을 둔다(빠짐 · 들어옴도 그쪽 응답이 정한다).
       const newer = new Set([...state.seqs].filter(([, seq]) => seq > action.seq).map(([id]) => id));
@@ -358,12 +376,39 @@ export function inboxLiveReducer(state: InboxLiveState, action: InboxLiveAction)
           rows: merge.rows,
           buildings: data.buildings,
           awaitingCount: counts ? data.awaitingCount : state.list.awaitingCount,
+          doneCursor: data.doneCursor,
+          doneHasMore: data.doneHasMore,
         },
         leaving: withAll(state.leaving, merge.left, data.rows.filter((row) => !newer.has(row.id)).map((row) => row.id)),
         entered: withAll(state.entered, merge.entered),
         seqs,
         countsSeq: counts ? action.seq : state.countsSeq,
         replaceSeq: action.seq,
+        paged: !!action.keepPaged && state.paged,
+      };
+    }
+    case "appendDone": {
+      const list = state.list;
+      if (!list || state.replaceSeq !== action.sinceReplace || list.doneCursor !== action.from) return state;
+      const present = new Set(list.rows.map((row) => row.id));
+      const added: InboxConversationRow[] = [];
+      const seqs = new Map(state.seqs);
+      for (const row of action.page.rows) {
+        if (present.has(row.id) || (seqs.get(row.id) ?? 0) > action.seq) continue;
+        present.add(row.id);
+        added.push(row);
+        seqs.set(row.id, action.seq);
+      }
+      return {
+        ...state,
+        list: {
+          ...list,
+          rows: added.length > 0 ? sortInboxRows([...list.rows, ...added]) : list.rows,
+          doneCursor: action.page.doneCursor,
+          doneHasMore: action.page.doneHasMore,
+        },
+        seqs,
+        paged: true,
       };
     }
     case "drop": {

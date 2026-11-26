@@ -1,7 +1,8 @@
 /**
  * 손님 메시지함(2단계) — 화면 · 서버 액션이 같이 쓰는 **순수** 규칙. docs/product/47-guest-messaging.md §5 · §6-1 · §9
  *
- * - 목록 정렬은 마지막 메시지가 최신인 순(`compareInboxRows`). 기다린 시간(`computeWaiting`)은 줄 글자 · 색에만 쓴다.
+ * - 목록 정렬은 **열린 대화(답장 기다림 · 나중에 — 끝난 「나중에」 포함) 먼저, 처리 끝은 아래**, 묶음 안에서는 마지막 메시지가 최신인 순
+ *   (`compareInboxRows`, 2026-11-26). 서버 · 실시간 합치기 · PC · 모바일이 모두 이 한 함수를 쓴다. 기다린 시간(`computeWaiting`)은 줄 글자 · 색에만 쓴다.
  * - 「나중에」가 끝난 대화는 DB 상태가 아직 `snoozed` 여도 「답장 기다림」으로 본다(다음 메시지가 올 때 DB 함수가 바꾼다 — §4-0).
  * - 보내기 막힘(직접 예약 · 채널 모름)은 어댑터의 허용 목록과 같은 규칙(`OTA_SENDABLE_CHANNELS`).
  * - 「나중에」 시각은 도쿄 기준(CLAUDE.md 7). UTC 자르기 금지 — `tokyo-date.ts`.
@@ -109,8 +110,21 @@ function ms(value: string | null): number {
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
-/** 마지막 메시지(누가 보냈든)가 최신인 순(§6-1). 없는 줄은 맨 아래, 같으면 id. */
-export function compareInboxRows(a: InboxConversationRow, b: InboxConversationRow): number {
+/** 열린 대화(DB 상태가 처리 끝이 아님 — 기다림 · 나중에, 끝난 「나중에」도)인가. 정렬 묶음은 DB 상태로 정한다(시간이 흘러도 순서가 흔들리지 않게). */
+function isOpenGroup(row: Pick<InboxConversationRow, "status">): boolean {
+  return row.status !== "done";
+}
+
+/**
+ * 목록 순서(§6-1, 2026-11-26) — ① 열린 대화가 처리 끝보다 위 ② 그 안에서 마지막 메시지(누가 보냈든)가 최신인 순, 없는 줄은 맨 아래
+ * ③ 같으면 id. 처리 끝 안의 순서는 서버 키셋 커서(`last_message_at desc nulls last, id asc`)와 같다.
+ */
+export function compareInboxRows(
+  a: Pick<InboxConversationRow, "id" | "status" | "lastMessageAt">,
+  b: Pick<InboxConversationRow, "id" | "status" | "lastMessageAt">,
+): number {
+  const openA = isOpenGroup(a);
+  if (openA !== isOpenGroup(b)) return openA ? -1 : 1;
   if (!a.lastMessageAt !== !b.lastMessageAt) return a.lastMessageAt ? -1 : 1;
   const byRecent = ms(b.lastMessageAt) - ms(a.lastMessageAt);
   if (byRecent !== 0) return byRecent;
@@ -416,6 +430,10 @@ export type InboxListData = {
   awaitingCount: number;
   /** 정본 건물 이름(그릴 때 localize). */
   buildings: string[];
+  /** 받은 처리 끝의 마지막 줄 열쇠(`inbox-paging` 커서) — 「더 불러오기」는 이 뒤부터. 처리 끝을 안 받았으면 null. */
+  doneCursor: string | null;
+  /** 처리 끝이 더 있는가(지금 필터 기준). 상태 탭이 처리 끝을 빼면 언제나 거짓. */
+  doneHasMore: boolean;
 };
 
 /** 두 날짜 사이 밤 수(YYYY-MM-DD). */

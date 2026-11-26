@@ -20,6 +20,7 @@
  */
 
 import "server-only";
+import { isUnverifiedMarker, UNVERIFIED_MARKER_KEY } from "@/lib/beds24/unverified-marker";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
@@ -71,7 +72,8 @@ const RESERVATION_COLUMNS =
   "id, status, source, source_reservation_id, property_name, room_label, guest_name, check_in_date, check_out_date, created_at, " +
   "bid:raw_payload->>id, book_id:raw_payload->>bookId, raw_status:raw_payload->>status, raw_channel:raw_payload->>channel, " +
   "raw_referer:raw_payload->>referer, raw_api_source:raw_payload->>apiSource, raw_lang:raw_payload->>lang, " +
-  "num_adult:raw_payload->>numAdult, num_child:raw_payload->>numChild, master_id:raw_payload->>masterId, booking_time:raw_payload->>bookingTime";
+  "num_adult:raw_payload->>numAdult, num_child:raw_payload->>numChild, master_id:raw_payload->>masterId, booking_time:raw_payload->>bookingTime, " +
+  `unverified_at:raw_payload->>${UNVERIFIED_MARKER_KEY}`;
 
 const PAGE = 1000;
 const MAX_RESERVATIONS = 6000;
@@ -104,6 +106,8 @@ export type ReservationRowForAuto = {
   master_id?: string | null;
   /** Beds24 `bookingTime`(UTC). */
   booking_time?: string | null;
+  /** 웹훅이 Beds24 확인 없이 본문으로 적용한 예약(`unverified-marker.ts`) — 자동 안내 대상이 아니다. */
+  unverified_at?: string | null;
 };
 
 function untyped(client: Client): SupabaseClient {
@@ -377,7 +381,33 @@ export function assembleAutoBookings(
   return out;
 }
 
-async function loadBookingsFromRows(db: Client, organizationId: string, rows: ReservationRowForAuto[]): Promise<Map<string, LoadedBooking>> {
+/**
+ * 「확인 못 함」 표시가 있는 예약을 뺀다 — 모든 계획 · 큐 넣기가 여기를 지난다(전체 바퀴 · 웹훅 뒤 · 관리자 실행 · 범위 밖 큐 넣기).
+ * 예약 번호의 행 하나라도 표시가 있으면 그 예약 전부를 뺀다. 묶음 예약의 다른 방은 그대로 계획한다.
+ * 뺀 번호는 `unverified` 로 돌려준다 — 큐 넣기가 그 예약의 「보낼 예정」 줄을 지우지 않고 그대로 둔다(확인되면 다음 바퀴가 보낸다).
+ */
+export function excludeUnverifiedReservations(rows: readonly ReservationRowForAuto[]): {
+  rows: ReservationRowForAuto[];
+  unverified: Set<string>;
+} {
+  const unverified = new Set<string>();
+  for (const row of rows) {
+    if (!isUnverifiedMarker(row.unverified_at)) continue;
+    unverified.add(providerBookingIdOf(row) ?? `row:${row.id}`);
+  }
+  if (unverified.size === 0) return { rows: [...rows], unverified };
+  return { rows: rows.filter((row) => !unverified.has(providerBookingIdOf(row) ?? `row:${row.id}`)), unverified };
+}
+
+async function loadBookingsFromRows(
+  db: Client,
+  organizationId: string,
+  allRows: ReservationRowForAuto[],
+  unverifiedOut?: Set<string>,
+): Promise<Map<string, LoadedBooking>> {
+  const { rows, unverified } = excludeUnverifiedReservations(allRows);
+  for (const id of unverified) unverifiedOut?.add(id);
+  if (unverified.size > 0) console.warn("[guest-messages/auto] skip:unverified_reservations", { count: unverified.size });
   if (rows.length === 0) return new Map();
   const buildings = new Map((await loadBuildingGuestInfos(db, organizationId)).map((building) => [building.canonicalName, building]));
   const ids = rows.map(providerBookingIdOf).filter((id): id is string => !!id);
@@ -577,7 +607,8 @@ export async function runAutoMessagePlanner(
 
   const today = tokyoDateOf(nowIso) as string;
   const reservations = await loadAutoReservations(db, organizationId, today, { reservationIds: options.reservationIds });
-  const loaded = await loadBookingsFromRows(db, organizationId, reservations);
+  const unverified = new Set<string>();
+  const loaded = await loadBookingsFromRows(db, organizationId, reservations, unverified);
   result.bookings = loaded.size;
 
   const existing = await loadExistingRuns(
@@ -646,7 +677,7 @@ export async function runAutoMessagePlanner(
   }
 
   if (options.enqueue) {
-    const enqueued = await enqueueDueAutoRuns(db, organizationId, { now, rules, loaded });
+    const enqueued = await enqueueDueAutoRuns(db, organizationId, { now, rules, loaded, unverified });
     result.enqueued = enqueued.enqueued;
     result.skippedAtEnqueue = enqueued.skipped;
     result.writeErrors += enqueued.errors;
@@ -663,7 +694,7 @@ export async function runAutoMessagePlanner(
 async function enqueueDueAutoRuns(
   db: Client,
   organizationId: string,
-  args: { now: Date; rules: AutoRule[]; loaded: Map<string, LoadedBooking> },
+  args: { now: Date; rules: AutoRule[]; loaded: Map<string, LoadedBooking>; unverified: Set<string> },
 ): Promise<{ enqueued: number; skipped: number; errors: number }> {
   const counts = { enqueued: 0, skipped: 0, errors: 0 };
   const nowIso = args.now.toISOString();
@@ -682,12 +713,12 @@ async function enqueueDueAutoRuns(
   const rulesById = new Map(args.rules.map((rule) => [rule.id, rule]));
 
   // 이번 범위에 없는 예약 — 실행 줄이 가리키는 예약 행으로 따로(+ 같은 묶음).
-  const outside = dueRows.filter((row) => !args.loaded.has(row.provider_booking_id));
+  const outside = dueRows.filter((row) => !args.loaded.has(row.provider_booking_id) && !args.unverified.has(row.provider_booking_id));
   let extra = new Map<string, LoadedBooking>();
   const outsideReservationIds = [...new Set(outside.map((row) => row.reservation_id).filter((id): id is string => !!id))];
   if (outsideReservationIds.length > 0) {
     const rows = await loadAutoReservations(db, organizationId, tokyoDateOf(nowIso) as string, { reservationIds: outsideReservationIds });
-    extra = await loadBookingsFromRows(db, organizationId, rows);
+    extra = await loadBookingsFromRows(db, organizationId, rows, args.unverified);
   }
 
   const patch = async (run: KnownRun, update: Record<string, unknown>): Promise<boolean> => {
@@ -709,6 +740,8 @@ async function enqueueDueAutoRuns(
   for (const row of dueRows) {
     const rule = rulesById.get(row.rule_id);
     if (!rule) continue;
+    // 「확인 못 함」 예약 — 큐에 넣지도, 줄을 지우지도 않는다(Beds24 값으로 다시 쓰이면 다음 바퀴가 다룬다).
+    if (args.unverified.has(row.provider_booking_id)) continue;
     const run = toKnownRun(row);
     const entry = args.loaded.get(row.provider_booking_id) ?? extra.get(row.provider_booking_id);
     if (!entry) {

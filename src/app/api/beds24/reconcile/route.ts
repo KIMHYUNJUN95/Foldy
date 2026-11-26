@@ -2,6 +2,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import { backfillBeds24Reservations } from "@/lib/beds24/reservations-backfill";
 import { isBeds24SyncPaused } from "@/lib/beds24/sync-control";
 import { syncBeds24RoomBlocks, type RoomBlockSyncResult } from "@/lib/beds24/room-blocks-sync";
+import {
+  recheckUnverifiedBeds24Reservations,
+  unverifiedRecheckBudgetMs,
+  type UnverifiedRecheckResult,
+} from "@/lib/beds24/unverified-recheck";
 import { recordBeds24ReconciliationEvent } from "@/lib/beds24/webhook-events";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { requestMatchesSecret } from "@/lib/api-secret";
@@ -40,6 +45,7 @@ function isUuid(value: string | null) {
 }
 
 async function handle(request: NextRequest) {
+  const routeStartedAt = performance.now();
   if (isBeds24SyncPaused()) {
     return NextResponse.json({ ok: true, paused: true }, { status: 202 });
   }
@@ -77,6 +83,23 @@ async function handle(request: NextRequest) {
       roomBlocks = null;
     }
 
+    // 「확인 못 함」 표시 예약 다시 읽기 — 증분(`modifiedFrom`)은 Beds24 에서 안 바뀐 예약(지어낸 배달)을 다시 읽지 않아
+    // 표시가 영영 남는다. 블락 뒤에 둔다(블락은 이 경로가 유일한 입구라 먼저). 실패해도 정합 결과와 묶지 않는다.
+    // 예산은 라우트가 쓴 시간에 맞춘다(`min(15초, 45초 − 지난 시간)`) — 8초가 안 남으면 건너뛰고 `skipped_time`.
+    let unverifiedRecheck: UnverifiedRecheckResult | null = null;
+    try {
+      const budgetMs = unverifiedRecheckBudgetMs(performance.now() - routeStartedAt);
+      unverifiedRecheck =
+        budgetMs === null
+          ? { candidates: 0, cleared: 0, cancelled: 0, unavailable: 0, leftoverMarked: 0, stoppedReason: "skipped_time" }
+          : await recheckUnverifiedBeds24Reservations(supabase, {
+              organizationId: organizationIdParam ?? undefined,
+              budgetMs,
+            });
+    } catch (error) {
+      console.error("[beds24/reconcile] unverified recheck failed", error instanceof Error ? error.message : "unknown");
+    }
+
     const httpStatus = result.partial ? 207 : 200;
     await recordBeds24ReconciliationEvent({
       supabase,
@@ -98,6 +121,7 @@ async function handle(request: NextRequest) {
               : "no_data",
         ...result,
         roomBlocks,
+        unverifiedRecheck,
       },
       { status: httpStatus },
     );

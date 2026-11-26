@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { withUnverifiedMarker } from "@/lib/beds24/unverified-marker";
 import { after } from "next/server";
 import {
   beds24LastNightToCheckout,
@@ -51,8 +52,21 @@ export type ProcessWebhookBookingResult =
       };
     }
   | {
+      /** 저장된 것보다 오래된 배달(`modifiedTime`) — 덮어쓰지 않고 건너뛴다(`webhook-booking-guard.ts`). */
+      ok: true;
+      mode: "skipped_stale";
+      sourceReservationId: string;
+      originalReservationId: string;
+      mappedStatus: Database["public"]["Enums"]["reservation_status"];
+      reservationId?: undefined;
+    }
+  | {
       ok: false;
-      mode: "missing_required_fields" | "upsert_failed";
+      mode:
+        | "missing_required_fields"
+        | "upsert_failed"
+        | "verify_not_found"
+        | "over_delivery_cap";
       sourceReservationId: string | null;
       missing?: string[];
       error?: string;
@@ -394,25 +408,25 @@ async function upsertReservationByBookingIdentity(params: {
   };
 }
 
-export async function processBeds24WebhookBooking(params: {
+/** 조직은 **우리 DB 매핑**이 정한다. 페이로드의 조직 id 는 믿지 않는다(`webhook-organization.ts`). */
+export async function resolveWebhookOrganizationId(params: {
   payload: Beds24JsonRecord;
   organizationIdDefault: string | null;
   supabase: SupabaseClient<Database>;
-}): Promise<ProcessWebhookBookingResult> {
-  const { payload, supabase } = params;
-  const sanitizedPayload = sanitizeRawPayload(payload);
-
-  const syncFields = extractBeds24RoomSyncFields(payload);
-  // 조직은 **우리 DB 매핑**이 정한다. 페이로드의 조직 id 는 믿지 않는다(`webhook-organization.ts`).
-  const organizationId = pickWebhookOrganizationId({
+  syncFields?: ReturnType<typeof extractBeds24RoomSyncFields>;
+}): Promise<string | null> {
+  const syncFields = params.syncFields ?? extractBeds24RoomSyncFields(params.payload);
+  return pickWebhookOrganizationId({
     fallbackOrganizationId: params.organizationIdDefault,
-    mappedOrganizationIds: await readMappedOrganizationIds(supabase, {
+    mappedOrganizationIds: await readMappedOrganizationIds(params.supabase, {
       externalPropertyId: syncFields.externalPropertyId,
-      externalRoomId: readBeds24ExternalRoomId(payload) ?? syncFields.externalRoomId,
+      externalRoomId: readBeds24ExternalRoomId(params.payload) ?? syncFields.externalRoomId,
     }),
   });
+}
 
-  const sourceReservationId = readBeds24String(payload, [
+export function readWebhookSourceReservationId(payload: Beds24JsonRecord): string | null {
+  return readBeds24String(payload, [
     "bookId",
     "book_id",
     "apiReference",
@@ -423,7 +437,12 @@ export async function processBeds24WebhookBooking(params: {
     "booking_id",
     "id",
   ]);
+}
 
+export function readWebhookStayDates(payload: Beds24JsonRecord): {
+  checkInDate: string | null;
+  checkOutDate: string | null;
+} {
   const checkInDate = toBeds24IsoDate(
     readBeds24String(payload, [
       "firstNight",
@@ -435,12 +454,34 @@ export async function processBeds24WebhookBooking(params: {
       "startDate",
     ]),
   );
-
   const checkOutDate =
     beds24LastNightToCheckout(readBeds24String(payload, ["lastNight", "last_night"])) ??
     toBeds24IsoDate(
       readBeds24String(payload, ["checkOut", "check_out", "departure", "departureDate", "endDate"]),
     );
+  return { checkInDate, checkOutDate };
+}
+
+export async function processBeds24WebhookBooking(params: {
+  payload: Beds24JsonRecord;
+  organizationIdDefault: string | null;
+  supabase: SupabaseClient<Database>;
+  /** Beds24 에서 확인하지 못하고 본문으로 쓸 때만 — 저장 행에 「확인 못 함」 표시를 남긴다(`unverified-marker.ts`). */
+  unverifiedAt?: string | null;
+}): Promise<ProcessWebhookBookingResult> {
+  const { payload, supabase } = params;
+  const sanitizedPayload = withUnverifiedMarker(sanitizeRawPayload(payload), params.unverifiedAt);
+
+  const syncFields = extractBeds24RoomSyncFields(payload);
+  const organizationId = await resolveWebhookOrganizationId({
+    payload,
+    organizationIdDefault: params.organizationIdDefault,
+    supabase,
+    syncFields,
+  });
+
+  const sourceReservationId = readWebhookSourceReservationId(payload);
+  const { checkInDate, checkOutDate } = readWebhookStayDates(payload);
 
   const guestFirstName = readBeds24String(payload, ["guestFirstName", "guest_first_name", "firstName", "first_name"]);
   const guestLastName = readBeds24String(payload, ["guestLastName", "guest_last_name", "lastName", "last_name"]);

@@ -20,6 +20,7 @@ vi.mock("@/lib/beds24/webhook-events", () => ({
   recordBeds24WebhookRejection: async () => undefined,
 }));
 vi.mock("@/lib/beds24/price-webhook", () => ({
+  extractPriceWebhookSignal: () => null,
   processBeds24PriceWebhook: async () => {
     state.priceCalls += 1;
     return { handled: false, reason: "test" };

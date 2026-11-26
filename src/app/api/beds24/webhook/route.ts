@@ -1,7 +1,10 @@
 import { after, NextResponse, type NextRequest } from "next/server";
 import { extractBeds24WebhookBookingCandidates } from "@/lib/beds24/booking-payload";
-import { processBeds24WebhookBooking } from "@/lib/beds24/process-webhook-booking";
-import { processBeds24PriceWebhook } from "@/lib/beds24/price-webhook";
+import { processBeds24WebhookBooking, type ProcessWebhookBookingResult } from "@/lib/beds24/process-webhook-booking";
+import { extractPriceWebhookSignal, processBeds24PriceWebhook } from "@/lib/beds24/price-webhook";
+import { readBeds24OwnBookingId } from "@/lib/beds24/reservation-id";
+import { readBeds24AccountCredit } from "@/lib/beds24/account-credit";
+import { createBeds24VerifyGate, guardBeds24WebhookBooking } from "@/lib/beds24/webhook-booking-guard";
 import { isBeds24SyncPaused } from "@/lib/beds24/sync-control";
 import {
   recordBeds24WebhookEvent,
@@ -25,7 +28,22 @@ import {
 export const maxDuration = 60;
 
 /**
- * 받은 배달을 다른 수신처로 넘긴다 — **기본 꺼짐**.
+ * 한 배달에서 처리할 예약 수 상한(2026-11-26). Beds24 는 보통 한 배달에 예약 하나(그룹 예약도 방마다)를 싣는다.
+ * 넘는 것은 처리하지 않고 `over_delivery_cap` 실패로 남긴다 — 매일 정합 작업(`modifiedFrom`)이 복구한다.
+ * 실제 상한은 아래 시간 예산이 먼저 건다 — 10 은 확인이 필요 없는 빠른 배달의 행 수 상한이다.
+ */
+export const BEDS24_WEBHOOK_MAX_BOOKINGS = 10;
+
+/**
+ * 처리 중 이 시간을 넘기면 남은 예약은 같은 실패로 넘긴다 — 60초(`maxDuration`)에 잘려 결과 기록까지 잃지 않게.
+ * 20초 근거: 예산 직전에 시작한 마지막 한 건이 확인 읽기 5초 + DB 왕복 ~2초 → 루프 최대 ~27초.
+ * 응답 뒤(`after()`) 일 = 결과 기록 ~1초 + 메시지 받기 ~3초 + 사진 복사 예산 20초 ≈ 24초. 합 ~51초 — 60초 안에 ~9초 여유.
+ */
+export const BOOKING_LOOP_BUDGET_MS = 20_000;
+
+/**
+ * 받은 **가격** 배달을 다른 수신처로 넘긴다 — **기본 꺼짐**. 예약 배달(손님 전화 · 메일 · 주소)은 절대 넘기지 않는다
+ * (2026-11-26) — 부르는 쪽이 예약이 없고 가격 신호(`extractPriceWebhookSignal`)가 있을 때만 부른다.
  *
  * 전환일에 Beds24 재고 웹훅의 주인을 우리로 가져오면서 저쪽 프로젝트를 계속 살려두기 위한
  * 스위치다. 설계·근거는 `src/lib/beds24/webhook-forward.ts`.
@@ -83,7 +101,7 @@ function schedulePriceDeferred<T extends object>(result: T) {
   return rest;
 }
 
-/** 거절 · 미분류 배달 원문 저장 상한(글자). 넘으면 앞부분 표본과 길이만 남긴다(2026-10-26). */
+/** 거절 · 미분류 · 실패 배치 원문 저장 상한(글자). 넘으면 앞부분 표본과 길이만 남긴다(2026-10-26, 실패 배치 2026-11-26). */
 const MAX_STORED_REJECTED_BODY_CHARS = 20_000;
 const REJECTED_BODY_SAMPLE_CHARS = 4_000;
 
@@ -184,7 +202,7 @@ export async function GET(request: NextRequest) {
     body[key] = value;
   }
 
-  scheduleForward({ request, method: "GET" });
+  if (extractPriceWebhookSignal(body)) scheduleForward({ request, method: "GET" });
 
   const supabase = getSupabaseServiceClient();
   const priceResult = await processBeds24PriceWebhook({ body, supabase });
@@ -220,10 +238,12 @@ export async function POST(request: NextRequest) {
   const rawText = await request.text();
   const { body } = parseWebhookBody(rawText);
 
-  scheduleForward({ request, method: "POST", rawBody: rawText, contentType });
-
   const supabase = getSupabaseServiceClient();
   const bookingPayloads = extractBeds24WebhookBookingCandidates(body);
+
+  if (bookingPayloads.length === 0 && extractPriceWebhookSignal(body)) {
+    scheduleForward({ request, method: "POST", rawBody: rawText, contentType });
+  }
 
   // 예약이 없는 배달 중 **가격 변경 웹훅**을 먼저 걸러낸다 (2026-09-17).
   //
@@ -271,14 +291,94 @@ export async function POST(request: NextRequest) {
 
   const organizationIdDefault = process.env.BEDS24_DEFAULT_ORGANIZATION_ID?.trim() ?? null;
 
-  const results: Awaited<ReturnType<typeof processBeds24WebhookBooking>>[] = [];
-  for (const payload of bookingPayloads) {
+  // 결과는 `bookingPayloads` 와 같은 순서 · 같은 길이다(메시지 받기가 번호로 짝짓는다).
+  const results: ProcessWebhookBookingResult[] = [];
+  let stale = 0;
+  let verified = 0;
+  let verifyUnavailableApplied = 0;
+  let overCap = 0;
+  // 확인하지 못하고 적용한 것 · 없는 예약 취소는 자동 안내를 계획하지 않는다.
+  const noAutoMessages = new Set<ProcessWebhookBookingResult>();
+  const verifyGate = createBeds24VerifyGate(async () => (await readBeds24AccountCredit(supabase))?.remaining ?? null);
+  for (const [index, payload] of bookingPayloads.entries()) {
+    if (index >= BEDS24_WEBHOOK_MAX_BOOKINGS || performance.now() - startedAt > BOOKING_LOOP_BUDGET_MS) {
+      overCap += 1;
+      results.push({
+        ok: false,
+        mode: "over_delivery_cap",
+        sourceReservationId: readBeds24OwnBookingId(payload),
+      });
+      continue;
+    }
+    let guard: Awaited<ReturnType<typeof guardBeds24WebhookBooking>>;
+    try {
+      guard = await guardBeds24WebhookBooking({
+        payload,
+        organizationIdDefault,
+        supabase,
+        gate: verifyGate,
+      });
+    } catch (error) {
+      console.error("[beds24/webhook] booking guard failed", error instanceof Error ? error.message : "unknown");
+      results.push({
+        ok: false,
+        mode: "upsert_failed",
+        sourceReservationId: readBeds24OwnBookingId(payload),
+        error: "guard_failed",
+      });
+      continue;
+    }
+    if (guard.kind === "stale") {
+      stale += 1;
+      const bookingId = readBeds24OwnBookingId(payload) ?? "";
+      console.warn("[beds24/webhook] skip:stale_delivery", {
+        bookingId,
+        incomingModifiedTime: guard.incomingModifiedTime,
+      });
+      results.push({
+        ok: true,
+        mode: "skipped_stale",
+        sourceReservationId: bookingId,
+        originalReservationId: bookingId,
+        mappedStatus: guard.status,
+      });
+      continue;
+    }
+    if (guard.kind === "verify_failed") {
+      console.warn("[beds24/webhook] skip:verify_failed", {
+        bookingId: readBeds24OwnBookingId(payload),
+        mode: guard.mode,
+        reason: guard.reason,
+      });
+      results.push({
+        ok: false,
+        mode: guard.mode,
+        sourceReservationId: readBeds24OwnBookingId(payload),
+      });
+      continue;
+    }
+    if (guard.verified) verified += 1;
+    if (guard.fallback) {
+      if (guard.fallback === "verify_unavailable") verifyUnavailableApplied += 1;
+      const tag = guard.fallback === "verify_unavailable" ? "verify_unavailable_applied" : "verify_not_found_cancelled";
+      console.warn(`[beds24/webhook] ${tag}`, { bookingId: readBeds24OwnBookingId(payload) });
+    }
+    const unverifiedAt =
+      guard.fallback === "verify_unavailable" ? new Date().toISOString() : (guard.carryUnverifiedAt ?? null);
     const result = await processBeds24WebhookBooking({
-      payload,
+      payload: guard.payload,
       organizationIdDefault,
       supabase,
+      unverifiedAt,
     });
+    if (guard.fallback) noAutoMessages.add(result);
     results.push(result);
+  }
+  if (overCap > 0) {
+    console.warn("[beds24/webhook] skip:over_delivery_cap", {
+      total: bookingPayloads.length,
+      skipped: overCap,
+    });
   }
 
   const succeeded = results.filter((result) => result.ok).length;
@@ -301,7 +401,7 @@ export async function POST(request: NextRequest) {
   const durationMs = Math.round(performance.now() - startedAt);
   // 손님 메시지 임시 원문 기록(V1, docs/product/47 §3-4) — `BEDS24_WEBHOOK_CAPTURE_MESSAGES=1` 일 때만, 메시지가 실린 배달만.
   // 실제 배달 모양을 확인하면 끈다. 표는 같은 beds24_webhook_events(모드 `messages_capture`). 첨부는 길이만, 크기 상한.
-  // 실패 배치는 예전대로 원문 전체(재처리용)를 남긴다.
+  // 실패 배치는 원문(재처리용)을 남기되 거절 배달과 같은 20,000자 상한(2026-11-26).
   const captureMessages = shouldCaptureWebhookMessages(body);
   const keepRaw = anyFailed || captureMessages;
   after(() =>
@@ -310,7 +410,11 @@ export async function POST(request: NextRequest) {
       durationMs,
       httpStatus: anyFailed ? 207 : 200,
       results,
-      rawBody: anyFailed ? body : captureMessages ? prepareCapturedMessagesPayload(body) : undefined,
+      rawBody: anyFailed
+        ? capRejectedBody(body, rawText)
+        : captureMessages
+          ? prepareCapturedMessagesPayload(body)
+          : undefined,
       contentType: keepRaw ? contentType : undefined,
       extraModes: captureMessages ? ["messages_capture"] : undefined,
     }),
@@ -339,7 +443,12 @@ export async function POST(request: NextRequest) {
 
   // 손님 메시지 자동 안내(docs/product/47 §5-6) — 들어온 예약만 다시 계획한다(날짜 바뀜 · 취소 · 확정 직후). 큐 넣기 · Beds24 호출 없음.
   // 안에서 모든 오류를 삼킨다.
-  after(() => planAutoMessagesAfterWebhook(supabase, results));
+  after(() =>
+    planAutoMessagesAfterWebhook(
+      supabase,
+      results.filter((result) => result.mode !== "skipped_stale" && !noAutoMessages.has(result)),
+    ),
+  );
 
   // 부분 실패한 배치를 Beds24 가 전달 실패로 보고 재시도 폭주를 하지 않도록
   // 항상 2xx 로 ACK 한다. 실패한 행은 위에서(응답 뒤) 기록되고
@@ -350,6 +459,9 @@ export async function POST(request: NextRequest) {
       processed: results.length,
       succeeded,
       failed,
+      stale,
+      verified,
+      verifyUnavailableApplied,
       results,
     },
     { status: 200 },

@@ -443,28 +443,57 @@ export async function postBeds24BookingUpdate(
   return { ok: true };
 }
 
+/** 모든 예약 상태 — `status` 를 생략하면 Beds24 가 취소(어쩌면 문의 · 요청도) 예약을 뺀다. 여러 개 실어도 1 크레딧(01 문서). */
+const ALL_BOOKING_STATUSES_QUERY = ["new", "request", "confirmed", "cancelled", "black", "inquiry"]
+  .map((status) => `status=${status}`)
+  .join("&");
+/** `inquiry` 를 Beds24 가 받는다는 기록이 없어(실제로 확인된 건 이 5개 — 01 문서 2026-08-07) 400 이면 이것으로 한 번 더. */
+const DOCUMENTED_BOOKING_STATUSES_QUERY = ["new", "request", "confirmed", "cancelled", "black"]
+  .map((status) => `status=${status}`)
+  .join("&");
+
 /**
  * 예약 한 건을 Beds24 예약번호로 읽는다. 수정 직후 우리 표를 맞추는 데 쓴다 —
  * 웹훅을 기다리면 방금 고친 것이 화면에 안 보여 사람은 한 번 더 고친다.
+ *
+ * `allStatuses` (웹훅 확인 읽기, 2026-11-26): 모든 상태를 싣고, 응답을 엄격히 읽는다 — `not_found` 는
+ * 정상 응답(`success !== false`, `data` 배열)에 그 번호의 행이 **없을 때만**. 모양이 다르면 `unexpected_response`.
+ * 그룹 예약은 여러 행이 오므로 첫 행이 아니라 번호가 같은 행을 고른다.
  */
 export async function fetchBeds24BookingById(
   bookingId: string,
-  options?: { timeoutMs?: number },
+  options?: { timeoutMs?: number; allStatuses?: boolean },
 ): Promise<{ ok: true; booking: JsonRecord } | { ok: false; error: string } | { skipped: string }> {
   const resolved = await resolveBase();
   if ("skipped" in resolved) return resolved;
 
-  const response = await beds24Fetch(`${resolved.base}/bookings?id=${encodeURIComponent(bookingId)}`, {
-    cache: "no-store",
-    signal: options?.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined,
-    headers: { accept: "application/json", token: resolved.token },
-  }, { action: "bookings.read", job: "booking" });
+  // 시한은 두 번 읽어도 한 번 — 400 다시 읽기가 웹훅 예산을 늘리지 않게.
+  const signal = options?.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined;
+  const read = (statusQuery: string) =>
+    beds24Fetch(`${resolved.base}/bookings?id=${encodeURIComponent(bookingId)}${statusQuery}`, {
+      cache: "no-store",
+      signal,
+      headers: { accept: "application/json", token: resolved.token },
+    }, { action: "bookings.read", job: "booking" });
+  let response = await read(options?.allStatuses ? `&${ALL_BOOKING_STATUSES_QUERY}` : "");
+  let readWithoutInquiry = false;
+  if (options?.allStatuses && response.status === 400) {
+    response = await read(`&${DOCUMENTED_BOOKING_STATUSES_QUERY}`);
+    readWithoutInquiry = true;
+  }
   const credit = readCreditSignal(response.headers);
   if (!response.ok) {
     throw new Beds24HttpError(response.status, credit.resetInSec, response.status === 429);
   }
   const body = (await response.json()) as unknown;
   const root = asRecord(body);
+  if (options?.allStatuses) {
+    if (!root || root.success === false || !Array.isArray(root.data)) return { error: "unexpected_response", ok: false };
+    const match = root.data.map(asRecord).find((row) => row && String(row.id ?? "") === bookingId);
+    if (match) return { booking: match, ok: true };
+    // 문의(inquiry)를 빼고 읽었으니, 없다는 것은 「없음」이 아니라 「모름」 — 살아 있는 문의를 취소하지 않게.
+    return { error: readWithoutInquiry ? "unexpected_response" : "not_found", ok: false };
+  }
   const rows = Array.isArray(body) ? body : Array.isArray(root?.data) ? root.data : null;
   const booking = asRecord(rows?.[0]);
   if (!booking || String(booking.id ?? "") !== bookingId) return { error: "not_found", ok: false };

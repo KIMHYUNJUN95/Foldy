@@ -331,7 +331,8 @@ Webhook processing is now split into shared helpers instead of keeping all logic
   - verifies secret (`BEDS24_WEBHOOK_SECRET` via `x-beds24-webhook-secret` / Bearer / `?secret=`). **Fail-closed since 2026-11-13:** unset secret → `503 not_configured`, wrong/missing → `403` — nothing is stored. The same secret no longer opens any cron/job route (tick, reconcile, reviews-sync + health + relink, rates-sync, price-jobs/worker, recruit full sync); per-route table: `docs/engineering/07-environment-setup.md` 「API 라우트별 비밀값」
   - parses JSON body
   - extracts one or more booking candidates
-  - delegates each booking to `processBeds24WebhookBooking()`
+  - runs each booking through `guardBeds24WebhookBooking()` (ordering + verify, below), then `processBeds24WebhookBooking()`
+  - see 「2026-11-26 웹훅 순서 · 확인 · 상한」 below
 - `src/lib/beds24/booking-payload.ts`
   - `extractBeds24BookingCandidates()` for strict backfill `/bookings` responses
   - `extractBeds24WebhookBookingCandidates()` for relaxed webhook parsing
@@ -1435,3 +1436,90 @@ Beds24 V2 크레딧은 **계정 단위 5분 창**(한도 200 — `x-five-min-lim
 1. 그 토큰을 쓰는 호출 지점 힌트에 `credentialKey` 를 넘긴다(`Beds24CreditHint.credentialKey`).
 2. `account_credit` 줄과 쿨다운(`api_cooldown`)은 지금 main 전용이다 — 토큰마다 줄 이름을 나눌지 정한다(기록 함수는 main 일 때만 갱신한다).
 3. 읽기(`credit-usage-read.ts`)는 지금 'main' 만 읽는다. 창 계산 함수(`groupBeds24CreditWindows`)와 DB 함수는 이미 키를 받으니, 키마다 따로 계산해 화면에 토큰별 게이지를 둔다.
+
+## 2026-11-26 웹훅 순서 · 확인 · 상한 (보안 점검)
+
+웹훅 인증은 공유 비밀값 하나다(서명 · 시각 · nonce 없음). 그 값은 Beds24 설정 화면과 — `?secret=` 로 보내면 — 주소가 남는
+로그에도 보인다. 아는 사람이 예전 배달을 다시 보내거나 취소 · 날짜 바꾸기를 지어내면 예약이 덮이고 손님 자동 안내가 다시 계획된다
+(실제 Beds24 메시지가 손님에게 나갈 수 있다). 그래서 예약 하나마다 처리 전에 `src/lib/beds24/webhook-booking-guard.ts` 를 지난다.
+
+- **순서.** 들어온 예약의 Beds24 `modifiedTime` 이 그 예약(같은 Beds24 자기 번호)의 저장된 행 `raw_payload->>modifiedTime`
+  중 가장 새 값보다 **엄격히 오래됐으면** 덮지 않는다 — 결과 모드 `skipped_stale`(성공으로 셈, 응답 `stale` 수, 로그
+  `skip:stale_delivery` 에 번호 · 시각만). 같은 시각(같은 배달 재전송)은 그대로 적용한다. 어느 쪽이든 시각이 없으면 판단하지 않는다.
+  근거: `modifiedTime` 은 `GET /bookings` 와 웹훅이 같은 예약 객체로 싣고, 우리는 그 객체를 `raw_payload` 에 그대로 저장한다
+  (예약 상세 `modifiedAt` · 자동화 취소 시각이 이미 이 값을 읽는다). 비교하는 두 값 모두 Beds24 시계다.
+- **확인(되읽기).** 상태를 바꾸는 배달 — 저장된 행이 없음(새 예약), 상태(취소 · 되살림 등) · 체크인 · 체크아웃 · Beds24 방 번호가
+  저장된 어느 행과도 다름, 또는 `modifiedTime` 이 지금보다 10분 넘게 미래 — 은 본문을 믿지 않고 `fetchBeds24BookingById`
+  (`GET /bookings?id=`, 판매 캘린더가 쓰기 뒤 되읽기에 이미 쓰는 것, **1 크레딧** — `x-request-cost` 실측 1, 시한 5초)로 그 예약
+  한 건을 읽어 **읽은 값**을 처리기에 넘긴다(응답 `verified` 수). 메시지만 온 배달처럼 상태가 그대로면 부르지 않는다(크레딧 0).
+  예상 사용량: 새 예약 1건 · 취소 1건 · 날짜/방 변경 1건마다 1 크레딧(5분 200 통에서). **주기 조회는 없다.**
+  - **못 읽음(사용자 결정 2026-11-26).** 429 · 시한 · 토큰 없음 · 그 밖의 Beds24 오류면 **본문을 예전처럼 적용**한다 — 새 예약 ·
+    취소가 정합 작업까지 늦지 않게. 다만 그 배달의 그 예약은 **자동 안내를 계획하지 않는다**(지어낸 배달로 손님에게 메시지가 나가지
+    않게). 로그 `verify_unavailable_applied`(번호만), 응답 `verifyUnavailableApplied` 수. 낡은 배달 판정은 그 전에 그대로 돈다.
+  - **「확인 못 함」 표시(사용자 결정 2026-11-26, 마이그레이션 없음).** 「못 읽음」으로 적용한 행의 `raw_payload` 에
+    `_foldy_unverified_at`(적용 시각, `src/lib/beds24/unverified-marker.ts`)을 남긴다. 표시된 예약은 **Beds24 에서 읽은 값으로 다시
+    쓰일 때까지** 자동 안내를 계획 · 큐에 넣지 않는다. 지우는 길: Beds24 에서 읽은 값을 쓰는 경로는 모두 `raw_payload` 를 통째로
+    바꾼다 — 확인된 웹훅(되읽은 값) · 매일 정합 · 백필(`reservations-backfill.ts` 일괄 upsert) · 판매 캘린더 되읽기(`ops-calendar.ts` →
+    처리기) · 없는 예약 취소(저장된 값에서 표시를 지움). 합치기(`jsonb_set` · `||`)로 쓰는 곳은 없다(마이그레이션 포함 확인).
+    **이어 붙임:** 확인이 필요 없는 배달(상태 · 날짜 · 방 그대로, 메시지만 온 배달 등)도 본문으로 통째로 덮으므로, 가드가 저장 행의
+    표시를 읽어(`carryUnverifiedAt`) 처리기가 다시 남긴다 — Beds24 확인 없이 표시가 지워지지 않게. 그룹 예약은 Beds24 예약 번호별로
+    본다(표시된 방만 빠지고 같은 묶음의 다른 방은 계획). 남는 한계: 다른 키(방 이름 바뀜 등)로 새 행이 생기면 옛 표시 행이 남아 그
+    번호의 안내를 계속 막을 수 있다(더 막는 쪽, 손님에게 잘못 나가지는 않음).
+  - **매일 다시 읽기(3차 감사 2026-11-26).** 증분 정합은 `modifiedFrom` 커서로 읽어 Beds24 에서 실제로 안 바뀐 예약(지어낸 배달)은
+    다시 읽지 않는다 — 그대로면 표시 · 지어낸 값이 영영 남는다. 그래서 `/api/beds24/reconcile` 이 증분 · 블락 뒤에
+    `recheckUnverifiedBeds24Reservations()`(`src/lib/beds24/unverified-recheck.ts`)를 돈다: Beds24 건물이 연결된 조직(또는
+    `organizationId`)의 `raw_payload->>_foldy_unverified_at is not null` 행을 `coalesce(_foldy_recheck_at, _foldy_unverified_at)`
+    오래된 순으로, 예약 번호(`readBeds24OwnBookingId`)로 줄여 최대 `UNVERIFIED_RECHECK_LIMIT`(20)개를 `allStatuses` 로 번호 읽기
+    (1 크레딧씩, 최대 하루 20). 있으면 일반 처리기(표시 지워짐) · 엄격한 없음이면 `loadStoredCancelPayload` 로 취소 · 못 읽음이면
+    그대로 다음 날. 웹훅과 같은 차단기(429 한 번 · 크레딧 10 미만이면 그만). 적용 뒤에도 같은 번호의 다른 행에 표시가 남으면 풀지
+    않고 기록만(`leftoverMarked`, 그 행 값은 지어낸 것일 수 있다). 실패해도 정합 결과와 묶지 않는다(응답 `unverifiedRecheck`). 표시
+    행 찾기는 인덱스 없이 조직 예약을 훑는다(하루 한 번).
+    - **돌아가며 읽기(4차 감사).** 읽었는데도 표시가 남은 행(못 읽음 · 다른 키의 옛 행)에는 `raw_payload._foldy_recheck_at`(그 시각)을
+      적는다 — 같은 20개가 매일 앞자리를 차지해 다른 예약이 굶지 않게. 적기 직전에 그 행을 다시 읽고 `updated_at` 이 같을 때만 쓴다
+      (그사이 웹훅이 Beds24 값으로 바꾼 행을 옛 값으로 되돌리지 않게). PostgREST 는 `coalesce` 로 정렬하지 못해 「아직 안 읽은 행
+      (표시 시각 순)」 · 「읽은 행(다시 읽은 시각 순)」을 따로 앞 100행씩 읽어 합친다. Beds24 값으로 쓰이면 `raw_payload` 가 통째로
+      바뀌어 이 키도 지워진다. 확인 없이 이어 붙일 때(`carryUnverifiedAt`)는 이 시각을 표시 값으로 이어 붙여 순서가 앞으로 돌아가지 않는다.
+    - **시간(4차 감사).** 정합 라우트(상한 60초)가 시작 시각을 잡고 예산을 `min(15초, 45초 − 지난 시간)`
+      (`unverifiedRecheckBudgetMs`)으로 준다. 8초(`UNVERIFIED_RECHECK_MIN_BUDGET_MS`)가 안 남으면 아예 건너뛰고
+      `stoppedReason: "skipped_time"`. 예산 안에서도 한 번 읽기 시한(5초)이 들어갈 자리가 없으면 더 읽지 않는다(`budget`).
+  - **낡은 배달 판정에서 표시 행은 뺀다.** 표시 행의 `modifiedTime` 은 지어낸 것일 수 있어(미래 쪽 10분 안) 진짜 배달을 낡았다고
+    막지 않게 「가장 새 시각」 비교에 쓰지 않는다.
+  - **`status=inquiry` 를 받는지 기록이 없다.** 저장소 · 문서에서 실제로 확인된 것은 5개(`new · request · confirmed · cancelled ·
+    black`, 위 2026-08-07) 뿐이다. 그래서 `allStatuses` 읽기가 HTTP 400 이면 `inquiry` 를 뺀 5개로 **한 번만** 다시 읽는다(최대 2
+    크레딧, 시한은 둘을 합쳐 5초). 그것도 실패면 던진다 → 「못 읽음」. **다시 읽은 결과에 그 번호가 없으면 `not_found` 가 아니라
+    `unexpected_response`(「못 읽음」)** — 문의를 빼고 읽었으니 「없음」이 아니라 「모름」이다. 예전에는 저장값으로 취소해서 살아 있는
+    문의 예약이 취소될 수 있었다(4차 감사 버그, 웹훅 확인 · 매일 다시 읽기 둘 다). Beds24 가 모르는 상태를 400 없이 조용히
+    무시하는지는 실제 호출로 확인하지 않았다.
+  - **차단기.** 한 배달에서 확인 읽기가 429 를 한 번 받으면 그 배달의 나머지는 부르지 않고 위 「못 읽음」 길로 간다. 처음 확인이 필요할
+    때 한 번 마지막 계정 크레딧 기록(`beds24_sync_locks` 의 `account_credit` 줄, `readBeds24AccountCredit` — 새 표 없음)을 읽어
+    남은 값이 `LOW_CREDIT_THRESHOLD`(10) 미만이면 그 배달은 처음부터 부르지 않는다. 기록이 없거나 읽기 실패면 막지 않는다.
+  - **확인 읽기는 모든 상태를 싣는다(재감사 2026-11-26).** `fetchBeds24BookingById(id, { allStatuses: true })` 가
+    `status=new&status=request&status=confirmed&status=cancelled&status=black&status=inquiry` 를 붙인다(여러 개여도 1 크레딧 —
+    위 「`status` 를 생략하면 Beds24 는 취소 예약을 뺀다」). 응답은 엄격히 읽는다: `not_found` 는 2xx · `success !== false` ·
+    `data` 가 배열 · 그 안에 `id` 가 같은 행이 **없을 때만**. 그 밖의 모양은 `unexpected_response` → 「못 읽음」(본문 적용).
+    그룹 예약은 여러 행이 오므로 첫 행이 아니라 번호가 같은 행을 쓴다. 판매 캘린더(`src/actions/ops-calendar.ts`)는 옵션 없이 예전 그대로.
+  - **없는 예약(사용자 결정 2026-11-26).** Beds24 가 「없음」이라 하면: 그 조직에 그 Beds24 예약(같은 자기 번호)의 저장된 행이 있으면
+    그 행의 **저장된 원래 값**에 `status: "cancelled"` 만 얹어(명시 상태 키는 지움, 본문 값은 쓰지 않음) 일반 처리기 → 일반 취소 경로
+    (`processCancelledWebhookBooking` · 방 재고 · 청소 정합 그대로)로 취소한다. 자동 안내는 계획하지 않는다. 로그
+    `verify_not_found_cancelled`. 저장된 행이 없거나 배달에 Beds24 번호가 없으면 쓰지 않고 `verify_not_found` 실패로 기록만 한다.
+- **남는 위험.** 상태를 안 바꾸는 칸(이름 · 전화 · 인원 · 금액 등 `raw_payload`)은 확인 없이 적용된다 — 비밀값을 아는 사람이 지어낼 수
+  있다. 모든 배달을 되읽으면 메시지 배달마다 1 크레딧이라 하지 않았다. 「못 읽음」 때는 상태를 바꾸는 본문도 적용된다(자동 안내만
+  막음 — 사용자 결정, 정합 작업이 나중에 바로잡는다).
+  **손님 메시지 받기(47)는 이 확인을 거치지 않는다(고치지 않음, 알려진 위험).** `src/lib/guest-messages/webhook-ingest.ts:117`
+  부근 — 지어내거나 낡은 배달의 메시지 본문도 그대로 대화에 들어간다(낡은 배달로 건너뛴 예약의 메시지 포함). 메시지는 Beds24 메시지
+  번호로 중복만 거른다.
+- **상한.** 한 배달에 예약 10개(`BEDS24_WEBHOOK_MAX_BOOKINGS`), 그리고 처리 시간 예산 20초(`BOOKING_LOOP_BUDGET_MS`) — 예산을
+  넘긴 뒤의 예약은 `over_delivery_cap` 실패로 남고 정합 작업이 복구한다(Beds24 는 보통 한 배달에 예약 하나). 20초 근거: 예산 직전에
+  시작한 마지막 한 건이 확인 읽기 5초 + DB ~2초 → 루프 최대 ~27초, 응답 뒤(`after()`) 일 = 결과 기록 ~1초 + 메시지 받기 ~3초 +
+  사진 복사 예산 20초 ≈ 24초, 합 ~51초로 `maxDuration` 60초 안에 ~9초 여유. 가드가 던지면(DB 읽기 실패) 그 예약은
+  `upsert_failed`(`guard_failed`)로 남고 다음 예약은 계속한다.
+  실패 배치 원문(`beds24_webhook_events.raw_payload`)도 거절 배달과 같은 20,000자 상한(넘으면 표본 4,000자 + 길이).
+- **전달 URL.** `BEDS24_PRICE_WEBHOOK_FORWARD_URL` 은 **가격 배달만** 넘긴다(예약 후보가 없고 `extractPriceWebhookSignal` 이 신호를
+  읽은 배달, GET 도 같다). 예약 본문(손님 전화 · 메일 · 주소)은 넘기지 않는다.
+- **`?secret=` 를 없애려면 (사용자 할 일, 지금은 그대로 받음).** 비교는 이미 상수 시간(`requestMatchesSecret` → `safeEqualSecret`)이고
+  주소를 로그에 남기지 않는다. 다만 Vercel · Beds24 쪽 요청 로그에는 주소가 남는다. Beds24 의 예약 웹훅(Booking Webhook) 설정
+  화면(건물마다 — 정확한 메뉴 이름은 계정 화면에서 확인)에서 주소 칸의 `?secret=…` 를 지우고, 같은 화면의 커스텀 헤더 칸에 `x-beds24-webhook-secret: <값>` 을 넣는다. 재고(가격) 웹훅
+  (V1 GET, 주소 한 줄만 받음)은 헤더 칸이 없을 수 있어 확인이 필요하다. 모든 건물이 헤더로 오는 것을 `beds24_webhook_events` 로 확인한 뒤에
+  route 의 `query: true` 를 지운다.
+- 코드: `src/app/api/beds24/webhook/route.ts` · `src/lib/beds24/webhook-booking-guard.ts` · 테스트
+  `src/lib/__tests__/beds24-webhook-booking-guard.test.ts` · `beds24-webhook-route-limits.test.ts`.

@@ -44,6 +44,7 @@ import {
 import {
   assembleAutoBookings,
   autoFillContextFor,
+  excludeUnverifiedReservations,
   planAutoMessagesAfterWebhook,
   runAutoMessagePlanner,
   toAutoBooking,
@@ -823,6 +824,72 @@ describe("자동 안내 리뷰 — 발송 작업", () => {
     expect(fake.tables.guest_messages.map((m) => m.id)).toEqual(["m-ok"]);
   });
 
+  it("보내기 직전 — Beds24 확인 못 한 예약의 자동 안내는 지우지 않고 붙잡는다(queued · 다음 시도 30분 뒤)", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const fake = createFakeSupabase({
+      guest_message_outbox: [
+        { id: "ob-hold", organization_id: ORG, conversation_id: "c-1", kind: "auto", status: "queued", attempts: 0, body: "hold", next_try_at: "2026-11-12T02:30:00Z", created_at: "2026-11-12T02:30:00Z" },
+        { id: "ob-ok", organization_id: ORG, conversation_id: "c-1", kind: "auto", status: "queued", attempts: 0, body: "ok", next_try_at: "2026-11-12T02:31:00Z", created_at: "2026-11-12T02:31:00Z" },
+      ],
+      guest_conversations: [conv],
+      guest_message_channel_state: [],
+      guest_messages: [{ id: "m-hold", organization_id: ORG, conversation_id: "c-1", outbox_id: "ob-hold", external_id: null, direction: "host", body: "hold" }],
+      reservations: [
+        { id: "res-u", organization_id: ORG, status: "confirmed", raw_status: "confirmed", unverified_at: "2026-11-12T01:00:00.000Z" },
+        { id: "res-1", organization_id: ORG, status: "confirmed", raw_status: "confirmed" },
+      ],
+      auto_message_runs: [
+        { id: "run-hold", organization_id: ORG, outbox_id: "ob-hold", status: "queued", scheduled_at: "2026-11-12T02:30:00.000Z", reservation_id: "res-u" },
+        { id: "run-ok", organization_id: ORG, outbox_id: "ob-ok", status: "queued", scheduled_at: "2026-11-12T02:31:00.000Z", reservation_id: "res-1" },
+      ],
+    });
+    const { calls, adapter } = okAdapter();
+    const result = await runGuestOutbox(fake.client as never, ORG, { enabled: true, adapter, now: NOW });
+    expect(result).toMatchObject({ ran: true, sent: 1 });
+    expect(calls).toEqual([["ob-ok"]]);
+    const ob = Object.fromEntries(fake.tables.guest_message_outbox.map((row) => [row.id, row]));
+    expect(ob["ob-hold"]).toMatchObject({ status: "queued", next_try_at: new Date(NOW.getTime() + 30 * 60_000).toISOString() });
+    const runs = Object.fromEntries(fake.tables.auto_message_runs.map((row) => [row.id, row]));
+    expect(runs["run-hold"].status).toBe("queued");
+    expect(fake.tables.guest_messages.map((m) => m.id)).toContain("m-hold");
+  });
+
+  it("붙잡기(미루기) 저장이 실패하면 queued 로 한 번 더 되돌린다 — sending 으로 남아 「보냈는지 모름」이 되지 않게", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const fake = createFakeSupabase({
+      guest_message_outbox: [
+        { id: "ob-hold", organization_id: ORG, conversation_id: "c-1", kind: "auto", status: "queued", attempts: 0, body: "hold", next_try_at: "2026-11-12T02:30:00Z", created_at: "2026-11-12T02:30:00Z" },
+      ],
+      guest_conversations: [conv],
+      guest_message_channel_state: [],
+      guest_messages: [],
+      reservations: [{ id: "res-u", organization_id: ORG, status: "confirmed", raw_status: "confirmed", unverified_at: "2026-11-12T01:00:00.000Z" }],
+      auto_message_runs: [{ id: "run-hold", organization_id: ORG, outbox_id: "ob-hold", status: "queued", scheduled_at: "2026-11-12T02:30:00.000Z", reservation_id: "res-u" }],
+    });
+    // 미루기(next_try_at 을 싣는 queued 되돌리기)만 실패시킨다.
+    const client = fake.client as unknown as { from: (table: string) => Record<string, unknown> };
+    const from = client.from.bind(client);
+    client.from = (table: string) => {
+      const builder = from(table);
+      if (table !== "guest_message_outbox") return builder;
+      const update = (builder.update as (value: Record<string, unknown>) => unknown).bind(builder);
+      builder.update = (value: Record<string, unknown>) => {
+        if (value.status !== "queued" || !value.next_try_at) return update(value);
+        const failing: Record<string, unknown> = {};
+        for (const method of ["eq", "in", "select"]) failing[method] = () => failing;
+        failing.then = (resolve: (value: unknown) => unknown) => resolve({ data: null, error: { message: "boom" } });
+        return failing;
+      };
+      return builder;
+    };
+    const { calls, adapter } = okAdapter();
+    await runGuestOutbox(fake.client as never, ORG, { enabled: true, adapter, now: NOW });
+    expect(calls).toEqual([]);
+    expect(fake.tables.guest_message_outbox[0]).toMatchObject({ status: "queued" });
+    expect(errors.mock.calls.some((call) => String(call[0]).includes("auto hold failed"))).toBe(true);
+  });
+
   it("직원 답장을 먼저 읽는다 — 자동 안내가 자리를 다 채울 만큼 밀려 있어도", async () => {
     const autos = Array.from({ length: 100 }, (_, i) => ({
       id: `ob-a${String(i).padStart(3, "0")}`,
@@ -956,5 +1023,76 @@ describe("자동 안내 — 규칙 끄기", () => {
     const fake = makeDb({ auto_message_rules: [ruleRow({ enabled: false })], auto_message_runs: [run("r-c", "cancelled")] });
     await setAutoRuleEnabled(fake.client as never, ORG, RULE_ID, true);
     expect(fake.tables.auto_message_runs[0].status).toBe("cancelled");
+  });
+});
+
+describe("자동 안내 — Beds24 확인 못 한 예약은 계획하지 않는다 (2026-11-26)", () => {
+  const MARK = "2026-11-26T01:00:00.000Z";
+
+  it("excludeUnverifiedReservations — 표시 있는 예약 번호의 행을 모두 빼고 번호를 돌려준다", () => {
+    const rows = [
+      reservationRow({ id: "a1", bid: "70001", unverified_at: MARK }),
+      reservationRow({ id: "a2", bid: "70001", source_reservation_id: "70001::room::202" }),
+      reservationRow({ id: "b1", bid: "70002", source_reservation_id: "70002::room::203" }),
+    ] as unknown as ReservationRowForAuto[];
+    const { rows: kept, unverified } = excludeUnverifiedReservations(rows);
+    expect(kept.map((row) => row.id)).toEqual(["b1"]);
+    expect([...unverified]).toEqual(["70001"]);
+  });
+
+  it("전체 바퀴 — 표시된 예약은 실행 줄을 만들지 않는다", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const fake = makeDb({ reservations: [reservationRow({ unverified_at: MARK })] });
+    const result = await runAutoMessagePlanner(fake.client as never, ORG, { now: NOW });
+    expect(result).toMatchObject({ bookings: 0, created: 0 });
+    expect(fake.tables.auto_message_runs).toHaveLength(0);
+  });
+
+  it("웹훅 뒤 묶음 다시 계획 — 표시된 방만 빼고 나머지 방은 계획한다", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const master = reservationRow({ id: "res-a", bid: "70001", source_reservation_id: "70001::room::201", room_label: "201", raw_payload: { id: "70001" } });
+    const member = reservationRow({
+      id: "res-b",
+      bid: "70002",
+      source_reservation_id: "70002::room::202",
+      room_label: "202",
+      master_id: "70001",
+      unverified_at: MARK,
+      raw_payload: { id: "70002", masterId: "70001", _foldy_unverified_at: MARK },
+    });
+    const fake = makeDb({ reservations: [master, member] });
+    await planAutoMessagesAfterWebhook(fake.client as never, [{ ok: true, reservationId: "res-b" }], NOW);
+    expect(fake.tables.auto_message_runs).toHaveLength(1);
+    expect(fake.tables.auto_message_runs[0]).toMatchObject({ provider_booking_id: "70001", room_label: "201" });
+  });
+
+  it("이미 계획된 줄 — 표시되면 보낼 시각이 돼도 큐에 안 넣고 지우지도 않는다, 표시가 지워지면 큐에 넣는다", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const fake = makeDb();
+    const db = fake.client as never;
+    await runAutoMessagePlanner(db, ORG, { now: NOW });
+    expect(fake.tables.auto_message_runs[0].status).toBe("scheduled");
+    fake.tables.reservations[0].unverified_at = MARK;
+    const due = new Date("2026-11-19T09:01:00.000Z");
+    expect((await runAutoMessagePlanner(db, ORG, { now: due, enqueue: true })).enqueued).toBe(0);
+    expect(fake.tables.auto_message_runs[0].status).toBe("scheduled");
+    expect(fake.tables.guest_message_outbox ?? []).toHaveLength(0);
+    fake.tables.reservations[0].unverified_at = null;
+    expect((await runAutoMessagePlanner(db, ORG, { now: due, enqueue: true })).enqueued).toBe(1);
+    expect(fake.tables.auto_message_runs[0].status).toBe("queued");
+  });
+
+  it("범위 밖 예약도 — 표시되면 보낼 차례 줄을 cancelled 로 닫지 않고 그대로 둔다", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const confirmed = ruleRow({ trigger: "confirmed", offset_days: 0, send_time: null, enabled_at: "2026-11-10T00:00:00Z" });
+    const far = reservationRow({ id: "res-far", bid: "90001", source_reservation_id: "90001::room::201", check_in_date: "2027-03-01", check_out_date: "2027-03-03", created_at: "2026-11-12T02:00:00Z" });
+    const fake = makeDb({ auto_message_rules: [confirmed], reservations: [far] });
+    const db = fake.client as never;
+    await planAutoMessagesAfterWebhook(db, [{ ok: true, reservationId: "res-far" }], NOW);
+    expect(fake.tables.auto_message_runs).toHaveLength(1);
+    fake.tables.reservations[0].unverified_at = MARK;
+    const result = await runAutoMessagePlanner(db, ORG, { now: new Date(NOW.getTime() + 60_000), enqueue: true });
+    expect(result.enqueued).toBe(0);
+    expect(fake.tables.auto_message_runs[0].status).toBe("scheduled");
   });
 });

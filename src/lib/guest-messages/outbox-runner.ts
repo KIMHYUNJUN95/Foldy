@@ -13,6 +13,7 @@
  */
 
 import "server-only";
+import { isUnverifiedMarker, UNVERIFIED_MARKER_KEY } from "@/lib/beds24/unverified-marker";
 import { userCreditActor, withBeds24CreditScope } from "@/lib/beds24/credit-ledger";
 import type { Beds24CreditActor } from "@/lib/beds24/credit-usage-types";
 
@@ -301,15 +302,17 @@ async function dropStaleAutoRows(supabase: Client, organizationId: string, rows:
   const runRows = (runs.data ?? []) as Array<{ id: string; outbox_id: string; scheduled_at: string; reservation_id: string | null }>;
   const reservationIds = [...new Set(runRows.map((run) => run.reservation_id).filter((id): id is string => !!id))];
   const cancelledReservations = new Set<string>();
+  const unverifiedReservations = new Set<string>();
   if (reservationIds.length > 0) {
     const reservations = await client
       .from("reservations")
-      .select("id, status, raw_status:raw_payload->>status")
+      .select(`id, status, raw_status:raw_payload->>status, unverified_at:raw_payload->>${UNVERIFIED_MARKER_KEY}`)
       .eq("organization_id", organizationId)
       .in("id", reservationIds);
     if (!reservations.error) {
-      for (const row of (reservations.data ?? []) as Array<{ id: string; status: string | null; raw_status: string | null }>) {
+      for (const row of (reservations.data ?? []) as Array<{ id: string; status: string | null; raw_status: string | null; unverified_at: string | null }>) {
         if (autoBookingStatus(row.status, row.raw_status) === "cancelled") cancelledReservations.add(row.id);
+        else if (isUnverifiedMarker(row.unverified_at)) unverifiedReservations.add(row.id);
       }
     }
   }
@@ -344,8 +347,45 @@ async function dropStaleAutoRows(supabase: Client, organizationId: string, rows:
       .in("outbox_id", ids)
       .eq("status", "queued");
   }
+  // Beds24 확인 못 한 예약(`unverified-marker.ts`) — 지우지 않고 붙잡는다: queued 로 되돌리되 다음 시도를 미룬다.
+  // 표시가 지워지면 그때 보내고, 그사이 6시간이 지나면 위 past_due 로 닫힌다.
+  const hold = runRows
+    .filter((run) => !!run.reservation_id && unverifiedReservations.has(run.reservation_id) && !dropped.has(run.outbox_id))
+    .map((run) => run.outbox_id);
+  if (hold.length > 0) {
+    const held = await supabase
+      .from("guest_message_outbox")
+      .update({ status: "queued", next_try_at: new Date(now.getTime() + AUTO_UNVERIFIED_HOLD_MS).toISOString() })
+      .eq("organization_id", organizationId)
+      .in("id", hold)
+      .eq("status", "sending")
+      .select("id");
+    if (held.error) {
+      // 보내지 않은 줄이 sending 으로 남으면 10분 뒤 멈춘 줄 풀기가 「보냈는지 모름(uncertain · stuck)」으로 잘못 적는다 —
+      // 미루기 없이라도 queued 로 한 번 더 되돌린다(다음 바퀴가 다시 집어 이 검사로 다시 붙잡는다).
+      console.error("[guest-messages/outbox] auto hold failed — retrying plain requeue", held.error.message);
+      const back = await supabase
+        .from("guest_message_outbox")
+        .update({ status: "queued" })
+        .eq("organization_id", organizationId)
+        .in("id", hold)
+        .eq("status", "sending");
+      if (back.error) {
+        console.error("[guest-messages/outbox] auto hold requeue failed — rows stay sending, stuck release will mark them uncertain though NOT sent", {
+          count: hold.length,
+          message: back.error.message,
+        });
+      }
+    }
+    // 되돌리기가 실패해도 이번에는 보내지 않는다.
+    for (const id of hold) dropped.add(id);
+    console.warn("[guest-messages/outbox] hold:unverified_reservation", { count: hold.length });
+  }
   return dropped;
 }
+
+/** 확인 못 한 예약의 자동 안내를 붙잡아 둘 때 다음 시도까지(Beds24 값으로 다시 쓰이길 기다림). */
+export const AUTO_UNVERIFIED_HOLD_MS = 30 * 60_000;
 
 /** sending 으로 잡힌 채 이 시간이 지나면 멈춘 것으로 본다(보내기 한 번은 길어야 수십 초). */
 export const OUTBOX_STUCK_MINUTES = 10;

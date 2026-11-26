@@ -110,9 +110,10 @@ export function createFakeSupabase(
         filters.push((row) => String(valueOf(row, column)) !== String(value));
         return api;
       },
-      /** `filter(칸, "eq", 값)` 만 흉내(`raw_payload->>id` 같은 JSON 경로 포함). 그 밖 연산자는 거르지 않는다. */
+      /** `filter(칸, "eq" | "is", 값)` 만 흉내(`raw_payload->>id` 같은 JSON 경로 포함). 그 밖 연산자는 거르지 않는다. */
       filter(column: string, operator: string, value: unknown) {
         if (operator === "eq") filters.push((row) => String(valueOf(row, column)) === String(value));
+        if (operator === "is") filters.push((row) => (valueOf(row, column) ?? null) === value);
         return api;
       },
       gte(column: string, value: unknown) {

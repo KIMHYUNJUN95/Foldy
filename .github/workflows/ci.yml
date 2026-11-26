@@ -49,8 +49,20 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
+      # 2026-11-25: CI 에서 진짜 DB 검사 3개(transport-receipts-private-bucket · task-project-read-hardening ·
+      # guest-message-search-sql)가 FOLDY_PGLITE_DIR 이 없어 조용히 건너뛰어졌다. PGlite 를 저장소 밖 임시 폴더에
+      # 깔아(package.json · lock 안 건드림) 그 폴더를 가리키면 CI 에서도 실제로 돈다.
+      - name: Install PGlite (DB tests)
+        run: |
+          mkdir -p "${{ runner.temp }}/pglite"
+          cd "${{ runner.temp }}/pglite"
+          npm init -y >/dev/null
+          npm i --no-audit --no-fund --no-save @electric-sql/pglite@0.3.14
+
       - name: Test
         run: npm test
+        env:
+          FOLDY_PGLITE_DIR: ${{ runner.temp }}/pglite
 
       - name: Build
         run: npm run build

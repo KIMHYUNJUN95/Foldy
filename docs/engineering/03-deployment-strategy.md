@@ -355,6 +355,7 @@ Play 에 올릴 AAB 는 **업로드 키**로 서명한다(Play App Signing 이 �
 - **`.github/workflows/ci.yml` — 푸시마다 검사:** main 푸시 · PR 마다 `npm ci` → lint → `tsc --noEmit` → `npm test` → `npm run build`
   (Node 24, Vercel 과 같음). 비밀값 없이 공개 값 자리에 가짜 값만 넣는다 — .env 없는 깨끗한 복사본에서 끝까지 도는 것 확인.
   문서(`docs/**` · `*.md`)만 바뀐 커밋은 건너뛴다. **배포를 막지는 않는다**(Vercel 은 따로 배포) — 깨진 커밋을 몇 분 안에 알리는 용도.
+  **PGlite 설치 단계(2026-11-25):** Test 앞에서 `@electric-sql/pglite@0.3.14` 를 `${{ runner.temp }}/pglite` 에 깔고(저장소 `package.json` · lock 안 건드림) Test 에 `FOLDY_PGLITE_DIR` 로 넘긴다 — 진짜 DB 검사 3개(`transport-receipts-private-bucket` · `task-project-read-hardening` · `guest-message-search-sql`)가 CI 에서 건너뛰어지던 것을 막는다.
 - **`.github/workflows/secret-scan.yml` — 비밀값 유출 검사:** 저장소가 **공개**라 푸시 · PR 마다 gitleaks 로 새 커밋을 검사한다.
   걸리면 커밋을 되돌리는 것으로는 부족하다 — 이력에 남으므로 **그 비밀값을 바로 교체**한다. 오탐은 `.gitleaksignore` 에 지문으로,
   진짜 비밀값이 아님을 확인한 것만 넣는다. 2026-10-20 전체 이력 1,031 커밋 검사: 진짜 유출 0건 · 오탐 3건(vault 비밀값 이름 2 · 테스트용 가짜 QR 토큰 1, DB 대조 0건).

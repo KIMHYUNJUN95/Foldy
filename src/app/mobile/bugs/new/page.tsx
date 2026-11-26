@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { MobileShell } from "@/components/shell/mobile-shell";
-import { getMyBugReports } from "@/lib/bug-reports";
 import { getMobileNavBadges } from "@/lib/nav-badges";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getOnboardingState } from "@/lib/onboarding";
@@ -27,11 +26,11 @@ export default async function MobileBugComposePage() {
   }
 
   const copy = getDictionary(session.user.preferredLanguage).bugs;
-  const [mine, navBadges] = await Promise.all([getMyBugReports(session), navBadgesPromise]);
+  const navBadges = await navBadgesPromise;
 
   return (
     <MobileShell activeItem="bugs" badges={navBadges} title={copy.title}>
-      <BugComposeClient copy={copy} myCount={mine.loadFailed ? null : mine.reports.length} />
+      <BugComposeClient copy={copy} />
     </MobileShell>
   );
 }

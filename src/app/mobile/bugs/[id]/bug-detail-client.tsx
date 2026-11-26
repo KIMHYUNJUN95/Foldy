@@ -100,10 +100,14 @@ export function BugDetailClient({ copy, bug, viewerIsAuthor, isReviewer, isDevel
       <div className="bgw-dh">
         <div className="bgw-dh__k">
           <span className="bgw-id">{formatBugCode(bug.id)}</span>
-          <span aria-hidden="true">·</span>
-          <span className="bgw-st" data-s={bug.status}>
-            {bugStatusLabel(copy, bug.status)}
-          </span>
+          {isReviewer ? null : (
+            <>
+              <span aria-hidden="true">·</span>
+              <span className="bgw-st" data-s={bug.status}>
+                {bugStatusLabel(copy, bug.status)}
+              </span>
+            </>
+          )}
         </div>
         <h1>{bug.title}</h1>
         <span className="bgw-dh__m">
@@ -111,6 +115,17 @@ export function BugDetailClient({ copy, bug, viewerIsAuthor, isReviewer, isDevel
           {formatReportedAt(bug.createdAt)}
         </span>
       </div>
+
+      {isReviewer ? null : (
+        <ol aria-label={w.progressLabel} className="bgw-trk" data-at={STATUSES.indexOf(bug.status)}>
+          {STATUSES.map((s, i) => (
+            <li aria-current={s === bug.status ? "step" : undefined} data-on={i <= STATUSES.indexOf(bug.status) || undefined} data-now={s === bug.status || undefined} key={s}>
+              <i aria-hidden="true" />
+              <span>{bugStatusLabel(copy, s)}</span>
+            </li>
+          ))}
+        </ol>
+      )}
 
       <p className="bgw-body">{bug.description}</p>
 
@@ -127,7 +142,8 @@ export function BugDetailClient({ copy, bug, viewerIsAuthor, isReviewer, isDevel
       {isReviewer ? (
         <section className="bgw-sec">
           <span className="bgw-sec__t">{w.changeStatus}</span>
-          <div aria-label={w.changeStatus} className="bgw-seg" role="group">
+          <div aria-label={w.changeStatus} className="bgw-seg" data-at={STATUSES.indexOf(shownStatus)} role="group">
+            <span aria-hidden="true" className="bgw-seg__pill" />
             {STATUSES.map((s) => (
               <button
                 aria-pressed={shownStatus === s}

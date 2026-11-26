@@ -161,7 +161,7 @@
    「+ 신고」는 제목 묶음 아래쪽에 맞춘 보라 글자 버튼(꽉 찬 버튼이 위 줄 아이콘에 너무 가까웠다 — 게시판 「+ 글쓰기」 · 제안함 「+ 쓰기」와 같게) ·
    위 줄 15 · 줄 사이에만 선 · 줄 16/13 · 안내 13 · 빈 화면 17/15 · 상세 본문 16 · 상태 바꾸기 15 · 지우기 15 · 확인 창 버튼 50/15 ·
    새 신고 칸 이름 13 · 사진 줄 15/600 · 사진 ✕ 누르는 자리 44. */
-.bgw-h:has(> .bgw-cta) { align-items: flex-end; }
+.bgw-h:has(> .bgw-cta) { align-items: flex-start; }
 .bgw-h p { font-size: 15px; }
 .bgw-cta { padding: 0; margin-bottom: -2px; border-radius: 0; background: none; box-shadow: none; color: var(--w-pri-ink); font-size: 15px; font-weight: 600; }
 .bgw-row { border-top: 0; }
@@ -181,3 +181,64 @@
 .bgw-ph__l { font-size: 15px; font-weight: 600; }
 .bgw-tile button::before { content: ""; position: absolute; inset: -9px; }
 
+
+/* 시안(2026-11-26) — unslop · HIG 다듬기 */
+.bgw-h h1 { font-weight: 600; }
+.bgw-dh h1 { font-weight: 600; letter-spacing: -0.02em; }
+.bgw-id { font-family: inherit; font-weight: 500; letter-spacing: 0; font-variant-numeric: tabular-nums; color: var(--w-faint); }
+.bgw-cta { margin-bottom: 0; min-height: 44px; }
+/* 목록 묶음 — 진행 중 · 끝남 */
+.bgw-grp { display: flex; flex-direction: column; }
+.bgw-grp + .bgw-grp { margin-top: 20px; }
+.bgw-grp__t { margin: 0 0 4px; font-size: 13px; font-weight: 600; color: var(--w-soft); }
+.bgw-grp__t span { font-weight: 500; color: var(--w-faint); font-variant-numeric: tabular-nums; margin-left: 2px; }
+.bgw-list + .bgw-note { margin-top: 12px; }
+/* 진행 단계 — 신고한 사람에게만 */
+.bgw-trk { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; }
+.bgw-trk li { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; font-size: 13px; color: var(--w-faint); }
+.bgw-trk li::before { content: ""; position: absolute; top: 4px; left: 10px; right: 0; height: 2px; border-radius: 1px; background: var(--w-line); }
+.bgw-trk li:last-child::before { display: none; }
+.bgw-trk li[data-on]::before { background: var(--w-pri); }
+.bgw-trk li[data-now]::before { background: var(--w-line); }
+.bgw-trk i { position: relative; width: 10px; height: 10px; border-radius: 50%; background: var(--w-line); }
+.bgw-trk li[data-on] i { background: var(--w-pri); }
+.bgw-trk li[data-now] i { box-shadow: 0 0 0 4px var(--w-sel); }
+.bgw-trk li[data-now] span { color: var(--w-ink); font-weight: 600; }
+.bgw-trk li[data-on]:not([data-now]) span { color: var(--w-soft); }
+/* 상태 바꾸기 — 조용한 세그먼트 + 흰 알약 */
+.bgw-seg { position: relative; gap: 0; padding: 3px; border-radius: 12px; background: var(--w-field); }
+.bgw-seg__pill {
+  position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / 4); border-radius: 9px; background: #fff;
+  box-shadow: 0 1px 2px rgba(22, 20, 31, .08), 0 2px 8px -2px rgba(22, 20, 31, .08);
+  transform: translateX(calc(var(--at, 0) * 100%)); transition: transform 240ms var(--w-ease);
+}
+.bgw-seg[data-at="0"] { --at: 0; } .bgw-seg[data-at="1"] { --at: 1; } .bgw-seg[data-at="2"] { --at: 2; } .bgw-seg[data-at="3"] { --at: 3; }
+.bgw-seg button { position: relative; z-index: 1; height: 40px; border-radius: 9px; background: transparent; font-weight: 500; color: var(--w-soft); }
+.bgw-seg button[aria-pressed="true"] { background: transparent; color: var(--w-ink); font-weight: 600; }
+/* 새 신고 — 이름표는 칸 위, 칸은 옅은 바탕 */
+.bgw-fl { display: flex; flex-direction: column; gap: 8px; margin-top: 0; }
+.bgw-fl > span { position: static; padding: 0; background: none; font-size: 15px; font-weight: 600; color: var(--w-ink); }
+.bgw-fl:focus-within > span { color: var(--w-ink); }
+.bgw-fl :is(input, textarea) { border: 1px solid transparent; background: var(--w-field); padding: 12px 14px; }
+.bgw-fl input { height: 48px; padding-top: 12px; }
+.bgw-fl :is(input, textarea):focus { background: #fff; border-color: var(--w-pri); }
+.bgw-form__main, .bgw-form__side { display: flex; flex-direction: column; gap: 20px; }
+.bgw-send { font-weight: 600; transition: transform 160ms var(--w-ease), background-color 200ms ease, color 200ms ease; }
+.bgw-send:active { transform: scale(.97); }
+.bgw-send:disabled:not([data-state]) { opacity: 1; background: var(--w-field); color: var(--w-soft); }
+.bgw-form > .bgw-note, .bgw-form__side > .bgw-note { text-align: left; margin-top: -8px; }
+.bgw-cf__c b { font-weight: 600; }
+.bgw-cf__a button { font-weight: 600; }
+/* 폴드 · 태블릿 */
+@media (min-width: 600px) { .bgw { max-width: 600px; } .bgw-shots { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1000px) and (min-height: 600px) {
+  .bgw:has(> .bgw-form) { max-width: 920px; }
+  .bgw-form { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 32px; align-items: start; }
+  .bgw-fl textarea { min-height: 240px; }
+  .bgw:has(> .bgw-dh) { max-width: 720px; }
+  .split-list .bgw:has(> .bgw-dh) { max-width: 640px; }
+}
+@media (prefers-reduced-motion: reduce) { .bgw-seg__pill { transition: none; } }
+.bgw-h:has(> .bgw-cta) .bgw-cta { margin-top: -2px; }
+/* 신고자 상세: 폰은 머리 줄에 상태 글자, 폴드 · 태블릿은 진행 줄만 (시안 캔버스 기준) */
+@media (min-width: 600px) { .bgw-dh__k > .bgw-st, .bgw-dh__k > [aria-hidden] { display: none; } }

@@ -8,7 +8,6 @@
  */
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { compressImageFile } from "@/components/announcements/announcement-image-uploader";
 import type { BugCopy } from "@/components/bugs/bug-types";
@@ -37,8 +36,7 @@ const CHECK = (
   </svg>
 );
 
-/** `myCount` 가 null = 내 신고를 못 읽음 → 숫자 없이 「내 신고」만(「0」은 거짓). */
-export function BugComposeClient({ copy, myCount }: { copy: BugCopy; myCount: number | null }) {
+export function BugComposeClient({ copy }: { copy: BugCopy }) {
   const w = copy.white;
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -158,12 +156,10 @@ export function BugComposeClient({ copy, myCount }: { copy: BugCopy; myCount: nu
           <h1>{copy.title}</h1>
           <p>{w.formSub}</p>
         </div>
-        <Link className="bgw-link" href="/mobile/bugs">
-          {myCount === null ? w.myReportsNoCount : w.myReports.replace("{n}", String(myCount))}
-        </Link>
       </header>
 
       <form className="bgw-form" onSubmit={onSubmit}>
+        <div className="bgw-form__main">
         <label className="bgw-fl">
           <span>{w.fieldTitle}</span>
           <input
@@ -185,6 +181,8 @@ export function BugComposeClient({ copy, myCount }: { copy: BugCopy; myCount: nu
           />
         </label>
 
+        </div>
+        <div className="bgw-form__side">
         <div className="bgw-ph">
           <span className="bgw-ph__l">
             {w.photos} <span>{w.photosHint.replace("{n}", String(previews.length))}</span>
@@ -233,6 +231,7 @@ export function BugComposeClient({ copy, myCount }: { copy: BugCopy; myCount: nu
           )}
         </button>
         <p className="bgw-note">{w.note}</p>
+        </div>
       </form>
     </div>
   );

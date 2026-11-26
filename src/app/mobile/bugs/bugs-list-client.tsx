@@ -62,27 +62,39 @@ export function BugsListClient({ copy, reports, loadFailed = false, isReviewer }
           </div>
         ) : (
           <LiveWash move sig={reports.map((b) => `${b.id}:${b.status}`).join(",")}>
-            {reports.map((bug, i) => (
-              <Link
-                className="bgw-row"
-                data-live={`${bug.id}:${bug.status}`}
-                href={`/mobile/bugs/${bug.id}`}
-                key={bug.id}
-                style={{ "--i": i } as CSSProperties}
-              >
-                <span className="bgw-row__b">
-                  <span className="bgw-row__t">{bug.title}</span>
-                  <span className="bgw-row__m">
-                    <span className="bgw-id">{formatBugCode(bug.id)}</span> · {formatBugDay(bug.createdAt)}
-                    {isReviewer && bug.reporterName ? ` · ${bug.reporterName}` : ""}
-                  </span>
-                </span>
-                <span className="bgw-st" data-s={bug.status}>
-                  {bugStatusLabel(copy, bug.status)}
-                </span>
-                {CHEVRON}
-              </Link>
-            ))}
+            {[
+              { key: "open", label: w.groupOpen, items: reports.filter((b) => b.status === "submitted" || b.status === "reviewing") },
+              { key: "done", label: w.groupDone, items: reports.filter((b) => b.status === "fixed" || b.status === "closed") },
+            ]
+              .filter((g) => g.items.length > 0)
+              .map((g) => (
+                <section aria-label={g.label} className="bgw-grp" key={g.key}>
+                  <h2 className="bgw-grp__t">
+                    {g.label} <span>{g.items.length}</span>
+                  </h2>
+                  {g.items.map((bug, i) => (
+                    <Link
+                      className="bgw-row"
+                      data-live={`${bug.id}:${bug.status}`}
+                      href={`/mobile/bugs/${bug.id}`}
+                      key={bug.id}
+                      style={{ "--i": i } as CSSProperties}
+                    >
+                      <span className="bgw-row__b">
+                        <span className="bgw-row__t">{bug.title}</span>
+                        <span className="bgw-row__m">
+                          <span className="bgw-id">{formatBugCode(bug.id)}</span> · {formatBugDay(bug.createdAt)}
+                          {isReviewer && bug.reporterName ? ` · ${bug.reporterName}` : ""}
+                        </span>
+                      </span>
+                      <span className="bgw-st" data-s={bug.status}>
+                        {bugStatusLabel(copy, bug.status)}
+                      </span>
+                      {CHEVRON}
+                    </Link>
+                  ))}
+                </section>
+              ))}
           </LiveWash>
         )}
       </div>

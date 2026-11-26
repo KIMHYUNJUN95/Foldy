@@ -25,6 +25,21 @@ const SUPABASE_HOSTNAME = (() => {
  */
 const DEPLOY_ID = process.env.VERCEL_DEPLOYMENT_ID ?? process.env.VERCEL_GIT_COMMIT_SHA ?? "dev";
 
+/**
+ * 보안 헤더(2026-11-26, 보안 점검 4번). 모든 응답에 싣는다.
+ *
+ * - `frame-ancestors 'self'` — 다른 사이트가 우리 화면을 iframe 으로 넣는 것(클릭재킹)을 막는다. **CSP 는 이 지시어만** 둔다
+ *   (다른 지시어는 인라인 스크립트 · 외부 이미지에 영향이 커서 따로 설계). `X-Frame-Options: DENY` 는 쓰지 않는다 —
+ *   `SplitList` 가 같은 출처 페이지를 `stayops-pane` iframe 으로 띄우기 때문(`src/lib/split-pane.ts`). 같은 출처는 `'self'` 로 허용된다.
+ * - `nosniff` — 브라우저가 Content-Type 을 추측해 실행하지 못하게.
+ * - `strict-origin-when-cross-origin` — 다른 출처로는 경로 · 쿼리를 빼고 출처만 보낸다.
+ */
+export const SECURITY_HEADERS = [
+  { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+];
+
 const nextConfig: NextConfig = {
   // React Compiler — 자동 메모이제이션.
   //
@@ -43,7 +58,7 @@ const nextConfig: NextConfig = {
   // 빌드가 캐시에서 한 번 더 뜨므로 「고친 코드가 실제로 돌고 있는가」부터 확인해야 한다(2026-10-09).
   env: { NEXT_PUBLIC_BUILD_SHA: (process.env.VERCEL_GIT_COMMIT_SHA ?? "dev").slice(0, 7), FOLDY_DEPLOY_ID: DEPLOY_ID },
   async headers() {
-    return [{ source: "/:path*", headers: [{ key: "x-foldy-build", value: DEPLOY_ID }] }];
+    return [{ source: "/:path*", headers: [{ key: "x-foldy-build", value: DEPLOY_ID }, ...SECURITY_HEADERS] }];
   },
   // 개발 환경 리소스 접근(HMR + 클라이언트 청크)을 허용한다. localhost 대신
   // WSL 네트워크 IP 로 앱을 열 때 필요하며 개발 전용이다(운영에는 영향 없음).

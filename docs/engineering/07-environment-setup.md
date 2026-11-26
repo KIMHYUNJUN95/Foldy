@@ -789,6 +789,19 @@ Required:
 - Add all production-safe variables to Vercel environment settings.
 - Keep server secrets unavailable to client bundle.
 
+## 보안 응답 헤더 (2026-11-26)
+
+`next.config.ts` 의 `headers()` 가 모든 경로(`/:path*`)에 아래를 싣는다(`x-foldy-build` 와 함께). 테스트: `src/lib/__tests__/next-config-security-headers.test.ts`.
+
+| 헤더 | 값 | 이유 |
+|---|---|---|
+| `Content-Security-Policy` | `frame-ancestors 'self'` | 다른 사이트가 우리 화면을 iframe 에 넣는 것(클릭재킹) 방지. **CSP 는 이 지시어만** — 다른 지시어는 인라인 스크립트 · 외부 이미지 영향이 커 따로 설계한다. |
+| `X-Content-Type-Options` | `nosniff` | Content-Type 추측 실행 방지 |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | 다른 출처에는 출처만 전달 |
+
+- **`X-Frame-Options: DENY` 는 쓰지 않는다.** `SplitList` 가 같은 출처 페이지를 `stayops-pane` iframe 으로 띄운다(`src/lib/split-pane.ts`). `frame-ancestors 'self'` 는 같은 출처 프레임을 허용한다.
+- Capacitor 앱(iOS · Android)은 배포 웹을 최상위 문서로 로드(`server.url`)하므로 `frame-ancestors` 는 앱 셸에 영향이 없다(프레임으로 들어가는 것이 아님).
+
 ## Canonical `.env.example` Shape
 
 ```txt

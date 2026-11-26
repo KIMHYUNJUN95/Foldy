@@ -223,7 +223,7 @@ Implementation:
 
 ## Server Write Rules (2026-11-25)
 
-- 모든 쓰기는 서버 액션 + 서버 키. 로그인한 사용자의 직접 쓰기 권한은 거뒀다(`202611250004`, 운영 미적용 · 커밋 전) — `docs/engineering/05-rls-permissions.md` 「bug_reports」.
+- 모든 쓰기는 서버 액션 + 서버 키. 로그인한 사용자의 직접 쓰기 권한은 거뒀다(`202611250004`, 운영 적용 2026-11-26) — `docs/engineering/05-rls-permissions.md` 「bug_reports」.
 - 작성자 수정 · 삭제(`updateBugReport` · `deleteBugReport`)는 쓰기 쿼리에 `status = 'submitted'` 를 다시 건다(개발자 제외). 읽은 뒤 리뷰어가
   상태를 바꿨으면 0줄 → `not_editable`, 수정 · 삭제하지 않는다.
 - 리뷰어 상태 바꾸기(`updateBugReportStatus`)도 쓰기 쿼리에 **읽은 상태**(`status = 읽은 값`)를 다시 건다. 그 사이 다른 리뷰어가

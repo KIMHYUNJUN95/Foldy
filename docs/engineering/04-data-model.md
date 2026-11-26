@@ -1272,7 +1272,7 @@ primary key (task_id, occurrence_date)
 
 ## board_posts / board_post_reads / board_comments / board_reactions
 
-> 쓰기 권한(2026-11-25 `202611250004`, 운영 미적용): `authenticated` 는 SELECT 만, 쓰기는 서버 키만 — `05-rls-permissions.md` 「게시판」.
+> 쓰기 권한(2026-11-25 `202611250004`, 운영 적용 2026-11-26): `authenticated` 는 SELECT 만, 쓰기는 서버 키만 — `05-rls-permissions.md` 「게시판」.
 
 자유 게시판 피드. **마이그레이션 `supabase/migrations/202606250001_board.sql` 적용 완료 (2026-06-25).**  
 전체 기능 명세: `docs/product/23-board-workflow.md`.
@@ -1548,7 +1548,7 @@ aggregate only after measuring a real query-performance need; it must remain der
 
 ## bug_reports
 
-> 쓰기 권한(2026-11-25 `202611250004`, 운영 미적용): `authenticated` 는 SELECT 만, 쓰기는 서버 키만 — `05-rls-permissions.md` 「bug_reports」.
+> 쓰기 권한(2026-11-25 `202611250004`, 운영 적용 2026-11-26): `authenticated` 는 SELECT 만, 쓰기는 서버 키만 — `05-rls-permissions.md` 「bug_reports」.
 
 Foldy 앱/시스템 버그 및 제품 문제 신고. **1차 구현 (2026-06-25).** Migration: `supabase/migrations/<timestamp>_bug_reports.sql` (DB engineer 결과 확인 후 파일명 갱신 필요).
 

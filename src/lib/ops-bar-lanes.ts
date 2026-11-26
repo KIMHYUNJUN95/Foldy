@@ -38,6 +38,11 @@ export type LaneBar = {
   checkIn: string;
   /** `YYYY-MM-DD`. 이 날 밤은 비어 있다. */
   checkOut: string;
+  /**
+   * 먼저 자리를 잡는 순서(작을수록 먼저, 기본 0 — 2026-11-26). 판매 캘린더는 확정 0 · 문의/요청 1 · 취소 2 로 넘겨
+   * **겹치면 확정이 위층**에 온다 — 문의가 먼저 체크인해도 확정 예약이 0층을 차지한다.
+   */
+  rank?: number;
 };
 
 export type BarLaneResult = {
@@ -62,21 +67,24 @@ export function assignBarLanes(bars: readonly LaneBar[]): BarLaneResult {
     // 체크인 순. 같은 날 시작하면 **짧은 것을 먼저** 놓는다 — 긴 것이 먼저 0층을 차지하면
     // 짧은 것들이 전부 아래층으로 밀려 층이 불필요하게 늘어난다.
     const sorted = [...roomBars].sort(
-      (a, b) => a.checkIn.localeCompare(b.checkIn) || a.checkOut.localeCompare(b.checkOut),
+      (a, b) =>
+        (a.rank ?? 0) - (b.rank ?? 0) || a.checkIn.localeCompare(b.checkIn) || a.checkOut.localeCompare(b.checkOut),
     );
-    /** 층별로 「지금까지 가장 늦은 체크아웃」. */
-    const laneEnds: string[] = [];
+    /**
+     * 층별로 놓인 구간. 순서(rank)가 섞이면 「가장 늦은 체크아웃」 하나로는 앞쪽 빈자리를 놓친다 — 구간을 다 들고 겹침을 본다.
+     * rank 가 하나뿐이면 예전(체크인 순 · 끝난 층에 놓기)과 같은 결과다.
+     */
+    const lanes: Array<Array<[string, string]>> = [];
     for (const bar of sorted) {
-      let lane = laneEnds.findIndex((end) => end <= bar.checkIn);
+      let lane = lanes.findIndex((spans) => spans.every(([from, to]) => to <= bar.checkIn || bar.checkOut <= from));
       if (lane === -1) {
-        lane = laneEnds.length;
-        laneEnds.push(bar.checkOut);
-      } else {
-        laneEnds[lane] = bar.checkOut;
+        lane = lanes.length;
+        lanes.push([]);
       }
+      lanes[lane].push([bar.checkIn, bar.checkOut]);
       laneById.set(bar.id, lane);
     }
-    laneCountByRoom.set(roomKey, Math.max(laneEnds.length, 1));
+    laneCountByRoom.set(roomKey, Math.max(lanes.length, 1));
   }
 
   return { laneById, laneCountByRoom };

@@ -6363,6 +6363,7 @@ export type Database = {
           name_ko: string | null
           nationality: string | null
           ops_calendar_mode: string | null
+          ops_calendar_status_filter: string[] | null
           phone_number: string
           preferred_language: Database["public"]["Enums"]["app_language"]
           profile_photo_url: string | null
@@ -6387,6 +6388,7 @@ export type Database = {
           name_ko?: string | null
           nationality?: string | null
           ops_calendar_mode?: string | null
+          ops_calendar_status_filter?: string[] | null
           phone_number: string
           preferred_language?: Database["public"]["Enums"]["app_language"]
           profile_photo_url?: string | null
@@ -6411,6 +6413,7 @@ export type Database = {
           name_ko?: string | null
           nationality?: string | null
           ops_calendar_mode?: string | null
+          ops_calendar_status_filter?: string[] | null
           phone_number?: string
           preferred_language?: Database["public"]["Enums"]["app_language"]
           profile_photo_url?: string | null

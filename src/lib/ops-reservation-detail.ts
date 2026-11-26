@@ -175,3 +175,16 @@ export function buildOpsReservationDetail(row: ReservationDetailRow): OpsReserva
     status: row.status,
   };
 }
+
+/**
+ * 「손님」 칸(이메일 · 전화 · 휴대폰 · 나라 · 언어 · 주소)에 보일 값이 하나라도 있는가.
+ * Airbnb 문의(inquiry) 원본은 이 칸들이 비어 오는 일이 많다 — 다 비면 PC 패널 · 모바일 시트 둘 다 칸째 숨긴다.
+ * (손님 이름은 패널 머리에 따로 보인다.)
+ */
+export function hasGuestContactDetails(
+  detail: Pick<OpsReservationDetail, "address" | "countryCode" | "countryText" | "email" | "language" | "mobile" | "phone">,
+): boolean {
+  return [detail.email, detail.phone, detail.mobile, detail.countryCode, detail.countryText, detail.language, detail.address].some(
+    (value) => !!value,
+  );
+}

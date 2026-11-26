@@ -5,6 +5,7 @@ import type {
   OpsCalendarRate,
   OpsCalendarRoom,
 } from "@/lib/ops-calendar";
+import type { OpsRoomStay } from "@/lib/ops-calendar-occupancy";
 
 /**
  * 판매 캘린더 격자의 **행 단위 데이터** — 순수 모듈(2026-09-30 속도).
@@ -52,8 +53,13 @@ export type OpsGridRowData = {
   history: string;
   /** 칸마다 한 글자 — `1` 이면 1박 갭. */
   gap: string;
-  /** 이 행의 예약 막대(취소 포함 — 격자가 보기 모드로 거른다). */
+  /** 이 행에 **그릴** 예약 막대 — 서버가 「예약 표시」 필터로 이미 거른 것. 점유 판정에는 쓰지 않는다. */
   bars: OpsCalendarBar[];
+  /**
+   * 이 행을 **차지하는** 확정 숙박 — 필터와 무관(2026-11-26, `ops-calendar-occupancy.ts`). 팔린 밤 · 오늘 빈방 ·
+   * 옮기기 충돌 · 가격/최소박 고르기는 막대 대신 이것으로 센다. 확정을 꺼도 팔린 밤은 팔린 밤이다.
+   */
+  stays: OpsRoomStay[];
   blocks: OpsCalendarBlock[];
 };
 
@@ -120,15 +126,16 @@ export function buildGridRowData(args: {
   isGap: (date: string) => boolean;
   bars: OpsCalendarBar[];
   blocks: OpsCalendarBlock[];
+  stays: OpsRoomStay[];
 }): OpsGridRowData {
   const rates = encodeRowRates(args.dates, args.rateAt);
   const history = encodeDayFlags(args.dates, args.hasHistory);
   const gap = encodeDayFlags(args.dates, args.isGap);
   // 창이 옮겨지면 같은 배열이라도 뜻이 달라진다 — 창의 첫날·길이도 해시에 넣는다.
   const sig = hashString(
-    JSON.stringify([args.dates[0] ?? "", args.dates.length, args.room, rates, history, gap, args.bars, args.blocks]),
+    JSON.stringify([args.dates[0] ?? "", args.dates.length, args.room, rates, history, gap, args.bars, args.blocks, args.stays]),
   );
-  return { bars: args.bars, blocks: args.blocks, gap, history, rates, room: args.room, sig };
+  return { bars: args.bars, blocks: args.blocks, gap, history, rates, room: args.room, sig, stays: args.stays };
 }
 
 /**
@@ -164,6 +171,11 @@ export function buildRowRateLookup(
     if (!row || index === undefined) return undefined;
     return decodeRowRate(row.rates, index);
   };
+}
+
+/** 행들의 확정 숙박을 한 목록으로(격자 밖의 점유 판정 — 오늘 빈방 · 팔린 칸 · 옮기기 충돌). */
+export function rowStays(rows: readonly OpsGridRowData[]): OpsRoomStay[] {
+  return rows.flatMap((row) => row.stays);
 }
 
 /** 행들의 1박 갭 칸 → `행키|YYYY-MM-DD` 집합(격자 밖의 갭 선택·갭 맥락이 쓰는 모양). */

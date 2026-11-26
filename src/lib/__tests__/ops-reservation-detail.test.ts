@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildOpsReservationDetail, type ReservationDetailRow } from "@/lib/ops-reservation-detail";
+import {
+  buildOpsReservationDetail,
+  hasGuestContactDetails,
+  type ReservationDetailRow,
+} from "@/lib/ops-reservation-detail";
 
 /**
  * 예약 상세 패널에 보낼 값.
@@ -120,5 +124,35 @@ describe("buildOpsReservationDetail", () => {
     const detail = buildOpsReservationDetail({ ...row({}), raw_payload: null });
     expect(detail.guestName).toBe("Hendrik Venter");
     expect(detail.beds24Id).toBeNull();
+  });
+});
+
+/**
+ * 「손님」 칸은 보일 값이 하나라도 있을 때만 그린다.
+ * Airbnb 문의(inquiry) 원본은 이메일 · 전화 · 주소가 비어 오고, 나라 · 언어도 빈 문자열일 수 있다 —
+ * 그때 제목만 있는 빈 칸이 남으면 안 된다(PC 패널 · 모바일 시트 같은 판정).
+ */
+describe("hasGuestContactDetails", () => {
+  it("문의 원본처럼 연락처 · 나라 · 언어가 모두 비면 false", () => {
+    const detail = buildOpsReservationDetail(
+      row({ address: "", country: "", email: "", firstName: "Guest", lang: "", mobile: "", phone: "", status: "inquiry" }),
+    );
+    expect(hasGuestContactDetails(detail)).toBe(false);
+  });
+
+  it("언어 하나만 있어도 true", () => {
+    const detail = buildOpsReservationDetail(row({ email: "", lang: "en", phone: "" }));
+    expect(hasGuestContactDetails(detail)).toBe(true);
+  });
+
+  it("코드로 못 읽는 나라 글자만 있어도 true", () => {
+    const detail = buildOpsReservationDetail(row({ country: "Narnia" }));
+    expect(hasGuestContactDetails(detail)).toBe(true);
+  });
+
+  it("이메일 · 전화 · 주소가 있으면 true", () => {
+    expect(hasGuestContactDetails(buildOpsReservationDetail(row({ email: "a@example.com" })))).toBe(true);
+    expect(hasGuestContactDetails(buildOpsReservationDetail(row({ phone: "+81-90-0000-0000" })))).toBe(true);
+    expect(hasGuestContactDetails(buildOpsReservationDetail(row({ city: "Tokyo" })))).toBe(true);
   });
 });

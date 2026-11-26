@@ -20,10 +20,12 @@ import {
   type ReservationEditCopy,
 } from "@/components/admin/ops/ops-reservation-edit";
 import type { OpsCalendarBar } from "@/lib/ops-calendar";
-import type { OpsReservationDetail } from "@/lib/ops-reservation-detail";
+import { hasGuestContactDetails, type OpsReservationDetail } from "@/lib/ops-reservation-detail";
 import { formatPhoneDisplay } from "@/lib/phone-format";
 import { spwDate, type SpwCopy } from "@/components/admin/ops/ops-price-panel";
 import { useBuildingName, useRoomPlaceLabel } from "@/components/shared/building-names";
+import { isPendingBarKind } from "@/components/admin/ops/ops-bar-kind";
+import { OpsReservationMessages, type ReservationMessagesCopy } from "@/components/admin/ops/ops-reservation-messages";
 import "./ops-calendar-panels-white.css";
 
 /**
@@ -57,7 +59,11 @@ import "./ops-calendar-panels-white.css";
  * 다시 눌러 봐야 주석만 덧씌워진다. 「취소만 보기」에서 열면 상세만 보인다.
  */
 
-export type ReservationCardCopy = ReservationEditCopy & ReservationMoveCopy & {
+export type ReservationCardCopy = ReservationEditCopy & ReservationMoveCopy & ReservationMessagesCopy & {
+  pendingInquiryNotice: string;
+  pendingRequestNotice: string;
+  statusInquiry: string;
+  statusRequest: string;
   reEdit: string;
   reSaved: string;
   /** Beds24 엔 반영됐지만 우리 표가 늦다 — 「반영 지연」. */
@@ -78,6 +84,7 @@ export type ReservationCardCopy = ReservationEditCopy & ReservationMoveCopy & {
   rcErrForbidden: string;
   rcErrNotFound: string;
   rcErrAlreadyCancelled: string;
+  rcErrPending: string;
   rcErrNoBookingId: string;
   rcErrBeds24: string;
   rcErrCooldown: string;
@@ -137,6 +144,8 @@ export function reservationCancelErrorText(copy: ReservationCardCopy, result: Ex
       return copy.rcErrNotFound;
     case "already_cancelled":
       return copy.rcErrAlreadyCancelled;
+    case "pending":
+      return copy.rcErrPending;
     case "no_booking_id":
       return copy.rcErrNoBookingId;
     case "cooldown":
@@ -366,6 +375,9 @@ export function OpsReservationPanel({
               <b className="spw-head__t">{bar.guestName}</b>
               <span className="spw-head__s">
                 {bar.isCancelled && <span className="spw-tag">{copy.rcCancelled}</span>}
+                {isPendingBarKind(bar.kind) && (
+                  <span className="spw-tag">{bar.kind === "inquiry" ? copy.statusInquiry : copy.statusRequest}</span>
+                )}
                 {[nightsText, guestCount].filter(Boolean).join(" · ")}
               </span>
             </div>
@@ -432,7 +444,16 @@ export function OpsReservationPanel({
             {leadDays !== null && leadDays >= 0 && (
               <p className="spw-note">{copy.rpLeadTime.replace("{n}", String(leadDays))}</p>
             )}
+            {/* 문의 · 요청 — 방을 막지 않고, 여기서 고치지 않는다(확정된 뒤에). */}
+            {isPendingBarKind(bar.kind) && (
+              <p className="spw-note is-warn">
+                {bar.kind === "inquiry" ? copy.pendingInquiryNotice : copy.pendingRequestNotice}
+              </p>
+            )}
           </section>
+
+          {/* ── 손님 메시지 ── 따로 읽는다. 권한이 없으면 칸이 없다. */}
+          <OpsReservationMessages copy={copy} localeTag={localeTag} reservationId={bar.id} variant="pc" />
 
           {!detail && !loadFailed && (
             <div aria-busy className="spw-loading">
@@ -467,32 +488,34 @@ export function OpsReservationPanel({
                 </section>
               )}
 
-              {/* ── 손님 ── 전화는 하이픈으로 끊어 보이고, 복사는 받은 값 그대로. */}
-              <section className="spw-sect">
-                <span className="spw-sec">{copy.rpSectionGuest}</span>
-                <dl className="spw-kv">
-                  {row("email", copy.rpEmail, detail.email, detail.email)}
-                  {row("phone", copy.rpPhone, detail.phone ? formatPhoneDisplay(detail.phone) : null, detail.phone)}
-                  {row("mobile", copy.rpMobile, detail.mobile ? formatPhoneDisplay(detail.mobile) : null, detail.mobile)}
-                  {row(
-                    "country",
-                    copy.rpCountry,
-                    detail.countryCode ? (
-                      <>
-                        {regionName(detail.countryCode, localeTag)}
-                        {/* 채널이 안 준 국가는 전화번호로 추정한 것이다 — 국적과 다를 수 있다. */}
-                        {detail.countrySource === "phone" && (
-                          <span className="spw-muted"> · {copy.rpCountryFromPhone}</span>
-                        )}
-                      </>
-                    ) : (
-                      detail.countryText
-                    ),
-                  )}
-                  {row("lang", copy.rpLanguage, detail.language ? languageName(detail.language, localeTag) : null)}
-                  {row("address", copy.rpAddress, detail.address, detail.address)}
-                </dl>
-              </section>
+              {/* ── 손님 ── 전화는 하이픈으로 끊어 보이고, 복사는 받은 값 그대로. 문의처럼 다 비면 칸째 숨긴다. */}
+              {hasGuestContactDetails(detail) && (
+                <section className="spw-sect">
+                  <span className="spw-sec">{copy.rpSectionGuest}</span>
+                  <dl className="spw-kv">
+                    {row("email", copy.rpEmail, detail.email, detail.email)}
+                    {row("phone", copy.rpPhone, detail.phone ? formatPhoneDisplay(detail.phone) : null, detail.phone)}
+                    {row("mobile", copy.rpMobile, detail.mobile ? formatPhoneDisplay(detail.mobile) : null, detail.mobile)}
+                    {row(
+                      "country",
+                      copy.rpCountry,
+                      detail.countryCode ? (
+                        <>
+                          {regionName(detail.countryCode, localeTag)}
+                          {/* 채널이 안 준 국가는 전화번호로 추정한 것이다 — 국적과 다를 수 있다. */}
+                          {detail.countrySource === "phone" && (
+                            <span className="spw-muted"> · {copy.rpCountryFromPhone}</span>
+                          )}
+                        </>
+                      ) : (
+                        detail.countryText
+                      ),
+                    )}
+                    {row("lang", copy.rpLanguage, detail.language ? languageName(detail.language, localeTag) : null)}
+                    {row("address", copy.rpAddress, detail.address, detail.address)}
+                  </dl>
+                </section>
+              )}
 
               {/* ── 메시지 ── 손님 요청이 제일 자주 쓰이므로 펼쳐 두고 채널 메시지는 접는다. */}
               {(detail.guestComments || detail.internalNotes || detail.channelMessage) && (
@@ -557,8 +580,9 @@ export function OpsReservationPanel({
         </div>
 
         <div className="spw-foot is-panel is-even">
-          {/* 취소된 예약은 고치지도, 다시 취소하지도 않는다 — 닫기만. 바꾸기 권한이 없어도 닫기만(2026-10-20). */}
-          {bar.isCancelled || !canWrite ? (
+          {/* 취소된 예약은 고치지도, 다시 취소하지도 않는다 — 닫기만. 바꾸기 권한이 없어도 닫기만(2026-10-20).
+              문의 · 예약 요청도 닫기만(2026-11-26) — 확정 전이라 수정 · 옮기기 · 취소가 Beds24 에서 뜻이 없다. */}
+          {bar.isCancelled || isPendingBarKind(bar.kind) || !canWrite ? (
             <button className="spw-btn is-wide" onClick={onClose} type="button">
               {copy.rcClose}
             </button>

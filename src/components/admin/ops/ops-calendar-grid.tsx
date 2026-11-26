@@ -26,6 +26,7 @@ import {
   decodeRowRate,
   reuseStableRows,
   rowGapCellKeys,
+  rowStays,
   sameOpsDays,
   type OpsGridRowData,
 } from "@/lib/ops-calendar-rows";
@@ -47,7 +48,6 @@ import {
 import { Check, ChevronDown, ChevronLeft, TrendingDown } from "lucide-react";
 import { buildOpsDaySummaries } from "@/lib/ops-day-summary";
 import { BEDS24_LIVE_STATUS_EVENT, currentBeds24LiveStatus } from "@/components/shared/beds24-live-refresh";
-import { OpsNavLink } from "@/components/admin/ops/ops-nav";
 import { opsUrgentVacantCells } from "@/lib/ops-urgent-vacant";
 import { buildOpsScopeSummary } from "@/lib/ops-scope-summary";
 import { OpsBlockPanel, type BlockPanelCopy } from "@/components/admin/ops/ops-block-panel";
@@ -66,6 +66,10 @@ import {
 } from "@/components/admin/ops/ops-write-tracker";
 import { formatGridPrice } from "@/lib/ops-price-format";
 import { assignBarLanes, assignBlockLanes } from "@/lib/ops-bar-lanes";
+import { barOccupiesRoom, type OpsBarKind } from "@/lib/ops-reservation-kind";
+import type { OpsStatusFilterKey } from "@/lib/ops-calendar-status-filter";
+import { OpsStatusFilter, type OpsStatusFilterCopy } from "@/components/admin/ops/ops-status-filter";
+import { opsBarLaneRank, opsBarPrefix } from "@/components/admin/ops/ops-bar-kind";
 import {
   OpsReservationPanel,
   type ReservationCardCopy,
@@ -97,6 +101,7 @@ import {
 } from "@/lib/ops-calendar-selection";
 import { hasOpsLargeRooms, isOpsLargeRoom, orderOpsLargeRoomsFirst } from "@/lib/ops-large-rooms";
 import { opsVacantRoomKeys } from "@/lib/ops-vacant-today";
+import { opsStayCellKeys, opsStayClash } from "@/lib/ops-calendar-occupancy";
 import { opsVacantGapCells, opsVacantGaps, type OpsVacantGap, type OpsVacantGapLength, type OpsVacantGapSort } from "@/lib/ops-vacant-gaps";
 import { OpsVacantGapsPanel, type VacantGapsCopy } from "@/components/admin/ops/ops-vacant-gaps-panel";
 import { OPS_GAP_OPEN_EVENT } from "@/components/admin/ops/ops-gap-button";
@@ -173,7 +178,7 @@ type Copy = {
   SalesSummaryCopy & { ssButton: string } &
   PriceWinsCopy &
   VacantGapsCopy & { vgToggle: string; vgHint: string; vgBack: string } &
-  RecentBookingsCopy & {
+  RecentBookingsCopy & OpsStatusFilterCopy & {
     rbToggle: string;
     pwToggle: string;
     pwList: string;
@@ -198,7 +203,8 @@ type Copy = {
     syncedHint: string;
     priceMissingTitle: string;
     priceMissingBody: string;
-    scwCancelledOnly: string;
+    barPrefixInquiry: string;
+    barPrefixRequest: string;
     scwVacantTonight: string;
     scwNewBooking: string;
     scwHistoryFailed: string;
@@ -424,7 +430,11 @@ type GridRowProps = {
   editMode: boolean;
   /** 차단 모드 — 팔린 밤도 고른다(`canSelect` 와 같다). */
   blockMode: boolean;
-  showCancelled: boolean;
+  /**
+   * 「예약 표시」에서 확정을 뺐나(2026-11-26) — 그러면 팔린 밤도 빈칸처럼 보이므로 빈 칸 `+` · 가격 개입 흐림을 끈다.
+   * 예전 「취소만 보기」 자리.
+   */
+  confirmedHidden: boolean;
   /** 판매 캘린더를 바꿀 수 있나 — 없으면 빈칸 `+`(수기 예약 시작)를 띄우지 않는다. */
   canWrite: boolean;
   priceWinsOnly: boolean;
@@ -476,7 +486,7 @@ const OpsGridRow = memo(function OpsGridRow({
   row,
   scopeOn,
   selectedDates,
-  showCancelled,
+  confirmedHidden,
   canWrite,
   today,
   winIds,
@@ -491,44 +501,44 @@ const OpsGridRow = memo(function OpsGridRow({
   const selected = new Set(selectedDates ? selectedDates.split("|") : []);
   const wins = new Set(winIds ? winIds.split("|") : []);
   const marks = new Set(markIds ? markIds.split("|") : []);
-  // **켜면 취소만, 끄면 일반만.** 둘을 같이 그리면 같은 밤에 겹쳐 못 읽는다.
-  const roomBars = allRoomBars.filter((bar) => bar.isCancelled === showCancelled);
+  // 서버가 「예약 표시」 필터로 이미 거른 막대다(`getOpsCalendarData` · 2026-11-26) — 여기서는 다 그린다.
+  const roomBars = allRoomBars;
   /**
-   * 취소 막대는 **같은 밤에 여러 건이 겹친다.** 한 줄에 그리면 서로 덮어 못 읽는다 —
-   * 실측(2026-09-28)으로 취소가 걸린 방-밤의 20%가 2건 이상, 최대 5건이다.
-   * 그래서 층을 나누고 그만큼 트랙을 키운다(저쪽 `cancelledBarLaneMap` 과 같다). 층은 방마다 따로
-   * 세므로 행 안에서 센다.
+   * 겹치는 막대는 **층을 나눈다.** 취소는 같은 밤에 여러 건이 겹치고(실측 2026-09-28 — 취소가 걸린 방-밤의 20%가
+   * 2건 이상, 최대 5건), 문의 · 요청은 확정 예약과 같은 밤에 겹친다. 확정이 늘 0층(위층) — `opsBarLaneRank`.
+   * 겹침이 없으면 한 층이라 예전 모양 그대로다. 층은 방마다 따로 세므로 행 안에서 센다.
    */
-  const barLanes = showCancelled
-    ? assignBarLanes(
-        allRoomBars
-          .filter((bar) => bar.isCancelled)
-          .map((bar) => ({ checkIn: bar.checkIn, checkOut: bar.checkOut, id: bar.id, roomKey: bar.roomKey })),
-      )
-    : null;
+  const barLanes = assignBarLanes(
+    roomBars.map((bar) => ({
+      checkIn: bar.checkIn,
+      checkOut: bar.checkOut,
+      id: bar.id,
+      rank: opsBarLaneRank(bar.kind),
+      roomKey: bar.roomKey,
+    })),
+  );
   /*
    * 차단은 **예약 층 아래 따로 둔 줄**에 놓는다(2026-10-06). 0층은 예약 막대와 빈 칸의 `+`(수기 예약 시작)가 쓰는 줄 —
    * 차단한 날에도 수기 예약을 넣게 되면서 차단이 0층에 있으면 `+` 를 가렸다(사용자 지적). 차단이 있는 방만 줄이 하나
    * 늘어난다. 차단끼리 겹치면 그 아래로(`assignBlockLanes`).
    */
-  const blockFromLane = barLanes?.laneCountByRoom.get(room.key) ?? 1;
+  const blockFromLane = barLanes.laneCountByRoom.get(room.key) ?? 1;
   const blockLanes = assignBlockLanes(
     roomBars.map((bar) => ({
       checkIn: bar.checkIn,
       checkOut: bar.checkOut,
-      lane: barLanes?.laneById.get(bar.id) ?? 0,
+      lane: barLanes.laneById.get(bar.id) ?? 0,
     })),
     roomBlocks.map((block) => ({ endDate: block.endDate, id: block.id, startDate: block.startDate })),
     { fromLane: blockFromLane },
   );
-  const laneCount = Math.max(barLanes?.laneCountByRoom.get(room.key) ?? 1, blockLanes.laneCount);
-  /** 팔린 밤(살아 있는 예약). 가격 수정에서 막히는 유일한 조건이다(블록은 막지 않는다). */
+  const laneCount = Math.max(barLanes.laneCountByRoom.get(room.key) ?? 1, blockLanes.laneCount);
+  /** 팔린 밤(확정 숙박). 가격 수정에서 막히는 유일한 조건이다(블록은 막지 않는다). */
   const sold = new Set<string>();
-  // 점유는 **항상** 일반 예약으로만 센다 — 「취소만 보기」를 켜도 팔린 밤은 팔린 밤이다.
-  for (const bar of allRoomBars) {
-    if (bar.isCancelled) continue;
+  // 점유는 막대가 아니라 `row.stays`(확정 숙박 — 「예약 표시」 필터와 무관, 2026-11-26)로 센다. 확정을 꺼도 팔린 밤이다.
+  for (const stay of row.stays) {
     for (const day of days) {
-      if (day.date >= bar.checkIn && day.date < bar.checkOut) {
+      if (day.date >= stay.checkIn && day.date < stay.checkOut) {
         sold.add(day.date);
       }
     }
@@ -546,9 +556,9 @@ const OpsGridRow = memo(function OpsGridRow({
   // 같은 두 가지를 막는다 — 여기만 느슨하면 격자에서 끈 기간이 패널에서 막힌다.
   // **차단(BLOCK)은 막지 않는다**(2026-10-06 사용자 결정 — Beds24 처럼 차단한 날에도 수기 예약을 넣는다).
   const nightTaken = (date: string) => sold.has(date) || !dayFlagAt(row.rates.has, dayIndex.get(date) ?? -1);
-  // 빈 칸의 `+`. **「취소만 보기」에서는 숨긴다** — 그 모드에서는 일반 막대가 안 보여
-  // 팔린 밤도 빈칸처럼 보이는데, 거기에 `+` 가 뜨면 이미 찬 방에 예약을 넣으려 하게 된다.
-  const canStart = (date: string) => canWrite && !editMode && !showCancelled && !nightTaken(date) && date >= today;
+  // 빈 칸의 `+`. **확정을 뺀 보기에서는 숨긴다** — 확정 막대가 안 보여 팔린 밤도 빈칸처럼 보이는데, 거기에 `+` 가 뜨면
+  // 이미 찬 방에 예약을 넣으려 하게 된다. 문의 · 요청 막대 아래 밤은 비어 있으니 `+` 가 뜬다(문의 위에 새 예약 OK).
+  const canStart = (date: string) => canWrite && !editMode && !confirmedHidden && !nightTaken(date) && date >= today;
   const startDraft = (date: string) => actions.current.startDraft(bookingRoom, date);
 
   const cellClass = (day: OpsCalendarDay, index: number, withRoom: boolean) => {
@@ -745,12 +755,14 @@ const OpsGridRow = memo(function OpsGridRow({
             const geometry = barGeometry(days, bar.checkIn, bar.checkOut);
             if (!geometry) return null;
             // 층이 있으면 그만큼 내려 그린다. 층 0 은 평소 자리 그대로다.
-            const lane = barLanes?.laneById.get(bar.id) ?? 0;
+            const lane = barLanes.laneById.get(bar.id) ?? 0;
+            const pending = bar.kind === "inquiry" || bar.kind === "request";
             return (
               <div
-                className={`opsg__bar ${bar.channel}${bar.isCancelled ? " cancelled" : ""}${
-                  priceWinsOnly && !showCancelled ? (wins.has(bar.id) ? " pw-win" : " pw-dim") : ""
+                className={`opsg__bar ${bar.channel}${bar.isCancelled ? " cancelled" : ""}${pending ? " is-pending" : ""}${
+                  priceWinsOnly && !confirmedHidden ? (wins.has(bar.id) ? " pw-win" : " pw-dim") : ""
                 }${bar.id === moveFadeId ? " is-moving-from" : ""}`}
+                data-kind={bar.kind}
                 key={bar.id}
                 // 편집 모드에서는 칸 선택이 먼저다 — 막대를 누르다 상세가 뜨면 드래그 선택이 끊긴다.
                 onClick={
@@ -761,13 +773,14 @@ const OpsGridRow = memo(function OpsGridRow({
                         actions.current.openBar(bar, room);
                       }
                 }
-                // 꾹(0.4초) 누르면 끌어 옮기기(2026-10-19). 취소 막대 · 편집 모드는 제외.
-                onPointerDown={editMode || bar.isCancelled ? undefined : (event) => actions.current.holdBar(bar, room, event)}
+                // 꾹(0.4초) 누르면 끌어 옮기기(2026-10-19). 확정 막대만 — 취소 · 문의 · 요청 · 편집 모드는 제외.
+                onPointerDown={editMode || !barOccupiesRoom(bar) ? undefined : (event) => actions.current.holdBar(bar, room, event)}
                 style={lane > 0 ? { ...geometry, top: `calc(3px + ${lane * OPS_LANE_STEP_PX}px)` } : geometry}
                 // 브라우저 툴팁(이름 · 기간)은 두지 않는다(2026-10-01 사용자) — 막대를 지나갈 때마다 떠서 격자를
                 // 가린다. 자세한 것은 눌러서 예약 상세로.
               >
                 {marks.has(bar.id) ? <TrendingDown aria-hidden="true" className="opsg__winmark" /> : null}
+                {opsBarPrefix(bar.kind, copy)}
                 {bar.guestName}
               </div>
             );
@@ -814,7 +827,6 @@ function monthLabelOf(year: number, month: number, withYear: boolean, localeTag:
 
 export function OpsCalendarGrid({
   canWrite,
-  cancelledHref,
   copy: copyProp,
   days: daysProp,
   hasRates,
@@ -823,8 +835,10 @@ export function OpsCalendarGrid({
   properties,
   propertyPicker,
   rows,
-  showCancelled,
   status,
+  statusCounts,
+  statusFilter,
+  statusFilterBaseHref,
   today,
 }: {
   /**
@@ -832,8 +846,6 @@ export function OpsCalendarGrid({
    * 예약 만들기, 막대 꾹 끌어 옮기기, 예약 패널의 수정 · 옮기기 · 취소, 이력의 되돌리기 · 지금 보내기가 없다. 서버 액션도 같은 키로 막는다.
    */
   canWrite: boolean;
-  /** 「취소만 보기」를 켜고 끄는 주소(서버가 만든다 — 다른 쿼리는 그대로). */
-  cancelledHref: string;
   copy: Copy;
   /** 요금이 하나라도 들어왔나. 없으면 격자 위에 안내 한 줄. */
   hasRates: boolean;
@@ -855,12 +867,15 @@ export function OpsCalendarGrid({
    * 블록을 행마다 묶고 내용 해시(`sig`)를 단다.
    */
   rows: OpsGridRowData[];
+  /** 보는 범위(보이는 방)의 종류별 예약 수 — 「예약 표시」 필터 항목 옆 숫자. */
+  statusCounts: Record<OpsBarKind, number>;
   /**
-   * **「취소만 보기」다.** 켜면 일반 예약이 사라지고 취소된 것만 남는다 — 저쪽과 같다
-   * (`isCancelled === showCancelled`). 겹쳐 그리면 못 읽기 때문이다.
-   * 점유·갭 판정은 이 값과 **무관하게** 항상 취소를 뺀다.
+   * 「예약 표시」 필터(2026-11-26 — 예전 「취소만 보기」). 서버가 이미 이 값으로 막대를 걸렀다.
+   * 점유·갭 판정은 이 값과 **무관하게** 확정 예약만 센다(`barOccupiesRoom`).
    */
-  showCancelled: boolean;
+  statusFilter: readonly OpsStatusFilterKey[];
+  /** `show=` 를 뺀 지금 주소 — 필터가 고른 값을 붙여 이동한다(함수는 서버→클라이언트로 못 넘긴다). */
+  statusFilterBaseHref: string;
   today: string;
 }) {
   /*
@@ -900,6 +915,8 @@ export function OpsCalendarGrid({
   const serverRooms = useMemo(() => stableRows.map((row) => row.room), [stableRows]);
   const rowsByKey = useMemo(() => new Map(stableRows.map((row) => [row.room.key, row])), [stableRows]);
   const bars = useMemo(() => stableRows.flatMap((row) => row.bars), [stableRows]);
+  /** 방을 차지하는 확정 숙박 — 필터와 무관. 팔린 칸 · 오늘 빈방 · 옮기기 충돌 · 갭 맥락은 막대 대신 이것으로 센다. */
+  const stays = useMemo(() => rowStays(stableRows), [stableRows]);
   const blocks = useMemo(() => stableRows.flatMap((row) => row.blocks), [stableRows]);
   /** `roomKey|YYYY-MM-DD` — 1박 갭인 칸(행 표시에서 되살린다). */
   const gapCells = useMemo(() => rowGapCellKeys(stableRows, dates), [stableRows, dates]);
@@ -1154,8 +1171,10 @@ export function OpsCalendarGrid({
     checkIn: string;
     checkOut: string;
   } | null>(null);
-  /** 편집 모드·「취소만 보기」에서는 예약을 만들지 않는다 — 고르던 것도 거기서는 안 보인다. */
-  const activeDraft = !editMode && !showCancelled ? bookingDraft : null;
+  /** 「예약 표시」에서 확정을 뺐나 — 팔린 밤도 빈칸처럼 보이니 예약 만들기 · 빈칸 `+` 를 끈다. */
+  const confirmedHidden = !statusFilter.includes("confirmed");
+  /** 편집 모드·확정을 뺀 보기에서는 예약을 만들지 않는다 — 고르던 것도 거기서는 안 보인다. */
+  const activeDraft = !editMode && !confirmedHidden ? bookingDraft : null;
   const cancelDraft = () => setBookingDraft(null);
 
   // 고르는 중에만 Esc 로 무른다. 패널이 열려 있으면 패널의 Esc 가 먼저다(그때는 draft 가 없다).
@@ -1203,8 +1222,8 @@ export function OpsCalendarGrid({
   const todayInView = days.some((day) => day.date === today);
   const vacantActive = vacantOnly && todayInView;
   const vacantKeys = useMemo(
-    () => opsVacantRoomKeys({ bars, roomKeys: serverRooms.map((room) => room.key), today }),
-    [bars, serverRooms, today],
+    () => opsVacantRoomKeys({ roomKeys: serverRooms.map((room) => room.key), stays, today }),
+    [serverRooms, stays, today],
   );
   const rooms = useMemo(() => {
     const base = vacantActive ? serverRooms.filter((room) => vacantKeys.has(room.key)) : serverRooms;
@@ -1467,10 +1486,9 @@ export function OpsCalendarGrid({
   };
   /** 그 줄 그 숙박에 겹치는 살아 있는 예약 · 차단(격자가 가진 창 안만 — 창 밖은 서버가 다시 본다). */
   const moveClash = (roomKey: string, arrival: string, departure: string, excludeId: string) => {
-    for (const bar of bars) {
-      if (bar.roomKey !== roomKey || bar.isCancelled || bar.id === excludeId) continue;
-      if (bar.checkIn < departure && bar.checkOut > arrival) return { blocked: true, guest: bar.guestName as string | null };
-    }
+    // 확정 숙박만 막는다 — 「예약 표시」로 숨긴 확정도 막고, 문의 · 요청 · 취소 위로는 옮길 수 있다(2026-11-26).
+    const clash = opsStayClash(stays, roomKey, arrival, departure, excludeId);
+    if (clash) return { blocked: true, guest: clash.guestName as string | null };
     for (const block of blocks) {
       if (block.roomKey !== roomKey) continue;
       if (block.startDate < departure && block.endDate >= arrival) return { blocked: true, guest: null };
@@ -1488,7 +1506,7 @@ export function OpsCalendarGrid({
     document.documentElement.classList.remove("is-moving-bar");
   };
   const holdBarForMove: GridRowActions["holdBar"] = (bar, room, event) => {
-    if (editMode || event.button !== 0 || event.pointerType === "touch" || bar.isCancelled || room.roomIds.length === 0) return;
+    if (editMode || event.button !== 0 || event.pointerType === "touch" || !barOccupiesRoom(bar) || room.roomIds.length === 0) return;
     const hit = hitTest(event.clientX, event.clientY);
     if (!hit) return;
     cancelHold();
@@ -1682,18 +1700,8 @@ export function OpsCalendarGrid({
    * blackout·재고 블록·취소된 예약은 막지 않는다 — 차단해 둔 날도 가격은 미리 정해 둘 수
    * 있고, 취소된 예약은 이미 없는 예약이다(저쪽 `isCellPriceBlocked` 와 같다).
    */
-  const soldCells = useMemo(() => {
-    const sold = new Set<string>();
-    for (const bar of bars) {
-      if (bar.isCancelled) continue;
-      for (const date of dates) {
-        if (date >= bar.checkIn && date < bar.checkOut) {
-          sold.add(selectionCellKey(bar.roomKey, date));
-        }
-      }
-    }
-    return sold;
-  }, [bars, dates]);
+  // 확정 숙박(필터와 무관)으로 센다 — 확정을 꺼도 팔린 밤에서 가격 · 최소박을 고를 수 없다(2026-11-26).
+  const soldCells = useMemo(() => opsStayCellKeys(stays, dates), [stays, dates]);
 
   // **차단 모드에서는 예약이 있는 밤도 고른다**(2026-10-06). 차단은 예약이 있는 밤에도 걸고 풀어야 한다 — 차단한 날에
   // 수기 예약을 넣게 된 뒤로 「예약 + 차단」이 같은 밤에 겹치는데, 예전처럼 팔린 밤을 막으면 그 차단을 풀 수가 없었다
@@ -1968,14 +1976,15 @@ export function OpsCalendarGrid({
   const gapContext = useMemo(
     () =>
       buildGapContext({
-        bars,
+        // 갭 앞뒤 손님은 확정 숙박이다 — 확정을 꺼도 맥락이 남는다.
+        bars: stays,
         blocks,
         gapCells,
         propertyNames: new Map(rooms.map((room) => [room.key, room.propertyName])),
         roomLabels: new Map(rooms.map((room) => [room.key, room.displayRoomLabel])),
         roomOrder: new Map(rooms.map((room, index) => [room.key, index])),
       }),
-    [bars, blocks, gapCells, rooms],
+    [blocks, gapCells, rooms, stays],
   );
 
   /** 한 줄(객실) 또는 한 열(날짜)을 통째로. 전부 골라져 있으면 해제된다. */
@@ -2429,8 +2438,8 @@ export function OpsCalendarGrid({
             {mode === "off" ? (
               <>
                 {propertyPicker}
-                {/* 「취소만 보기」에서는 팔린 밤도 빈칸처럼 보여 예약을 만들지 않는다 — 버튼도 숨긴다. 바꾸기 권한이 없어도 숨긴다. */}
-                {canWrite && !showCancelled && (
+                {/* 확정을 뺀 보기에서는 팔린 밤도 빈칸처럼 보여 예약을 만들지 않는다 — 버튼도 숨긴다. 바꾸기 권한이 없어도 숨긴다. */}
+                {canWrite && !confirmedHidden && (
                   <button
                     aria-pressed={createHint}
                     className="scw-btn is-soft"
@@ -2496,15 +2505,13 @@ export function OpsCalendarGrid({
                       <b className="scw-tb__n">{vacantKeys.size}</b>
                     </button>
                   )}
-                  {/* 취소만 보기 — 켜면 일반 예약이 사라지고 취소된 것만 남는다(서버가 다시 그린다). */}
-                  <OpsNavLink
-                    aria-pressed={showCancelled}
-                    className={`scw-tb is-filter${showCancelled ? " on" : ""}`}
-                    href={cancelledHref}
-                    role="button"
-                  >
-                    {copy.scwCancelledOnly}
-                  </OpsNavLink>
+                  {/* 예약 표시 — 확정 · 문의 · 예약 요청 · 취소를 골라 본다(서버가 다시 그린다, 2026-11-26). */}
+                  <OpsStatusFilter
+                    baseHref={statusFilterBaseHref}
+                    copy={copy}
+                    counts={statusCounts}
+                    filter={statusFilter}
+                  />
                   {hasLargeRooms && (
                     <button
                       aria-pressed={largeFirst}
@@ -2594,7 +2601,7 @@ export function OpsCalendarGrid({
                 </div>
               </div>
               {/* 체크인만 찍힌 상태 · 「+ 수기 예약」 안내. 무엇을 기다리는지 적어 둔다. */}
-              {(activeDraft || (createHint && !showCancelled)) && (
+              {(activeDraft || (createHint && !confirmedHidden)) && (
                 <div className="scw-note" role="status">
                   <span>
                     {activeDraft
@@ -2928,7 +2935,7 @@ export function OpsCalendarGrid({
                 scopeOn={scope.roomKeys.includes(room.key)}
                 selectedDates={selectedDatesByRoom.get(room.key) ?? ""}
                 canWrite={canWrite}
-                showCancelled={showCancelled}
+                confirmedHidden={confirmedHidden}
                 today={today}
                 moveFadeId={moveDrag && moveDrag.room.key === room.key ? moveDrag.bar.id : ""}
                 moveGhost={moveGhostFor(room.key)}
@@ -2963,7 +2970,7 @@ export function OpsCalendarGrid({
               setCreateHint((value) => !value);
             }}
             periodLabel={opsWindowLabel(days)}
-            showNewBooking={!showCancelled}
+            showNewBooking={!confirmedHidden}
             toolbarRef={toolbarRef}
           />
         </div>
@@ -3141,6 +3148,7 @@ export function OpsCalendarGrid({
                 guestName: booking.guestName,
                 id: booking.reservationId,
                 isCancelled: false,
+                kind: "confirmed",
                 roomKey: booking.roomKey,
               },
               propertyName: booking.propertyName,
@@ -3200,6 +3208,7 @@ export function OpsCalendarGrid({
                 guestName: conversion.guestName,
                 id: conversion.reservationId,
                 isCancelled: false,
+                kind: "confirmed",
                 roomKey: conversion.roomKey,
               },
               propertyName: conversion.propertyName,

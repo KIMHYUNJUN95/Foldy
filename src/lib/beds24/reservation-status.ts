@@ -88,6 +88,15 @@ export function isPendingBeds24InquiryStatus(rawStatus: unknown): boolean {
   return PENDING_INQUIRY_PAYLOAD_MATCHES.includes(rawStatus);
 }
 
+/**
+ * 문의와 예약 요청을 **나눈다**(2026-11-26, 판매 캘린더 「예약 표시」 필터). 같은 값 집합(`PENDING_INQUIRY_PAYLOAD_MATCHES`)만 쓴다 —
+ * Beds24 숫자 상태 5 = 문의(inquiry), 3 = 예약 요청(request). 문의 · 요청이 아니면 `null`.
+ */
+export function pendingBeds24InquiryKind(rawStatus: unknown): "inquiry" | "request" | null {
+  if (!isPendingBeds24InquiryStatus(rawStatus)) return null;
+  return rawStatus === "request" || rawStatus === "3" || rawStatus === 3 ? "request" : "inquiry";
+}
+
 /** 예약 원본(`raw_payload`)이 문의 · 예약 요청인가 — `status` 칸을 본다. */
 export function isPendingBeds24Inquiry(rawPayload: unknown): boolean {
   if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) return false;

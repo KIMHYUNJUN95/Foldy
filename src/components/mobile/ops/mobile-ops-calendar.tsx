@@ -34,6 +34,10 @@ import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { DatePickerSheet } from "@/components/shell/date-picker-sheet";
 import type { Dictionary } from "@/lib/i18n";
 import { assignBarLanes, assignBlockLanes } from "@/lib/ops-bar-lanes";
+import { isPendingBarKind, opsBarLaneRank, opsBarPrefix } from "@/components/admin/ops/ops-bar-kind";
+import { MobileOpsStatusFilterSheet } from "@/components/mobile/ops/mobile-ops-status-filter-sheet";
+import { opsStatusFilterBadgeCount, type OpsStatusFilterKey } from "@/lib/ops-calendar-status-filter";
+import type { OpsBarKind } from "@/lib/ops-reservation-kind";
 import { formatGridPrice } from "@/lib/ops-price-format";
 import { attachMouseDragScroll } from "@/lib/mouse-drag-scroll";
 import type {
@@ -50,6 +54,7 @@ import {
   decodeRowRate,
   reuseStableRows,
   rowGapCellKeys,
+  rowStays,
   sameOpsDays,
   type OpsGridRowData,
 } from "@/lib/ops-calendar-rows";
@@ -78,6 +83,7 @@ import type { CellHistory } from "@/lib/ops-price-history";
 import { buildOpsScopeSummary } from "@/lib/ops-scope-summary";
 import { opsUrgentVacantCells } from "@/lib/ops-urgent-vacant";
 import { opsVacantRoomKeys } from "@/lib/ops-vacant-today";
+import { opsStayCellKeys } from "@/lib/ops-calendar-occupancy";
 import { opsVacantGapCells, opsVacantGaps, type OpsVacantGap, type OpsVacantGapLength, type OpsVacantGapSort } from "@/lib/ops-vacant-gaps";
 import { OpsVacantGapsPanel } from "@/components/admin/ops/ops-vacant-gaps-panel";
 import { useBuildingName } from "@/components/shared/building-names";
@@ -114,20 +120,24 @@ type PropertyPill = { name: string; href: string; selected: boolean };
 
 type Nav = {
   allHref: string;
-  cancelledHref: string;
   isRolling: boolean;
   monthlyHref: string;
   nextHref: string;
   prevHref: string;
   rangeLabel: string;
   rollingHref: string;
-  showCancelled: boolean;
+  /** 보는 범위의 종류별 예약 수 — 「예약 표시」 시트 항목 옆 숫자. */
+  statusCounts: Record<OpsBarKind, number>;
+  /** 「예약 표시」 필터(2026-11-26 — 예전 「취소 보기」). 서버가 이미 이 값으로 막대를 걸렀다. */
+  statusFilter: readonly OpsStatusFilterKey[];
+  /** `show=` 를 뺀 지금 주소. */
+  statusFilterBaseHref: string;
   todayHref: string;
 };
 
 /** 날짜 이동 — 고른 날짜로 `start`(30일) 또는 `ym`(월간)만 바꾸고 나머지 쿼리는 그대로. */
 type Jump = {
-  base: { cancelled?: string; mode: string; property: string[] };
+  base: { mode: string; property: string[]; show?: string };
   month: string;
   start: string;
 };
@@ -268,6 +278,11 @@ export function MobileOpsCalendar({
     if (href === `${window.location.pathname}${window.location.search}`) return;
     setNavPending({ from: rowsProp });
   };
+  // 「예약 표시」 시트(2026-11-26). 닫으면 칩으로 초점을 돌려준다.
+  const [statusSheetOpen, setStatusSheetOpen] = useState(false);
+  const statusChipRef = useRef<HTMLButtonElement | null>(null);
+  const statusBadge = opsStatusFilterBadgeCount(nav.statusFilter);
+  const confirmedHidden = !nav.statusFilter.includes("confirmed");
   useEffect(() => {
     if (!navPending) return;
     // 같은 데이터가 와서 배열이 안 바뀌는 경우의 안전장치.
@@ -281,11 +296,13 @@ export function MobileOpsCalendar({
   const [largeFirst, setLargeFirst] = useState(false);
   const serverRooms = useMemo(() => rows.map((row) => row.room), [rows]);
   const allBars = useMemo(() => rows.flatMap((row) => row.bars), [rows]);
+  /** 방을 차지하는 확정 숙박 — 「예약 표시」 필터와 무관(2026-11-26). 점유 판정은 막대 대신 이것으로 센다. */
+  const stays = useMemo(() => rowStays(rows), [rows]);
   const allBlocks = useMemo(() => rows.flatMap((row) => row.blocks), [rows]);
   const hasLargeRooms = useMemo(() => hasOpsLargeRooms(serverRooms), [serverRooms]);
   const vacantKeys = useMemo(
-    () => opsVacantRoomKeys({ bars: allBars, roomKeys: serverRooms.map((room) => room.key), today }),
-    [allBars, serverRooms, today],
+    () => opsVacantRoomKeys({ roomKeys: serverRooms.map((room) => room.key), stays, today }),
+    [serverRooms, stays, today],
   );
   const vacantActive = vacantOnly && todayInView;
   const rooms = useMemo(() => {
@@ -298,14 +315,8 @@ export function MobileOpsCalendar({
 
   const rateAt = useMemo(() => buildRowRateLookup(rows, dates), [rows, dates]);
   const gapCells = useMemo(() => rowGapCellKeys(rows, dates), [rows, dates]);
-  const soldCells = useMemo(() => {
-    const sold = new Set<string>();
-    for (const bar of allBars) {
-      if (bar.isCancelled) continue;
-      for (const date of dates) if (date >= bar.checkIn && date < bar.checkOut) sold.add(selectionCellKey(bar.roomKey, date));
-    }
-    return sold;
-  }, [allBars, dates]);
+  // 확정을 꺼도 팔린 밤은 팔린 밤이다 — 가격 · 최소박 시트에서 빠진다(데스크톱과 같은 판정).
+  const soldCells = useMemo(() => opsStayCellKeys(stays, dates), [stays, dates]);
   const blockedCells = useMemo(() => {
     const blocked = new Set<string>();
     for (const block of allBlocks) {
@@ -746,14 +757,14 @@ export function MobileOpsCalendar({
   const gapContext = useMemo(
     () =>
       buildGapContext({
-        bars: allBars,
+        bars: stays,
         blocks: allBlocks,
         gapCells,
         propertyNames: new Map(rooms.map((room) => [room.key, room.propertyName])),
         roomLabels: new Map(rooms.map((room) => [room.key, room.displayRoomLabel])),
         roomOrder: new Map(rooms.map((room, index) => [room.key, index])),
       }),
-    [allBars, allBlocks, gapCells, rooms],
+    [allBlocks, gapCells, rooms, stays],
   );
 
   /*
@@ -1436,8 +1447,13 @@ export function MobileOpsCalendar({
   const rowIndexByKey = new Map(roomKeys.map((key, index) => [key, index]));
   const allSelected = selectedProperties.length === 0;
   const rowCopy = useMemo(
-    () => ({ blockLabel: copy.blockLabel, bkPurposes: copy.bkPurposes as Record<string, string> }),
-    [copy.blockLabel, copy.bkPurposes],
+    () => ({
+      barPrefixInquiry: copy.barPrefixInquiry,
+      barPrefixRequest: copy.barPrefixRequest,
+      blockLabel: copy.blockLabel,
+      bkPurposes: copy.bkPurposes as Record<string, string>,
+    }),
+    [copy.barPrefixInquiry, copy.barPrefixRequest, copy.blockLabel, copy.bkPurposes],
   );
 
   const selCount = selection.length;
@@ -1458,7 +1474,7 @@ export function MobileOpsCalendar({
       if (hiddenBy > 0) grid.scrollTop += hiddenBy + 8;
     }
     hadDockRef.current = hasDock;
-  }, [days, hasDock, nav.showCancelled, rooms, rows]);
+  }, [days, hasDock, nav.statusFilter, rooms, rows]);
   const selRoomCount = new Set(selection.map((cell) => cell.roomKey)).size;
   const scopeActive = isScopeActive(scope);
   const panelKind = overlay && (overlay.kind === "price" || overlay.kind === "minstay" || overlay.kind === "block") ? overlay.kind : null;
@@ -1628,14 +1644,23 @@ export function MobileOpsCalendar({
             {copy.ssButton}
           </button>
         )}
-        <Link
-          className={`mops-chip${nav.showCancelled ? " on" : ""}`}
-          href={nav.cancelledHref}
-          onNavigate={markNav(nav.cancelledHref)}
-          scroll={false}
+        {/* 예약 표시 — 확정 · 문의 · 예약 요청 · 취소를 시트에서 고른다(2026-11-26, 예전 「취소 보기」). */}
+        <button
+          aria-expanded={statusSheetOpen}
+          aria-haspopup="dialog"
+          className={`mops-chip${statusBadge > 0 ? " on" : ""}`}
+          onClick={() => setStatusSheetOpen(true)}
+          ref={statusChipRef}
+          type="button"
         >
-          {nav.showCancelled ? copy.showCancelledOn : copy.showCancelled}
-        </Link>
+          {copy.statusFilter}
+          {statusBadge > 0 && (
+            <b>
+              <span aria-hidden="true">+{statusBadge}</span>
+              <span className="sr-only">{copy.statusFilterChanged.replace("{n}", String(statusBadge))}</span>
+            </b>
+          )}
+        </button>
         {hasLargeRooms && (
           <button
             aria-pressed={largeFirst}
@@ -1790,7 +1815,7 @@ export function MobileOpsCalendar({
                   rowIndex={rowIndexByKey.get(room.key) ?? 0}
                   scopeOn={scope.roomKeys.includes(room.key)}
                   selFlags={flagsFor(room.key, selectedKeys)}
-                  showCancelled={nav.showCancelled}
+                  confirmedHidden={confirmedHidden}
                   solo={group.rooms.length === 1}
                   today={today}
                   // 임박 빈방 테두리는 칩을 **켰을 때만**(2026-10-02 사용자 지시 — 늘 그리면 격자가 복잡해 보였다).
@@ -1865,6 +1890,23 @@ export function MobileOpsCalendar({
         )}
 
       {/* ── 시트들 — 전부 공용 `BottomSheet`, 내용은 데스크톱 패널 그대로 ─────────────────────── */}
+      {statusSheetOpen && (
+        <MobileOpsStatusFilterSheet
+          baseHref={nav.statusFilterBaseHref}
+          copy={copy}
+          counts={nav.statusCounts}
+          filter={nav.statusFilter}
+          onClose={() => {
+            setStatusSheetOpen(false);
+            statusChipRef.current?.focus();
+          }}
+          onNavigate={(href) => {
+            if (href === `${window.location.pathname}${window.location.search}`) return;
+            setNavPending({ from: rowsProp });
+            router.push(href, { scroll: false });
+          }}
+        />
+      )}
       {panelKind && canWrite && (
         <BottomSheet
           ariaLabel={panelKind === "price" ? copy.panelTitle : panelKind === "minstay" ? copy.minStayTitle : copy.bkTitle}
@@ -2214,6 +2256,7 @@ export function MobileOpsCalendar({
                       guestName: conversion.guestName,
                       id: conversion.reservationId,
                       isCancelled: false,
+                      kind: "confirmed",
                       roomKey: conversion.roomKey,
                     },
                     propertyName: conversion.propertyName,
@@ -2257,6 +2300,7 @@ export function MobileOpsCalendar({
                       guestName: booking.guestName,
                       id: booking.reservationId,
                       isCancelled: false,
+                      kind: "confirmed",
                       roomKey: booking.roomKey,
                     },
                     propertyName: booking.propertyName,
@@ -2589,14 +2633,14 @@ const MobileOpsRow = memo(function MobileOpsRow({
   rowIndex,
   scopeOn,
   selFlags,
-  showCancelled,
+  confirmedHidden,
   solo,
   today,
   urgFlags,
   winIds,
   markIds,
 }: {
-  copy: { blockLabel: string; bkPurposes: Record<string, string> };
+  copy: { blockLabel: string; bkPurposes: Record<string, string>; barPrefixInquiry: string; barPrefixRequest: string };
   days: OpsCalendarDay[];
   pending: { price: Map<string, number>; minStay: Map<string, number>; settled: Set<string> } | undefined;
   priceWinsOnly: boolean;
@@ -2605,7 +2649,8 @@ const MobileOpsRow = memo(function MobileOpsRow({
   /** 객실 축에 들어 있다(데스크톱 객실명 강조와 같다). */
   scopeOn: boolean;
   selFlags: string;
-  showCancelled: boolean;
+  /** 「예약 표시」에서 확정을 뺐다 — 가격 개입 흐림을 끈다. */
+  confirmedHidden: boolean;
   /** 객실 하나뿐인 건물(독채) — 묶음 머리 대신 객실 열에 건물 이름을 적는다. */
   solo: boolean;
   today: string;
@@ -2621,9 +2666,9 @@ const MobileOpsRow = memo(function MobileOpsRow({
   const indexOf = (date: string) => days.findIndex((day) => day.date === date);
   const wins = new Set(winIds ? winIds.split("|") : []);
   const marks = new Set(markIds ? markIds.split("|") : []);
-  // 보기 모드로 거른다 — 「취소 보기」면 취소만, 아니면 살아 있는 예약만(데스크톱과 같다).
-  const bars = row.bars.filter((bar) => bar.isCancelled === showCancelled && bar.checkOut > first && bar.checkIn <= last);
-  const barLanes = assignBarLanes(bars);
+  // 「예약 표시」 필터는 서버가 이미 걸렀다 — 여기서는 보이는 기간만. 확정이 늘 위층(데스크톱과 같다, 2026-11-26).
+  const bars = row.bars.filter((bar) => bar.checkOut > first && bar.checkIn <= last);
+  const barLanes = assignBarLanes(bars.map((bar) => ({ ...bar, rank: opsBarLaneRank(bar.kind) })));
   const blocks = row.blocks.filter((block) => block.endDate >= first && block.startDate <= last);
   // 차단은 예약 층 아래 따로 둔 줄에(데스크톱과 같다, 2026-10-06) — 0층은 예약 막대 · 빈 칸 자리.
   const blockLanes = assignBlockLanes(
@@ -2689,15 +2734,17 @@ const MobileOpsRow = memo(function MobileOpsRow({
           const right = endIndex >= days.length ? days.length * CELL_W : (endIndex + 0.5) * CELL_W - 1;
           const lane = barLanes.laneById.get(bar.id) ?? 0;
           const channel = bar.channel === "airbnb" ? "abnb" : bar.channel === "booking" ? "bkng" : "dir";
-          const winClass = priceWinsOnly && !showCancelled ? (wins.has(bar.id) ? " pw-win" : " pw-dim") : "";
+          const winClass = priceWinsOnly && !confirmedHidden ? (wins.has(bar.id) ? " pw-win" : " pw-dim") : "";
           return (
             <span
-              className={`mops-bar-r ${channel}${startIndex < 0 ? " open-l" : ""}${bar.isCancelled ? " cxl" : ""}${winClass}`}
+              className={`mops-bar-r ${channel}${startIndex < 0 ? " open-l" : ""}${bar.isCancelled ? " cxl" : ""}${isPendingBarKind(bar.kind) ? " is-pending" : ""}${winClass}`}
               data-bar={bar.id}
+              data-kind={bar.kind}
               key={bar.id}
               style={{ left, top: TOP_H + lane * LANE_H + BAR_DY, width: Math.max(12, right - left) }}
             >
               {marks.has(bar.id) ? <TrendingDown aria-hidden="true" className="mops-winmark" /> : null}
+              {opsBarPrefix(bar.kind, copy)}
               {bar.guestName}
             </span>
           );

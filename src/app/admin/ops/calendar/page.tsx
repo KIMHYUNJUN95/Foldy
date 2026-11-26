@@ -14,6 +14,8 @@ import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { getOpsCalendarData, OPS_CALENDAR_ROLLING_DAYS } from "@/lib/ops-calendar";
 import { scheduleOpsCalendarOpenRefresh } from "@/lib/ops-calendar-open-refresh";
 import { resolveOpsCalendarMode } from "@/lib/ops-calendar-mode-preference";
+import { resolveOpsCalendarStatusFilter } from "@/lib/ops-calendar-status-filter-preference";
+import { serializeOpsStatusFilter } from "@/lib/ops-calendar-status-filter";
 import { canWriteOpsCalendar, opsNavId } from "@/lib/ops-admin";
 import { isOpsRatesStale, opsRatesSyncedLabel } from "@/lib/ops-rates-freshness";
 import {
@@ -54,7 +56,10 @@ type SearchParams = {
   property?: string | string[];
   /** 30일 뷰의 시작일. 없으면 도쿄 기준 어제. */
   start?: string;
+  /** 예전 「취소 보기」 링크(`cancelled=1`) — 이제 「예약 표시」 필터로 읽는다(확정 + 취소). 새 링크는 싣지 않는다. */
   cancelled?: string;
+  /** 「예약 표시」 필터(2026-11-26) — `confirmed,inquiry` 처럼 쉼표로. 없으면 저장값 → 기본(확정만). `none` = 아무것도. */
+  show?: string;
 };
 
 function addDays(date: string, days: number): string {
@@ -76,19 +81,22 @@ export default async function OpsCalendarPage({
   // 「이력」 버튼의 빨간 숫자(최근 7일 전송 실패 + 멈춘 작업)도 **같이** 센다 — 달력 데이터를 다 받은
   // 뒤에 따로 세면 그만큼 화면이 늦게 온다(2026-09-30 속도).
   // 주소에 30일/월간이 없으면 이 사용자가 마지막으로 본 보기로 연다(있으면 그게 새 기억) — 대시보드 · 모바일 공용.
-  const mode = await resolveOpsCalendarMode(session.user.id, params.mode);
+  const [mode, statusFilter] = await Promise.all([
+    resolveOpsCalendarMode(session.user.id, params.mode),
+    resolveOpsCalendarStatusFilter(session.user.id, { cancelled: params.cancelled, show: params.show }),
+  ]);
+  const showParam = serializeOpsStatusFilter(statusFilter);
   const [data, historyAlerts] = await Promise.all([
     getOpsCalendarData(session, {
       mode,
       month: params.ym,
       properties: parsePropertyParam(params.property),
       start: params.start,
-      showCancelled: params.cancelled === "1",
+      statusFilter,
     }),
     countOpsHistoryAlerts(getSupabaseServiceClient(), session.organization.id),
   ]);
 
-  const showCancelled = params.cancelled === "1";
   const isRolling = data.mode === "rolling";
 
   /*
@@ -120,7 +128,7 @@ export default async function OpsCalendarPage({
       ym: data.mode === "monthly" ? data.month : undefined,
       property: data.selectedProperties,
       start: data.mode === "rolling" ? data.start : undefined,
-      cancelled: showCancelled ? "1" : undefined,
+      show: showParam,
       ...next,
     });
 
@@ -177,7 +185,6 @@ export default async function OpsCalendarPage({
             격자가 필요할 때 서버 액션으로 따로 받는다(2026-09-30 속도). */}
         <OpsCalendarGrid
           canWrite={canWriteOpsCalendar(session)}
-          cancelledHref={hrefWith({ cancelled: showCancelled ? undefined : "1" })}
           copy={copy}
           days={data.days}
           hasRates={data.hasRates}
@@ -219,9 +226,9 @@ export default async function OpsCalendarPage({
                     }}
                     localeTag={localeTag}
                     params={{
-                      cancelled: showCancelled ? "1" : undefined,
                       mode: data.mode,
                       property: data.selectedProperties,
+                      show: showParam,
                     }}
                     start={data.start}
                   />
@@ -242,7 +249,7 @@ export default async function OpsCalendarPage({
                       thisMonth: dictionary.admin.shared.dateThisMonth,
                     }}
                     localeTag={localeTag}
-                    preserveQueryKeys={["mode", "property", "cancelled"]}
+                    preserveQueryKeys={["mode", "property", "show"]}
                     ym={data.month}
                   />
                 </div>
@@ -272,7 +279,9 @@ export default async function OpsCalendarPage({
             />
           }
           rows={data.rows}
-          showCancelled={showCancelled}
+          statusCounts={data.statusCounts}
+          statusFilter={statusFilter}
+          statusFilterBaseHref={hrefWith({ show: undefined })}
           status={{
             // 「N시간 전 기준」일 때만 「오래됐을 수 있음」을 붙인다(시안 SalesStates-PC ①).
             label:

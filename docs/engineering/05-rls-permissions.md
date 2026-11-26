@@ -167,7 +167,7 @@ Read (2026-11-11 사용자 관리 점검 — `202611110003_user_management_harde
 
 Update:
 
-- **본인은 화면 설정 칸만**: `preferred_language` · `theme_preference` · `bottom_nav_tabs` · `ops_calendar_mode`(칸 권한).
+- **본인은 화면 설정 칸만**: `preferred_language` · `theme_preference` · `bottom_nav_tabs` · `ops_calendar_mode`(칸 권한). `ops_calendar_status_filter`(2026-11-26)는 칸 권한에 넣지 않았다 — 서버가 본인 행만 service-role 로 쓴다.
   전에는 정책에 칸 제한이 없어 본인이 `hire_date`(연차 부풀리기) · `deleted_at` · `can_generate_report` 등을 PATCH 로 바꿀 수 있었다.
 - 이름 · 전화 · 성별 · 생년월일 · 국적/이름 세 가지는 검증을 거쳐야 해서 서버 액션(service role)만 쓴다(`src/app/account/actions.ts` ·
   `src/app/onboarding/actions.ts`). 입사일 · 리포트 권한 등 관리 칸은 service role 서버 액션 · RPC 만.
@@ -2032,6 +2032,7 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 ## 2026-11-13 손님 메시지 2단계 — 서버 액션 권한 · 새 표 · 함수 (`202611130001_guest_messages_stage2`, 운영 적용 2026-11-13)
 
 - 화면 쓰기는 모두 서버 액션 `src/actions/guest-messages.ts`(service_role + `organization_id` 조건). 읽기 · 번역 = `guest_messages.view`, 답장 · 내부 메모 · 처리 끝 · 나중에 · 큐 고치기/취소/다시 보내기 = `view` **와** `reply`. 관리자 웹 권한은 따로 요구하지 않는다(알바 개인 부여 — 47 §8). 다른 조직 대화 id 는 `not_found`. 읽기(목록 · 대화)는 발송 작업을 걸지 않는다(부작용 없음).
+- **판매 캘린더 예약 패널 — 손님 메시지(2026-11-26):** `src/actions/reservation-messages.ts`(PC · 모바일 공용). `loadReservationMessages` = `guest_messages.view`, `sendReservationMessage` = `view` **와** `reply` 를 서버가 확인한 뒤 service_role 로 읽고 쓴다(모든 조회에 `organization_id` 조건, 다른 조직 예약은 `not_found`). 권한이 없으면 redirect 대신 `forbidden` 결과. 대화가 없으면 첫 메시지 때 예약 · 채널에 묶인 대화를 만든다 — 멱등 키 · 글 길이 · 직접 예약 검사를 통과한 뒤에만. 발송은 메시지함과 같은 `guest_message_enqueue_reply` 함수.
 - 대화의 작성자 이름은 그 조직 `memberships` 에 있는 사람만 profiles 에서 읽는다.
 - 번역 캐시 `guest_message_translations` 는 없는 언어만 채운다 — 보기 권한만 가진 사람이 다른 사람이 본 번역을 바꿀 수 없다.
 - `translation_usage` · `guest_message_translations`: RLS 켬 · 정책 없음 · `anon` · `authenticated` 권한 회수, `service_role` 만.

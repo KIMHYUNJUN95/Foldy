@@ -343,6 +343,10 @@
 .mops .mops-bar-r.abnb { background: #fbd3d8; color: #8a1f2e; }
 .mops .mops-bar-r.bkng { background: #cfddf6; color: #1c3a78; }
 .mops .mops-bar-r.dir { background: #d3eedc; color: #1f6b3d; }
+/* 문의 · 예약 요청(2026-11-26) — 방을 막지 않는다. PC 와 같은 빗금 + 이름 앞 꼬리표. */
+.mops .mops-bar-r.is-pending.abnb { background: repeating-linear-gradient(135deg, #fbd3d8 0 4px, #fff 4px 7px); box-shadow: inset 0 0 0 1px #f3a9b3; }
+.mops .mops-bar-r.is-pending.bkng { background: repeating-linear-gradient(135deg, #cfddf6 0 4px, #fff 4px 7px); box-shadow: inset 0 0 0 1px #a3bdea; }
+.mops .mops-bar-r.is-pending.dir { background: repeating-linear-gradient(135deg, #d3eedc 0 4px, #fff 4px 7px); box-shadow: inset 0 0 0 1px #a6d9b6; }
 .mops .mops-bar-r.pw-win { box-shadow: 0 0 0 1.5px var(--mw-pri); }
 /* 최근 예약을 켰을 때 가격 개입에도 잡힌 막대 — 이름 앞 내림 화살표(2026-10-28). */
 .mops-winmark { display: inline-block; width: 11px; height: 11px; margin-right: 3px; vertical-align: -1px; stroke-width: 2.6; flex: none; }

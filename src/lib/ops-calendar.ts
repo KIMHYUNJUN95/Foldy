@@ -51,6 +51,9 @@ import type { Database } from "@/types/database";
 import { resolveSelectedProperties } from "@/lib/ops-calendar-properties";
 import { isSalesCountedReservation, legacyReservationAmount, type SalesRawPayload } from "@/lib/ops-sales-summary";
 import { opsUnitRoomKey, ROOM_AXIS_SEPARATOR, toRoomAxisKey } from "@/lib/ops-room-key";
+import { barOccupiesRoom, opsReservationKind, type OpsBarKind } from "@/lib/ops-reservation-kind";
+import { opsStayCellKeys, splitOpsBars, type OpsRoomStay } from "@/lib/ops-calendar-occupancy";
+import { DEFAULT_OPS_STATUS_FILTER, isOpsBarShown, type OpsStatusFilterKey } from "@/lib/ops-calendar-status-filter";
 
 /**
  * 운영 관리자 「판매 캘린더」의 읽기 계층.
@@ -124,6 +127,8 @@ const SLIM_PAYLOAD_KEYS = [
   "unit_label",
   "room_label",
   "bookingTime",
+  // 원본 상태 — 문의 · 예약 요청을 가린다(`opsReservationKind`, 2026-11-26). 없으면 문의가 확정 막대 · 막힌 방이 된다.
+  "status",
 ] as const;
 
 const RESERVATION_SELECT = [
@@ -148,6 +153,15 @@ function toReservationRow(raw: Record<string, unknown>): ReservationRow {
     source: raw.source as ReservationRow["source"],
     status: raw.status as ReservationRow["status"],
   };
+}
+
+/** 이 예약이 방을 차지하는가 — 확정만(문의 · 요청 · 취소 · 노쇼는 빈 방). `opsReservationKind` 와 같은 판정. */
+function rowOccupiesRoom(row: Pick<ReservationRow, "status" | "raw_payload">): boolean {
+  return opsReservationKind(row.status, rawStatusOf(row.raw_payload)) === "confirmed";
+}
+
+function rawStatusOf(payload: ReservationRow["raw_payload"]): unknown {
+  return payload && typeof payload === "object" && !Array.isArray(payload) ? (payload as Record<string, unknown>).status : undefined;
 }
 
 /** JSON 경로 선택은 타입 추론이 안 된다 — 한 쪽의 모양을 직접 적는다. */
@@ -268,6 +282,11 @@ export type OpsCalendarBar = {
   guestName: string;
   id: string;
   isCancelled: boolean;
+  /**
+   * 표시 종류(2026-11-26) — 확정 · 문의 · 예약 요청 · 취소. 방을 차지하는 것은 확정뿐이다(`barOccupiesRoom`).
+   * `isCancelled` 는 `kind === "cancelled"` 와 같다(예전 호출부 호환).
+   */
+  kind: OpsBarKind;
   roomKey: string;
 };
 
@@ -524,7 +543,7 @@ export async function readOpsRoomUnavailableNights(args: {
   const booked = new Set<string>();
   const reservationRoomAxis = makeReservationRoomAxis(roomCatalog);
   for (const row of reservationsResult.data) {
-    if (row.status === "cancelled" || row.status === "no_show") continue;
+    if (!rowOccupiesRoom(row)) continue;
     if (row.id === args.excludeReservationId) continue;
     if (isExcludedOperationalRoom(row.property_name, row.room_label)) continue;
     if (reservationRoomAxis(row).roomKey !== args.roomKey) continue;
@@ -594,7 +613,7 @@ export async function readOpsMoveTargets(args: {
     const booked = new Set<string>();
     let clashGuest: string | null = null;
     for (const row of reservationsResult.data) {
-      if (row.status === "cancelled" || row.status === "no_show") continue;
+      if (!rowOccupiesRoom(row)) continue;
       if (row.id === args.excludeReservationId) continue;
       if (isExcludedOperationalRoom(row.property_name, row.room_label)) continue;
       if (axis(row).roomKey !== target.roomKey) continue;
@@ -664,8 +683,11 @@ export async function getOpsCalendarData(
     /** 고른 건물(들). 빈 목록 = 전체. 없는 이름은 버린다(`resolveSelectedProperties`). */
     properties?: readonly string[];
     start?: string;
-    /** 취소된 예약도 함께 볼 것인가. 기본은 꺼짐 — 저쪽 `showCancelled` 와 같다. */
-    showCancelled?: boolean;
+    /**
+     * 「예약 표시」 필터 — 그릴 종류(2026-11-26). 기본은 확정만(`DEFAULT_OPS_STATUS_FILTER`). 예전 「취소 보기」는 여기에 합쳤다.
+     * 문의 · 요청은 그려도 **빈 방**이다 — 빈방 · 갭 · 가동률 · 새 예약에 영향이 없다.
+     */
+    statusFilter?: readonly OpsStatusFilterKey[];
   },
 ) {
   const today = toJstDateString(new Date());
@@ -866,29 +888,36 @@ export async function getOpsCalendarData(
     });
   }
 
-  const bars: OpsCalendarBar[] = [];
+  /** 막대 전부(필터 전) — 그릴 막대와 점유(확정 숙박)는 `splitOpsBars` 가 나눈다. 점유는 필터와 무관하다. */
+  const allBars: OpsCalendarBar[] = [];
+  /** 「예약 표시」 항목별 건수용 — 필터와 무관하게 모든 예약의 (종류, 건물). 고른 건물만 마지막에 센다. */
+  const kindByRow: Array<{ kind: OpsBarKind; propertyName: string }> = [];
+  const statusFilter = filters.statusFilter ?? DEFAULT_OPS_STATUS_FILTER;
   for (const row of reservationsResult.data) {
     // 건물 단위 제외는 여기서 하지 않는다(사노가 보여야 한다). 객실 단위는 그대로 건다.
     if (isExcludedOperationalRoom(row.property_name, row.room_label)) continue;
 
-    const isCancelled = row.status === "cancelled" || row.status === "no_show";
-    if (isCancelled && !filters.showCancelled) continue;
-
+    const kind = opsReservationKind(row.status, rawStatusOf(row.raw_payload));
     const { displayRoomLabel, propertyName, roomKey } = reservationRoomAxis(row);
-
-    if (!roomsByKey.has(roomKey)) {
-      roomsByKey.set(roomKey, { displayRoomLabel, key: roomKey, propertyName, roomIds: [] });
-    }
-    bars.push({
+    kindByRow.push({ kind, propertyName });
+    const bar: OpsCalendarBar = {
       channel: opsChannelOf(row.source),
       checkIn: row.check_in_date,
       checkOut: row.check_out_date,
       guestName: row.guest_name,
       id: row.id,
-      isCancelled,
+      isCancelled: kind === "cancelled",
+      kind,
       roomKey,
-    });
+    };
+    // 목록 밖 방은 **그릴 막대나 확정 숙박**이 있을 때만 행이 된다 — 확정을 꺼도 팔린 방 행은 남는다.
+    if (!isOpsBarShown(kind, statusFilter) && !barOccupiesRoom(bar)) continue;
+    if (!roomsByKey.has(roomKey)) {
+      roomsByKey.set(roomKey, { displayRoomLabel, key: roomKey, propertyName, roomIds: [] });
+    }
+    allBars.push(bar);
   }
+  const { shown: bars, stays } = splitOpsBars(allBars, statusFilter);
 
   let blocks: OpsCalendarBlock[] = [];
   if (blocksResult.error) {
@@ -1042,14 +1071,8 @@ export async function getOpsCalendarData(
     }
   }
 
-  const occupiedCells = new Set<string>();
-  for (const bar of bars) {
-    if (bar.isCancelled) continue;
-    for (let date = bar.checkIn; date < bar.checkOut; date = addDays(date, 1)) {
-      occupiedCells.add(`${bar.roomKey}|${date}`);
-      if (occupiedCells.size > 200_000) break;
-    }
-  }
+  // 점유는 「예약 표시」 필터와 무관한 확정 숙박으로 센다(`splitOpsBars` · 2026-11-26) — 확정을 꺼도 팔린 밤은 갭이 아니다.
+  const occupiedCells = opsStayCellKeys(stays);
   for (const block of blocks) {
     for (let date = block.startDate; date <= block.endDate; date = addDays(date, 1)) {
       occupiedCells.add(`${block.roomKey}|${date}`);
@@ -1141,6 +1164,12 @@ export async function getOpsCalendarData(
     if (list) list.push(bar);
     else barsByRoom.set(bar.roomKey, [bar]);
   }
+  const staysByRoom = new Map<string, OpsRoomStay[]>();
+  for (const stay of stays) {
+    const list = staysByRoom.get(stay.roomKey);
+    if (list) list.push(stay);
+    else staysByRoom.set(stay.roomKey, [stay]);
+  }
   const blocksByRoom = new Map<string, OpsCalendarBlock[]>();
   for (const block of blocks) {
     const list = blocksByRoom.get(block.roomKey);
@@ -1156,11 +1185,19 @@ export async function getOpsCalendarData(
       isGap: (date) => gapCells.has(`${room.key}|${date}`),
       rateAt: (date) => rates.get(`${room.key}|${date}`),
       room,
+      stays: staysByRoom.get(room.key) ?? [],
     }),
   );
   const visibleRoomKeys = new Set(rooms.map((room) => room.key));
+  const statusCounts: Record<OpsBarKind, number> = { cancelled: 0, confirmed: 0, inquiry: 0, request: 0 };
+  // 고른 건물의 예약을 센다 — 켜면 그 행이 생기므로 「지금 보이는 행」으로 세면 목록 밖 방의 문의가 빠진다.
+  for (const entry of kindByRow) {
+    if (selectedProperties.length === 0 || selectedSet.has(entry.propertyName)) statusCounts[entry.kind] += 1;
+  }
 
   return {
+    /** 「예약 표시」 항목별 건수(보이는 객실 · 이 창). */
+    statusCounts,
     /** 요금이 한 칸이라도 있는가. 하나도 없으면 화면이 「아직 안 들어옴」을 알린다. */
     hasRates: rates.size > 0,
     /**
@@ -1335,8 +1372,9 @@ export async function readOpsSalesInputs(args: {
       const value = raw[`sp_${key}`];
       if (value !== null && value !== undefined) sales[key] = value;
     }
-    // 목록 밖 방은 격자처럼 살아 있는 예약이 있을 때만 행이 된다(가동률에는 안 들어간다).
-    if (!propertyOfRoom.has(roomKey) && row.status !== "cancelled" && row.status !== "no_show") {
+    // 목록 밖 방은 격자처럼 방을 차지하는 **확정** 예약이 있을 때만 행이 된다(가동률에는 안 들어간다).
+    // 문의 · 요청 · 취소 · 노쇼는 줄을 만들지 않는다 — 격자와 같은 판정(`opsReservationKind`, 2026-11-26).
+    if (!propertyOfRoom.has(roomKey) && opsReservationKind(row.status, raw.sp_status) === "confirmed") {
       propertyOfRoom.set(roomKey, propertyName);
       labelOfRoom.set(roomKey, displayRoomLabel);
     }
@@ -1795,6 +1833,7 @@ export async function resolveOpsReservationPlacements(
         guestName: row.guest_name,
         id: row.id,
         isCancelled: row.status === "cancelled" || row.status === "no_show",
+        kind: opsReservationKind(row.status, rawStatusOf(row.raw_payload)),
         roomKey,
       },
       propertyName,

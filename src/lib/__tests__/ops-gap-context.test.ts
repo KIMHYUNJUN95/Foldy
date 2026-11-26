@@ -18,6 +18,7 @@ const bar = (over: Partial<OpsCalendarBar>): OpsCalendarBar => ({
   guestName: "Guest",
   id: "b1",
   isCancelled: false,
+  kind: "confirmed",
   roomKey: "402",
   ...over,
 });

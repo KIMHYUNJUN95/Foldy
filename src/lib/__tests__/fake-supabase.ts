@@ -35,6 +35,8 @@ export function createFakeSupabase(
     let rangeFrom: number | null = null;
     let rangeTo: number | null = null;
     let single = false;
+    /** `select(cols, { count: "exact", head: true })` — 맞는 줄 수만(`count`), head 면 데이터 없이. */
+    let countMode: { head: boolean } | null = null;
     let orders: Array<{ column: string; ascending: boolean }> = [];
     const rows = () => (tables[table] ??= []);
 
@@ -87,6 +89,7 @@ export function createFakeSupabase(
           return 0;
         });
       }
+      if (countMode) return { count: sorted.length, data: countMode.head ? null : sorted, error: null };
       const from = rangeFrom ?? 0;
       const to = rangeTo ?? FAKE_MAX_ROWS - 1;
       const page = sorted.slice(from, Math.min(to + 1, from + FAKE_MAX_ROWS));
@@ -181,7 +184,8 @@ export function createFakeSupabase(
         rangeTo = to;
         return api;
       },
-      select() {
+      select(_columns?: string, options?: { count?: string; head?: boolean }) {
+        if (options?.count) countMode = { head: options.head === true };
         return api;
       },
       single() {

@@ -1,0 +1,126 @@
+/* 예약 패널 「손님 메시지」 칸 — PC 패널(.spw-sect) · 모바일 시트(.msw-sect) 공용(2026-11-26).
+   계약: docs/product/33-calendar-write-features.md → 「예약 패널 — 손님 메시지」 */
+
+.rmsg {
+  --rmsg-ink: #1c1a24;
+  --rmsg-soft: #6b6878;
+  --rmsg-violet: #7a52e6;
+  --rmsg-violet-ink: #5a30cf;
+  --rmsg-violet-bg: #f4f1fd;
+  --rmsg-fill: #f4f4f6;
+  --rmsg-red: #c5282e;
+  --rmsg-ease: cubic-bezier(0.23, 1, 0.32, 1);
+  gap: 8px;
+}
+.rmsg > .spw-sec,
+.rmsg > .h { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.rmsg__unread {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--rmsg-violet-bg);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--rmsg-violet-ink);
+  font-variant-numeric: tabular-nums;
+}
+.rmsg__open {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 28px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--rmsg-violet-ink);
+  text-decoration: none;
+}
+.rmsg__open:hover { text-decoration: underline; }
+.rmsg__list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.rmsg__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 92%;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--rmsg-fill);
+  animation: rmsg-in 180ms var(--rmsg-ease) both;
+}
+.rmsg__item.is-host { align-self: flex-end; background: var(--rmsg-violet-bg); }
+.rmsg__meta { display: flex; gap: 6px; font-size: 11px; color: var(--rmsg-soft); }
+.rmsg__meta time { font-variant-numeric: tabular-nums; }
+.rmsg__body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--rmsg-ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.rmsg__fail { display: flex; flex-wrap: wrap; gap: 6px; font-size: 12px; font-weight: 600; color: var(--rmsg-red); }
+.rmsg__note { margin: 0; font-size: 12px; line-height: 1.5; color: var(--rmsg-soft); }
+.rmsg__note.is-err { color: var(--rmsg-red); }
+.rmsg__form { display: flex; flex-direction: column; gap: 6px; }
+.rmsg__input {
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--rmsg-fill);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--rmsg-ink);
+  resize: vertical;
+}
+.rmsg__input:focus-visible { outline: 2px solid var(--rmsg-violet); outline-offset: 1px; }
+.rmsg__row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.rmsg__status { min-width: 0; font-size: 12px; font-weight: 600; color: var(--rmsg-soft); }
+.rmsg__send { flex: 0 0 auto; min-width: 96px; white-space: nowrap; }
+.rmsg__alert {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #fdecec;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--rmsg-red);
+  animation: rmsg-in 180ms var(--rmsg-ease) both;
+}
+.rmsg__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.rmsg__link:disabled { opacity: 0.5; cursor: default; }
+
+/* 모바일 — 글자 · 손가락 크기 */
+.rmsg.is-mobile .rmsg__open { min-height: 44px; font-size: 14px; }
+.rmsg.is-mobile .rmsg__body { font-size: 15px; }
+.rmsg.is-mobile .rmsg__meta { font-size: 12px; }
+.rmsg.is-mobile .rmsg__input { font-size: 16px; min-height: 80px; }
+.rmsg.is-mobile .rmsg__send { height: 48px; padding: 0 18px; }
+.rmsg.is-mobile .rmsg__note,
+.rmsg.is-mobile .rmsg__status,
+.rmsg.is-mobile .rmsg__alert,
+.rmsg.is-mobile .rmsg__fail { font-size: 13px; }
+.rmsg.is-mobile .rmsg__link { min-height: 32px; }
+
+@keyframes rmsg-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rmsg__item,
+  .rmsg__alert { animation: none; }
+}

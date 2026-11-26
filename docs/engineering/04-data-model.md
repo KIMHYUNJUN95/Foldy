@@ -122,6 +122,7 @@ theme_preference text not null default 'system'  -- schema only; NOT used by the
 bottom_nav_tabs text[] not null default '{home,calendar,requests,announcements}'
 can_generate_report boolean not null default false
 ops_calendar_mode text  -- 2026-10-05 (202610050001): 판매 캘린더 마지막 보기 rolling·monthly, null = 30일
+ops_calendar_status_filter text[]  -- 2026-11-26 (202611260002): 판매 캘린더 「예약 표시」 confirmed·inquiry·request·cancelled 중 고른 것, null = 확정만, {} = 아무것도
 nationality text      -- 2026-10-22 (202610220006): ISO 3166-1 alpha-2 (KR · JP …), check ^[A-Z]{2}$
 name_ko text          -- 한국어 이름 — 국적 KR 필수 (규칙은 src/lib/identity-names.ts)
 name_ja text          -- 일본어 이름(한자) — 국적 JP 필수
@@ -161,6 +162,8 @@ management for the few part-timers who work in a management capacity. See
 `docs/engineering/05-rls-permissions.md` and `docs/product/18-todo-task-workflow.md` (2026-06-13).
 
 `ops_calendar_mode` (2026-10-05, `202610050001_profile_ops_calendar_mode.sql`) remembers the user's last 판매 캘린더 view (`rolling` = 30일 / `monthly` = 월간), shared by `/admin/ops/calendar` and `/mobile/ops/calendar`. Written server-side (service-role, own row) when a calendar URL carries `mode`; read when it doesn't. See `docs/product/33-calendar-write-features.md` 「30일 · 월간 보기 기억」.
+
+`ops_calendar_status_filter` (2026-11-26, `202611260002_profile_ops_calendar_status_filter.sql`, check: values ⊂ the four kinds) remembers the 판매 캘린더 「예약 표시」 filter, shared by PC and mobile. Same pattern as `ops_calendar_mode`: written server-side (service-role, own row) when the URL carries `show=`, read when it doesn't; not in the user's column UPDATE grant. See `docs/product/33-calendar-write-features.md` 「예약 표시 — 상태 필터」.
 
 `bottom_nav_tabs` stores the user's customized mobile bottom-bar tabs (ordered ids, max 4 enforced in app logic). Added in `supabase/migrations/202606080001_profile_bottom_nav.sql`. The selectable pool is the current `mobileSidebarNavigation`: `home`, `calendar`, `cleaning`, `tasks`, `requests`, `attendance`, `announcements`, `board`, `suggestions`, `complaints`, `linen-return`, and `directory`. Unknown/stale ids are ignored by the resolver.
 

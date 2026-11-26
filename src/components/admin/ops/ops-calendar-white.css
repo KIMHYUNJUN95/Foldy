@@ -158,6 +158,25 @@
 .adm .scw-menu__row:hover { background: #f7f7f9; }
 .adm .scw-menu__row.on { background: var(--scw-v-bg); font-weight: 600; }
 .adm .scw-menu__name { flex: 1 1 auto; }
+/* 「예약 표시」 필터(2026-11-26) — 진짜 체크박스를 `scw-menu__ck` 모양으로. */
+.adm .scw-sf__pop { min-width: 248px; }
+.adm .scw-sf__set { border: 0; margin: 0; padding: 0; min-width: 0; }
+.adm .scw-sf__legend { padding: 4px 8px 6px; font-size: 12px; font-weight: 600; color: var(--scw-mute); }
+.adm .scw-sf__row { gap: 10px; padding-left: 10px; }
+.adm .scw-sf__input {
+  appearance: none; width: 18px; height: 18px; flex: none; margin: 0; border-radius: 5px; background: #fff; cursor: pointer;
+  box-shadow: inset 0 0 0 1.5px var(--scw-ghost); transition: background-color 140ms ease, box-shadow 140ms ease, transform 140ms var(--scw-ease);
+  background-repeat: no-repeat; background-position: center; background-size: 11px;
+}
+.adm .scw-sf__input:checked {
+  background-color: var(--scw-v); box-shadow: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+}
+.adm .scw-sf__input:active { transform: scale(0.92); }
+.adm .scw-sf__input:focus-visible { outline: 2px solid var(--scw-v); outline-offset: 2px; }
+.adm .scw-sf__n { font-size: 12px; font-weight: 500; color: var(--scw-faint); font-variant-numeric: tabular-nums; }
+.adm .scw-sf__note { margin: 6px 0 0; padding: 0 10px; font-size: 12px; line-height: 1.45; color: var(--scw-mute); }
+@media (prefers-reduced-motion: reduce) { .adm .scw-sf__pop { animation: none; } }
 .adm .scw-menu__sub { font-size: 12px; font-weight: 400; color: var(--scw-faint); margin-left: 10px; }
 
 /* ── 도구 줄 2 — 글자 버튼 ─────────────────────────────────────────── */
@@ -323,6 +342,11 @@
 .adm .scw .opsg__bar.booking { background: #cfddf6; color: #1f3f7a; box-shadow: none; }
 .adm .scw .opsg__bar.manual { background: #d3eedc; color: #1f6b3d; box-shadow: none; }
 .adm .scw .opsg__bar.cancelled { background: #efeff3; color: var(--scw-faint); box-shadow: none; text-decoration: line-through; }
+/* 문의 · 예약 요청(2026-11-26) — 아직 방을 막지 않는다. 채널 색 빗금 + 「문의 · 」 꼬리표로 확정과 구분(색만으로 가르지 않는다). */
+.adm .scw .opsg__bar.is-pending.airbnb { background: repeating-linear-gradient(135deg, #fbd3d8 0 4px, #fff 4px 7px); box-shadow: inset 0 0 0 1px #f3a9b3; }
+.adm .scw .opsg__bar.is-pending.booking { background: repeating-linear-gradient(135deg, #cfddf6 0 4px, #fff 4px 7px); box-shadow: inset 0 0 0 1px #a3bdea; }
+.adm .scw .opsg__bar.is-pending.manual { background: repeating-linear-gradient(135deg, #d3eedc 0 4px, #fff 4px 7px); box-shadow: inset 0 0 0 1px #a6d9b6; }
+.adm .scw .opsg__bar.is-pending { cursor: pointer; }
 .adm .scw .opsg__bar.pw-dim { opacity: 0.35; }
 .adm .scw .opsg__bar.pw-win { background: var(--scw-v); color: #fff; font-weight: 600; box-shadow: none; }
 /* 최근 예약을 켰을 때 가격 개입에도 잡힌 막대 — 이름 앞 내림 화살표(2026-10-28). */

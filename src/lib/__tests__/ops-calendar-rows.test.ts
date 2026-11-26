@@ -11,7 +11,9 @@ import {
   reuseStableRows,
   rowGapCellKeys,
   sameOpsDays,
+  rowStays,
 } from "@/lib/ops-calendar-rows";
+import type { OpsRoomStay } from "@/lib/ops-calendar-occupancy";
 
 const dates = ["2026-10-01", "2026-10-02", "2026-10-03"];
 
@@ -44,10 +46,11 @@ const bar: OpsCalendarBar = {
   guestName: "Guest",
   id: "r1",
   isCancelled: false,
+  kind: "confirmed",
   roomKey: room.key,
 };
 
-function makeRow(overrides: { price?: number; bars?: OpsCalendarBar[]; history?: string[] } = {}) {
+function makeRow(overrides: { price?: number; bars?: OpsCalendarBar[]; history?: string[]; stays?: OpsRoomStay[] } = {}) {
   const rates = new Map<string, OpsCalendarRate>([
     ["2026-10-01", rate({ bookingPrice: 14800, minStay: 2, price: overrides.price ?? 10000 })],
     // 칸은 있는데 가격이 없다 — 「칸 없음」과 달라야 한다.
@@ -62,6 +65,7 @@ function makeRow(overrides: { price?: number; bars?: OpsCalendarBar[]; history?:
     isGap: (date) => date === "2026-10-03",
     rateAt: (date) => rates.get(date),
     room,
+    stays: overrides.stays ?? [],
   });
 }
 
@@ -111,6 +115,15 @@ describe("ops-calendar-rows signature", () => {
     expect(makeRow({ history: [] }).sig).not.toBe(base);
     expect(makeRow({ bars: [{ ...bar, guestName: "Other" }] }).sig).not.toBe(base);
     expect(makeRow({ bars: [] }).sig).not.toBe(base);
+    // 확정을 꺼서 막대가 없어도 점유(숙박)가 바뀌면 행이 바뀐 것이다(2026-11-26).
+    expect(makeRow({ stays: [bar] }).sig).not.toBe(base);
+  });
+
+  it("keeps stays on the row and flattens them across rows", () => {
+    const stay: OpsRoomStay = bar;
+    const row = makeRow({ bars: [], stays: [stay] });
+    expect(row.stays).toEqual([stay]);
+    expect(rowStays([row, makeRow({ stays: [] })])).toEqual([stay]);
   });
 
   it("changes when the window moves even if the arrays look the same", () => {
@@ -122,6 +135,7 @@ describe("ops-calendar-rows signature", () => {
       isGap: () => false,
       rateAt: () => undefined,
       room,
+      stays: [],
     });
     const b = buildGridRowData({
       bars: [],
@@ -131,6 +145,7 @@ describe("ops-calendar-rows signature", () => {
       isGap: () => false,
       rateAt: () => undefined,
       room,
+      stays: [],
     });
     expect(a.sig).not.toBe(b.sig);
   });

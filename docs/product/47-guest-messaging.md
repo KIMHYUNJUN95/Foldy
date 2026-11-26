@@ -530,6 +530,11 @@ PC `/admin/messages` 목록 위 · 모바일 `/mobile/messages` 필터 줄 위(�
 - **안전**: 번호 값은 로그 · 오류 글에 넣지 않는다(실패 로그는 오류 글만). 다른 조직 대화 id 는 `not_found`, 잘못된 id 는 `invalid`, 권한 없으면 `forbidden`(redirect 없음 — 폰 사용자를 관리자 화면으로 보내지 않게).
 - 시험: `src/lib/__tests__/guest-messages-access-codes.test.ts`(규칙 · 공백 방 라벨 · 화면 상태 — 답이 오기 전에 숨기면 늦게 온 번호를 버림 · 권한 없음 구분) · `guest-messages-access-codes-actions.test.ts`(권한 문 · 조직 범위 · 언어 · 실패 로그에 번호 없음) · `copy-text.test.ts`(대체 복사). 번호는 가짜 값만. 컴포넌트를 실제로 그리는 시험은 없다(저장소에 Testing Library · jsdom 이 없음 — 늦은 답 규칙은 순수 상태 함수로 시험).
 
+### 5-15. 판매 캘린더 예약 패널 「손님 메시지」 칸 (2026-11-26, 커밋 전)
+
+예약 패널(PC) · 예약 시트(모바일)에서 최근 2개 · 안 읽음 · 대화 열기 · 짧은 답장(첫 메시지면 대화 생성). 권한은 §8 그대로
+(`view` = 보기 + 링크, `reply` = 입력). 자세한 동작: [33](33-calendar-write-features.md) 「예약 패널 — 손님 메시지」.
+
 ## 6. 추가 기능 (D5)
 
 ### 6-1. 기다린 시간 표시

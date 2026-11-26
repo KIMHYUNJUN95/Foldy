@@ -17,6 +17,8 @@ import { canAccessOpsAdmin, canWriteOpsCalendar } from "@/lib/ops-admin";
 import { getOpsCalendarData, OPS_CALENDAR_ROLLING_DAYS } from "@/lib/ops-calendar";
 import { scheduleOpsCalendarOpenRefresh } from "@/lib/ops-calendar-open-refresh";
 import { resolveOpsCalendarMode } from "@/lib/ops-calendar-mode-preference";
+import { resolveOpsCalendarStatusFilter } from "@/lib/ops-calendar-status-filter-preference";
+import { serializeOpsStatusFilter } from "@/lib/ops-calendar-status-filter";
 import { isOpsRatesStale, opsRatesSyncedLabel } from "@/lib/ops-rates-freshness";
 import {
   buildOpsCalendarHref,
@@ -42,7 +44,10 @@ type SearchParams = {
   ym?: string;
   property?: string | string[];
   start?: string;
+  /** 예전 「취소 보기」 링크 — 「예약 표시」 필터로 읽는다(확정 + 취소). */
   cancelled?: string;
+  /** 「예약 표시」 필터(2026-11-26) — 대시보드와 같은 값. */
+  show?: string;
 };
 
 function addDays(date: string, days: number): string {
@@ -67,10 +72,12 @@ export default async function MobileOpsCalendarPage({ searchParams }: { searchPa
 
   const dictionary = getDictionary(session.user.preferredLanguage);
   const copy = dictionary.opsAdmin.calendar;
-  const showCancelled = params.cancelled === "1";
-
-  // 주소에 30일/월간이 없으면 이 사용자가 마지막으로 본 보기로 연다(있으면 그게 새 기억) — 대시보드 · 모바일 공용.
-  const mode = await resolveOpsCalendarMode(session.user.id, params.mode);
+  // 주소에 30일/월간 · 예약 표시가 없으면 이 사용자가 마지막으로 고른 값으로 연다(있으면 그게 새 기억) — 대시보드 · 모바일 공용.
+  const [mode, statusFilter] = await Promise.all([
+    resolveOpsCalendarMode(session.user.id, params.mode),
+    resolveOpsCalendarStatusFilter(session.user.id, { cancelled: params.cancelled, show: params.show }),
+  ]);
+  const showParam = serializeOpsStatusFilter(statusFilter);
   const [data, badges, historyAlerts, credit] = await Promise.all([
     getOpsCalendarData(session, {
       mode,
@@ -78,8 +85,8 @@ export default async function MobileOpsCalendarPage({ searchParams }: { searchPa
       // 모바일은 **한 건물씩만** 본다(2026-10-05 사용자 결정 — 다중 선택은 데스크톱 전용). 옛 링크 · 관리자 화면에서
       // 여러 건물이 붙어 와도 첫 건물만.
       properties: parsePropertyParam(params.property).slice(0, 1),
-      showCancelled,
       start: params.start,
+      statusFilter,
     }),
     navBadgesPromise,
     // 「이력」 칩의 빨간 숫자(최근 7일 전송 실패 + 멈춘 작업) — 데스크톱과 같은 셈.
@@ -95,9 +102,9 @@ export default async function MobileOpsCalendarPage({ searchParams }: { searchPa
   const hrefWith = (next: Partial<SearchParams>) =>
     buildOpsCalendarHref(
       {
-        cancelled: showCancelled ? "1" : undefined,
         mode: data.mode,
         property: data.selectedProperties,
+        show: showParam,
         start: data.mode === "rolling" ? data.start : undefined,
         ym: data.mode === "monthly" ? data.month : undefined,
         ...next,
@@ -129,16 +136,15 @@ export default async function MobileOpsCalendarPage({ searchParams }: { searchPa
         historyAlerts={historyAlerts}
         jump={{
           base: {
-            cancelled: showCancelled ? "1" : undefined,
             mode: data.mode,
             property: data.selectedProperties,
+            show: showParam,
           },
           month: data.month,
           start: data.start,
         }}
         nav={{
           allHref: hrefWith({ property: undefined }),
-          cancelledHref: hrefWith({ cancelled: showCancelled ? undefined : "1" }),
           isRolling,
           monthlyHref: hrefWith({ mode: "monthly", start: undefined }),
           nextHref: isRolling
@@ -153,7 +159,9 @@ export default async function MobileOpsCalendarPage({ searchParams }: { searchPa
               : ""
             : data.month,
           rollingHref: hrefWith({ mode: "rolling", start: undefined, ym: undefined }),
-          showCancelled,
+          statusCounts: data.statusCounts,
+          statusFilter,
+          statusFilterBaseHref: hrefWith({ show: undefined }),
           todayHref: isRolling ? hrefWith({ start: addDays(data.today, -1) }) : hrefWith({ ym: data.today.slice(0, 7) }),
         }}
         properties={data.propertyOptions.map((name) => ({

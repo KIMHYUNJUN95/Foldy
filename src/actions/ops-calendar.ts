@@ -13,6 +13,7 @@ import {
   postBeds24BookingUpdate,
 } from "@/lib/beds24/calendar-client";
 import { resolveReservationStatusFromBeds24Record } from "@/lib/beds24/reservation-status";
+import { opsReservationKind } from "@/lib/ops-reservation-kind";
 import { processBeds24WebhookBooking } from "@/lib/beds24/process-webhook-booking";
 import {
   acquireBeds24Lock,
@@ -1152,6 +1153,8 @@ export type ReservationEditResult =
         | "forbidden"
         | "not_found"
         | "cancelled"
+        /** Beds24 문의 · 요청 — 확정 전이라 바꿀 수 없다(2026-11-26). */
+        | "pending"
         | "no_booking_id"
         | "occupied"
         | "no_active_unit"
@@ -1222,6 +1225,7 @@ async function submitReservationEditInScope(args: {
     raw_payload: unknown;
   };
   if (row.status === "cancelled" || row.status === "no_show") return { error: "cancelled", ok: false };
+  if (isPendingReservationRow(row)) return { error: "pending", ok: false };
 
   const bookingId = readBeds24CancelTargetId(row.raw_payload);
   if (!bookingId) return { error: "no_booking_id", ok: false };
@@ -1439,6 +1443,7 @@ export type ReservationMoveResult =
         | "forbidden"
         | "not_found"
         | "cancelled"
+        | "pending"
         | "no_booking_id"
         | "unknown_room"
         /** 다른 건물로는 옮기지 않는다 — Beds24 예약은 건물(프로퍼티)에 묶여 있다. */
@@ -1641,6 +1646,7 @@ async function submitReservationMoveInScope(args: {
     raw_payload: unknown;
   };
   if (row.status === "cancelled" || row.status === "no_show") return { error: "cancelled", ok: false };
+  if (isPendingReservationRow(row)) return { error: "pending", ok: false };
   const bookingId = readBeds24CancelTargetId(row.raw_payload);
   if (!bookingId) return { error: "no_booking_id", ok: false };
   const raw =
@@ -1845,6 +1851,7 @@ export type CancelReservationResult =
         | "forbidden"
         | "not_found"
         | "already_cancelled"
+        | "pending"
         | "no_booking_id"
         | "beds24_failed"
         | "cooldown"
@@ -1879,6 +1886,7 @@ async function submitReservationCancelInScope(args: {
 
   const row = found.data as { id: string; status: string; raw_payload: unknown };
   if (row.status === "cancelled") return { error: "already_cancelled", ok: false };
+  if (isPendingReservationRow(row)) return { error: "pending", ok: false };
 
   const bookingId = readBeds24CancelTargetId(row.raw_payload);
   if (!bookingId) return { error: "no_booking_id", ok: false };
@@ -2370,4 +2378,15 @@ export async function loadOpsSalesSummary(args: {
     console.error("[ops-calendar] sales summary read failed", error);
     return { error: "failed", ok: false };
   }
+}
+
+/**
+ * Beds24 문의(5) · 요청(3) — 우리 표는 「확정」이어도 원본 상태가 대기다. 수정 · 옮기기 · 취소를 서버에서 거절한다(2026-11-26).
+ * 화면은 버튼을 숨기지만 그것만 믿지 않는다. 판정은 격자 막대와 같은 `opsReservationKind` 하나.
+ */
+function isPendingReservationRow(row: { status: string; raw_payload: unknown }): boolean {
+  const payload = row.raw_payload;
+  const rawStatus = payload && typeof payload === "object" && !Array.isArray(payload) ? (payload as Record<string, unknown>).status : undefined;
+  const kind = opsReservationKind(row.status, rawStatus);
+  return kind === "inquiry" || kind === "request";
 }

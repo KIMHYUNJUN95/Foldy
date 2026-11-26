@@ -43,19 +43,29 @@ vi.mock("@/lib/beds24/calendar-client", async (importOriginal) => {
     postBeds24Booking: vi.fn(),
     postBeds24Calendar: vi.fn(),
     postBeds24BookingUpdate: vi.fn(),
+    postBeds24BookingCancel: vi.fn(),
   };
 });
 
 let fake = createFakeSupabase({});
 vi.mock("@/lib/supabase/service", () => ({ getSupabaseServiceClient: () => fake.client }));
 
-const { revertBlockChange, submitManualBooking, submitReservationEdit, submitRoomBlock, submitRoomUnblock } = await import("@/actions/ops-calendar");
+const {
+  revertBlockChange,
+  submitManualBooking,
+  submitReservationCancel,
+  submitReservationEdit,
+  submitReservationMove,
+  submitRoomBlock,
+  submitRoomUnblock,
+} = await import("@/actions/ops-calendar");
 const calendarClient = await import("@/lib/beds24/calendar-client");
 const postCalendar = vi.mocked(calendarClient.postBeds24Calendar);
 const fetchBooking = vi.mocked(calendarClient.fetchBeds24BookingById);
 const fetchCalendar = vi.mocked(calendarClient.fetchBeds24Calendar);
 const postBooking = vi.mocked(calendarClient.postBeds24Booking);
 const postBookingUpdate = vi.mocked(calendarClient.postBeds24BookingUpdate);
+const postBookingCancel = vi.mocked(calendarClient.postBeds24BookingCancel);
 
 const PROPERTY = { external_property_id: "176431", name: "Test House" };
 const ROOM_KEY = opsUnitRoomKey({ propertyName: PROPERTY.name, roomLabel: "101" })!;
@@ -112,6 +122,7 @@ beforeEach(() => {
   postBooking.mockReset();
   postBookingUpdate.mockReset();
   postCalendar.mockReset();
+  postBookingCancel.mockReset();
 });
 
 describe("submitManualBooking — 같은 방 동시 생성", () => {
@@ -287,6 +298,38 @@ describe("submitReservationEdit — 방 잠금 · Beds24 재확인", () => {
     expect(result).toEqual({ ok: true, stale: true });
     expect(fake.rpcCalls.filter((call) => call.name === "beds24_try_lock")).toHaveLength(0);
     expect(fetchCalendar).not.toHaveBeenCalled();
+  });
+});
+
+describe("문의 · 요청은 서버에서 쓰기를 거절한다(2026-11-26)", () => {
+  // 우리 표는 「확정」이지만 원본(raw_payload.status)이 Beds24 문의(5) · 요청(3)인 줄 — 화면은 버튼을 숨기지만
+  // 서버가 따로 막아야 한다. 막지 않으면 문의를 「수정」해 Beds24 에 확정 예약처럼 써 버린다.
+  const seedPending = (rawStatus: string | number) => {
+    fake.tables.reservations = [
+      {
+        check_in_date: "2030-01-10",
+        check_out_date: "2030-01-11",
+        guest_name: "Inquiry Guest",
+        id: "res-p",
+        organization_id: "org-1",
+        raw_payload: { bookId: 901, numAdult: 1, numChild: 0, price: 10000, roomId: 5001, status: rawStatus },
+        source: "beds24",
+        status: "confirmed",
+      },
+    ];
+  };
+
+  it.each([["inquiry"], [5], ["request"], [3]])("원본 상태 %s — 수정 · 옮기기 · 취소 모두 `pending`, Beds24 를 부르지 않는다", async (rawStatus) => {
+    seedPending(rawStatus);
+    const edit = await submitReservationEdit({ changes: { numAdult: 2 }, reservationId: "res-p", roomIds: ["u1"], roomKey: ROOM_KEY });
+    const move = await submitReservationMove({ reservationId: "res-p", targetRoomIds: ["u1"], targetRoomKey: ROOM_KEY });
+    const cancel = await submitReservationCancel({ reservationId: "res-p" });
+    expect(edit).toEqual({ error: "pending", ok: false });
+    expect(move).toEqual({ error: "pending", ok: false });
+    expect(cancel).toEqual({ error: "pending", ok: false });
+    expect(postBookingUpdate).not.toHaveBeenCalled();
+    expect(postBooking).not.toHaveBeenCalled();
+    expect(postBookingCancel).not.toHaveBeenCalled();
   });
 });
 

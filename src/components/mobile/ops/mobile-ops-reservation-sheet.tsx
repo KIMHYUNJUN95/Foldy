@@ -40,8 +40,10 @@ import {
 import type { OpsCalendarBar } from "@/lib/ops-calendar";
 import { stayNights } from "@/lib/ops-manual-booking";
 import { MobileMoveCalendar, addDaysKey } from "@/components/mobile/ops/mobile-move-calendar";
-import type { OpsReservationDetail } from "@/lib/ops-reservation-detail";
+import { hasGuestContactDetails, type OpsReservationDetail } from "@/lib/ops-reservation-detail";
 import { haptic } from "@/lib/haptics";
+import { isPendingBarKind } from "@/components/admin/ops/ops-bar-kind";
+import { OpsReservationMessages } from "@/components/admin/ops/ops-reservation-messages";
 import { useBuildingName } from "@/components/shared/building-names";
 
 /**
@@ -339,6 +341,9 @@ export function MobileOpsReservationSheet({
               <h3>{bar.guestName}</h3>
               <p>
                 {bar.isCancelled && <span className="cxl">{copy.rcCancelled} · </span>}
+                {isPendingBarKind(bar.kind) && (
+                  <span className="cxl">{bar.kind === "inquiry" ? copy.statusInquiry : copy.statusRequest} · </span>
+                )}
                 {sub}
               </p>
             </div>
@@ -366,6 +371,16 @@ export function MobileOpsReservationSheet({
               <span className="msw-lead">{copy.rpLeadTime.replace("{n}", String(leadDays))}</span>
             )}
           </div>
+
+          {/* 문의 · 요청 — 방을 막지 않고, 여기서 고치지 않는다(확정된 뒤에). */}
+          {isPendingBarKind(bar.kind) && (
+            <div className="msw-alert warn">
+              {bar.kind === "inquiry" ? copy.pendingInquiryNotice : copy.pendingRequestNotice}
+            </div>
+          )}
+
+          {/* 손님 메시지 — 따로 읽는다. 권한이 없으면 칸이 없다. */}
+          <OpsReservationMessages copy={copy} localeTag={localeTag} reservationId={bar.id} variant="mobile" />
 
           {!detail && !loadFailed && (
             // 최종 배치와 같은 자리표시 — 다 와도 튀지 않는다.
@@ -395,25 +410,28 @@ export function MobileOpsReservationSheet({
                 </div>
               )}
 
-              <div className="msw-sect">
-                <span className="h">{copy.rpSectionGuest}</span>
-                {/* 이메일 · 전화는 누르면 바로 메일 쓰기 · 전화 걸기(예전 「빠른 연락」 버튼 대신). 전화는 하이픈으로 끊어 보인다. */}
-                {row("email", copy.rpEmail, detail.email ? <a href={`mailto:${detail.email}`}>{detail.email}</a> : null, detail.email)}
-                {row("phone", copy.rpPhone, tel(detail.phone), detail.phone)}
-                {row("mobile", copy.rpMobile, tel(detail.mobile), detail.mobile)}
-                {row(
-                  "country",
-                  copy.rpCountry,
-                  countryText ? (
-                    <>
-                      {countryText}
-                      {detail.countrySource === "phone" && <small> · {copy.rpCountryFromPhone}</small>}
-                    </>
-                  ) : null,
-                )}
-                {row("lang", copy.rpLanguage, languageText)}
-                {row("addr", copy.rpAddress, detail.address)}
-              </div>
+              {/* 문의처럼 연락처 · 나라 · 언어가 다 비면 칸째 숨긴다(PC 패널과 같은 판정). */}
+              {hasGuestContactDetails(detail) && (
+                <div className="msw-sect">
+                  <span className="h">{copy.rpSectionGuest}</span>
+                  {/* 이메일 · 전화는 누르면 바로 메일 쓰기 · 전화 걸기(예전 「빠른 연락」 버튼 대신). 전화는 하이픈으로 끊어 보인다. */}
+                  {row("email", copy.rpEmail, detail.email ? <a href={`mailto:${detail.email}`}>{detail.email}</a> : null, detail.email)}
+                  {row("phone", copy.rpPhone, tel(detail.phone), detail.phone)}
+                  {row("mobile", copy.rpMobile, tel(detail.mobile), detail.mobile)}
+                  {row(
+                    "country",
+                    copy.rpCountry,
+                    countryText ? (
+                      <>
+                        {countryText}
+                        {detail.countrySource === "phone" && <small> · {copy.rpCountryFromPhone}</small>}
+                      </>
+                    ) : null,
+                  )}
+                  {row("lang", copy.rpLanguage, languageText)}
+                  {row("addr", copy.rpAddress, detail.address)}
+                </div>
+              )}
 
               {(detail.guestComments || detail.internalNotes || detail.channelMessage) && (
                 <div className="msw-sect">
@@ -456,7 +474,7 @@ export function MobileOpsReservationSheet({
         </div>
       </div>
 
-      {!bar.isCancelled && canWrite && (
+      {!bar.isCancelled && !isPendingBarKind(bar.kind) && canWrite && (
         <div className={`msw-foot even${threeActs ? " three" : ""}`}>
           {/* 버튼 셋이면 폰 폭(< 600)에서만 짧은 이름 — 영어 · 일본어 전체 이름은 두 줄로 접혔다(2026-10-23). 넓은 화면은 전체 이름. */}
           <button className="msw-btn soft" disabled={!detail} onClick={() => setMode("edit")} type="button">

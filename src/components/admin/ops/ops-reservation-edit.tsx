@@ -45,6 +45,7 @@ export type ReservationEditCopy = {
   reChannelPriceNote: string;
   reErrNoChanges: string;
   reErrCancelled: string;
+  rcErrPending: string;
   reErrNotApplied: string;
   mbGuest: string;
   mbEmail: string;
@@ -116,6 +117,8 @@ export function reservationEditErrorText(
       return copy.mbErrRoomBusy;
     case "cancelled":
       return copy.reErrCancelled;
+    case "pending":
+      return copy.rcErrPending;
     case "not_applied":
       return copy.reErrNotApplied;
     case "forbidden":

@@ -30,6 +30,7 @@
  */
 
 import type { OpsCalendarBar, OpsCalendarBlock, OpsCalendarChannel } from "@/lib/ops-calendar";
+import { barOccupiesRoom } from "@/lib/ops-reservation-kind";
 
 /** 갭 한쪽에 무엇이 있는가. `none` 은 「과거라서 못 판다」 또는 「경계 밖」이다. */
 export type GapNeighbor = { kind: OpsCalendarChannel | "block" | "none" };
@@ -73,7 +74,8 @@ export function buildGapContext(args: {
 }): GapContextEntry[] {
   const barsByRoom = new Map<string, OpsCalendarBar[]>();
   for (const bar of args.bars) {
-    if (bar.isCancelled) continue;
+    // 문의 · 요청은 갭의 앞뒤 손님이 아니다(2026-11-26).
+    if (!barOccupiesRoom(bar)) continue;
     const list = barsByRoom.get(bar.roomKey);
     if (list) list.push(bar);
     else barsByRoom.set(bar.roomKey, [bar]);

@@ -66,6 +66,7 @@ export type ReservationMoveCopy = {
   reChannelDates: string;
   reErrNotApplied: string;
   reErrCancelled: string;
+  rcErrPending: string;
   rcErrForbidden: string;
   rcErrNotFound: string;
   rcErrNoBookingId: string;
@@ -128,6 +129,8 @@ export function reservationMoveErrorText(
       return copy.reErrNotApplied;
     case "cancelled":
       return copy.reErrCancelled;
+    case "pending":
+      return copy.rcErrPending;
     case "forbidden":
       return copy.rcErrForbidden;
     case "not_found":

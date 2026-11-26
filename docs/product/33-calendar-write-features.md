@@ -1042,6 +1042,8 @@ Beds24 는 아무것도 안 들어가도 `success: true` 를 준다. 사노 `481
 
 ## 취소된 예약 보기 (2026-09-28 구현 · 저쪽 규칙 그대로)
 
+> **2026-11-26 바뀜:** 「취소 보기」 단추는 아래 「예약 표시 — 상태 필터」에 합쳤다(취소 = 항목 하나). 옛 `cancelled=1` 링크는 「취소」를 더한 값(= 기본 확정 + 취소)으로 읽는다 — 예전 「취소만 보기」와 달리 확정도 같이 보이는 것은 **의도한 변경**이다. 아래는 예전 기록.
+
 > **사용자 지시:** 「취소 기준이라던가 그런 거 전부 저쪽 프로젝트에서 그대로 가져오도록
 > 해」 → `BuildingCalendar.jsx` 를 줄 단위로 읽어 아래에 옮겼다.
 
@@ -1112,6 +1114,63 @@ if (isCancelled === showCancelled) { ... }
 저쪽은 취소 막대에 `[Cancelled] ` 접두어를 붙이고 회색(`#8E8E93`)으로 칠한다. 우리는
 **회색 + 취소선**으로 표시하고 접두어는 붙이지 않는다 — 「취소만 보기」에서는 **모든 막대가
 취소**라 접두어가 전부 붙어 폭만 먹고 손님 이름이 잘린다. 신호는 같고 자리는 덜 먹는다.
+
+## 예약 표시 — 상태 필터 (2026-11-26 구현 · 커밋 전)
+
+> **사용자 보고:** Airbnb **문의**가 확정 예약처럼 막대로 그려지고 방을 막았다. 시안: 캔버스 MM33d93w… v11.
+
+- **항목:** 확정 · 문의 · 예약 요청 · 취소(Beds24 상태 — 문의 = 5 · 요청 = 3 · `opsReservationKind()` `src/lib/ops-reservation-kind.ts`).
+  차단은 넣지 않는다(예약이 아니다). **기본 = 확정만.** 항목마다 지금 창 · 고른 건물의 건수(꺼서 지금 행이 없는 방의 문의도 센다), 「기본으로」, 고른 것이 기본보다
+  많으면 단추에 `+N`. PC `OpsStatusFilter`(`src/components/admin/ops/ops-status-filter.tsx`, 팝오버) · 모바일
+  `MobileOpsStatusFilterSheet`(`BottomSheet`, 48px 줄). 예전 「취소 보기」 단추를 대신한다.
+  PC 팝오버는 판매 캘린더 도구 줄의 기존 체크 메뉴(`scw-menu` — 객실 고르기 메뉴와 같은 모양)를 쓴다. `src/components/admin/shared`
+  에는 여러 개를 고르는 체크 필터가 없고(`AdmDropdown` 은 하나 고르기), 이 도구 줄 메뉴들과 모양을 맞추는 것이 먼저라 공용으로 올리지 않았다.
+- **기억:** URL `show=confirmed,inquiry`(아무것도 = `show=none`) → 없으면 사람마다 `profiles.ops_calendar_status_filter`
+  (마이그레이션 `202611260002`, 서버가 본인 행만 service-role 로 읽고 쓴다 — `ops_calendar_mode` 와 같은 방식) → 없으면 확정만.
+  칸이 없는 DB 여도 기본으로 열린다(`src/lib/ops-calendar-status-filter-preference.ts`). 판정은 순수 함수 `src/lib/ops-calendar-status-filter.ts`.
+- **문의 · 요청 막대:** 빗금 + 앞에 「문의 · 」/「요청 · 」(`opsBarPrefix`), 겹치면 확정이 위 줄(`opsBarLaneRank`, `src/components/admin/ops/ops-bar-kind.ts`).
+- **문의 · 요청은 빈 방이다.** 보이게 켜도 갭 · 빈 칸 · 오늘 빈방 · 옮길 자리 · 막힌 밤 · 가동률 · 판매 요약의 객실 줄은 확정만 센다
+  (`barOccupiesRoom`, `rowOccupiesRoom` — `ops-calendar.ts` · `ops-gap-context.ts` · `ops-vacant-today.ts` · `ops-bar-lanes.ts`).
+- **점유는 필터와 무관하다(독립 검사 2026-11-26).** 필터는 무엇을 그릴지만 정한다. 서버가 행마다 `stays`(방을 차지하는 확정 숙박)를
+  따로 싣고(`splitOpsBars` · `opsStayCellKeys` · `opsStayClash`, `src/lib/ops-calendar-occupancy.ts`), 서버 · PC · 모바일이 모두 이것으로
+  팔린 밤 · 1박 갭(일괄 최소박 포함) · 오늘 빈방 · 옮기기 충돌 · 가격/최소박 고르기를 판정한다. 예전에는 보이는 막대로 세서 「취소」만
+  켜면 팔린 밤이 갭 · 빈 방이 됐다.
+- **서버도 문의 · 요청 쓰기를 거절한다.** 예약 수정 · 옮기기 · 취소(`submitReservationEdit` · `submitReservationMove` ·
+  `submitReservationCancel`)는 `raw_payload.status` 가 문의 · 요청이면 `pending` 오류(`rcErrPending` — 「Beds24 에서 먼저 확정하거나 거절」).
+- **문의 · 요청 위에 수기 예약:** 우리 격자는 문의 · 요청 밤을 빈 칸으로 보고 고르게 둔다. 만들기 직전 서버가 Beds24 달력을 한 번 더
+  읽으므로(`numAvail`), Beds24 가 그 요청에 방을 잡아 두었다면 `occupied` 로 막힌다. 그때 「이미 예약이 있습니다」 문구에 「화면에 없으면
+  「예약 표시」에서 문의 · 예약 요청을 켜 보세요」를 붙였다(`mbErrOccupied`). 요청(3)이 Beds24 재고를 잡는지는 운영 기록으로 확인하지
+  못했다 — 2026-11-26 운영 표에 요청(3) 예약이 0건(문의 11건뿐).
+- **문의 · 요청 예약 패널:** 수정 · 옮기기 · 취소 단추가 없다(닫기만) — 확정 전이라 Beds24 에서 뜻이 없다. 숙박 칸 아래에
+  `pendingInquiryNotice` / `pendingRequestNotice` 안내, 머리에 상태 표시. 손님 메시지 칸은 그대로 있다(아래).
+- **「손님」 칸은 값이 하나라도 있을 때만 (2026-11-26):** Airbnb 문의 원본은 이메일 · 전화 · 휴대폰 · 주소가 빈 문자열로 오고(운영 문의 11건 확인),
+  나라도 비는 일이 있다. 읽는 위치(`raw_payload.email` · `phone` · `mobile` · `country2`/`country` · `lang` · `address`)는 맞다 — 원본에 값이 없는 것.
+  여섯 값이 모두 비면 PC 패널 · 모바일 시트 모두 칸째 숨긴다(`hasGuestContactDetails` · `src/lib/ops-reservation-detail.ts`, 테스트 `ops-reservation-detail.test.ts`).
+  손님 이름은 패널 머리에 그대로 보인다.
+- 테스트: `src/lib/__tests__/ops-calendar-status-filter.test.ts` · `ops-calendar-status-filter-preference.test.ts` · `ops-calendar-rows.test.ts` ·
+  `ops-gap-context.test.ts` · `ops-calendar-occupancy.test.ts`(확정을 끈 상태) · `ops-manual-booking-concurrency.test.ts`(문의 · 요청 쓰기 거절).
+
+## 예약 패널 — 손님 메시지 (2026-11-26 구현 · 커밋 전)
+
+PC 예약 패널(`ops-reservation-panel.tsx`) · 모바일 예약 시트(`mobile-ops-reservation-sheet.tsx`)의 숙박 칸 아래 「손님 메시지」 칸
+(`OpsReservationMessages`, `src/components/admin/ops/ops-reservation-messages.tsx`). 대화 기능 본체는 [47](47-guest-messaging.md).
+
+- **따로 읽는다:** 패널이 열린 뒤 `loadReservationMessages`(`src/actions/reservation-messages.ts`) — 숙박 · 금액은 기다리지 않는다.
+  예약 id → 대화(`reservation_id`, 없으면 Beds24 예약 번호). 최근 손님 · 우리 메시지 2개(내부 메모 제외, 번역문이 있으면 번역문),
+  「안 읽음 N」(마지막 답장 뒤 손님 메시지), 「대화 열기」 — PC `/admin/messages?c=<id>`, 모바일 `/mobile/messages/<id>`.
+- **권한:** `guest_messages.view` 없으면 칸이 없다. 보기만 = 메시지 + 링크, `guest_messages.reply` = 입력 칸까지. 서버가 다시 확인하고
+  `forbidden` 결과를 돌려준다(redirect 없음 — 모바일 · PC 공용 액션). 조직이 다른 예약은 `not_found`.
+- **대화가 없으면** 「첫 메시지 쓰기」 — 보내면 예약 · 채널에 묶인 대화가 생긴다. 직접 예약 · 채널을 모르는 예약은 보낼 수 없다는 안내만(빈 대화를 만들지 않는다).
+  Beds24 번호가 없는 직접 · 수기 예약은 「직접 예약」 안내, 「채널 모름」은 채널도 모를 때만. 멱등 키 · 글 길이(`MAX_REPLY_CHARS`)
+  검사는 **대화를 만들기 전에** 한다(메시지함과 같은 `isValidIdempotencyKey` 판정).
+- **안 읽음 N** 은 따로 센다(`count: exact, head` — 마지막 답장 뒤 손님 메시지). 최근 줄만 세면 20에서 멈췄다.
+- 폰 폭에서 단추가 두 줄로 꺾이지 않게 모바일 단추는 짧은 글자(`rmFirstShort` · `rmQueueShort`, 긴 문구는 `aria-label`) + `nowrap`.
+- **발송이 꺼져 있으면**(`GUEST_MESSAGES_SEND_ENABLED`) 안내 + 단추 「보내기 대기」 — 큐에 넣고 켜질 때 나간다.
+- **보내기:** 같은 글 다시 보내기는 같은 멱등 키(두 번 안 나감), 글을 고치면 새 키. 보내는 중 role=status, 실패 role=alert
+  「보내지 못했어요 · 다시 보내기」(쓴 글 유지). 이미 큐에서 실패한 우리 메시지는 「안 나감 · 다시 보내기」(`retryGuestOutbox`).
+  햅틱: 서버가 받은 뒤 success, 실패 error.
+- 메시지 화면의 작성기 · 번역 · AI 도우미는 여기 다시 쓰지 않는다 — 긴 답장은 「대화 열기」.
+- 테스트: `src/lib/__tests__/reservation-messages-actions.test.ts`(21).
 
 ## 수동 예약 생성 (2026-09-28 구현)
 

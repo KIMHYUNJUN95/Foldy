@@ -680,6 +680,8 @@
   color: var(--ops-dir);
   box-shadow: inset 0 0 0 1px var(--ops-dir-line);
 }
+/* 문의 · 예약 요청(2026-11-26) — 방을 막지 않는다는 뜻의 빗금. 화이트 판은 ops-calendar-white.css. */
+.opsg__bar.is-pending { background-image: repeating-linear-gradient(135deg, transparent 0 4px, rgba(255, 255, 255, 0.85) 4px 7px); }
 /* 취소는 진하게 하지 않는다 — 살아있는 예약과 섞이면 안 된다. */
 .opsg__bar.cancelled {
   background: hsl(40 14% 93%);

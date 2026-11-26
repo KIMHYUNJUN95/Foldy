@@ -50,9 +50,7 @@
 .authw__role {
   font-size: 14px;
   color: var(--aw-muted);
-  padding-left: 12px;
-  margin-left: 2px;
-  border-left: 1px solid var(--aw-line);
+  margin-left: 4px;
   line-height: 20px;
 }
 .authw__backicon {
@@ -147,10 +145,11 @@
 .aw-hero { display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
 .aw-hero__mark { display: flex; }
 .aw-title { margin: 0; font-size: 26px; line-height: 1.3; font-weight: 700; letter-spacing: -0.03em; white-space: pre-line; }
-.aw-lede { margin: 0; font-size: 15px; line-height: 1.6; color: var(--aw-muted); }
+.aw-lede { margin: 0; font-size: 15px; line-height: 1.6; color: var(--aw-muted); text-wrap: pretty; word-break: keep-all; }
+.aw-stack { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.aw-stack > form > .aw-btn, .aw-stack > .aw-btn { width: 100%; }
 .aw-head { display: flex; flex-direction: column; gap: 8px; }
 
-.aw-stack { display: flex; flex-direction: column; gap: 10px; }
 .aw-gap-l { margin-top: 28px; }
 .aw-gap-m { margin-top: 20px; }
 
@@ -174,7 +173,7 @@
   transition: background var(--dur-fast) var(--ease-out), transform var(--dur-press) var(--ease-out);
 }
 .aw-btn:hover { background: #6b40e0; }
-.aw-btn:active { transform: scale(0.99); }
+.aw-btn:active { transform: scale(0.97); }
 .aw-btn:disabled, .aw-btn.dim { background: #e6e1f5; color: #8b80ac !important; cursor: default; }
 .aw-btn--line {
   background: #ffffff;
@@ -416,7 +415,7 @@
 @keyframes aw-in { from { opacity: 0; transform: translateY(6px); } }
 
 /* 제목 줄바꿈 — 한 단어만 떨어지지 않게 */
-.aw-title, .aw-lede { text-wrap: balance; }
+.aw-title { text-wrap: balance; }
 
 /* 움직임 줄이기 — 이동은 빼고 옅어지는 것만 */
 @media (prefers-reduced-motion: reduce) {

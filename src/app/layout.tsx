@@ -6,7 +6,6 @@ import {
   Noto_Sans_KR,
 } from "next/font/google";
 import localFont from "next/font/local";
-import { cookies, headers } from "next/headers";
 import Script from "next/script";
 import { SessionProvider } from "@/components/providers/session-provider";
 import { KeyboardInsetSync } from "@/components/pwa/keyboard-inset-sync";
@@ -18,7 +17,8 @@ import { HistoryTrackerBoot } from "@/components/shell/history-tracker-boot";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
 import { SplashScreen } from "@/components/pwa/splash-screen";
 import { TouchTabletDetect } from "@/components/pwa/touch-tablet-detect";
-import { getDictionary, resolvePreSessionLocale } from "@/lib/i18n";
+import { getDictionary } from "@/lib/i18n";
+import { resolveRequestLocale } from "@/lib/request-locale";
 import { buildOutdatedEngineScript } from "@/lib/outdated-engine-guard";
 import { getCurrentAppSession } from "@/lib/session";
 import { SPLIT_PANE_BOOT_SCRIPT } from "@/lib/split-pane";
@@ -120,8 +120,6 @@ export const viewport: Viewport = {
   ],
 };
 
-const LOCALE_COOKIE = "stayops_locale";
-
 /**
  * `<html lang>` — 세션 → `stayops_locale` 쿠키 → Accept-Language(지원하지 않는 언어는 "en", 헤더 없음은 "ko").
  *
@@ -133,11 +131,7 @@ const LOCALE_COOKIE = "stayops_locale";
  * 온보딩 화면은 자기 루트 엘리먼트에 lang 을 한 번 더 달아 그 구간을 메운다.
  */
 async function resolveDocumentLocale(session: Awaited<ReturnType<typeof getCurrentAppSession>>) {
-  if (session?.user.preferredLanguage) return session.user.preferredLanguage;
-  return resolvePreSessionLocale({
-    cookie: (await cookies()).get(LOCALE_COOKIE)?.value,
-    acceptLanguage: (await headers()).get("accept-language"),
-  });
+  return resolveRequestLocale(session);
 }
 
 export default async function RootLayout({

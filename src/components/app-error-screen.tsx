@@ -97,13 +97,13 @@ export function AppErrorScreen({
           alt=""
           height={64}
           src="/icons/icon-192.png"
-          style={{ display: "block", width: 64, height: 64, margin: "0 auto 20px", borderRadius: 15 }}
+          style={{ display: "block", width: 64, height: 64, margin: "0 auto 20px", borderRadius: 16 }}
           width={64}
         />
-        <h1 style={{ margin: "0 0 10px", fontSize: 20, lineHeight: 1.35, fontWeight: 700 }}>
+        <h1 style={{ margin: "0 0 10px", fontSize: 20, lineHeight: 1.35, fontWeight: 600, textWrap: "balance", wordBreak: "keep-all" }}>
           {online ? copy.errorTitle : copy.offlineTitle}
         </h1>
-        <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "#5b6472" }}>
+        <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "#5b6472", textWrap: "pretty", wordBreak: "keep-all" }}>
           {online ? copy.errorBody : copy.offlineBody}
         </p>
         <button
@@ -118,8 +118,13 @@ export function AppErrorScreen({
             color: "#fff",
             font: "inherit",
             fontSize: 15,
-            fontWeight: 700,
+            fontWeight: 600,
+            transition: "transform 160ms ease-out",
           }}
+          onPointerDown={(e) => { e.currentTarget.style.transform = "scale(0.97)"; }}
+          onPointerLeave={(e) => { e.currentTarget.style.transform = ""; }}
+          onPointerUp={(e) => { e.currentTarget.style.transform = ""; }}
+          onPointerCancel={(e) => { e.currentTarget.style.transform = ""; }}
           type="button"
         >
           {copy.errorRetry}
@@ -136,7 +141,12 @@ export function AppErrorScreen({
             font: "inherit",
             fontSize: 14,
             fontWeight: 600,
+            transition: "transform 160ms ease-out",
           }}
+          onPointerDown={(e) => { e.currentTarget.style.transform = "scale(0.97)"; }}
+          onPointerLeave={(e) => { e.currentTarget.style.transform = ""; }}
+          onPointerUp={(e) => { e.currentTarget.style.transform = ""; }}
+          onPointerCancel={(e) => { e.currentTarget.style.transform = ""; }}
           type="button"
         >
           {copy.errorHome}

@@ -1,8 +1,7 @@
-import Image from "next/image";
 import Link from "next/link";
-import { cookies, headers } from "next/headers";
+import { FALLBACK_PRIMARY, FallbackScreen } from "@/components/fallback-screen";
 import { FALLBACK_COPY } from "@/lib/fallback-copy";
-import { resolvePreSessionLocale } from "@/lib/i18n";
+import { resolveRequestLocale } from "@/lib/request-locale";
 import { getCurrentAppSession } from "@/lib/session";
 
 /**
@@ -18,37 +17,14 @@ import { getCurrentAppSession } from "@/lib/session";
  */
 export default async function MobileNotFound() {
   const session = await getCurrentAppSession().catch(() => null);
-  const locale =
-    session?.user.preferredLanguage ??
-    resolvePreSessionLocale({
-      cookie: (await cookies()).get("stayops_locale")?.value,
-      acceptLanguage: (await headers()).get("accept-language"),
-    });
+  const locale = await resolveRequestLocale(session);
   const copy = FALLBACK_COPY[locale];
 
   return (
-    <main className="flex min-h-svh flex-col items-center justify-center bg-background px-8 pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] text-center text-foreground">
-      <Image
-        alt="Foldy"
-        className="rounded-[22px] shadow-[0_22px_50px_-26px_rgb(122_82_230/0.55)]"
-        height={84}
-        priority
-        src="/icons/icon-192.png"
-        width={84}
-      />
-
-      <h1 className="mt-7 text-[22px] font-black tracking-[-0.02em]">{copy.notFoundTitle}</h1>
-
-      <p className="mt-3 text-[13px] font-medium leading-relaxed text-muted-foreground">
-        {copy.notFoundBody}
-      </p>
-
-      <Link
-        className="mt-8 inline-flex h-12 items-center rounded-full bg-primary px-8 text-[14px] font-extrabold text-primary-foreground shadow-[0_14px_28px_-12px_rgb(122_82_230/0.55)] transition-transform active:scale-[0.97]"
-        href="/mobile"
-      >
+    <FallbackScreen body={copy.notFoundBody} locale={locale} title={copy.notFoundTitle}>
+      <Link className={FALLBACK_PRIMARY} href="/mobile">
         {copy.goHome}
       </Link>
-    </main>
+    </FallbackScreen>
   );
 }

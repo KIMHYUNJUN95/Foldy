@@ -309,9 +309,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           {cfg.showEmail && blockedEmail && (
             <span className="aw-status__email"><Ic>{Mail}</Ic>{blockedEmail}</span>
           )}
-          <div className="aw-row aw-gap-m">
+          <div className="aw-stack aw-gap-m">
             <a href={cfg.primaryHref} className="aw-btn">{cfg.primary}</a>
-            <form action={signOut} style={{ display: "flex" }}>
+            <form action={signOut} className="aw-stack">
               <input name="next" type="hidden" value="/auth/login" />
               <button type="submit" className="aw-btn aw-btn--line">{cfg.secondary}</button>
             </form>

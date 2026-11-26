@@ -31,31 +31,31 @@ export const FALLBACK_COPY: Record<
 > = {
   // i18n-ignore-start: 폴백 화면 전용 문구 테이블(위 주석의 이유로 사전 모듈과 분리).
   ko: {
-    errorTitle: "문제가 발생했어요",
-    errorBody: "잠시 후 다시 시도해 주세요.",
+    errorTitle: "문제가 생겼어요",
+    errorBody: "화면을 표시하지 못했어요. 다시 시도해 주세요. 계속되면 소속 조직 관리자에게 알려 주세요.",
     retry: "다시 시도",
     home: "홈으로",
     notFoundTitle: "찾을 수 없어요",
     notFoundBody: "삭제되었거나 존재하지 않는 항목이에요.",
-    goHome: "홈으로 가기",
+    goHome: "홈으로",
   },
   ja: {
     errorTitle: "問題が発生しました",
-    errorBody: "しばらくしてからもう一度お試しください。",
+    errorBody: "画面を表示できませんでした。もう一度お試しください。続く場合は所属組織の管理者にお知らせください。",
     retry: "再試行",
     home: "ホームへ",
     notFoundTitle: "見つかりませんでした",
     notFoundBody: "削除されたか、存在しない項目です。",
-    goHome: "ホームに戻る",
+    goHome: "ホームへ",
   },
   en: {
     errorTitle: "Something went wrong",
-    errorBody: "Please try again in a moment.",
-    retry: "Retry",
-    home: "Home",
+    errorBody: "This screen couldn't be shown. Please try again. If it keeps happening, let your organization's administrator know.",
+    retry: "Try again",
+    home: "Go to home",
     notFoundTitle: "Not found",
     notFoundBody: "This item was deleted or doesn't exist.",
-    goHome: "Go home",
+    goHome: "Go to home",
   },
   // i18n-ignore-end
 };

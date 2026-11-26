@@ -1519,7 +1519,7 @@ Management Console" → Current Implementation Note.
 흰 화면 + 영어 "Something went wrong." 으로 떨어졌다 — 모바일은 브랜드·다국어 화면이 있는데
 콘솔만 맨몸이었다.
 
-모바일 경계와 **같은 문구 소스**(`src/lib/fallback-copy.ts`)를 쓰고, 언어는 루트 레이아웃이
+모바일 경계와 **같은 문구 소스**(`src/lib/fallback-copy.ts`)와 **같은 화면 컴포넌트**(`src/components/fallback-screen.tsx`, 2026-11-26 — 다시 시도 큰 버튼 + 홈으로 글자 링크)를 쓰고, 언어는 루트 레이아웃이
 심어 둔 `<html lang>` 에서 읽는다(알 수 없으면 `ko`). 사전 모듈(`i18n.ts`)에 의존하지 않는 이유는
 `docs/product/16-mobile-navigation.md` 의 폴백 화면 항목과 같다 — 앱이 고장난 상태에서 떠야 한다.
 

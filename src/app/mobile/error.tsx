@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
+import { FALLBACK_PRIMARY, FALLBACK_SECONDARY, FallbackScreen } from "@/components/fallback-screen";
 import { FALLBACK_COPY, resolveFallbackLocale } from "@/lib/fallback-copy";
 
 /**
@@ -34,37 +34,13 @@ export default function MobileError({
   }, [error]);
 
   return (
-    <main className="flex min-h-svh flex-col items-center justify-center gap-3 bg-background px-8 text-center text-foreground">
-      {/* 실제 PWA 앱 아이콘 — `not-found.tsx` 와 같은 소스를 써서 콜드런치·에러·404 가 하나의
-          브랜드로 읽히게 한다. 예전엔 여기에 그라데이션 박스 + 이탤릭 "S" 를 직접 그렸는데, 그건
-          제품 로고가 아니라 이 파일에서만 쓰던 임시 마크였다(2026-08-04). */}
-      <Image
-        alt="Foldy"
-        className="rounded-[20px]"
-        height={64}
-        priority
-        src="/icons/icon-192.png"
-        width={64}
-      />
-      <h1 className="mt-2 text-[19px] font-black tracking-[-0.02em]">{copy.errorTitle}</h1>
-      <p className="text-[13.5px] font-medium leading-relaxed text-muted-foreground">
-        {copy.errorBody}
-      </p>
-      <div className="mt-4 flex items-center gap-2.5">
-        <button
-          className="flex h-12 items-center justify-center rounded-full bg-primary px-7 text-[14px] font-extrabold text-primary-foreground transition-transform active:scale-[0.97]"
-          onClick={reset}
-          type="button"
-        >
-          {copy.retry}
-        </button>
-        <Link
-          className="flex h-12 items-center justify-center rounded-full border border-border bg-surface px-7 text-[14px] font-bold text-foreground transition-transform active:scale-[0.97]"
-          href="/mobile"
-        >
-          {copy.home}
-        </Link>
-      </div>
-    </main>
+    <FallbackScreen body={copy.errorBody} locale={locale} title={copy.errorTitle}>
+      <button className={FALLBACK_PRIMARY} onClick={reset} type="button">
+        {copy.retry}
+      </button>
+      <Link className={FALLBACK_SECONDARY} href="/mobile">
+        {copy.home}
+      </Link>
+    </FallbackScreen>
   );
 }

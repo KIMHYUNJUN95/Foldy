@@ -1612,7 +1612,7 @@ service-role 로 읽으므로 **조직을 쿼리에 직접 건다**(`organizatio
 
 ## 2026-10-15 룸 링크 직접 추가 — `room_link_buildings` · `room_link_rooms`
 
-마이그레이션 `202610150002_room_link_manual_entries.sql`(**운영 적용 전** — 검토 후 적용).
+마이그레이션 `202610150002_room_link_manual_entries.sql`(**운영 적용 완료 2026-11-26** — 트리거 8개 확인 — 검토 후 적용).
 
 - 두 표 모두 기존 룸 링크 표와 같은 모양: SELECT `to authenticated using (organization_id = any ((select public.capability_organization_ids('room_links.access'))::uuid[]))`
   (정책 `room links readers can read manual buildings` / `… manual rooms`) · 플랫폼 관리자 FOR ALL(`platform admins can manage manual buildings` / `… rooms`).

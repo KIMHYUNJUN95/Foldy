@@ -5,6 +5,8 @@
 > 2026-11-17: 손님 메시지 목록 순서를 손님 말 · 우리 답장 기준으로(리뷰 알림 system 줄 · 직원 메모는 올리지 않음) — `ingest-plan.ts` + 마이그레이션 `202611170001`(2026-11-17 운영 적용 · 어긋남 0). 커밋 · main 푸시.
 > 2026-10-25: 남은 일 전체(결정 대기 · 개발 순서 · 사용자 할 일 · 출시 일정)는 `docs/planning/19-open-tasks.md` 한곳에 모았다. 운영 마이그레이션은 `202610230008` 까지 전부 적용 확인.
 
+**2026-11-26 분실물 자동 삭제가 사진도 지움 (마이그레이션 `202611260004`, 미적용 · 커밋 안 함)** (09 · 04 · 05-rls · 07) — pg_cron `lostfound_auto_purge()` 가 행만 지우고 사진을 남기던 것. Vercel Cron `/api/lost-found/purge`(매일 UTC 15:15, `src/lib/lost-found-purge.ts`)가 폐기 후 도쿄 90일 지난 행을 사진 먼저 → 행 나중으로 지움(사진 실패면 행 남김, 한 번에 200개). 경로 고르기는 수동 삭제와 같은 `src/lib/request-photos.ts`. 마이그레이션은 잡 해제 + 함수 제거만. **운영 순서: 코드 배포 뒤 마이그레이션 적용**(먼저 적용해도 자동 삭제가 하루 비는 것뿐). 테스트 `lost-found-purge.test.ts`.
+
 **2026-11-26 서버 코드 보안 점검 묶음** (05-rls 「2026-11-26 서버 코드 보안 점검 묶음」 · 39 · 41) — 본인 급여 계좌 확정은 대표 계열만 · 재류카드 확인 문을 view + 사용자 관리로 통일 · `/api/tasks/reminders` `?secret=` 제거 · `canHandleMaintenance` lib 로 이동 · 게시판 태그 10개/30자 · ops 내보내기 줄/칸 상한 · 손님 메시지 propertyName 200자 · 채용 동기화 스로틀 선점 · 초대 코드 시도 제한(메모리, 최선 노력) + 최소 6자. 새 문구 `onboarding.errors.invite_rate_limited`(ko/ja/en).
 
 **2026-11-26 보안 점검 1 · 13 — 청소 기록 시각 · 기록 칸 서버 고정 + organization_id 잠금 7개 표 (마이그레이션 `202611260003`, 운영 적용 완료 2026-11-26)** (05-rls 「청소 시각 서버 고정 · organization_id 잠금」 · 04 · 07) — 작업자(authenticated) 쓰기의 `started_at` · `completed_at` · `duration_seconds` 는 트리거가 서버 시각으로 계산하고, 주인 · 날짜 · 방 · 종류 변경은 42501. service_role(관리자 경로)은 그대로. `forbid_organization_id_change` 를 announcements · cleaning_sessions · tasks · guest_conversations · guest_message_channel_state · property_operation_infos · reservation_internal_notes 에. 테스트 `cleaning-timing-org-guard.test.ts`.

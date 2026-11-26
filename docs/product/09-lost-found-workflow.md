@@ -247,7 +247,13 @@ returned: 반환완료 / 返却済み / Returned
 > **명시적으로 승인된 예외**다(사용자 승인, 2026-07-16). 수동 삭제는 여전히 즉시 하드 삭제로 남는다.
 >
 > **사진도 같이 지운다(2026-11-25).** 수동 삭제(`src/actions/request-delete.ts`)는 행을 지운 뒤 등록 사진 · 처리 사진을 스토리지(`request-images`)에서
-> 지운다 — 그 기록 폴더(`조직/폴더/기록 id/`) 안의 파일만, 실패해도 삭제는 성공(best-effort). **자동 삭제 크론(`lostfound_auto_purge`, 폐기 + 90일)은 행만 지우고 사진은 남긴다**(2026-11-25 확인) — 따로 고칠 일.
+> 지운다 — 그 기록 폴더(`조직/폴더/기록 id/`) 안의 파일만, 실패해도 삭제는 성공(best-effort).
+>
+> **자동 삭제는 앱 크론으로 옮겼다(2026-11-26, 마이그레이션 `202611260004`).** 예전 pg_cron `lostfound_auto_purge()` 는 행만 지우고 사진을 남겼다
+> (SQL 은 Storage 파일을 못 지운다). 이제 Vercel Cron `/api/lost-found/purge`(매일 UTC `15:15`, `CRON_SECRET` Bearer)가
+> `src/lib/lost-found-purge.ts` 로 모든 조직의 `disposed` 중 `(handled_at 도쿄 날짜) + 90 < 도쿄 오늘` 인 행을 한 번에 최대 200개 고르고,
+> 행마다 **사진 먼저(그 기록 폴더 아래 파일만 — 경로 고르기는 수동 삭제와 같은 `src/lib/request-photos.ts`) → 행 나중**
+> (`status = 'disposed'` 조건)으로 지운다. 사진 삭제가 실패한 행은 남겨 다음 날 다시 시도한다. 응답은 개수만. 자동 폐기(`lostfound_auto_dispose`, UTC `15:05`)는 그대로 pg_cron.
 
 > 구 판의 "30일 후 disposal_scheduled → 추가 기간 후 자동 삭제"와 2026-07-15의 "수동 폐기" 문안은 모두
 > 폐기됐다. 실제 정책은 **14일 자동 폐기 → 폐기 내역 90일 → 자동 삭제 + 연장 예외**다. 상세 계산·뷰는
@@ -589,8 +595,9 @@ Potential alerts:
 - **반환 방식 최종 명칭**: 기획 초안의 `shipped`/`picked_up`이 아니라 **`delivery`(배송) /
   `pickup`(방문 수령)**으로 구현됐다. `lost_return_method` enum. 위 "Required Fields"·"반환 방식
   구조화" 절 정정 완료.
-- **자동 생애주기**: `public.lostfound_auto_dispose()` / `public.lostfound_auto_purge()`
-  (SECURITY DEFINER, 도쿄 기준) + pg_cron 매일 1회(UTC `15:05`/`15:15`). 마이그레이션
+- **자동 생애주기**: `public.lostfound_auto_dispose()` / ~~`public.lostfound_auto_purge()`~~
+  (SECURITY DEFINER, 도쿄 기준) + pg_cron 매일 1회(UTC `15:05`/`15:15`). **자동 삭제는 2026-11-26 부터 Vercel Cron
+  `/api/lost-found/purge`(사진도 지움) — 함수 · 잡은 `202611260004` 에서 제거.** 마이그레이션
   `202607180001_lostfound_console.sql`. **원격 DB 적용 완료(2026-07-16, MCP)** — pg_cron 활성화 + cron
   잡 2개 active 검증.
 - **스키마**: `lost_items`에 `category`(not null default `'other'`) · `return_method` ·

@@ -8970,7 +8970,6 @@ export type Database = {
         }[]
       }
       lostfound_auto_dispose: { Args: never; Returns: undefined }
-      lostfound_auto_purge: { Args: never; Returns: undefined }
       mutate_attendance_session_with_audit: {
         Args: {
           p_action_type: string

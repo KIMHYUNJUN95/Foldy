@@ -615,6 +615,13 @@ Task reminder cron (production):
 - Requires the `task_due_soon` / `task_overdue` enum values from `supabase/migrations/202606110001_task_reminder_notifications.sql` (**applied to the linked project on 2026-06-11**); if a fresh environment lacks them, reminder inserts fail soft (logged, no crash) until applied.
 - Manual trigger: `curl "$APP_URL/api/tasks/reminders" -H "Authorization: Bearer $CRON_SECRET"`.
 
+Lost & found auto purge cron (production, 2026-11-26):
+
+- `GET/POST /api/lost-found/purge` hard-deletes lost items disposed more than 90 days ago (Tokyo dates) across all organizations, photos first then the row; a row whose photo removal fails is kept for the next day. Max 200 rows per run. Response is counts only (`checked` · `deleted` · `photosRemoved` · `photoFailures` · `deleteFailures`). Policy: `docs/product/09-lost-found-workflow.md`.
+- Driven daily by Vercel Cron (`vercel.json`, `15 15 * * *` UTC = 00:15 Asia/Tokyo, after the pg_cron auto-dispose at 15:05). `CRON_SECRET` only (404 if unset, 403 if missing/wrong). No new env vars.
+- Replaces the pg_cron job `lostfound-auto-purge`, removed by `supabase/migrations/202611260004_lostfound_purge_to_app_route.sql`. Rollout: deploy code first, then apply the migration (applying it first only skips one day of purging).
+- Manual trigger: `curl "$APP_URL/api/lost-found/purge" -H "Authorization: Bearer $CRON_SECRET"`.
+
 External review collection cron (production):
 
 - `GET/POST /api/beds24/reviews-sync` pulls Airbnb / Booking.com reviews from Beds24 into `external_reviews` (pure upsert on `organization_id, provider, external_review_id`). Reviews have no webhook, so this is the one Beds24 read path that must be scheduled. See `docs/engineering/01-beds24-integration.md` → "External Reviews".

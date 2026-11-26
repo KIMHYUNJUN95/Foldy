@@ -496,7 +496,9 @@ Change status / 처리 (모바일·어드민 동일 게이트):
 > 함수 2종(`lostfound_auto_dispose()` / `lostfound_auto_purge()`)은 `SECURITY DEFINER`라 RLS를
 > 우회하는 전역 배치 작업**이다 — pg_cron 실행에는 조직/세션 컨텍스트가 없으므로, 대상 행은
 > `status`와 도쿄 기준 날짜 계산만으로 좁힌다(조직 스코프 없음, 의도된 설계). 원격 DB에 적용
-> 완료(2026-07-16, MCP) — pg_cron 확장 활성화 + 두 배치 잡 등록 확인됨.
+> 완료(2026-07-16, MCP) — pg_cron 확장 활성화 + 두 배치 잡 등록 확인됨. **2026-11-26: `lostfound_auto_purge()` 와 그 잡은
+> `202611260004` 에서 제거 — 자동 삭제는 Vercel Cron `/api/lost-found/purge` 가 service role 로 돈다(모든 조직, 행마다
+> `id` + `organization_id` + `status = 'disposed'` 조건으로 지우고, 사진은 그 행의 조직 · 기록 폴더 아래 경로만).**
 
 Delete:
 
@@ -1415,7 +1417,7 @@ of the RLS/permission-relevant pieces:
 | --- | --- |
 | `issue_attendance_qr` | `src/lib/attendance-sites.ts` |
 | `update_staff_suggestion` | `src/app/mobile/suggestions/actions.ts` |
-| `lostfound_auto_dispose` / `lostfound_auto_purge` | 앱 호출 없음(운영 자동화) |
+| `lostfound_auto_dispose` / `lostfound_auto_purge` | 앱 호출 없음(운영 자동화) — `lostfound_auto_purge` 는 2026-11-26 `202611260004` 에서 제거(자동 삭제는 `/api/lost-found/purge`) |
 
 **RLS 판정 헬퍼는 건드리지 않는다.** `is_task_participant` / `has_org_role` / `is_platform_admin`
 등은 RLS 정책 안에서 **호출자 역할로 실행**되므로 `authenticated` 에서 회수하면 정책 평가가 통째로

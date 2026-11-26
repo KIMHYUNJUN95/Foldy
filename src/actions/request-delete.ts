@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { canDeleteRequestRecord } from "@/lib/request-delete-rule";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
-import { isOwnStoragePublicUrl, storagePathFromPublicUrl } from "@/lib/storage-url-guard";
+import { LOST_ITEM_PHOTO_COLUMNS, MAINTENANCE_PHOTO_COLUMNS, requestPhotoPaths, type RequestPhotoColumn } from "@/lib/request-photos";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { REQUEST_IMAGE_BUCKET } from "@/lib/task-images";
@@ -24,39 +24,22 @@ type DeleteResult = { ok: true } | { ok: false; error: "unauthorized" | "not_fou
 
 type RequestTable = "lost_items" | "maintenance_reports" | "order_requests";
 
-/** 열 → 사진이 올라가는 폴더(업로더가 `{조직}/{폴더}/{기록 id}/` 로 고정 — lost-item-create · maintenance-create · 처리 사진 액션). */
-const PHOTO_COLUMNS: Partial<Record<RequestTable, ReadonlyArray<{ column: string; folder: string }>>> = {
-  lost_items: [
-    { column: "image_urls", folder: "lost-items" },
-    { column: "handling_image_urls", folder: "lost-found-handling" },
-  ],
-  maintenance_reports: [
-    { column: "image_urls", folder: "maintenance-reports" },
-    { column: "resolution_image_urls", folder: "maintenance-resolutions" },
-  ],
+const PHOTO_COLUMNS: Partial<Record<RequestTable, ReadonlyArray<RequestPhotoColumn>>> = {
+  lost_items: LOST_ITEM_PHOTO_COLUMNS,
+  maintenance_reports: MAINTENANCE_PHOTO_COLUMNS,
 };
 
 /** 행을 지운 뒤 사진 파일을 지운다. 실패해도 삭제 결과는 바꾸지 않는다(파일이 남는 쪽이 안전). 이 기록의 폴더 아래 한 장짜리 경로만. */
 async function removeRequestPhotos(
   row: Record<string, unknown>,
-  columns: ReadonlyArray<{ column: string; folder: string }>,
+  columns: ReadonlyArray<RequestPhotoColumn>,
   organizationId: string,
   recordId: string,
 ) {
-  const paths = new Set<string>();
-  for (const { column, folder } of columns) {
-    const urls = row[column];
-    if (!Array.isArray(urls)) continue;
-    const prefix = `${organizationId}/${folder}/${recordId}/`;
-    for (const url of urls) {
-      if (typeof url !== "string" || !isOwnStoragePublicUrl(url, REQUEST_IMAGE_BUCKET, prefix)) continue;
-      const path = storagePathFromPublicUrl(url, REQUEST_IMAGE_BUCKET);
-      if (path) paths.add(path);
-    }
-  }
-  if (paths.size === 0) return;
+  const paths = requestPhotoPaths(row, columns, organizationId, recordId);
+  if (paths.length === 0) return;
   try {
-    const { error } = await getSupabaseServiceClient().storage.from(REQUEST_IMAGE_BUCKET).remove([...paths]);
+    const { error } = await getSupabaseServiceClient().storage.from(REQUEST_IMAGE_BUCKET).remove(paths);
     if (error) console.error("[deleteRequestRow] storage remove failed:", error.message);
   } catch (error) {
     console.error("[deleteRequestRow] storage remove threw:", error instanceof Error ? error.message : "unknown");

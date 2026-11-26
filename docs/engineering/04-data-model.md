@@ -785,8 +785,12 @@ daily via pg_cron (Tokyo-anchored, UTC `15:05`/`15:15`):
   (`hold_until` else `found_at + 14 days`, Tokyo date) has passed are set to `status = 'disposed'`
   (`handled_at = now()`, `handled_by = null` = system auto-dispose, `handled_by_admin = false`); rows
   within 3 days of the due date are bumped to `disposal_scheduled`.
-- `public.lostfound_auto_purge()` — hard-deletes `status = 'disposed'` rows whose disposal date
-  (`handled_at`, Tokyo) is more than 90 days in the past. Guarded to `status = 'disposed'` only.
+- ~~`public.lostfound_auto_purge()`~~ — **removed 2026-11-26 (`202611260004`, function + `lostfound-auto-purge` job dropped).**
+  It deleted rows but left their photos in storage. The purge now runs in the app: Vercel Cron
+  `/api/lost-found/purge` (daily UTC `15:15`, `src/lib/lost-found-purge.ts`) hard-deletes `status = 'disposed'` rows whose
+  disposal date (`handled_at`, Tokyo) + 90 days is before Tokyo today — photos first (`request-images`, only that
+  record's `lost-items/{id}/` · `lost-found-handling/{id}/` folders), then the row (`status = 'disposed'` guard).
+  A row whose photo removal fails stays for the next run. Max 200 rows per run.
 
 Both bypass RLS by design (cron has no org/session context) and instead scope purely by `status` and
 Tokyo date. See `docs/engineering/05-rls-permissions.md` → `lost_items` for the RLS-bypass note, and

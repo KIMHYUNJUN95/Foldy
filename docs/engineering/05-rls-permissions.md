@@ -1612,7 +1612,7 @@ service-role 로 읽으므로 **조직을 쿼리에 직접 건다**(`organizatio
 
 ## 2026-10-15 룸 링크 직접 추가 — `room_link_buildings` · `room_link_rooms`
 
-마이그레이션 `202610150002_room_link_manual_entries.sql`(**운영 적용 완료 2026-11-26** — 트리거 8개 확인 — 검토 후 적용).
+마이그레이션 `202610150002_room_link_manual_entries.sql`(**운영 적용 전** — 검토 후 적용).
 
 - 두 표 모두 기존 룸 링크 표와 같은 모양: SELECT `to authenticated using (organization_id = any ((select public.capability_organization_ids('room_links.access'))::uuid[]))`
   (정책 `room links readers can read manual buildings` / `… manual rooms`) · 플랫폼 관리자 FOR ALL(`platform admins can manage manual buildings` / `… rooms`).
@@ -2180,7 +2180,7 @@ Supabase advisor `anon_security_definer_function_executable` 정리. 운영 `pg_
 - **`/api/recruit/sync`** 최신분 스로틀: 조건부 update 로 `last_run_at` 을 먼저 잡은 요청만 실행(동시 요청 중 하나).
 - **초대 코드 시도 제한**: 사용자당 10분 10번(미리보기 + 가입 합산) + 6자 미만 즉시 invalid(`src/lib/invite-attempt-limiter.ts`). **서버 인스턴스 메모리라 인스턴스마다 따로 센다(최선 노력)** — 확실한 제한은 시도 기록 표(마이그레이션)가 필요해 결정 대기.
 
-## 청소 시각 서버 고정 · organization_id 잠금(2026-11-26) (`202611260003_cleaning_timing_guard_and_org_id_locks`, **운영 적용 전**)
+## 청소 시각 서버 고정 · organization_id 잠금(2026-11-26) (`202611260003_cleaning_timing_guard_and_org_id_locks`, **운영 적용 완료 2026-11-26** — 트리거 8개 확인)
 
 보안 점검 1 · 13. RLS 정책 · GRANT 는 바꾸지 않았다(트리거만). 테스트: `src/lib/__tests__/cleaning-timing-org-guard.test.ts`
 (파일 정적 확인 + `FOLDY_PGLITE_DIR` 있을 때 PGlite 로 authenticated · service_role 실제 쓰기).

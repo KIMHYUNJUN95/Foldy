@@ -13,7 +13,7 @@
  * - 공용 요청 이미지 업로드 헬퍼의 `uploadRequestImages`.
  */
 
-import Image from "next/image";
+import { RequestImage } from "@/components/request-image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ImagePlus, Loader2, X } from "lucide-react";
 import {
@@ -232,7 +232,7 @@ export function TaskPhotoUploader({
             <div className="tphoto__thumb" key={url}>
               {/* `request-images` 는 next.config 의 remotePatterns 에 있다 — 예전 주석의
                   「허용 목록에 없다」는 사실과 다르다(2026-08-11 확인). */}
-              <Image alt="" className="tphoto__img" src={url} width={64} height={64} />
+              <RequestImage alt="" className="tphoto__img" src={url} width={64} height={64} />
               <button
                 aria-label={copy.remove}
                 className="tphoto__remove"

@@ -13,6 +13,7 @@ import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { isOwnerOrPlatformDeveloper, isPlatformDeveloper } from "@/config/roles";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { isOwnStoragePublicUrl } from "@/lib/storage-url-guard";
+import { newRequestImagesOwnedBy } from "@/lib/request-image-owners";
 import type { Database } from "@/types/database";
 
 // database.ts 에는 Relationships 가 없어서 `service.rpc()` 에 타입이 붙지 않는다. 원자적 수정 RPC 에 필요한 만큼만
@@ -105,6 +106,9 @@ export async function createStaffSuggestion(formData: FormData) {
   if (!body) redirect(`${NEW}?error=missing_body`);
   if (!recipientId) redirect(`${NEW}?error=missing_recipient`);
   if (!areSuggestionImageUrls(imageUrls, session.organization.id)) redirect(`${NEW}?error=save_failed`);
+  if ((await newRequestImagesOwnedBy(getSupabaseServiceClient(), imageUrls, [], session.user.id)) !== true) {
+    redirect(`${NEW}?error=save_failed`);
+  }
 
   // 같은 조직의 활성 구성원(작성자 제외). 받는 사람과 참조를 한 곳에서 검증한다.
   const allowed = new Set((await getShareableUsers(session)).map((u) => u.id));
@@ -241,7 +245,10 @@ export async function updateStaffSuggestion(formData: FormData) {
     redirect(`/mobile/suggestions/${suggestionId}`);
   }
   const previousRecipientId = current.recipient_user_id;
-  if (!areSuggestionImageUrls(imageUrls, session.organization.id, current.image_urls ?? [])) {
+  if (
+    !areSuggestionImageUrls(imageUrls, session.organization.id, current.image_urls ?? []) ||
+    (await newRequestImagesOwnedBy(supabase, imageUrls, current.image_urls ?? [], session.user.id)) !== true
+  ) {
     redirect(`${EDIT}?error=save_failed`);
   }
 
@@ -424,6 +431,9 @@ export async function createStaffSuggestionComment(
   if (!areSuggestionImageUrls(imageUrls, session.organization.id)) return { ok: false, error: "save_failed" };
 
   const supabase = getSupabaseServiceClient();
+  if ((await newRequestImagesOwnedBy(supabase, imageUrls, [], session.user.id)) !== true) {
+    return { ok: false, error: "save_failed" };
+  }
   const participants = await loadParticipantIds(supabase, session.organization.id, suggestionId);
   if (!participants) return { ok: false, error: "not_found" };
 
@@ -501,7 +511,10 @@ export async function updateStaffSuggestionComment(
   // 수정은 제안 상태와 상관없이 댓글 작성자만 할 수 있다.
   if (comment.created_by_user_id !== session.user.id) return { ok: false, error: "forbidden" };
   if (imageUrls.length > STAFF_SUGGESTION_MAX_IMAGES) return { ok: false, error: "too_many_photos" };
-  if (!areSuggestionImageUrls(imageUrls, session.organization.id, comment.image_urls ?? [])) {
+  if (
+    !areSuggestionImageUrls(imageUrls, session.organization.id, comment.image_urls ?? []) ||
+    (await newRequestImagesOwnedBy(supabase, imageUrls, comment.image_urls ?? [], session.user.id)) !== true
+  ) {
     return { ok: false, error: "save_failed" };
   }
 

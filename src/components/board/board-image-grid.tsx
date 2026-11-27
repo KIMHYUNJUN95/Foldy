@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { RequestImage } from "@/components/request-image";
 import { useState } from "react";
 import { ImageLightbox } from "@/components/shell/image-lightbox";
 
@@ -33,7 +33,7 @@ export function BoardImageGrid({
             onClick={() => setOpenIndex(index)}
             type="button"
           >
-            <Image alt="" fill sizes={hero ? "(min-width: 1000px) 680px, 100vw" : "(min-width: 1000px) 340px, 50vw"} src={url} />
+            <RequestImage alt="" fill sizes={hero ? "(min-width: 1000px) 680px, 100vw" : "(min-width: 1000px) 340px, 50vw"} src={url} />
           </button>
         );
       })}

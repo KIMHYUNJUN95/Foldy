@@ -8,7 +8,12 @@ import { createFakeSupabase } from "@/lib/__tests__/fake-supabase";
  *   id 를 안 주면(모바일 새 할 일 폼) 예전처럼 서버가 만든다. 만들기 되돌리기 지우기는 조직으로도 거른다.
  * - 분실물: 방 카탈로그 읽기가 던지면 저장하지 않고 save_failed(수리 · 점검과 같게).
  */
-const state = vi.hoisted(() => ({ db: null as unknown, catalogThrows: false }));
+const state = vi.hoisted(() => ({
+  db: null as unknown,
+  catalogThrows: false,
+  owners: {} as Record<string, string>,
+  ownersFail: false,
+}));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/supabase/service", () => ({ getSupabaseServiceClient: () => state.db }));
@@ -65,6 +70,10 @@ let deletes: Array<{ table: string; filters: Array<[string, unknown]> }>;
 function db(failParticipants = false) {
   const fake = createFakeSupabase(tables).client;
   return {
+    rpc: async (_fn: string, args: { p_names: string[] }) =>
+      state.ownersFail
+        ? { data: null, error: { message: "x" } }
+        : { data: args.p_names.filter((n) => state.owners[n]).map((n) => ({ name: n, owner_id: state.owners[n] })), error: null },
     from(table: string) {
       const b = fake.from(table) as unknown as Record<string, (...args: unknown[]) => unknown>;
       if (table === "tasks") {
@@ -102,6 +111,8 @@ beforeEach(() => {
   deletes = [];
   state.db = db();
   state.catalogThrows = false;
+  state.owners = {};
+  state.ownersFail = false;
 });
 
 describe("createTaskRecord — 요청 id", () => {
@@ -150,5 +161,27 @@ describe("createLostItemRecord — 방 카탈로그 읽기 실패", () => {
       imageUrls: [],
     });
     expect(result).toEqual({ ok: false, error: "save_failed" });
+  });
+});
+
+describe("createTaskRecord — 사진은 내가 올린 파일만(2026-11-27 주소 끼워 넣기)", () => {
+  const BASE = "https://proj.supabase.co";
+  const PATH = `${ORG}/task-images/${REQ}/a.jpg`;
+  const URL_ = `${BASE}/storage/v1/object/public/request-images/${PATH}`;
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = BASE;
+  });
+  it("내가 올린 사진 → 저장", async () => {
+    state.owners = { [PATH]: ME };
+    const res = await createTaskRecord(session, input({ imageUrls: [URL_] }));
+    expect(res.ok).toBe(true);
+    expect(tables.tasks[0].image_urls).toEqual([URL_]);
+  });
+  it("남이 올린 사진 주소 · 주인 못 읽음 → save_failed, 저장 안 함", async () => {
+    state.owners = { [PATH]: OTHER };
+    expect(await createTaskRecord(session, input({ imageUrls: [URL_] }))).toEqual({ ok: false, error: "save_failed" });
+    state.ownersFail = true;
+    expect(await createTaskRecord(session, input({ imageUrls: [URL_] }))).toEqual({ ok: false, error: "save_failed" });
+    expect(tables.tasks).toHaveLength(0);
   });
 });

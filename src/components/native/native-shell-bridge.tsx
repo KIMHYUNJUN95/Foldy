@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { hasNativePlugin, IN_APP_BROWSER_OPTIONS, isNativeApp, nativePlatform } from "@/lib/native-app";
+import { isRequestImageLink, isTrustedSignedImageUrl, requestImageJsonHref } from "@/lib/native/request-image-link";
 import { resetPrivacyScreenOnStart } from "@/lib/native/privacy-screen";
 import { hasOpenOverlay } from "@/lib/swipe-back/controller";
 import { isSwipeBackScreen, parentScreen } from "@/lib/swipe-back/history-model";
@@ -76,6 +77,19 @@ export function NativeShellBridge() {
       await Browser.open({ url, ...IN_APP_BROWSER_OPTIONS });
     }
 
+    // request-images 원본 링크는 Supabase 서명 주소로 302 가 나 WebView 안에서 열면 시스템 브라우저로 튕긴다 —
+    // 서명 주소만 JSON 으로 받아 앱 안 브라우저로 연다. 실패하면 아무 데도 가지 않는다.
+    async function openRequestImage(url: URL) {
+      try {
+        const res = await fetch(requestImageJsonHref(url), { credentials: "same-origin" });
+        if (!res.ok) return;
+        const body = (await res.json()) as { url?: unknown };
+        if (isTrustedSignedImageUrl(body.url, process.env.NEXT_PUBLIC_SUPABASE_URL)) await openInAppBrowser(body.url);
+      } catch {
+        // 열지 못해도 화면은 그대로 둔다
+      }
+    }
+
     function resolve(href: string): URL | null {
       try {
         return new URL(href, window.location.href);
@@ -96,7 +110,8 @@ export function NativeShellBridge() {
       const download = anchor.hasAttribute("download");
       if (!external && !newWindow && !download) return;
       event.preventDefault();
-      if (external || download) void openInAppBrowser(url.href);
+      if (isRequestImageLink(url, window.location.origin)) void openRequestImage(url);
+      else if (external || download) void openInAppBrowser(url.href);
       else window.location.assign(url.href);
     }
     document.addEventListener("click", onClick, true);
@@ -107,7 +122,8 @@ export function NativeShellBridge() {
       const href = target ? String(target) : "";
       const url = href ? resolve(href) : null;
       if (!url || (url.protocol !== "http:" && url.protocol !== "https:")) return originalOpen(target, name, features);
-      if (url.origin === window.location.origin) window.location.assign(url.href);
+      if (isRequestImageLink(url, window.location.origin)) void openRequestImage(url);
+      else if (url.origin === window.location.origin) window.location.assign(url.href);
       else void openInAppBrowser(url.href);
       return null;
     }) as typeof window.open;

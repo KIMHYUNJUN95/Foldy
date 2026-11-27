@@ -1,5 +1,5 @@
 "use client";
-import Image from "next/image";
+import { RequestImage } from "@/components/request-image";
 import { useState } from "react";
 import { MoreHorizontal } from "lucide-react";
 import { ImageLightbox } from "@/components/shell/image-lightbox";
@@ -89,7 +89,7 @@ export function BoardComment({
                 onClick={() => setOpenIndex(index)}
                 type="button"
               >
-                <Image alt="" fill sizes="64px" src={url} />
+                <RequestImage alt="" fill sizes="64px" src={url} />
               </button>
             ))}
             <ImageLightbox closeLabel={copy.close} onClose={() => setOpenIndex(null)} openIndex={openIndex} urls={images} />

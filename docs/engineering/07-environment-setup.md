@@ -1022,6 +1022,20 @@ curl -o /dev/null -w '%{http_code}\n' \
 2026-09-11 실측: 영수증 서명 URL `200 image/jpeg`, 목록에 없는 `recruit-resumes` 와 외부 도메인은
 각각 `400` — 허용 범위는 필요한 만큼만 열려 있다.
 
+## request-images 비공개 전환 (2026-11-27, `202611270001_request_images_private.sql`)
+
+순서를 지킨다 — 거꾸로 하면 사진이 전부 깨진다.
+
+1. **`202611270002_request_image_owners.sql` 먼저 적용** — 사진 주인 읽는 함수(service role 전용). 이것만으로는 운영 동작이 바뀌지 않는다. 빠뜨리고 코드를 배포하면 사진 붙인 근태 정정 · 할 일 · 메모 · 제안 · 댓글 저장이 「오류」(`save_failed`)로 막히고 본인 사진 열기가 403 이 된다.
+   적용 전 확인: 함수 주인 `postgres` 가 `rolbypassrls = true` 여야 SECURITY DEFINER 함수가 `storage.objects` 를 읽는다 — 운영은 2026-11-27 읽기 전용 확인으로 이미 충족.
+   적용 뒤 확인: `select has_function_privilege('authenticated', 'public.request_image_owners(text[])', 'execute');` → false.
+2. **앱 코드 배포** — 라우트 `/api/request-images/[...path]` 와 화면의 `requestImageSrc()` 적용분. 배포 뒤 로그인한 상태로 사진이 라우트 주소(302 → `/object/sign/...`)로 뜨는지 본다. 앱(Capacitor)은 `?as=json` 으로 서명 주소를 받아 앱 안 브라우저로 연다.
+3. **`202611270001_request_images_private.sql` 적용** — `update storage.buckets set public = false where id = 'request-images';` (Supabase 대시보드 SQL 편집기). `202605210008` 은 다시 돌리지 않는다.
+4. **확인** — 예전 공개 주소(`/storage/v1/object/public/request-images/...`)를 로그인 없이 열면 400/404, 앱 화면 사진은 그대로 뜬다. 다른 조직 · 로그인 안 함은 라우트가 403 · 401. 근태 정정 사진 응답은 `Cache-Control: no-store`. 할 일 · 제안 · 버그 사진은 참여자(버그는 신고자 · 검토자)에게만 뜨고, 같은 조직이라도 참여하지 않은 계정은 403.
+5. 되돌리기: `update storage.buckets set public = true where id = 'request-images';`
+
+`next.config.ts` 원격 허용 목록에 이 버킷 `sign` 경로가 있어야 `next/image` 로 그리는 곳이 깨지지 않는다(위 「Supabase 주소는 두 갈래다」).
+
 ## Capacitor 앱 빌드 환경 변수 (2026-10-06)
 
 - `CAP_SERVER_URL` (선택) — `npm run cap:sync` 할 때 앱이 띄울 웹 주소. 비우면 `https://stay-ops-two.vercel.app`. 웹 런타임 변수가 아니라

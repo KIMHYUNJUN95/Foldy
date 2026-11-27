@@ -25,6 +25,7 @@ import type { AppSession } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import type { Database } from "@/types/database";
 import { bestEffortWrite } from "@/lib/db-write-guard";
+import { newRequestImagesOwnedBy } from "@/lib/request-image-owners";
 import { sanitizeTaskImageUrls } from "@/lib/task-images";
 import { linkedContextBelongsToOrg } from "@/lib/task-linked-context";
 
@@ -140,6 +141,8 @@ export async function createTaskRecord(session: AppSession, input: TaskCreateInp
   const id = requestedId || crypto.randomUUID();
   const recurrenceSeriesId = repeat ? id : null;
   const supabase = getSupabaseServiceClient();
+  // 남이 올린 사진 주소를 넣어 참여자에게 여는 것을 막는다(2026-11-27) — 내가 올린 파일만.
+  if ((await newRequestImagesOwnedBy(supabase, imageUrls, [], session.user.id)) !== true) return fail("save_failed");
 
   const insert: Database["public"]["Tables"]["tasks"]["Insert"] = {
     id,

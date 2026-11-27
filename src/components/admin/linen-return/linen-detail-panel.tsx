@@ -6,7 +6,7 @@
 // 등록 일시/등록자는 현장 증빙값이라 수정 창 머리에 적어만 두고, 서버 액션도 이 두 컬럼을 payload 에 넣지 않는다.
 // 사진은 기존 업로드 계약(compressImageFile → uploadRequestImages, 기능당 5장)을 그대로 쓴다.
 // 참고: docs/product/19-linen-defect-workflow.md → "Record Management Contract".
-import Image from "next/image";
+import { RequestImage } from "@/components/request-image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Camera, Minus, Plus, Trash2, X } from "lucide-react";
 import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
@@ -16,6 +16,7 @@ import { uploadRequestImages } from "@/components/requests/request-image-upload"
 import type { AdminLinenBuildingOption, AdminLinenItemOption, AdminLinenRecordVM } from "@/lib/admin-linen-returns";
 import { dayOf, itemsForBuilding, summaryOf, timeOf, tpl, weekdayLabel } from "./linen-console-data";
 import type { LinenCopy } from "./linen-record-list";
+import { requestImageSrc } from "@/lib/request-image-src";
 
 /** CLAUDE.md §8 — 기능당 5장(프로젝트 업무 예외는 해당 없음). 서버에서도 다시 막는다. */
 export const MAX_PHOTOS = 5;
@@ -99,8 +100,8 @@ export function LinenDetailPanel({ record, t, units, localeTag, disabled, onClos
           {record.photos.length ? (
             <div className="lfp__gal">
               {record.photos.map((url) => (
-                <a className="lfp__shot" href={url} key={url} rel="noreferrer" target="_blank">
-                  <Image alt="" fill sizes="170px" src={url} />
+                <a className="lfp__shot" href={requestImageSrc(url)} key={url} rel="noreferrer" target="_blank">
+                  <RequestImage alt="" fill sizes="170px" src={url} />
                 </a>
               ))}
             </div>
@@ -326,7 +327,7 @@ export function LinenEditModal({ record, t, errors, catalog, buildings, localeTa
         <div className="lnm-photos">
           {photos.map((url) => (
             <div className="lnm-ph" key={url}>
-              <Image alt="" fill sizes="64px" src={url} />
+              <RequestImage alt="" fill sizes="64px" src={url} />
               <button aria-label={t.fRemovePhoto} onClick={() => setPhotos((prev) => prev.filter((u) => u !== url))} type="button">
                 <X aria-hidden="true" />
               </button>

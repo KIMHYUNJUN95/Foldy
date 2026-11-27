@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import Image from "next/image";
+import { RequestImage } from "@/components/request-image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, ImageIcon, Inbox, MoreHorizontal, Pencil, Plus, Send, SkipForward, Trash2, UserMinus, UserPlus } from "lucide-react";
@@ -473,7 +473,7 @@ export function TaskDetailView({
               style={{ width: 64, height: 64 }}
               type="button"
             >
-              <Image alt="" className="object-cover" fill sizes="64px" src={url} />
+              <RequestImage alt="" className="object-cover" fill sizes="64px" src={url} />
             </button>
           ))}
           {canEditCore && task.imageUrls.length < maxPhotos ? (

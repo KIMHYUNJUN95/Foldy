@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition, type ChangeEvent } from "react";
-import Image from "next/image";
+import { RequestImage } from "@/components/request-image";
 import { useRouter } from "next/navigation";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import {
@@ -417,7 +417,7 @@ export function ComplaintCreate({
             {uploadedImages.map((url, index) => (
               <div key={url} className="fbw-photo">
                 <button type="button" className="fbw-photo__img" aria-label={`${t.photosTitle} ${index + 1}`} onClick={() => setLightboxIndex(index)}>
-                  <Image src={url} alt="" fill sizes="72px" />
+                  <RequestImage src={url} alt="" fill sizes="72px" />
                 </button>
                 <button type="button" className="fbw-photo__x" aria-label={t.wRemovePhoto} onClick={() => handleRemoveImage(index)}>
                   <X aria-hidden="true" />

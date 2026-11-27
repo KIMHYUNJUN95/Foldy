@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { RequestImage } from "@/components/request-image";
 import { useState } from "react";
 import { ImageLightbox } from "@/components/shell/image-lightbox";
 
@@ -34,7 +34,7 @@ export function LightboxThumbs({
       {urls.map((url, idx) => (
         <button key={`${url}-${idx}`} onClick={() => setOpenIndex(idx)} type="button">
           <div className={thumbClassName}>
-            <Image alt="" className="object-cover" fill sizes={sizes} src={url} />
+            <RequestImage alt="" className="object-cover" fill sizes={sizes} src={url} />
           </div>
         </button>
       ))}

@@ -8,6 +8,7 @@ import { isTopOverlay, pushOverlay } from "@/components/shell/bottom-sheet";
 import { useBodyScrollLock } from "@/components/shell/use-body-scroll-lock";
 import { getDictionary } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { requestImageSrc } from "@/lib/request-image-src";
 
 /**
  * 제어형 전체 화면 이미지 뷰어(scroll-snap 캐러셀 + 카운터)로,
@@ -330,7 +331,7 @@ export function ImageLightbox({
                   if (isActive && transform.scale > 1.01) applyTransform(IDENTITY);
                   else if (isActive) applyTransform({ scale: 2.5, tx: 0, ty: 0 });
                 }}
-                src={url}
+                src={requestImageSrc(url)}
                 style={{
                   transform: `translate(${t.tx}px, ${t.ty}px) scale(${t.scale})`,
                   transformOrigin: "center center",

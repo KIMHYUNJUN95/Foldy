@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import Image from "next/image";
+import { RequestImage } from "@/components/request-image";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { useBodyScrollLock } from "@/components/shell/use-body-scroll-lock";
 import { cn } from "@/lib/utils";
+import { requestImageSrc } from "@/lib/request-image-src";
 
 /**
  * 할 일 / 업데이트 로그 사진용 첨부 갤러리.
@@ -117,7 +118,7 @@ export function PhotoGallery({
             )}
             key={keys[i]}
           >
-            <Image alt="" aria-hidden="true" className="object-cover" fill sizes="72px" src={url} />
+            <RequestImage alt="" aria-hidden="true" className="object-cover" fill sizes="72px" src={url} />
             {overflow > 0 && i === MAX_THUMBS - 1 ? (
               <span className="absolute inset-0 flex items-center justify-center bg-slate-950/55 text-[13px] font-semibold text-white backdrop-blur-[1px]">
                 +{overflow}
@@ -149,7 +150,7 @@ export function PhotoGallery({
                 onClick={() => openLightbox(i)}
                 type="button"
               >
-                <Image
+                <RequestImage
                   alt=""
                   aria-hidden="true"
                   className="object-cover transition-transform duration-300 group-active:scale-105"
@@ -211,7 +212,7 @@ export function PhotoGallery({
                       alt=""
                       className="max-h-full max-w-full select-none rounded-lg object-contain shadow-[0_24px_70px_-20px_rgba(0,0,0,0.7)]"
                       draggable={false}
-                      src={url}
+                      src={requestImageSrc(url)}
                     />
                   </div>
                 ))}

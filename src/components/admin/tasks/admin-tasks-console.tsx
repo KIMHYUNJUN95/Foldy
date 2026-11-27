@@ -7,7 +7,7 @@
 // + admin-tasks-console.css(팝오버·모달·업로더 — 예전 그대로 쓰는 부분).
 // 서버 액션(@/app/admin/tasks/actions)이 모든 쓰기를 처리하고, revalidatePath 로 갱신한다(성공 뒤 router.refresh() 를 더 부르지 않는다 — 이중 렌더).
 // 참고: docs/product/28-admin-todoist-console.md.
-import Image from "next/image";
+import { RequestImage } from "@/components/request-image";
 import {
   Fragment,
   useCallback,
@@ -3830,7 +3830,7 @@ export function AdminTasksConsole({
                   className="atw-ph"
                   onClick={() => setLightbox({ urls: t.imageUrls, index: i })}
                 >
-                  <Image src={url} alt="" width={128} height={128} />
+                  <RequestImage src={url} alt="" width={128} height={128} />
                 </button>
               ))}
               {mine && t.imageUrls.length < maxPhotos && (
@@ -4066,7 +4066,7 @@ export function AdminTasksConsole({
                             className="atw-ph is-sm"
                             onClick={() => setLightbox({ urls: u.imageUrls, index: i })}
                           >
-                            <Image src={url} alt="" width={96} height={96} />
+                            <RequestImage src={url} alt="" width={96} height={96} />
                           </button>
                         ))}
                       </span>

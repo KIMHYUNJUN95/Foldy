@@ -107,6 +107,11 @@ function makeQuery(table: string) {
 
 const fakeClient = {
   from: (table: string) => makeQuery(table),
+  // storage owner — 파일 이름에 "new" 가 들어가면 나(u-me)가 올린 것, 아니면 동료(2026-11-27 주소 끼워 넣기 검사).
+  rpc: async (_fn: string, args: { p_names: string[] }) => ({
+    data: args.p_names.map((name) => ({ name, owner_id: name.includes("new") ? "u-me" : "u-peer" })),
+    error: null,
+  }),
   storage: {
     from: () => ({
       remove: async (paths: string[]) => (state.removed.push(...paths), { error: null }),
@@ -264,6 +269,18 @@ describe("1. PC 콘솔은 바꾼 칸만 보낸다", () => {
     });
     expect(res.ok).toBe(true);
     expect(taskRow().image_urls).toEqual([a, fresh, mine]);
+  });
+
+  it("남이 올린 사진 주소를 새로 붙이면 save_failed — 이미 있던 남의 사진은 그대로 통과", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co");
+    const base = "https://example.supabase.co/storage/v1/object/public/request-images";
+    const peer = `${base}/${ORG}/task-images/t-1/peer.jpg`;
+    const planted = `${base}/${ORG}/task-images/other/secret.jpg`;
+    seedTask(taskDetail({ imageUrls: [peer] }));
+    const res = await admin.updateConsoleTaskCore({ taskId: "t-1", title: "할 일", addImageUrls: [planted] });
+    expect(res).toEqual({ ok: false, error: "save_failed" });
+    expect(updatePayloads()).toEqual([]);
+    expect(state.removed).toEqual([]);
   });
 
   it("화면 — 우선순위 · 연결 · 사진 추가 · 코어 편집이 일정 칸을 다시 보내지 않는다", () => {

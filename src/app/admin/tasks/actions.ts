@@ -57,6 +57,7 @@ import {
   mergeTaskImageUrls,
   sanitizeTaskImageUrls,
 } from "@/lib/task-images";
+import { newRequestImagesOwnedBy } from "@/lib/request-image-owners";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { linkedContextBelongsToOrg } from "@/lib/task-linked-context";
 import { bestEffortWrite, mustWrite } from "@/lib/db-write-guard";
@@ -293,6 +294,11 @@ export async function createConsoleTask(input: {
   const id = crypto.randomUUID();
   const recurrenceSeriesId = repeat ? id : null;
   const supabase = getSupabaseServiceClient();
+  const imageUrls = sanitizeTaskImageUrls(input.imageUrls ?? [], !!linkedProjectId, session.organization.id);
+  // 남이 올린 사진 주소를 넣어 참여자에게 여는 것을 막는다(2026-11-27) — 내가 올린 파일만.
+  if ((await newRequestImagesOwnedBy(supabase, imageUrls, [], session.user.id)) !== true) {
+    return { ok: false, error: "save_failed" };
+  }
 
   const insert: Database["public"]["Tables"]["tasks"]["Insert"] = {
     id,
@@ -315,7 +321,7 @@ export async function createConsoleTask(input: {
     recurrence_instance_date: recurrenceSeriesId ? anchorDate : null,
     tags,
     // 상한은 클라이언트를 믿지 않고 여기서 다시 적용한다(CLAUDE.md §8).
-    image_urls: sanitizeTaskImageUrls(input.imageUrls ?? [], !!linkedProjectId, session.organization.id),
+    image_urls: imageUrls,
     project_id: linkedProjectId,
     section_id: linkedSectionId,
     ...context,
@@ -781,7 +787,13 @@ export async function updateConsoleTaskCore(input: {
     requestedImageUrls === undefined
       ? null
       : mergeTaskImageUrls(task.imageUrls, requestedImageUrls, !!task.projectId, session.organization.id);
-  if (nextImageUrls) update.image_urls = nextImageUrls;
+  if (nextImageUrls) {
+    // 새로 붙인 사진만 — 이미 있던 사진은 누가 올렸든 그대로 둔다(2026-11-27).
+    if ((await newRequestImagesOwnedBy(supabase, nextImageUrls, task.imageUrls, session.user.id)) !== true) {
+      return { ok: false, error: "save_failed" };
+    }
+    update.image_urls = nextImageUrls;
+  }
   if (input.context !== undefined) {
     const context = normalizeContext(input.context);
     if (!(await contextBelongsToOrg(session, context))) return { ok: false, error: "forbidden" };
@@ -1137,6 +1149,9 @@ export async function addConsoleNote(
   if (!text && photos.length === 0) return { ok: false, error: "empty" };
 
   const supabase = getSupabaseServiceClient();
+  if ((await newRequestImagesOwnedBy(supabase, photos, [], session.user.id)) !== true) {
+    return { ok: false, error: "save_failed" };
+  }
   // 메모는 이 액션의 본 데이터다 — 저장이 실패했는데 성공을 돌려주면 입력이 사라진다(2026-10-28).
   const saved = await mustWrite(
     "task_updates: insert note",

@@ -39,6 +39,7 @@ import {
   type ComposeFieldErrors,
 } from "./suggestion-compose-errors";
 import { dropFromReferences, pickRecipient, pickReferences } from "./suggestion-compose-pick";
+import { requestImageSrc } from "@/lib/request-image-src";
 
 const MAX_PHOTOS = 5;
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -478,7 +479,7 @@ export function SuggestionsCompose({
           tabIndex={-1}
         >
           {existingImages.map((url) => (
-            <div className="sgw-c__thumb" key={url} style={{ backgroundImage: `url(${url})` }}>
+            <div className="sgw-c__thumb" key={url} style={{ backgroundImage: `url(${requestImageSrc(url)})` }}>
               <button
                 aria-label={copy.removePhoto}
                 className="sgw-c__thumbx"

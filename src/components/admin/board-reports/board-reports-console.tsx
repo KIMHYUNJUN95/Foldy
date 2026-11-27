@@ -15,6 +15,7 @@ import { haptic } from "@/lib/haptics";
 import { boardDateTime } from "@/components/board/board-time";
 import type { PendingBoardReport } from "@/lib/board-moderation";
 import type { Dictionary } from "@/lib/i18n";
+import { requestImageSrc } from "@/lib/request-image-src";
 
 type Copy = Dictionary["board"];
 type W = Dictionary["boardReportsWhite"];
@@ -213,7 +214,7 @@ export function ReportPanel({
                     aria-label={w.photoOpen.replace("{n}", String(index + 1))}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element -- 게시판 사진 버킷은 next/image 허용 목록 밖 */}
-                    <img alt="" src={url} loading="lazy" />
+                    <img alt="" src={requestImageSrc(url)} loading="lazy" />
                   </button>
                 ))}
               </div>
@@ -274,7 +275,7 @@ export function ReportPanel({
             <X aria-hidden="true" />
           </button>
           {/* eslint-disable-next-line @next/next/no-img-element -- 원본 비율 그대로 크게 보기 */}
-          <img alt="" src={photo} onClick={(event) => event.stopPropagation()} />
+          <img alt="" src={requestImageSrc(photo)} onClick={(event) => event.stopPropagation()} />
         </div>
       ) : null}
       <EscapeKey open={photo !== null} onClose={() => setPhoto(null)} />

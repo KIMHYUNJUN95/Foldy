@@ -30,6 +30,7 @@ import "./suggestions-white.css";
 import { SuggestionCommentComposer } from "./suggestion-comment-composer";
 import { SuggestionCommentItem } from "./suggestion-comment-item";
 import { haptic } from "@/lib/haptics";
+import { requestImageSrc } from "@/lib/request-image-src";
 
 type SgCopy = Dictionary["mobile"]["suggestions"];
 
@@ -207,10 +208,10 @@ export function SuggestionsDetail({
           {data.imageUrls.map((url, i) => (
             <a
               aria-label={`${w.photosAlt} ${i + 1}`}
-              href={url}
+              href={requestImageSrc(url)}
               key={url}
               rel="noreferrer"
-              style={{ backgroundImage: `url(${url})` }}
+              style={{ backgroundImage: `url(${requestImageSrc(url)})` }}
               target="_blank"
             />
           ))}

@@ -8478,6 +8478,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      request_image_owners: {
+        Args: { p_names: string[] }
+        Returns: { name: string; owner_id: string | null }[]
+      }
       guest_conversation_apply_messages: {
         Args: {
           p_conversation_id: string

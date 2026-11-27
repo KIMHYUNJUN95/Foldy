@@ -6,6 +6,7 @@ import { Paperclip, Plus, X } from "lucide-react";
 import { haptic } from "@/lib/haptics";
 import type { Dictionary } from "@/lib/i18n";
 import "./board-white.css";
+import { requestImageSrc } from "@/lib/request-image-src";
 
 /**
  * 글쓰기 · 글 수정이 함께 쓰는 화면 조각 — 화이트 리디자인(2026-10-15, 시안 BoardNew-Phone).
@@ -119,7 +120,7 @@ export function BoardAttachSection({
         {photos.map((p) => (
           <span className="bdw-tile" key={p.id}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img alt="" src={p.src} />
+            <img alt="" src={requestImageSrc(p.src)} />
             <button aria-label={copy.deletePhoto} className="bdw-tile__x" onClick={() => onRemovePhoto(p.id)} type="button">
               <X aria-hidden="true" strokeWidth={2.4} />
             </button>

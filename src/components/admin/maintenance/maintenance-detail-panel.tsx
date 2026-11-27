@@ -5,7 +5,7 @@ import { GuestMessageBackLink } from "@/components/guest-messages/guest-message-
 // Admin 수리·점검 console — 우측 상세 패널. Read-centric: 처리(확인·상태 변경·메모)는 현장 모바일이
 // 담당하고, 여기서는 기록 열람 + 관리자 예외 개입(강제 완료 / 무효 / 삭제)만 한다.
 // maint-views.js 의 panel() 을 따른다.
-import Image from "next/image";
+import { RequestImage } from "@/components/request-image";
 import Link from "next/link";
 import { Trash2, TriangleAlert, X } from "lucide-react";
 import { useAdminPanelA11y } from "@/components/admin/shared/use-admin-panel-a11y";
@@ -16,6 +16,7 @@ import { categoryLabel, priorityLabel, statusLabel, type MaintCopy } from "./mai
 import { useRoomPlaceLabel } from "@/components/shared/building-names";
 import { distinctRoom } from "@/lib/place-label";
 import { canDeleteRequestRecord, type RequestDeleteAccess } from "@/lib/request-delete-rule";
+import { requestImageSrc } from "@/lib/request-image-src";
 
 export type MaintExceptionKind = "force" | "void" | "del";
 
@@ -111,8 +112,8 @@ export function MaintenanceDetailPanel({
           {report.photos.length ? (
             <div className="mwp__gal">
               {report.photos.map((url) => (
-                <a className="mwp__shot" href={url} key={url} rel="noreferrer" target="_blank">
-                  <Image alt="" src={url} fill sizes="160px" />
+                <a className="mwp__shot" href={requestImageSrc(url)} key={url} rel="noreferrer" target="_blank">
+                  <RequestImage alt="" src={url} fill sizes="160px" />
                 </a>
               ))}
             </div>
@@ -164,8 +165,8 @@ export function MaintenanceDetailPanel({
               {report.resolutionPhotos.length ? (
                 <div className="mwp__gal">
                   {report.resolutionPhotos.map((url) => (
-                    <a className="mwp__shot" href={url} key={url} rel="noreferrer" target="_blank">
-                      <Image alt="" src={url} fill sizes="160px" />
+                    <a className="mwp__shot" href={requestImageSrc(url)} key={url} rel="noreferrer" target="_blank">
+                      <RequestImage alt="" src={url} fill sizes="160px" />
                     </a>
                   ))}
                 </div>

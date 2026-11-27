@@ -8,7 +8,7 @@
  */
 
 import { useState, useTransition } from "react";
-import Image from "next/image";
+import { RequestImage } from "@/components/request-image";
 import { useRouter } from "next/navigation";
 import {
   bugStatusLabel,
@@ -20,6 +20,7 @@ import { deleteBugReportAction, setBugReportStatus } from "../actions";
 import { formatBugCode } from "../bugs-list-client";
 import "@/components/bugs/bugs-white.css";
 import { haptic } from "@/lib/haptics";
+import { requestImageSrc } from "@/lib/request-image-src";
 
 const STATUSES: BugStatus[] = ["submitted", "reviewing", "fixed", "closed"];
 
@@ -132,8 +133,8 @@ export function BugDetailClient({ copy, bug, viewerIsAuthor, isReviewer, isDevel
       {bug.imageUrls.length > 0 ? (
         <div className="bgw-shots">
           {bug.imageUrls.map((url, idx) => (
-            <a href={url} key={url} rel="noreferrer" target="_blank">
-              <Image alt={`${copy.screenshotAlt} ${idx + 1}`} className="object-cover" fill sizes="50vw" src={url} />
+            <a href={requestImageSrc(url)} key={url} rel="noreferrer" target="_blank">
+              <RequestImage alt={`${copy.screenshotAlt} ${idx + 1}`} className="object-cover" fill sizes="50vw" src={url} />
             </a>
           ))}
         </div>

@@ -52,6 +52,7 @@ import {
 import { linkedContextBelongsToOrg } from "@/lib/task-linked-context";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { isOwnerOrPlatformDeveloper } from "@/config/roles";
+import { newRequestImagesOwnedBy } from "@/lib/request-image-owners";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { bestEffortWrite, mustWrite } from "@/lib/db-write-guard";
 import type { Database } from "@/types/database";
@@ -313,6 +314,10 @@ export async function updateTaskCore(formData: FormData) {
     !!task.projectId,
     session.organization.id,
   );
+  // 새로 붙인 사진은 내가 올린 파일만(2026-11-27) — 남의 사진 주소를 넣어 참여자에게 여는 것을 막는다.
+  if ((await newRequestImagesOwnedBy(getSupabaseServiceClient(), imageUrls, task.imageUrls, session.user.id)) !== true) {
+    redirect(`/mobile/tasks/${id}/edit?error=save_failed`);
+  }
   const ctxPropertyId = cleanText(formData.get("ctxPropertyId")) || null;
   const ctxRoomId = cleanText(formData.get("ctxRoomId")) || null;
   const ctxReservationId = cleanText(formData.get("ctxReservationId")) || null;
@@ -1245,6 +1250,9 @@ export async function addTaskUpdate(formData: FormData) {
     redirect(detailPath(id));
   }
   const supabase = getSupabaseServiceClient();
+  if ((await newRequestImagesOwnedBy(supabase, imageUrls, [], session.user.id)) !== true) {
+    redirect(detailPath(id, "save_failed"));
+  }
   await bestEffortWrite(
     "task_updates: insert",
     supabase.from("task_updates").insert({

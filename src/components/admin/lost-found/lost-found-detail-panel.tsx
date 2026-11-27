@@ -5,7 +5,7 @@ import { GuestMessageBackLink } from "@/components/guest-messages/guest-message-
 // Admin 분실물 console — 우측 상세 패널. 화이트 리디자인(2026-10-14, 시안 LF-PC · LFReturn-PC): 위 한 줄(임박 · 상태 ·
 // 분류) + 삭제 · 닫기, 제목, 사진, 진행 중이면 「자동 폐기까지 D-n」 막대, 정보 줄. 아래는 진행 중이면
 // [반환 처리] · [보관 연장 | 폐기 처리] · 상태 정정, 완료면 「관리자 예외 개입」 복원. 상자 · 칩 없음.
-import Image from "next/image";
+import { RequestImage } from "@/components/request-image";
 import { RotateCcw, Trash2, X } from "lucide-react";
 import { canDeleteRequestRecord, type RequestDeleteAccess } from "@/lib/request-delete-rule";
 import { useAdminPanelA11y } from "@/components/admin/shared/use-admin-panel-a11y";
@@ -16,6 +16,7 @@ import { localizeLostFoundMemo } from "@/lib/lost-found-memo";
 import { fmtDate, fmtDateTime, isActive, lostGuestLine, tpl } from "./lost-found-console-data";
 import { categoryLabel, statusLabel, type LFCopy } from "./lost-found-console-shared";
 import { storageTotal } from "./lost-found-board";
+import { requestImageSrc } from "@/lib/request-image-src";
 
 export type LFActionKind = "return" | "dispose" | "extend" | "correct" | "restore" | "delete";
 
@@ -38,8 +39,8 @@ function Gallery({ urls }: { urls: readonly string[] }) {
   return (
     <div className="lfp__gal">
       {urls.map((url) => (
-        <a className="lfp__shot" href={url} key={url} rel="noreferrer" target="_blank">
-          <Image alt="" src={url} fill sizes="170px" />
+        <a className="lfp__shot" href={requestImageSrc(url)} key={url} rel="noreferrer" target="_blank">
+          <RequestImage alt="" src={url} fill sizes="170px" />
         </a>
       ))}
     </div>

@@ -1,5 +1,5 @@
 "use client";
-import Image from "next/image";
+import { RequestImage } from "@/components/request-image";
 import Link from "next/link";
 import { useState } from "react";
 import { haptic } from "@/lib/haptics";
@@ -90,7 +90,7 @@ export function BoardListRow({
           <span className="bdw-strip">
             {photos.map((url, i) => (
               <span className="bdw-ph" key={url}>
-                <Image alt="" fill sizes="(min-width: 1000px) 120px, 30vw" src={url} />
+                <RequestImage alt="" fill sizes="(min-width: 1000px) 120px, 30vw" src={url} />
                 {i === photos.length - 1 && hiddenPhotos > 0 ? <b className="bdw-ph__more">+{hiddenPhotos}</b> : null}
               </span>
             ))}

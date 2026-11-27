@@ -17,6 +17,7 @@ import "./attendance.css";
 import type { AttendanceCorrectionStatus } from "@/lib/attendance";
 import { getDictionary } from "@/lib/i18n";
 import { haptic } from "@/lib/haptics";
+import { requestImageSrc } from "@/lib/request-image-src";
 
 export type CorrectionRequestView = {
   id: string;
@@ -142,7 +143,7 @@ export function AttendanceCorrectionStatus({
             <dt className="is-mid">{copy.corrRowPhotos}</dt>
             <dd className="corrst-photos">
               {photos.map((u) => (
-                <a key={u} href={u} target="_blank" rel="noreferrer" style={{ backgroundImage: `url(${u})` }} aria-label={copy.corrRowPhotos} />
+                <a key={u} href={requestImageSrc(u)} target="_blank" rel="noreferrer" style={{ backgroundImage: `url(${requestImageSrc(u)})` }} aria-label={copy.corrRowPhotos} />
               ))}
             </dd>
           </>

@@ -22,6 +22,7 @@ import { getMemberIdsWithCapability } from "@/lib/attendance-review";
 import { notifyAttendanceAdmins } from "@/lib/notifications/create";
 import { bestEffortWrite } from "@/lib/db-write-guard";
 import { storagePathFromPublicUrl } from "@/lib/storage-url-guard";
+import { requestImagesOwnedBy } from "@/lib/request-image-owners";
 import { staffCorrectionTimesProblem, tokyoWallClockInstant } from "@/lib/attendance-clock";
 import { getCurrentFinalizedSnapshot } from "@/lib/attendance-finalization";
 import { isPayrollMonthLocked } from "@/lib/payroll-approval-server";
@@ -666,6 +667,14 @@ export async function createAttendanceCorrectionRequest(
   }
   const imageUrls = (input.imageUrls ?? []).slice(0, ATTENDANCE_CORRECTION_MAX_IMAGES);
   if (!areOwnCorrectionImageUrls(imageUrls, organizationId)) return { ok: false, reason: "invalid" };
+  // 내가 올린 파일만 붙인다(2026-11-27) — 남의 사진 주소를 넣으면 본인으로서 열 수 있게 되기 때문.
+  const owned = await requestImagesOwnedBy(
+    service,
+    imageUrls.map((url) => storagePathFromPublicUrl(url, CORRECTION_IMAGE_BUCKET) ?? ""),
+    userId,
+  );
+  if (owned === "error") return { ok: false, reason: "error" };
+  if (!owned) return { ok: false, reason: "invalid" };
 
   // 정정 대상 기준 날짜를 정하고, 연결된 세션이 있으면 본인 소유인지 확인한다.
   let baseDate: string;

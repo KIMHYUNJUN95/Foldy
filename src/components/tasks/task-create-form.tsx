@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import Image from "next/image";
+import { RequestImage } from "@/components/request-image";
 import { CalendarDays, ChevronDown, ChevronRight, Megaphone, Share2, Users, X } from "lucide-react";
 import { createTask } from "@/app/mobile/tasks/new/actions";
 import { updateTaskCore } from "@/app/mobile/tasks/[id]/actions";
@@ -697,7 +697,7 @@ export function TaskCreateForm({
               <div className="tkw-imgs">
                 {existingImgUrls.map((url, i) => (
                   <div className="tkw-imgs__t" key={i}>
-                    <Image alt="" aria-hidden="true" className="object-cover" fill sizes="76px" src={url} />
+                    <RequestImage alt="" aria-hidden="true" className="object-cover" fill sizes="76px" src={url} />
                     <button
                       aria-label={imgCopy.remove}
                       className="tkw-imgs__x"

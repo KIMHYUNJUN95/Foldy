@@ -2,7 +2,7 @@
 
 import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
-import Image from "next/image";
+import { RequestImage } from "@/components/request-image";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check, Trash2, X, ZoomIn } from "lucide-react";
 import "./feedback-mobile.css";
@@ -19,6 +19,7 @@ import {
   reopenComplaintAction,
   createComplaintCommentAction,
 } from "@/actions/complaints";
+import { requestImageSrc } from "@/lib/request-image-src";
 
 /** «10/8 14:20» — 도쿄 기준. */
 function stamp(iso: string): string {
@@ -44,7 +45,7 @@ function Lightbox({ src, caption, onClose, hint, closeLabel }: { src: string; ca
       <div className="fbw-lightbox__stage" onClick={onClose}>
         {/* 라이트박스는 원본 해상도로 본다(결정 로그 2026-06-22) — next/image 축소본을 쓰지 않는다. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt={caption} />
+        <img src={requestImageSrc(src)} alt={caption} />
       </div>
       <span className="fbw-lightbox__hint">
         <ZoomIn aria-hidden="true" />
@@ -205,7 +206,7 @@ export function ComplaintDetail({
               const caption = `${t.photosTitle} ${i + 1}`;
               return (
                 <button key={url} type="button" className="fbw-shot" aria-label={caption} onClick={() => setLightbox({ src: url, caption })}>
-                  <Image src={url} alt="" fill sizes="96px" />
+                  <RequestImage src={url} alt="" fill sizes="96px" />
                 </button>
               );
             })}
@@ -227,7 +228,7 @@ export function ComplaintDetail({
                 <span className="fbw-shots">
                   {cm.imageUrls.map((url, i) => (
                     <button key={url} type="button" className="fbw-shot is-sm" aria-label={`${t.photosTitle} ${i + 1}`} onClick={() => setLightbox({ src: url, caption: `${t.photosTitle} ${i + 1}` })}>
-                      <Image src={url} alt="" fill sizes="56px" />
+                      <RequestImage src={url} alt="" fill sizes="56px" />
                     </button>
                   ))}
                 </span>

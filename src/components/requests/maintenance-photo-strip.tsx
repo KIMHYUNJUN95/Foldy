@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { RequestImage } from "@/components/request-image";
 import { useState } from "react";
 import { ImageLightbox } from "@/components/shell/image-lightbox";
 
@@ -19,7 +19,7 @@ export function MaintenancePhotoStrip({ imageUrls, closeLabel, imageAltLabel }: 
     <div className="mdw-shots" data-swipe-back="off">
       {imageUrls.map((url, index) => (
         <button className="mdw-shot" key={url} onClick={() => setOpenIndex(index)} type="button" aria-label={`${imageAltLabel} ${index + 1}`}>
-          <Image alt="" fill sizes="96px" src={url} />
+          <RequestImage alt="" fill sizes="96px" src={url} />
         </button>
       ))}
       <ImageLightbox closeLabel={closeLabel} onClose={() => setOpenIndex(null)} openIndex={openIndex} urls={imageUrls} />

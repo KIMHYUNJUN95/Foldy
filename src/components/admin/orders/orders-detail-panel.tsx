@@ -5,7 +5,7 @@
 // 상품 링크 · 메모 · 수량) → 사유 · 거절 사유 · 배송 예정. 아래: 승인 대기 = [거절][승인], 주문 대기 = [거절][주문 처리],
 // 주문 처리됨 = [배송일 수정], 거절 = 「관리자 예외 개입」 [다시 열기]. 모두 아래에 요청 수정 · 상태 정정 글자 버튼.
 // 상자 · 칩 · 진행 막대 없음(상태는 위 글자가 이미 말한다 — hallmark 위계 점검).
-import Image from "next/image";
+import { RequestImage } from "@/components/request-image";
 import { ExternalLink, ImageIcon, Pencil, RotateCcw, Trash2, X } from "lucide-react";
 import { useAdminPanelA11y } from "@/components/admin/shared/use-admin-panel-a11y";
 import { canDeleteRequestRecord, type RequestDeleteAccess } from "@/lib/request-delete-rule";
@@ -59,7 +59,7 @@ function ItemRow({ it }: { it: OrderItemVM }) {
     <div className="ow-item">
       {thumb ? (
         <a className="ow-item__ph" href={thumb} target="_blank" rel="noreferrer">
-          <Image alt="" src={thumb} fill sizes="40px" />
+          <RequestImage alt="" src={thumb} fill sizes="40px" />
           {it.photoUrls.length > 1 ? <span className="ow-item__phn num">{it.photoUrls.length}</span> : null}
         </a>
       ) : (

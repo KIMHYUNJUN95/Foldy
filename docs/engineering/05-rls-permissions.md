@@ -2230,3 +2230,49 @@ Supabase advisor `anon_security_definer_function_executable` 정리. 운영 `pg_
 - **알려진 남은 점 3**: `x-forwarded-for` 첫 값을 믿는 건 Vercel 이 그 헤더를 덮어쓰기 때문이다. 앞에 Cloudflare 같은 프록시를 두게 되면
   (예: 도메인 이전 때) `clientIpFromHeaders`(`src/lib/auth-attempt-limit.ts`)를 다시 볼 것.
 - 테스트: `src/lib/__tests__/auth-attempt-limit.test.ts` · `auth-actions-attempt-limit.test.ts`.
+
+## 2026-11-27 request-images 비공개 버킷 (`202611270001_request_images_private.sql` · `202611270002_request_image_owners.sql`, **운영 적용 전 — 0002 → 앱 코드 → 0001 순서**)
+
+- 버킷 `request-images` 를 `public = false` 로. 예전엔 공개 주소만 알면 로그인 없이 누구나 사진을 열었다(분실물 · 수리 · 근태 정정 · 게스트 피드백 등).
+  올리기 · 지우기 · 읽기(1시간 안 내 업로드) 정책은 그대로 — 바꾸는 것은 `buckets.public` 하나. `202605210008` 의 upsert(`public = excluded.public`)는 다시 돌리지 않는다(되돌아가 공개가 됨).
+- **DB 에 저장하는 주소 모양은 그대로** — `.../storage/v1/object/public/request-images/{경로}`. `getPublicUrl()` 은 비공개 버킷에서도 같은 문자열을 만들므로
+  업로더(`src/components/requests/request-image-upload.ts` · `src/lib/board.ts` · `complaints.ts` · `bug-reports.ts`)와 서버 주소 검사(`storage-url-guard.ts` · `task-images.ts`)는 바꾸지 않는다.
+- **화면은 `requestImageSrc()`(`src/lib/request-image-src.ts`, 클라이언트 · 서버 공용)로 그린다.** 우리 프로젝트의 이 버킷 공개 · 서명 주소나 버킷 안 경로면
+  `/api/request-images/{경로}` 로 바꾸고, 다른 버킷 · 다른 프로젝트 · 외부 주소 · `blob:` 은 그대로 둔다.
+- **라우트 `GET /api/request-images/[...path]`** (`src/app/api/request-images/[...path]/route.ts`):
+  - 경로 검사: 칸마다 `[A-Za-z0-9._-]+`(`.` · `..` · 빈 칸 · 인코딩된 `/` · `\` 거절), 1칸 uuid, 알려진 폴더만 · 폴더별 칸 수
+    (`request-image-folders.ts` 목록 + `annual-leave-requests` · `bug-reports` · `complaint-images` = 4칸, `complaint-comment-images` = 5칸). 어긋나면 400.
+    교통비(`transport-reimbursements`)는 받지 않는다 — 자기 서명 경로(`transport-receipt-storage.ts`)가 따로 있다.
+  - 로그인 안 함 → 401. 1칸 조직의 활성 멤버가 아니면 → 403(세션 조직이면 세션이 이미 확인, 아니면 `memberships` 한 번). 플랫폼 관리자도 그 조직 멤버십이 없으면 403 —
+    다른 조직 범위 읽기(`hasOrganizationContext`)와 같다.
+  - **결정 A(2026-11-27):** 활성 멤버 누구나 열 수 있다. 단 `attendance-corrections` 는 `attendance.manage`, `annual-leave-requests` 는 `leave.approve`(관리 큐와 같은 권한)가 있거나
+    **그 파일을 올린 본인**(`storage.objects.owner_id`)만. 예전 안(「내 기록의 `image_urls` 에 그 주소가 있는가」)은 정정 저장 검사가 조직 · 폴더 모양만 봐서
+    남의 사진 주소를 내 요청에 넣고 열 수 있었다(2026-11-27 독립 검사). 주인은 service role 전용 SECURITY DEFINER 함수
+    `public.request_image_owners(text[])`(`202611270002_request_image_owners.sql`, 한 번에 20개까지, anon · authenticated 실행 회수)로 읽는다 —
+    storage 스키마는 PostgREST 로 노출되지 않는다. 도우미: `src/lib/request-image-owners.ts`. 못 읽으면 403.
+  - **정정 저장도 같은 확인**(`createAttendanceCorrectionRequest`): 붙인 사진이 모두 그 사용자가 올린 파일이어야 한다 — 아니면 `invalid`, 주인을 못 읽으면 `error`.
+  - 통과하면 service role 로 `createSignedUrl`(300초) → 302, `Referrer-Policy: no-referrer`. 캐시: 두 제한 폴더는 `no-store`(공용 태블릿에서 로그아웃 · 계정 바꾸기 뒤
+    남은 302 로 열리지 않게), 그 밖은 `private, max-age=240`. 서명 실패 → 404. 파일이 있는지는 권한 확인 전에 보지 않는다. 오류 응답은 모두 `no-store`.
+  - **`?as=json`**(앱용): 같은 검사 뒤 302 대신 `200 {"url": "<서명 주소>"}` · `no-store`. 오류는 같은 상태 코드에
+    `{"error": "bad_request" | "unauthorized" | "forbidden" | "not_found"}`. Capacitor WebView 가 302 를 따라 Supabase 로 나가 시스템 브라우저로 튕기는 것을 막으려고,
+    앱 다리가 이 주소를 읽어 서명 주소를 앱 안 브라우저로 연다.
+  - **할 일 · 제안 · 버그 사진은 표 RLS 범위로 좁힌다(사용자 결정 「셋 다 좁히기」 2026-11-27, 캐시 `no-store`):**
+    - `task-images` · `task-update-images` · `suggestion-images` — 칸 3 은 업로드 때 만든 무작위 id 라(할 일 상세 PC 업로더만 할 일 id) 행 id 로 찾지 않는다.
+      **사용자 세션(`getSupabaseServerClient`, RLS)** 으로 그 사진 주소(`…/object/public/…` · `…/object/…` 두 모양, `overlaps`)를 가진 행이 경로 조직에 하나라도 보이면 통과:
+      `tasks`(`deleted_at is null`) · `task_updates`(`tasks!inner` 로 조직 · `deleted_at is null`) · `staff_suggestions` + `staff_suggestion_comments`(병렬, `can_view_staff_suggestion`).
+      할 일 RLS 는 지운 할 일도 참여자에게 보여 주므로(실시간 삭제 신호 — 202611250001) 지운 것은 라우트가 막는다.
+      아니면 **올린 사람**(`request_image_owners`)이면 통과 — 저장 전 미리 보기. 둘 다 아니면 403. 쿼리 1번(제안은 병렬 2개) + 없을 때만 주인 1번.
+    - `bug-reports` — 서버(service role)가 올려 owner 가 없다. 칸 3 = 신고 id(`validateImages` 가 그 폴더만 받음). service role 로 그 신고(경로 조직)를 읽어
+      **신고한 사람 · `bug.review`(세션 조직이 아니면 `memberCapabilities`) · 플랫폼 개발자** 면 통과 — `getBugReportDetail` 과 같은 규칙. 신고가 없으면 403.
+      참고: `bug_reports` 읽기 RLS 는 아직 `owner` · `office_admin` 역할만 검토자로 본다(`202606250004`) — `bug.review` 를 가진 다른 역할(전무 등)은 사용자 세션으로
+      남의 신고를 못 읽는다. 라우트는 capability 기준이라 이 차이를 따라가지 않는다(별도 정리 대상).
+    - **저장도 같은 확인(주소 끼워 넣기 막기):** 할 일 만들기 · 수정(`createTaskRecord` · `createConsoleTask` · `updateTask` · `updateConsoleTaskCore`) · 메모(`addTaskUpdate` ·
+      `addConsoleNote`) · 제안 · 댓글 만들기 · 수정은 **그 기록에 없던 새 주소**가 모두 그 사용자가 올린 파일이어야 저장한다
+      (`newRequestImagesOwnedBy` — `src/lib/request-image-owners.ts`). 아니거나 주인을 못 읽으면 기존 `save_failed`. 이미 있던 사진(남이 올린 것 포함)은 묻지 않으므로
+      그대로 두는 수정은 통과한다. 반복 할 일은 행을 복사하지 않아(시리즈 한 행) 이 검사를 거치지 않는다.
+    - 읽기 오류(RLS 행 확인 · 버그 신고 · 주인 함수)는 403 / `save_failed` 로 닫되 `console.error("[request-images] … failed", { folder, code })` ·
+      `[request-image-owners] rpc failed` 를 남긴다 — 경로 · 주소 · 사용자는 적지 않는다.
+- 업로드 RLS 변경 없음 — 브라우저 올리기는 INSERT 정책 그대로. 올린 직후 미리보기는 `blob:` 이거나 라우트(조직 멤버 · 위 폴더는 올린 사람이면 열림)다.
+- 테스트: `src/lib/__tests__/request-image-src.test.ts` · `request-images-route.test.ts`(할 일 · 메모 · 제안 참여자 302 · 비참여자 403 · 지운 할 일 403 · 올린 사람 302 ·
+  버그 신고자 · 검토자 · 개발자 302) · `attendance-correction-request.test.ts`(사진 주인).
+

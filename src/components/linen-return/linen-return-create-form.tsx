@@ -4,7 +4,7 @@
 // 예전 「품목 고르기 + 수량」 줄을 하나씩 더하던 방식 대신 **이 건물의 활성 품목을 모두 펼쳐 ± 로 수량만** 정한다(사용자 승인).
 // 같은 품목을 두 번 넣을 일이 없고(규칙 4), 0 인 품목은 저장하지 않는다. 서버에 보내는 모양(linesJson)은 그대로.
 // 0 인 줄은 「−」를 숨긴다(hallmark 절제 점검). 숫자는 바뀔 때 살짝 굴러 바뀐다.
-import Image from "next/image";
+import { RequestImage } from "@/components/request-image";
 import { unstable_rethrow } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Minus, Plus, X } from "lucide-react";
@@ -313,7 +313,7 @@ export function LinenReturnCreateForm({
           <div className="ofw-photos__row">
             {keptPhotos.map((url) => (
               <div className="ofw-photos__th" key={url}>
-                <Image alt="" fill sizes="72px" src={url} />
+                <RequestImage alt="" fill sizes="72px" src={url} />
                 <button
                   aria-label={imgCopy.remove}
                   onClick={() => {

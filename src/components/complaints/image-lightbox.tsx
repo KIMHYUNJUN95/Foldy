@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
+import { requestImageSrc } from "@/lib/request-image-src";
 
 interface Props {
   images: string[];
@@ -182,7 +183,7 @@ export function ImageLightbox({ images, startIndex, onClose, labels }: Props) {
             «크게 봐서 확인한다» 는 목적이 깨진다. 핀치 줌도 원본이어야 의미가 있다. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={images[index]}
+          src={requestImageSrc(images[index])}
           alt=""
           className="cx-lb__img"
           style={{ transform: imgTransform, transition: imgTransition }}

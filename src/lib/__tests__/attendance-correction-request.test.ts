@@ -71,7 +71,12 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: unknown }> {
 }
 
 const inserted: Row[] = [];
+const storageOwners: { rows: Array<{ name: string; owner_id: string | null }>; fails: boolean } = { rows: [], fails: false };
 const insertingClient = {
+  async rpc(fn: string, args: { p_names: string[] }) {
+    if (fn !== "request_image_owners" || storageOwners.fails) return { data: null, error: { message: "rpc failed" } };
+    return { data: storageOwners.rows.filter((r) => args.p_names.includes(r.name)), error: null };
+  },
   from(t: string) {
     const q = new FakeQuery(t) as FakeQuery & { insert?: (row: Row) => unknown };
     (q as unknown as { insert: (row: Row) => unknown }).insert = (row: Row) => {
@@ -103,6 +108,8 @@ function seed() {
   for (const k of Object.keys(tables)) delete tables[k];
   failing.clear();
   inserted.length = 0;
+  storageOwners.rows = [];
+  storageOwners.fails = false;
   tables.attendance_sessions = [
     {
       id: "s1",
@@ -176,3 +183,34 @@ describe("정정 요청 — 시각 (M2)", () => {
     expect(inserted[0]?.desired_clock_out_at).toBe(new Date(`${ym}-01T23:30:00+09:00`).toISOString());
   });
 });
+
+describe("정정 요청 사진 — 내가 올린 파일만 붙인다 (2026-11-27)", () => {
+  const BASE = "https://proj.supabase.co";
+  const ORG = "org-1";
+  const path = `${ORG}/attendance-corrections/f1/a.jpg`;
+  const url = `${BASE}/storage/v1/object/public/request-images/${path}`;
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = BASE;
+  });
+
+  it("내가 올린 사진이면 받는다", async () => {
+    storageOwners.rows = [{ name: path, owner_id: "u-a" }];
+    await expect(createAttendanceCorrectionRequest({ ...base, imageUrls: [url] })).resolves.toEqual({ ok: true, id: "req-1" });
+  });
+
+  it("남이 올린 사진 주소면 invalid", async () => {
+    storageOwners.rows = [{ name: path, owner_id: "u-b" }];
+    await expect(createAttendanceCorrectionRequest({ ...base, imageUrls: [url] })).resolves.toEqual({ ok: false, reason: "invalid" });
+    expect(inserted).toEqual([]);
+  });
+
+  it("없는 파일이면 invalid", async () => {
+    await expect(createAttendanceCorrectionRequest({ ...base, imageUrls: [url] })).resolves.toEqual({ ok: false, reason: "invalid" });
+  });
+
+  it("주인 확인을 못 읽으면 error", async () => {
+    storageOwners.fails = true;
+    await expect(createAttendanceCorrectionRequest({ ...base, imageUrls: [url] })).resolves.toEqual({ ok: false, reason: "error" });
+  });
+});
+

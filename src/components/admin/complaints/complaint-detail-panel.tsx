@@ -1,4 +1,4 @@
-import Image from "next/image";
+import { RequestImage } from "@/components/request-image";
 import Link from "next/link";
 import { X } from "lucide-react";
 import { GuestMessageBackLink } from "@/components/guest-messages/guest-message-back-link";
@@ -13,6 +13,7 @@ import {
   ComplaintStatusButton,
   type ComplaintActionLabels,
 } from "@/components/admin/complaints/complaint-panel-actions";
+import { requestImageSrc } from "@/lib/request-image-src";
 
 // 수동 컴플레인 상세 패널 — 서버 컴포넌트. 화이트 리디자인(2026-10-14, 시안 FBManual-PC 오른쪽):
 // 상태 · 플랫폼 → 제목 → 건물 · 객실 / 예약 / 평점 / 작성자 → 내용 → 사진 → 처리 기록(댓글) + 남기기 →
@@ -156,8 +157,8 @@ export function ComplaintDetailPanel({
             {complaint.imageUrls.length > 0 ? (
               <div className="cxw-shots">
                 {complaint.imageUrls.map((url) => (
-                  <a key={url} href={url} target="_blank" rel="noreferrer" className="cxw-shot" aria-label={copy.photosTitle}>
-                    <Image src={url} alt="" width={72} height={72} />
+                  <a key={url} href={requestImageSrc(url)} target="_blank" rel="noreferrer" className="cxw-shot" aria-label={copy.photosTitle}>
+                    <RequestImage src={url} alt="" width={72} height={72} />
                   </a>
                 ))}
               </div>
@@ -177,8 +178,8 @@ export function ComplaintDetailPanel({
                   {comment.imageUrls.length > 0 ? (
                     <span className="cxw-shots">
                       {comment.imageUrls.map((url) => (
-                        <a key={url} href={url} target="_blank" rel="noreferrer" className="cxw-shot is-sm" aria-label={copy.photosTitle}>
-                          <Image src={url} alt="" width={56} height={56} />
+                        <a key={url} href={requestImageSrc(url)} target="_blank" rel="noreferrer" className="cxw-shot is-sm" aria-label={copy.photosTitle}>
+                          <RequestImage src={url} alt="" width={56} height={56} />
                         </a>
                       ))}
                     </span>

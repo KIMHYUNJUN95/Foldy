@@ -934,6 +934,13 @@ request-images   -- shared image bucket; path: {org_id}/{request_type}/{request_
                  -- server (service role) only, not in the list: bug-reports, complaint-images,
                  --   complaint-comment-images. 5-part paths (transport, annual leave) have own policies.
                  -- details: docs/engineering/05-rls-permissions.md 「2026-11-20 request-images 폴더 되살리기」
+                 -- PRIVATE from 2026-11-27 (202611270001, not yet applied — app code first). Stored values stay
+                 --   public-URL-shaped; screens draw requestImageSrc() → /api/request-images/{path}, which checks
+                 --   org membership (+ uploader = storage.objects.owner_id via service-role-only
+                 --   public.request_image_owners(text[]) (202611270002) / attendance.manage / leave.approve for
+                 --   attendance-corrections and annual-leave-requests; task / task-update / suggestion photos need a
+                 --   row the user can read under RLS or the uploader; bug-reports need the reporter / bug.review) and 302s to a 5-minute signed URL
+                 --   (?as=json → 200 {url} for the app). 05-rls 「request-images 비공개 버킷」
 announcement-images -- announcement images
                  -- path: {org_id}/{announcement_id}/{filename}
 ```

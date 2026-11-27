@@ -13,7 +13,7 @@
 // 시각 계약: 공용 `.panel` 슬라이드오버 + `.fld` + `.btn--pri`. 컴플레인 전용 스타일을 새로 만들지
 // 않고 admin-console.css의 공용 primitive를 그대로 쓴다 (CLAUDE.md §4).
 
-import Image from "next/image";
+import { RequestImage } from "@/components/request-image";
 import { useMemo, useRef, useState, useTransition, type ChangeEvent } from "react";
 import { Camera, Star, X } from "lucide-react";
 import { compressImageFile } from "@/components/announcements/announcement-image-uploader";
@@ -427,7 +427,7 @@ export function ComplaintCreatePanel({ labels, reservations, places, onClose }: 
             <div className="cxupgrid">
               {images.map((url, index) => (
                 <div key={url} className="cxupthumb">
-                  <Image src={url} alt="" width={96} height={96} />
+                  <RequestImage src={url} alt="" width={96} height={96} />
                   <button
                     type="button"
                     aria-label={labels.removePhoto}

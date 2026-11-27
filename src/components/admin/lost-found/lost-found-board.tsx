@@ -4,7 +4,7 @@
 // 자동 폐기까지 남은 날 순으로 한 줄씩 세운 「보관 타임라인」. 줄마다 품목 · 위치 · 보관 경과 막대 · D-day.
 // 종결(반환 · 폐기)은 「반환」 · 「폐기 내역」 보기에서만 본다.
 import { LiveWash } from "@/components/shared/live-wash";
-import Image from "next/image";
+import { RequestImage } from "@/components/request-image";
 import { Search } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import type { AdminLostItemVM } from "@/lib/admin-lost-found";
@@ -62,7 +62,7 @@ function Row({
       <span className="lfw-tr__item">
         <span className="lfw-thumb">
           {item.photos[0] ? (
-            <Image alt="" src={item.photos[0]} fill sizes="40px" />
+            <RequestImage alt="" src={item.photos[0]} fill sizes="40px" />
           ) : (
             <CatIcon aria-hidden="true" />
           )}

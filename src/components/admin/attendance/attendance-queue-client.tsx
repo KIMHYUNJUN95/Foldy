@@ -2,7 +2,7 @@
 
 import { attendanceRoleLabel } from "@/lib/attendance-console-labels";
 import { LiveWash } from "@/components/shared/live-wash";
-import Image from "next/image";
+import { RequestImage } from "@/components/request-image";
 import { Fragment, useEffect, useMemo, useState, useTransition } from "react";
 import {
   Ban,
@@ -1930,7 +1930,7 @@ function CorrectionPanel({
                     onClick={() => setLightboxIndex(i)}
                     aria-label={c.trPanelEvidenceCount(photos.length)}
                   >
-                    <Image src={url} alt="" width={34} height={34} />
+                    <RequestImage src={url} alt="" width={34} height={34} />
                   </button>
                 ))}
               </div>

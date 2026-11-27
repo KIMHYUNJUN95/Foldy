@@ -1,7 +1,7 @@
 /* 직원 목록 — 화이트 리디자인(2026-10-14, 시안 Dir-Phone · Dir-Fold · Dir-Tablet).
    흰 바탕 · 상자 없음 · 선택은 옅은 보라 바탕만. 움직임: 줄 차례 등장 · 전화 버튼 누름(살짝 작아짐 + 진동) ·
    번호 복사됨 체크 그리기 · 프로필 칸 흐림 → 선명. reduced-motion 이면 끈다. */
-.drw { --drw-ink: #16141f; --drw-soft: #6b6878; --drw-faint: var(--text-done); --drw-pri: #7a52e6; --drw-pri-ink: #5a30cf; --drw-tint: #f1ecfd; --drw-sel: #f4f1fd; --drw-line: var(--separator); color: var(--drw-ink); }
+.drw { --drw-ink: #16141f; --drw-soft: #6b6878; --drw-faint: var(--text-done); --drw-pri: #7a52e6; --drw-pri-ink: #5a30cf; --drw-tint: #f1ecfd; --drw-sel: #f4f4f6; --drw-line: var(--separator); color: var(--drw-ink); }
 .drw .num { font-variant-numeric: tabular-nums; }
 .drw-list { display: flex; flex-direction: column; min-width: 0; padding-bottom: 24px; }
 .drw-h { display: flex; flex-direction: column; gap: 4px; margin-bottom: 16px; }
@@ -54,7 +54,8 @@
 .drw.is-tablet .drw-r.on { border-radius: 12px; background: var(--drw-sel); border-top-color: transparent; }
 .drw.is-tablet .drw-r.on + .drw-r { border-top-color: transparent; }
 .drw-pane { position: sticky; top: 24px; padding-top: 8px; }
-.drw-hint { margin: 64px 0 0; font-size: 14px; color: var(--drw-soft); }
+/* 안내는 칸 세로 · 가로 가운데(2026-11-27 unslop) */
+.drw-hint { display: grid; place-items: center; min-height: 60vh; margin: 0; font-size: 14px; text-align: center; color: var(--drw-soft); }
 .drw-prof { display: flex; flex-direction: column; gap: 22px; max-width: 440px; animation: drw-clear 240ms ease both; }
 @keyframes drw-clear { from { opacity: .3; filter: blur(2px); } }
 .drw-prof__h { display: flex; align-items: center; gap: 14px; }
@@ -101,3 +102,9 @@
   .drw-r, .drw-prof, .drw-btn.is-done svg path, .drw-btn.is-done svg polyline { animation: none; }
   .drw-call, .drw-btn { transition: none; }
 }
+
+/* unslop 다듬기(2026-11-27, 요청함 · 연락처 시안) — 얼굴 동그라미 회색, 나만 옅은 보라 · 역할은 이름 옆 작은 회색 글자 · 둘째 줄은 번호만 ·
+   태블릿 고른 줄은 옅은 회색 바탕(선택 표시 규칙 — 막대 없음). 전화 단추 보라 · 누르는 자리 44 그대로. */
+.drw-av { background: #f1f0f5; color: #4b4858; font-weight: 600; }
+.drw-r.is-self .drw-av, .drw-av.is-self { background: #efe9fd; color: #5a30cf; }
+.drw-rt { margin-left: 6px; font-size: 13px; font-weight: 500; color: #8a8796; }

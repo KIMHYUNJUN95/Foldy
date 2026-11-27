@@ -7,6 +7,7 @@ import { getOnboardingState } from "@/lib/onboarding";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { displayRoleKey, fetchPlatformDeveloperIds } from "@/lib/platform-developers";
+import { directoryRoleTag } from "@/lib/directory-role-tag";
 import type { Database } from "@/types/database";
 
 type MembershipRow = Database["public"]["Tables"]["memberships"]["Row"];
@@ -62,11 +63,17 @@ export default async function MobileDirectoryPage() {
   const people: DirectoryPerson[] = memberships
     .map((m) => {
       const profile = profileMap.get(m.user_id);
+      const roleKey = displayRoleKey(m.role, m.user_id, devIds);
+      const roleLabel = roles[roleKey] ?? m.role;
       return {
         membershipId: m.id,
         name: profile?.name ?? "—",
         role: m.role,
-        roleLabel: roles[displayRoleKey(m.role, m.user_id, devIds)] ?? m.role,
+        roleLabel,
+        roleTag: directoryRoleTag(m.role, roleLabel, roleKey !== m.role, {
+          fieldManager: copy.roleTagFieldManager,
+          partLeader: copy.roleTagPartLeader,
+        }),
         phone: profile?.phone_number ?? "",
         joinedAt: m.joined_at,
         isSelf: m.user_id === session.user.id,
@@ -97,8 +104,6 @@ export default async function MobileDirectoryPage() {
           copyNumber: copy.copyNumber,
           copied: copy.copied,
           copyFailed: copy.copyFailed,
-          labelPhone: copy.labelPhone,
-          labelRole: copy.labelRole,
           labelJoined: copy.labelJoined,
           pickHint: copy.pickHint,
           clear: copy.clear,

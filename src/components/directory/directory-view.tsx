@@ -21,6 +21,8 @@ export type DirectoryPerson = {
   name: string;
   role: string;
   roleLabel: string;
+  /** 이름 옆 작은 역할 글자 — 묶음 이름과 겹치는 말은 뺀 것(`directoryRoleTag`), 빈 문자열이면 안 그림. */
+  roleTag: string;
   phone: string;
   joinedAt: string | null;
   isSelf: boolean;
@@ -40,8 +42,6 @@ export type DirectoryCopy = {
   copyNumber: string;
   copied: string;
   copyFailed: string;
-  labelPhone: string;
-  labelRole: string;
   labelJoined: string;
   pickHint: string;
   clear: string;
@@ -121,17 +121,15 @@ export function DirectoryView({ people, orgName, locale, copy }: { people: Direc
                       <b>
                         {p.name}
                         {p.isSelf ? <span className="drw-me">{copy.me}</span> : null}
+                        {p.roleTag ? <span className="drw-rt">{p.roleTag}</span> : null}
                       </b>
-                      <span className="num">
-                        <span className="drw-role">{p.roleLabel}</span>
-                        <span className="drw-subph">{` · ${formatPhoneDisplay(p.phone) || copy.noPhoneLong}`}</span>
-                      </span>
+                      <span className="num drw-subph">{formatPhoneDisplay(p.phone) || copy.noPhoneLong}</span>
                     </span>
                     <span className={`drw-ph num${p.phone ? "" : " is-none"}`}>{formatPhoneDisplay(p.phone) || copy.noPhoneLong}</span>
                   </>
                 );
                 return (
-                  <div key={p.membershipId} className={`drw-r${on ? " on" : ""}`}>
+                  <div key={p.membershipId} className={`drw-r${on ? " on" : ""}${p.isSelf ? " is-self" : ""}`}>
                     {isTablet ? (
                       <button type="button" className="drw-r__main" aria-pressed={on} onClick={() => setSelectedId(p.membershipId)}>
                         {body}
@@ -185,7 +183,7 @@ function Profile({ person, copy, locale }: { person: DirectoryPerson; copy: Dire
   return (
     <div className="drw-prof">
       <div className="drw-prof__h">
-        <span className="drw-av is-lg" aria-hidden="true">
+        <span className={`drw-av is-lg${person.isSelf ? " is-self" : ""}`} aria-hidden="true">
           {person.name.slice(0, 1)}
         </span>
         <div>
@@ -208,11 +206,8 @@ function Profile({ person, copy, locale }: { person: DirectoryPerson; copy: Dire
           </button>
         </div>
       ) : null}
+      {/* 전화 · 역할은 위 머리 · 단추와 겹쳐 가입만 둔다(2026-11-27 unslop). */}
       <dl className="drw-dl">
-        <dt>{copy.labelPhone}</dt>
-        <dd className="num">{formatPhoneDisplay(person.phone) || copy.noPhoneLong}</dd>
-        <dt>{copy.labelRole}</dt>
-        <dd>{person.roleLabel}</dd>
         <dt>{copy.labelJoined}</dt>
         <dd className="num">{joined}</dd>
       </dl>

@@ -70,7 +70,7 @@ export default async function MobileRequestsPage({ searchParams }: PageProps) {
     <MobileShell activeItem="requests" badges={navBadges} title={dictionary.mobile.requestsTitle} split>
       <LiveRefresh sources={requestLiveSources(session.organization.id)} />
       <SplitList detail="requests">
-        {/* 화이트 리디자인(2026-10-13 · 10-14 문구 맞춤, 시안 Req-Phone): 제목 · 한 줄 → 옅은 타일 셋(아이콘 위 · 글자 아래). */}
+        {/* 제목 · 한 줄 → 옅은 타일 셋(2026-11-27 unslop: 아이콘 옆 글자, 긴 말은 칸 안 두 줄). */}
         <div className="rqw-head">
           <h1>{dictionary.mobile.requestsHead.title}</h1>
           <p>{dictionary.mobile.requestsHead.sub}</p>
@@ -78,15 +78,15 @@ export default async function MobileRequestsPage({ searchParams }: PageProps) {
         <div className="rqw-quick">
           <Link href="/mobile/lost-found/new">
             <ShoppingBag aria-hidden="true" />
-            {dictionary.mobile.requestsHead.lost}
+            <span>{dictionary.mobile.requestsHead.lost}</span>
           </Link>
           <Link href="/mobile/maintenance/new">
             <Wrench aria-hidden="true" />
-            {dictionary.mobile.requestsHead.maintenance}
+            <span>{dictionary.mobile.requestsHead.maintenance}</span>
           </Link>
           <Link href="/mobile/requests/orders/new">
             <ShoppingCart aria-hidden="true" />
-            {dictionary.mobile.requestsHead.order}
+            <span>{dictionary.mobile.requestsHead.order}</span>
           </Link>
         </div>
 
@@ -118,9 +118,8 @@ export default async function MobileRequestsPage({ searchParams }: PageProps) {
             groupScope: dictionary.mobile.filterGroupScope,
             groupStatus: dictionary.mobile.filterGroupStatus,
             groupType: dictionary.mobile.filterGroupType,
-            groupToday: dictionary.mobile.groupToday,
-            groupYesterday: dictionary.mobile.groupYesterday,
-            groupEarlier: dictionary.mobile.groupEarlier,
+            groupOpen: dictionary.mobile.requestGroupOpen,
+            groupDone: dictionary.mobile.requestGroupDone,
             openCountTemplate: dictionary.mobile.requestOpenCount,
             noFilterResults: dictionary.mobile.noFilterResults,
             returnedEntry: dictionary.lostFound.returned.entry,
@@ -172,7 +171,6 @@ export default async function MobileRequestsPage({ searchParams }: PageProps) {
             arriveToday: dictionary.mobile.orderDetail.wArriveToday,
             arriveTomorrow: dictionary.mobile.orderDetail.wArriveTomorrow,
             arriveOn: dictionary.mobile.orderDetail.wArriveOn,
-            reqOn: dictionary.mobile.orderDetail.wReqOn,
           }}
           deliveryCalendarCopy={{
             title: dictionary.mobile.deliveryCalendar.title,

@@ -49,6 +49,17 @@ import { getCanonicalPropertyName, localizePropertyName, localizeRoomPlaceLabel 
 import { resolveRequestCatalogLocation, resolveRequestLocation, type RequestLocationDisplay } from "@/lib/request-location";
 import type { ActiveRoomCatalogItem } from "@/lib/rooms";
 import type { Database } from "@/types/database";
+import {
+  activeLostStatuses,
+  activeMaintenanceStatuses,
+  activeOrderStatuses,
+  lostRowTone,
+  maintenanceRowTone,
+  orderRowTone,
+  splitRequestRowsByStatus,
+  tokyoMonthDayLabel,
+  type RequestRowTone,
+} from "@/lib/request-status-groups";
 import { cn } from "@/lib/utils";
 import { FoldyEmpty } from "@/components/shared/foldy-empty";
 
@@ -70,21 +81,8 @@ const LIST_FILTER_KEYS = [
   "scope", "type", "status", "building", "date", "startDate", "endDate",
 ] as const;
 
-// 이 집합들은 모듈 수준 상수이므로 렌더 사이에 참조가 안정적이다.
-const activeLostStatuses = new Set<LostItemStatus>([
-  "registered",
-  "stored",
-  "disposal_scheduled",
-]);
-const activeMaintenanceStatuses = new Set<MaintenanceStatus>(["open", "in_progress"]);
-// active: requested/approved/ordered, closed: received/closed
-const activeOrderStatuses = new Set<OrderStatus>(["requested", "approved", "ordered"]);
 
-// ── Date grouping (Tokyo operating date) ─────────────────────────────────────
-// 요청을 Asia/Tokyo 달력 날짜로 오늘 / 어제 / 이전으로
-// 나누므로, 서버/러너 시간대와 상관없이 묶음이 안정적이다.
-type DateGroupKey = "today" | "yesterday" | "earlier";
-
+// 도쿄 운영 날짜 키 — 서버/러너 시간대와 상관없이 안정적이다.
 function tokyoDateKey(value: string): string {
   // en-CA → "YYYY-MM-DD"
   return new Intl.DateTimeFormat("en-CA", {
@@ -113,16 +111,6 @@ function GroupHeader({ label, count }: { label: string; count: number }) {
 
 // delivery_date 는 날짜만 있다. 03:00 UTC(= 일본 정오)와 명시적 Asia/Tokyo 를 써서
 // 러너 시간대와 상관없이 달력 날짜가 항상 안정적이게 한다.
-/** 오늘 · 어제는 시각만, 그 전은 「9/26 14:05」(도쿄) — 「이전」 묶음에서 날짜가 안 보이던 것. */
-function formatTime(value: string, locale: Locale) {
-  const hm = new Intl.DateTimeFormat(locale, { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(value));
-  const key = tokyoDateKey(value);
-  const today = tokyoDateKey(new Date().toISOString());
-  if (key === today || key === shiftDateKey(today, -1)) return hm;
-  const [, m, d] = key.split("-");
-  return `${Number(m)}/${Number(d)} ${hm}`;
-}
-
 function formatDeliveryDate(value: string, locale: Locale) {
   const [y, m, d] = value.split("-").map(Number);
   const noonJst = new Date(Date.UTC(y, m - 1, d, 3, 0, 0));
@@ -176,9 +164,8 @@ type FilterLabels = {
   groupScope: string;
   groupStatus: string;
   groupType: string;
-  groupToday: string;
-  groupYesterday: string;
-  groupEarlier: string;
+  groupOpen: string;
+  groupDone: string;
   openCountTemplate: string;
   noFilterResults: string;
   returnedEntry: string;
@@ -218,7 +205,6 @@ type OrderCopy = {
   arriveToday: string;
   arriveTomorrow: string;
   arriveOn: string;
-  reqOn: string;
 };
 
 type DeliveryCalendarCopy = {
@@ -312,8 +298,8 @@ const KIND_ICON: Record<ListKind, React.ReactNode> = {
   order: <ShoppingCart aria-hidden="true" />,
 };
 
-// 화이트 리디자인(2026-10-13, 시안 Req-Phone): 카드 · 사진 · 메모 · 배지 대신 한 줄 행 — 종류 아이콘 · 제목(긴급) · 「호실 · 건물 · 신고자 · 시각」 · 상태 글자.
-// 눌림 반응(scale) · 삭제는 오른쪽 작은 휴지통(권한 있을 때만).
+// 한 줄 행 — 종류 아이콘 · 제목(긴급 글자) · 「호실 · 건물 · 신고자」 · 오른쪽 위 상태 · 아래 날짜(2026-11-27 unslop).
+// 휴지통은 모바일 상세에 삭제가 없어 줄에 남긴다(권한 있을 때만).
 const RequestListCard = memo(function RequestListCard({
   kind,
   href,
@@ -322,6 +308,7 @@ const RequestListCard = memo(function RequestListCard({
   meta,
   statusLabel,
   statusTone,
+  date,
   onDelete,
   deleteLabel,
   live,
@@ -333,7 +320,9 @@ const RequestListCard = memo(function RequestListCard({
   urgentLabel?: string | null;
   meta: (string | null | undefined)[];
   statusLabel: string;
-  statusTone: "open" | "prog" | "done" | "soon";
+  statusTone: RequestRowTone;
+  /** 도쿄 날짜 「M/D」 — 상태 아래. */
+  date: string;
   onDelete?: () => void;
   deleteLabel: string;
   /** 새 줄이 위에서 내려오는 움직임의 열쇠(`LiveWash move`). */
@@ -352,7 +341,10 @@ const RequestListCard = memo(function RequestListCard({
         </span>
         <span className="rqw-row__m">{meta.filter((x, i, arr) => x && x !== "-" && arr.indexOf(x) === i).join(" · ")}</span>
       </span>
-      <span className={`rqw-row__s is-${statusTone}`}>{statusLabel}</span>
+      <span className="rqw-row__r">
+        <span className={`rqw-row__s is-${statusTone}`}>{statusLabel}</span>
+        <span className="rqw-row__d">{date}</span>
+      </span>
       {onDelete ? (
         <button
           className="rqw-row__del"
@@ -751,30 +743,7 @@ export function RequestsFilterView({
     [enrichedOrders, scopeFilter, currentUserId],
   );
 
-  // ── 날짜 묶음(도쿄 운영 날짜): 오늘 / 어제 / 이전.
   const todayKey = useMemo(() => tokyoDateKey(new Date().toISOString()), []);
-  const yesterdayKey = useMemo(() => shiftDateKey(todayKey, -1), [todayKey]);
-
-  const groupByDate = useCallback(
-    <T,>(items: T[], getTime: (item: T) => string) => {
-      const labels: Record<DateGroupKey, string> = {
-        today: filterLabels.groupToday,
-        yesterday: filterLabels.groupYesterday,
-        earlier: filterLabels.groupEarlier,
-      };
-      const buckets: Record<DateGroupKey, T[]> = { today: [], yesterday: [], earlier: [] };
-      for (const item of items) {
-        const key = tokyoDateKey(getTime(item));
-        const bucket: DateGroupKey =
-          key === todayKey ? "today" : key === yesterdayKey ? "yesterday" : "earlier";
-        buckets[bucket].push(item);
-      }
-      return (["today", "yesterday", "earlier"] as DateGroupKey[])
-        .filter((key) => buckets[key].length > 0)
-        .map((key) => ({ key, label: labels[key], items: buckets[key] }));
-    },
-    [todayKey, yesterdayKey, filterLabels.groupToday, filterLabels.groupYesterday, filterLabels.groupEarlier],
-  );
 
   const hasDateFilter = hasCustomRange || datePreset !== "all";
   const presetLabel =
@@ -832,15 +801,17 @@ export function RequestsFilterView({
     { id: "order", label: filterLabels.filterOrder, count: baseOrders.length },
   ];
 
-  // 모든 탭이 한 줄 목록을 쓴다 — 「전체」에서는 종류가 섞이고 도쿄 날짜별로 묶는다.
-  type Row = { key: string; time: string; node: React.ReactNode; active?: boolean; daysLeft?: number; orderGroup?: "active" | "deliv" | "past"; sortKey?: string };
+  // 모든 탭이 한 줄 목록을 쓴다 — 「전체」 · 수리 탭은 진행 중 / 끝남으로 묶는다(done = 상태 글자가 done 톤).
+  type Row = { key: string; time: string; node: React.ReactNode; done: boolean; active?: boolean; daysLeft?: number; orderGroup?: "active" | "deliv" | "past"; sortKey?: string };
   const rows: Row[] = [
     ...visibleLostItems.map((item) => {
       // 보관 중이면 시각 대신 자동 폐기까지 D-day(만료면 +n). 3일 이내 · 만료는 빨간 상태 글자.
       const clock = lostItemClock(item, todayKey);
+      const tone = lostRowTone(item.status, clock);
       return {
       key: `l-${item.id}`,
       time: item.found_at,
+      done: tone === "done",
       active: clock != null,
       daysLeft: clock?.daysLeft ?? 0,
       node: (
@@ -855,10 +826,11 @@ export function RequestsFilterView({
             item.location.roomLabel,
             item.location.buildingLabel,
             item.reporter_name,
-            clock ? (clock.daysLeft < 0 ? `D+${-clock.daysLeft}` : `D-${clock.daysLeft}`) : formatTime(item.found_at, locale),
+            clock ? (clock.daysLeft < 0 ? `D+${-clock.daysLeft}` : `D-${clock.daysLeft}`) : null,
           ]}
           statusLabel={lostFoundCopy.statusLabels[item.status]}
-          statusTone={clock && (clock.isDueSoon || clock.isExpired) ? "soon" : activeLostStatuses.has(item.status) ? "open" : "done"}
+          statusTone={tone}
+          date={tokyoMonthDayLabel(item.found_at)}
           onDelete={
             canDeleteRequestRecord({ canDeleteAny, isOwner: item.reported_by_user_id === currentUserId })
               ? () => openDelete({ type: "lost-found", id: item.id, title: item.item_name })
@@ -869,9 +841,12 @@ export function RequestsFilterView({
       ),
       };
     }),
-    ...visibleMaintenance.map((report) => ({
+    ...visibleMaintenance.map((report) => {
+      const tone = maintenanceRowTone(report.status);
+      return {
       key: `m-${report.id}`,
       time: report.created_at,
+      done: tone === "done",
       node: (
         <RequestListCard
           key={`maintenance:${report.id}`}
@@ -885,10 +860,10 @@ export function RequestsFilterView({
             report.is_building_only ? maintenanceCopy.buildingOnly : report.location.roomLabel,
             report.location.buildingLabel,
             report.reporter_name,
-            formatTime(report.created_at, locale),
           ]}
           statusLabel={maintenanceCopy.statusLabels[report.status]}
-          statusTone={report.status === "in_progress" ? "prog" : activeMaintenanceStatuses.has(report.status) ? "open" : "done"}
+          statusTone={tone}
+          date={tokyoMonthDayLabel(report.created_at)}
           onDelete={
             canDeleteRequestRecord({ canDeleteAny, isOwner: report.reported_by_user_id === currentUserId })
               ? () => openDelete({ type: "maintenance", id: report.id, title: report.issue_title })
@@ -897,7 +872,8 @@ export function RequestsFilterView({
           deleteLabel={deleteCopy.deleteAction}
         />
       ),
-    })),
+      };
+    }),
     ...visibleOrders.map((order) => {
       const win = formatDeliveryDateWindow(order.delivery_start_date, order.delivery_end_date, order.delivery_date, locale);
       // 비품 주문 탭 묶음(2026-10-14 시안 Order-Tablet): 처리 중(요청됨 · 승인됨) → 배송 예정(주문 처리됨 · 배송이 오늘 이후) → 지난 요청.
@@ -916,10 +892,11 @@ export function RequestsFilterView({
         if (delivStart === shiftDateKey(todayKey, 1)) return orderCopy.arriveTomorrow;
         return orderCopy.arriveOn.replace("{d}", `${+delivStart.slice(5, 7)}/${+delivStart.slice(8, 10)}`);
       })();
-      const reqDay = tokyoDateKey(order.created_at);
+      const tone = orderRowTone(order.status);
       return {
         key: `o-${order.id}`,
         time: order.created_at,
+        done: tone === "done",
         orderGroup,
         sortKey: orderGroup === "deliv" ? (delivStart ?? "") : order.created_at,
         node: (
@@ -934,14 +911,11 @@ export function RequestsFilterView({
               localizeRoomPlaceLabel(order.room_label ?? "", buildingLabels),
               localizePropertyName(order.building_name, buildingLabels),
               order.reporter_name,
-              typeFilter === "order"
-                ? (arrive ?? orderCopy.reqOn.replace("{d}", `${+reqDay.slice(5, 7)}/${+reqDay.slice(8, 10)}`))
-                : win
-                  ? `${orderCopy.deliveryDateShort} ${win}`
-                  : formatTime(order.created_at, locale),
+              typeFilter === "order" ? arrive : win ? `${orderCopy.deliveryDateShort} ${win}` : null,
             ]}
             statusLabel={orderCopy.statusLabels[order.status]}
-            statusTone={activeOrderStatuses.has(order.status) ? "open" : "done"}
+            statusTone={tone}
+            date={tokyoMonthDayLabel(order.created_at)}
             onDelete={
               canDeleteRequestRecord({
                 canDeleteAny,
@@ -957,7 +931,7 @@ export function RequestsFilterView({
       };
     }),
   ].sort((x, y) => (x.time < y.time ? 1 : -1));
-  // 분실물 탭만 날짜 대신 「보관 중 · 자동 폐기 가까운 순」 → 「완료 · 최근 순」으로 묶는다(2026-10-14 시안 LF-Tablet).
+  // 분실물 탭은 「보관 중 · 자동 폐기 가까운 순」 → 「완료 · 최근 순」으로 묶는다(2026-10-14 시안 LF-Tablet).
   const rowGroups =
     typeFilter === "lost-found"
       ? [
@@ -982,7 +956,13 @@ export function RequestsFilterView({
             },
             { key: "o-past", label: orderCopy.groupPast, items: rows.filter((r) => r.orderGroup === "past") },
           ].filter((g) => g.items.length > 0)
-        : groupByDate(rows, (r) => r.time);
+        : (() => {
+            const { open, done } = splitRequestRowsByStatus(rows);
+            return [
+              { key: "s-open", label: filterLabels.groupOpen, items: open },
+              { key: "s-done", label: filterLabels.groupDone, items: done },
+            ].filter((g) => g.items.length > 0);
+          })();
 
   return (
     <div className="space-y-4">
@@ -1005,7 +985,7 @@ export function RequestsFilterView({
         </div>
 
         <div className="rqw-bar">
-          <div className="rqw-seg" role="tablist">
+          <div className="rqw-seg" role="group" aria-label={filterLabels.groupScope}>
             <button
               type="button"
               aria-pressed={scopeFilter !== "mine"}

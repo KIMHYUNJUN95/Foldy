@@ -527,8 +527,8 @@ List layout (`src/components/requests/requests-filter-view.tsx`):
   `order_requests.delivery_date` (auto-shown when an admin sets it, auto-updated on edit; respects the
   전체/내 요청 scope). Day tap → that day's deliveries, each linking to the order detail. Full spec:
   Order Request Workflow doc → "Delivery Calendar (Implemented — 2026-06-15)".
-- **Open count ("총 N건")**: counts only records in **active/open status** for the current tab + mine scope (lost-found active, maintenance `open`/`in_progress`, order `requested`/`approved`/`ordered`). Completed/closed records are excluded, so the number drops as work is closed. Completed records still appear as cards (e.g. under earlier date groups).
-- **Date groups**: visible records are split into **Today / Yesterday / Earlier** (`오늘/어제/이전`) by the Tokyo operating date of each record (lost `found_at`, maintenance/order `created_at`). Empty groups are not rendered. Group labels: `dictionary.mobile.groupToday/groupYesterday/groupEarlier`.
+- **Open count ("총 N건")**: counts only records in **active/open status** for the current tab + mine scope (lost-found active, maintenance `open`/`in_progress`, order `requested`/`approved`/`ordered`). Completed/closed records are excluded, so the number drops as work is closed. Completed records still appear as rows (under the 「끝남」 group since 2026-11-27).
+- **Status groups (2026-11-27, 「전체」 · 수리 탭)**: visible records are split into **진행 중 / 끝남** (ja 未完了 / 終了 · en Active / Done) — 끝남 = the row's status tone is `done` (one decision: `lostRowTone` · `maintenanceRowTone` · `orderRowTone` in `src/lib/request-status-groups.ts`, then `splitRequestRowsByStatus`). Order inside each group stays newest first; empty groups are not rendered. Labels: `dictionary.mobile.requestGroupOpen/requestGroupDone`. 분실물 · 비품 주문 탭 keep their own groups. (The old Today / Yesterday / Earlier date groups and `groupToday/groupYesterday/groupEarlier` were removed.)
 
 Status change permission:
 
@@ -1390,5 +1390,11 @@ Future navigation additions must also update the side-menu badge table and `getM
 - 로딩: `messages/loading.tsx` · `messages/[id]/loading.tsx` 한 줄 재내보내기.
 - AI 답장 도우미(2026-11-18, 47 §5-11 · 49): 답장 칸 바로 위 한 줄 · 「비슷한 대화」는 폰 · 폴드 · 태블릿 칸 모두 공용 `BottomSheet`(태블릿은 가운데 카드). 칩 줄은 가로로 넘겨 `data-swipe-back="off"`.
 
+- **요청함 · 직원 목록 unslop (2026-11-27)** — `/mobile/requests`(`requests-filter-view.tsx` · `requests-list.css` · `page.tsx`):
+  - 「전체」 · 수리 탭 묶음 = 날짜(오늘 · 어제 · 이전) 대신 **「진행 중 N」 위 · 「끝남 N」 아래**(끝남 = 상태 톤이 done — 분실물 처리 끝 · 수리 완료/무효 · 주문 입고/종료, 판정은 `lostRowTone` · `maintenanceRowTone` · `orderRowTone` 한 곳). 묶음 안 순서는 그대로(최신 순). 판정 `splitRequestRowsByStatus()`(`src/lib/request-status-groups.ts`, 시험 있음). 분실물 탭 · 비품 주문 탭의 자기 묶음은 그대로. i18n `mobile.requestGroupOpen` · `requestGroupDone`(ko 진행 중/끝남 · ja 未完了/終了 · en Active/Done — 묶음 이름이 상태 글자(수리 「対応中」 · 「完了」 · 「Open」)와 같지 않게), 안 쓰게 된 `mobile.groupToday` · `groupYesterday` · `groupEarlier` · `orderDetail.wReqOn` 삭제.
+  - 줄 오른쪽 칸(`.rqw-row__r`): 위 상태(대기 = 빈 보라 고리 · 진행 중 = 채운 보라 점 + #5a30cf 600 · 끝남 = 회색 글자만 · 폐기 임박 = 빨간 점 그대로), 아래 도쿄 날짜 「M/D」(13px #8a8796 tabular-nums). 메타 줄은 「호실 · 건물 · 신고자」(+ 분실물 D-n · 「전체」 탭 주문 배송 기간 · 주문 탭 「도착」)만 — 시각은 뺐다.
+  - 긴급은 제목 옆 「긴급」 글자 하나(#c4364b 13/500). 바로가기 셋은 아이콘(17px) 옆 글자 · 높이 44 이상 · 긴 말(en 「Report lost item」)은 칸 안 두 줄. 「전체 | 내 요청」은 배경 없는 글자 탭(고른 쪽 잉크 600, 누르는 자리 44).
+  - 줄 휴지통은 **그대로** — 모바일 상세(수리 · 분실물 · 주문)에는 지금도 삭제가 없다(문서 10 「unslop 다듬기」와 같은 판단).
+  - `/mobile/directory`: 얼굴 동그라미 회색(#f1f0f5 · #4b4858), 나만 옅은 보라. 역할은 이름 옆 작은 회색 글자 — 묶음 이름과 겹치면 빼고 역할 코드로 짧은 말(아르바이트 = 안 보임 · 아르바이트 리더 = 「리더」 · 현장 관리자 = 「관리자」, `directoryRoleTag()` · `mobile.directory.roleTagPartLeader` · `roleTagFieldManager`), 둘째 줄은 번호만. 태블릿 고른 줄 #f4f4f6, 프로필 정보 줄은 「가입」만(`labelPhone` · `labelRole` 키 삭제), 안내는 칸 가운데. 문서 17 「직원 목록 unslop 2차」.
 - **사용자 관리 unslop (2026-11-19)**: 탭 「멤버 · 초대 · 서류」 · 켠 탭 숫자 회색, 서류 칩 · 「확인 대기」 → 6px 점 + 잉크 글자, 굵기 600 상한, 누르는 자리 44px(작은 알약 · 도움말은 `::after` 로 넓힘), 휴지통 대신 상세 맨 아래 「멤버에서 빼기」(44px). 폴드 레일 · 태블릿 2분할 그대로. 문서 17 「직원 목록 unslop 다듬기」.
 - **청소 현황판 unslop (2026-11-16)**: 「손이 필요한 방」 주황 카드 → 투명 + 6px 점, 「담당 없음」 회색 글자 + 점, 「넣기」 옅은 보라 알약, 필터 44px. 상세는 `37-cleaning-shift-assignment.md` 「2026-11-16 unslop 다듬기」.

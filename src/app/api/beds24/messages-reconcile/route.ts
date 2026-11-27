@@ -2,6 +2,8 @@ import { after, NextResponse, type NextRequest } from "next/server";
 import { isBeds24SyncPaused } from "@/lib/beds24/sync-control";
 import { authorizeGuestMessagesCron } from "@/lib/guest-messages/cron-auth";
 import { isReconcileFailure, reconcileGuestMessages } from "@/lib/guest-messages/reconcile";
+import { EMOJI_REPAIR_DEFAULT_BOOKINGS, EMOJI_REPAIR_MAX_BOOKINGS, repairEmojiDamagedMessages } from "@/lib/guest-messages/emoji-repair";
+import { isEmojiRepairFailure, parseEmojiRepairSince } from "@/lib/guest-messages/emoji-heal";
 import { copyGuestMessageMediaForOrganizations } from "@/lib/guest-messages/media-copy-server";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -11,6 +13,10 @@ import { getSupabaseServiceClient } from "@/lib/supabase/service";
 // 정기 실행은 Supabase pg_cron 15분(`202611130006_guest_messages_cron.sql`, **운영 미적용**). vercel.json 에는 없다.
 // 인가: `Authorization: Bearer <CRON_SECRET 또는 pg_cron 토큰>`(`authorizeGuestMessagesCron`) — Beds24 웹훅 시크릿은 받지 않는다
 // (웹훅 주소에 실려 다니는 값이라). 둘 다 없으면 닫힌 채(404).
+//
+// 되살리기 모드(47 §4-0-3): `?mode=repair&organizationId=<uuid>&since=<YYYY-MM-DD 도쿄 날짜 | 앞 응답의 nextCursor>&limit=<1~50>` —
+// 이모지가 「?」로 가려진 옛 줄을 예약마다 API 로 다시 읽어 고친다(맞을 때만 쓴다 — 다시 돌려도 같다). 응답의 `nextCursor` 가 null 이면 끝.
+// 한 번에 45초 예산 — 넘으면 `stoppedEarly: "time_budget"` + 커서. 없는 · 활성이 아닌 조직은 404.
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -34,6 +40,31 @@ async function handle(request: NextRequest) {
   const organizationIdParam = request.nextUrl.searchParams.get("organizationId");
   if (organizationIdParam && !isUuid(organizationIdParam)) {
     return NextResponse.json({ ok: false, error: "invalid_organization_id" }, { status: 400 });
+  }
+
+  if (request.nextUrl.searchParams.get("mode") === "repair") {
+    if (!organizationIdParam) return NextResponse.json({ ok: false, error: "organization_id_required" }, { status: 400 });
+    const since = parseEmojiRepairSince(request.nextUrl.searchParams.get("since"));
+    if (!since) return NextResponse.json({ ok: false, error: "invalid_since" }, { status: 400 });
+    const sinceId = request.nextUrl.searchParams.get("sinceId");
+    if (sinceId !== null && !isUuid(sinceId)) return NextResponse.json({ ok: false, error: "invalid_since_id" }, { status: 400 });
+    const limitParam = request.nextUrl.searchParams.get("limit");
+    const limit = limitParam === null ? EMOJI_REPAIR_DEFAULT_BOOKINGS : Number(limitParam);
+    if (!Number.isInteger(limit) || limit < 1 || limit > EMOJI_REPAIR_MAX_BOOKINGS) {
+      return NextResponse.json({ ok: false, error: "invalid_limit" }, { status: 400 });
+    }
+    try {
+      const result = await repairEmojiDamagedMessages(organizationIdParam, { since, sinceId, maxBookings: limit });
+      if (result.skipped === "organization") {
+        return NextResponse.json({ ok: false, error: "organization_not_found" }, { status: 404 });
+      }
+      // 시간 · 요청 예산으로 멈춘 것만 정상(200) — `nextCursor` · `nextCursorId` 로 이어 부른다. 207 이면 반복을 멈춘다.
+      const failed = isEmojiRepairFailure(result);
+      return NextResponse.json({ ok: !failed, mode: "repair", result }, { status: failed ? 207 : 200 });
+    } catch (error) {
+      console.error("[guest-messages/emoji-repair] run failed", error instanceof Error ? error.message : "unknown");
+      return NextResponse.json({ ok: false, error: "repair_failed" }, { status: 500 });
+    }
   }
 
   let organizationIds: string[];

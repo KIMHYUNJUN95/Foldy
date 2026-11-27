@@ -4,6 +4,7 @@
  * - Beds24 를 새로 부르지 않는다(크레딧 0). 본문에 실린 `messages` 만 쓴다.
  * - 조직은 예약 처리와 같은 규칙(`org-resolve.ts`). 기본값으로만 정해진 예약은 경고 로그를 남긴다(넣기는 한다).
  * - 메시지가 없어도 그 조직의 `last_webhook_at` 은 고친다(「받는 통로 멈춤」 판단, §6-2).
+ * - 「?」가 든 새 줄이 들어간 예약은 `emojiSuspects` 로 돌려준다 — 라우트가 응답 뒤 그 예약만 API 로 다시 읽어 이모지를 되살린다(47 §4-0-3).
  * - **절대 던지지 않는다** — 예약 처리는 이미 끝났고, 여기 실패가 웹훅 응답을 바꾸면 안 된다.
  */
 
@@ -11,6 +12,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import type { Beds24JsonRecord } from "@/lib/beds24/booking-payload";
 import type { ProcessWebhookBookingResult } from "@/lib/beds24/process-webhook-booking";
+import type { EmojiHealSuspect } from "@/lib/guest-messages/emoji-repair";
 import {
   extractBeds24WebhookMessages,
   hasNonEmptyMessagesArray,
@@ -76,6 +78,8 @@ export type WebhookIngestSummary = {
   failedBookings: number;
   /** 조직 → 이번에 새로 들어간 메시지 id — 응답 뒤 사진 사본(47 §5-8)은 이 줄들만(밀린 것은 따라잡기 라우트). */
   mediaMessageIds: Record<string, string[]>;
+  /** 이모지가 「?」로 가려졌을 수 있는 새 줄이 들어간 예약(47 §4-0-3) — 응답 뒤 그 예약만 다시 읽는다. */
+  emojiSuspects: EmojiHealSuspect[];
 };
 
 export async function ingestBeds24WebhookMessages(args: {
@@ -96,6 +100,7 @@ export async function ingestBeds24WebhookMessages(args: {
     assumedUtcTimes: 0,
     failedBookings: 0,
     mediaMessageIds: {},
+    emojiSuspects: [],
   };
   try {
     const now = args.now ?? new Date();
@@ -167,6 +172,14 @@ export async function ingestBeds24WebhookMessages(args: {
         summary.inserted += result.inserted;
         if (result.insertedIds?.length) {
           summary.mediaMessageIds[organizationId] = [...(summary.mediaMessageIds[organizationId] ?? []), ...result.insertedIds];
+        }
+        if (result.maskedInserted) {
+          summary.emojiSuspects.push({
+            organizationId,
+            conversationId: result.conversationId,
+            providerBookingId,
+            insertedAt: new Date().toISOString(),
+          });
         }
         summary.merged += result.merged;
         summary.duplicates += result.duplicates;

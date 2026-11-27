@@ -17,6 +17,7 @@ import {
   type SentOutboxRow,
 } from "@/lib/guest-messages/ingest-plan";
 import { resolveOutboundChannel } from "@/lib/guest-messages/beds24-normalize";
+import { emojiHealCandidateIds, hasNonBmp, planEmojiHeals, type EmojiHealExisting } from "@/lib/guest-messages/emoji-heal";
 import type {
   ChannelCreditSnapshot,
   GuestChannelKey,
@@ -285,8 +286,12 @@ export type IngestResult = {
   duplicates: number;
   markedRead: number;
   failedMerges: number;
+  /** 이모지가 「?」로 가려져 있던 이미 있는 줄을 이번 본문으로 되살린 수(47 §4-0-3 — API 로 읽은 본문일 때만 생긴다). */
+  healed: number;
   /** 이번에 새로 들어간 메시지 줄 id — 웹훅 뒤 사진 사본(47 §5-8)을 이 줄들로만 좁힌다. */
   insertedIds?: string[];
+  /** 새로 들어간 줄 중 「?」가 있고 BMP 밖 글자가 없는 것이 있다 — 웹훅이면 이모지가 가려졌을 수 있어 그 예약을 다시 읽는다(47 §4-0-3). */
+  maskedInserted: boolean;
 };
 
 const ECHO_LOOKBACK_MS = 3 * 24 * 60 * 60 * 1000;
@@ -403,6 +408,8 @@ export async function ingestConversationMessages(
     duplicates: 0,
     markedRead: 0,
     failedMerges: 0,
+    healed: 0,
+    maskedInserted: false,
   };
   if (args.messages.length === 0) return result;
 
@@ -469,8 +476,19 @@ export async function ingestConversationMessages(
     if (inserted.error) throw new Error(`message insert failed: ${inserted.error.message}`);
     result.inserted = (inserted.data ?? []).length;
     result.insertedIds = ((inserted.data ?? []) as Array<{ id?: string }>).map((row) => row.id).filter((id): id is string => typeof id === "string");
+    const insertedExternal = new Set(((inserted.data ?? []) as Array<{ external_id?: string | null }>).map((row) => row.external_id));
+    result.maskedInserted = plan.inserts.some(
+      (message) => insertedExternal.has(message.externalId) && message.body.includes("?") && !hasNonBmp(message.body),
+    );
     result.duplicates += plan.inserts.length - result.inserted;
   }
+
+  result.healed = await healEmojiDamagedMessages(supabase, {
+    organizationId: args.organizationId,
+    provider: args.provider,
+    conversationId: conversation.id,
+    messages: args.messages,
+  });
 
   if (plan.markReadExternalIds.length > 0) {
     const marked = await supabase
@@ -543,6 +561,76 @@ export async function ingestConversationMessages(
   });
   if (applied.error) throw new Error(`conversation state apply failed: ${applied.error.message}`);
   return result;
+}
+
+/**
+ * 이모지가 「?」로 가려진 채 저장된 줄을 API 본문으로 되살린다(47 §4-0-3). 판정은 `planEmojiHeals` 만 — 들어온 본문에 BMP 밖 글자가
+ * 있을 때만 읽고(웹훅 본문은 이미 가려져 와 0번), 저장된 본문에 「?」가 있는 줄만 본다. 손님 말은 번역(캐시 · 옛 칸)도 지운다 —
+ * 망가진 글로 만든 번역일 수 있어서(다음에 볼 때 새로 번역). 실패는 로그만(받기를 깨뜨리지 않는다), 본문은 로그에 남기지 않는다.
+ */
+export async function healEmojiDamagedMessages(
+  supabase: Client,
+  args: {
+    organizationId: string;
+    provider: GuestMessageProvider;
+    /** 주면 그 대화 줄만 본다(받기 · 되살리기는 대화를 알고 있다). */
+    conversationId?: string;
+    messages: readonly NormalizedMessage[];
+  },
+): Promise<number> {
+  const candidates = emojiHealCandidateIds(args.messages);
+  if (candidates.length === 0) return 0;
+  try {
+    const parts = await Promise.all(
+      chunkValues(candidates, EXTERNAL_ID_CHUNK).map(async (part) => {
+        let query = supabase
+          .from("guest_messages")
+          .select("id, external_id, body, direction")
+          .eq("organization_id", args.organizationId)
+          .eq("provider", args.provider);
+        if (args.conversationId) query = query.eq("conversation_id", args.conversationId);
+        const found = await query.in("external_id", part).like("body", "%?%");
+        if (found.error) throw new Error(`heal read failed: ${found.error.message}`);
+        return (found.data ?? []) as EmojiHealExisting[];
+      }),
+    );
+    const plan = planEmojiHeals(args.messages, parts.flat());
+    let healed = 0;
+    const clearIds: string[] = [];
+    for (const update of plan) {
+      const patch = update.clearTranslation
+        ? { body: update.body, body_translated: null, translated_lang: null }
+        : { body: update.body };
+      // 읽은 본문 그대로일 때만 — 그사이 다른 실행이 먼저 고쳤으면 덮지 않고 세지도 않는다.
+      let write = supabase
+        .from("guest_messages")
+        .update(patch)
+        .eq("id", update.id)
+        .eq("organization_id", args.organizationId)
+        .eq("body", update.previousBody);
+      if (args.conversationId) write = write.eq("conversation_id", args.conversationId);
+      const written = await write.select("id");
+      if (written.error) {
+        console.error("[guest-messages] emoji heal write failed", written.error.message);
+        continue;
+      }
+      if ((written.data ?? []).length === 0) continue;
+      healed += 1;
+      if (update.clearTranslation) clearIds.push(update.id);
+    }
+    if (clearIds.length > 0) {
+      const cleared = await supabase
+        .from("guest_message_translations")
+        .delete()
+        .eq("organization_id", args.organizationId)
+        .in("message_id", clearIds);
+      if (cleared.error) console.error("[guest-messages] emoji heal translation clear failed", cleared.error.message);
+    }
+    return healed;
+  } catch (error) {
+    console.error("[guest-messages] emoji heal failed", error instanceof Error ? error.message : "unknown");
+    return 0;
+  }
 }
 
 /** 메시지를 예약별로 묶는다(순서 유지). */

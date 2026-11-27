@@ -29,6 +29,7 @@ import { activateBeds24Cooldown, getBeds24Cooldown } from "@/lib/beds24/sync-loc
 import { getOptionalBeds24ApiEnv } from "@/lib/env";
 import { recordGuestMessageCredit } from "@/lib/guest-messages/adapter-server";
 import { normalizeBeds24Message } from "@/lib/guest-messages/beds24-normalize";
+import { parseBeds24MessagesPage } from "@/lib/guest-messages/beds24-page";
 import { effectiveCreditReserve, knownRemainingCredit } from "@/lib/guest-messages/credit";
 import { decideReconcileOrganization } from "@/lib/guest-messages/org-resolve";
 import { readMappedOrganizationIds } from "@/lib/beds24/webhook-organization";
@@ -63,17 +64,6 @@ export type ReconcileResult = {
   failedBookings: number;
   assumedUtcTimes: number;
 };
-
-/** 응답 한 페이지 → 메시지 원본 목록 + 다음 페이지 여부. 모양이 달라도 던지지 않는다. */
-export function parseBeds24MessagesPage(json: unknown): { rows: unknown[]; nextPageExists: boolean } {
-  if (Array.isArray(json)) return { rows: json, nextPageExists: false };
-  if (!json || typeof json !== "object") return { rows: [], nextPageExists: false };
-  const record = json as { data?: unknown; pages?: { nextPageExists?: unknown } };
-  return {
-    rows: Array.isArray(record.data) ? record.data : [],
-    nextPageExists: record.pages?.nextPageExists === true,
-  };
-}
 
 export async function reconcileGuestMessages(
   organizationIds: readonly string[],

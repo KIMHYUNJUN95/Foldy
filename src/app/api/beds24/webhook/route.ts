@@ -15,6 +15,7 @@ import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { requestMatchesSecret } from "@/lib/api-secret";
 import { planAutoMessagesAfterWebhook } from "@/lib/guest-messages/auto-scheduler";
 import { copyPendingGuestMessageMedia } from "@/lib/guest-messages/media-copy-server";
+import { healEmojiAfterWebhook } from "@/lib/guest-messages/emoji-repair";
 import {
   ingestBeds24WebhookMessages,
   prepareCapturedMessagesPayload,
@@ -37,7 +38,9 @@ export const BEDS24_WEBHOOK_MAX_BOOKINGS = 10;
 /**
  * 처리 중 이 시간을 넘기면 남은 예약은 같은 실패로 넘긴다 — 60초(`maxDuration`)에 잘려 결과 기록까지 잃지 않게.
  * 20초 근거: 예산 직전에 시작한 마지막 한 건이 확인 읽기 5초 + DB 왕복 ~2초 → 루프 최대 ~27초.
- * 응답 뒤(`after()`) 일 = 결과 기록 ~1초 + 메시지 받기 ~3초 + 사진 복사 예산 20초 ≈ 24초. 합 ~51초 — 60초 안에 ~9초 여유.
+ * 응답 뒤(`after()`) 일 = 결과 기록 ~1초 + 메시지 받기 ~3초 + 동시에 max(사진 복사 예산 20초 + 마지막 한 장 ~2초,
+ * 이모지 다시 읽기 ~17초 = 예산 15초 + 마지막 고치기 · 맞추기 ~2초 — 마감 2초 안에는 새 요청을 시작하지 않는다) ≈ 26초.
+ * 합 ~53초 — 60초 안에 ~7초 여유.
  */
 export const BOOKING_LOOP_BUDGET_MS = 20_000;
 
@@ -433,9 +436,15 @@ export async function POST(request: NextRequest) {
       });
       // 방금 들어온 메시지의 Airbnb 사진만 Foldy 저장소로 복사(47 §5-8) — 밀린 것은 건드리지 않는다(따라잡기 라우트 몫).
       // 조직마다 6개 · 20초, 던지지 않음. Beds24 호출 없음.
-      for (const [organizationId, messageIds] of Object.entries(ingest.mediaMessageIds)) {
-        await copyPendingGuestMessageMedia(supabase, organizationId, { messageIds, limit: 6, budgetMs: 20_000 });
-      }
+      // 같은 때 「?」가 든 새 줄이 들어간 예약만 API 로 한 번 다시 읽어 이모지를 되살린다(47 §4-0-3 — 이벤트 기반, 15초 예산, 던지지 않음).
+      await Promise.all([
+        (async () => {
+          for (const [organizationId, messageIds] of Object.entries(ingest.mediaMessageIds)) {
+            await copyPendingGuestMessageMedia(supabase, organizationId, { messageIds, limit: 6, budgetMs: 20_000 });
+          }
+        })(),
+        ingest.emojiSuspects.length > 0 ? healEmojiAfterWebhook(supabase, ingest.emojiSuspects) : null,
+      ]);
     } catch (error) {
       console.error("[beds24/webhook] guest message ingest failed", error instanceof Error ? error.message : "unknown");
     }

@@ -69,7 +69,7 @@ vi.mock("@/lib/guest-messages/auto-scheduler", () => ({
 }));
 vi.mock("@/lib/guest-messages/media-copy-server", () => ({ copyPendingGuestMessageMedia: async () => undefined }));
 vi.mock("@/lib/guest-messages/webhook-ingest", () => ({
-  ingestBeds24WebhookMessages: async () => ({ mediaMessageIds: {} }),
+  ingestBeds24WebhookMessages: async () => ({ mediaMessageIds: {}, emojiSuspects: [] }),
   prepareCapturedMessagesPayload: () => null,
   shouldCaptureWebhookMessages: () => false,
 }));

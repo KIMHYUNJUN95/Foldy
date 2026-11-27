@@ -35,7 +35,7 @@ import { recordGuestMessageCredit } from "@/lib/guest-messages/adapter-server";
 import { normalizeBeds24Message } from "@/lib/guest-messages/beds24-normalize";
 import { effectiveCreditReserve, knownRemainingCredit } from "@/lib/guest-messages/credit";
 import { decideReconcileOrganization } from "@/lib/guest-messages/org-resolve";
-import { parseBeds24MessagesPage } from "@/lib/guest-messages/reconcile";
+import { parseBeds24MessagesPage } from "@/lib/guest-messages/beds24-page";
 import { groupMessagesByBooking, ingestConversationMessages, resolveConversationSeed } from "@/lib/guest-messages/store";
 import { readGuestMessageSettings, type NormalizedMessage } from "@/lib/guest-messages/types";
 import { warnAssumedUtcTimes } from "@/lib/guest-messages/webhook-ingest";

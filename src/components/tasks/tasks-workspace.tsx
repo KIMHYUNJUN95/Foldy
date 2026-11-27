@@ -1056,7 +1056,7 @@ export function TasksWorkspace({
   const todayOverdueBase = tasks.filter(isOverdue);
   const todayBase = tasks.filter(isToday);
   // 반복 회차: **오늘 회차이거나 밀린 회차가 있으면** 오늘 목록에 뜬다(2026-09-08).
-  // 밀린 것을 지연 섹션에 따로 세우지 않고 여기 한 줄로 모으고, 「N일 밀림」은 카드 배지가 된다.
+  // 밀린 것을 지연 섹션에 따로 세우지 않고 여기 한 줄로 모으고, 「N회 밀림」은 카드 배지가 된다.
   const todayRecBase = tasks.filter((t) =>
     showsOnTodayList(t, today, occStateOf, resolvedDatesFor(t.id)),
   );

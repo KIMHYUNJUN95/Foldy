@@ -49,7 +49,7 @@ export function ReorderableTaskList({
 }: {
   items: TaskRecord[];
   cardProps: CardProps;
-  /** taskId → 밀린 회차 수. 반복 카드에 「N일 밀림」 배지로 붙는다(2026-09-08). */
+  /** taskId → 밀린 회차 수. 반복 카드에 「N회 밀림」 배지로 붙는다(2026-09-08). */
   behindByTask?: Map<string, number>;
   disabled?: boolean;
   /** 날짜 목록이 아닌 곳(관리함)에서 쓰는 단순 순서 저장. */

@@ -141,12 +141,13 @@ import type { ProjectDetailData } from "@/lib/projects";
 import type { OccurrenceStateRecord, TaskDetail, TaskRecord } from "@/lib/tasks";
 import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
 import { haptic } from "@/lib/haptics";
-import { SKIPPED_DAYS_VISIBLE, selectRecentSkippedDays, selectUpcomingSkippedDays } from "@/lib/task-skipped-days";
+import { selectRecentSkippedDays, selectUpcomingSkippedDays } from "@/lib/task-skipped-days";
 import { shiftMonthKey } from "@/components/admin/shared/admin-month-key";
 import { AdminTimePicker } from "@/components/admin/shared/admin-time-picker";
 import { compressImageFile } from "@/components/announcements/announcement-image-uploader";
 import { formatUpdateStampTokyo } from "@/lib/tasks-date-label";
 import { doneTodayEntries, todayProgress } from "@/lib/tasks-today-progress";
+import { detailScheduleDate, needsCatchUp, splitCalendarDay, statusPillView } from "@/lib/tasks-console-view";
 import { ProgressRing, TaskRing, ViewNav, type NavItem } from "./atw-parts";
 import { ImageLightbox } from "@/components/shell/image-lightbox";
 import {
@@ -291,18 +292,6 @@ const EMPTY_TASK_CONTEXT: TaskContextValue = {
 // 클라이언트에서는 useLayoutEffect (페인트 전에 배치 → 깜빡임 없음), 서버에서는 useEffect
 // (SSR 경고를 피한다. 팝오버는 어차피 SSR 중에는 렌더되지 않는다).
 const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
-
-// 상세 패널 상태 분할 항목, 표시 순서. CSS thumb 는 정확히 이 세 개가 이 순서일 것을 가정한다
-// (분할 폭 단위로 이동한다) — 네 번째를 추가하면
-// admin-tasks-white.css 의 `.atw-status__thumb` 너비/오프셋도 고쳐야 한다.
-const STATUS_SEGMENTS = [
-  { status: "open", labelKey: "stOpen" },
-  { status: "in_progress", labelKey: "stInProgress" },
-  { status: "completed", labelKey: "stCompleted" },
-] as const satisfies readonly {
-  status: "open" | "in_progress" | "completed";
-  labelKey: "stOpen" | "stInProgress" | "stCompleted";
-}[];
 
 /** 만든 순서(오래된 것 먼저). 새 작업이 목록 **아래**, 추가 입력창 바로 위에 붙게 한다(2026-09-09). */
 const oldestFirst = (a: TaskRecord, b: TaskRecord) => a.createdAt.localeCompare(b.createdAt);
@@ -1239,8 +1228,22 @@ export function AdminTasksConsole({
       const trng = timeRange(t.timeLabel, t.durationMinutes);
       if (trng) seg.push(trng);
       if (t.recurrenceRule) seg.push(`↻ ${repeatShort(t.recurrenceRule, dict, locale)}`);
-      if (opts?.behindDays)
-        seg.push(<span className="is-red">{fill(dict.odDaysBehind, { n: String(opts.behindDays) })}</span>);
+      if (opts?.behindDays) {
+        seg.push(<span className="atw-behind">{fill(dict.odDaysBehind, { n: String(opts.behindDays) })}</span>);
+        if (needsCatchUp(opts.behindDays))
+          seg.push(
+            <button
+              type="button"
+              className="atw-meta-btn atw-catchup"
+              onClick={(e) => {
+                e.stopPropagation();
+                openTask(t.id, occ?.date);
+              }}
+            >
+              {dict.odCatchUp}
+            </button>,
+          );
+      }
       const c = t.resolvedContext;
       if (c) {
         const place = [c.propertyName, c.roomLabel].filter(Boolean).join(" ");
@@ -2049,7 +2052,7 @@ export function AdminTasksConsole({
 
   const todayData = () => {
     const odOne = filtered(overdueList).sort((a, b) => dateSort(a, b) || prioSort(a, b));
-    // 반복은 지연 섹션에 세우지 않는다(2026-09-08) — `recBehind` 로 오늘 줄의 「N일 밀림」이 된다.
+    // 반복은 지연 섹션에 세우지 않는다(2026-09-08) — `recBehind` 로 오늘 줄의 「N회 밀림」이 된다.
     // 필터는 네 갈래(지연/오늘 일회성, 지연/오늘 반복) 모두 `filtered()` 로 통일한다(2026-07-31).
     const recBehind = new Map<string, number>(
       personalTasks
@@ -2667,6 +2670,7 @@ export function AdminTasksConsole({
       const dstr = iso(dd);
       const wd = weekdayIndex(dstr);
       const ev = tasksOn(dstr);
+      const cell = splitCalendarDay(ev, (t) => isStandardRecurrence(t.recurrenceRule));
       cells.push(
         <div
           key={dstr}
@@ -2689,7 +2693,10 @@ export function AdminTasksConsole({
           }}
         >
           <span className={`atw-cc__d num ${wd === 0 ? "is-sun" : wd === 6 ? "is-sat" : ""}`}>{dd}</span>
-          {ev.slice(0, 3).map((t) => {
+          {cell.repeating > 0 && (
+            <span className="atw-cev is-rep num">{fill(dict.calRepeatN, { n: String(cell.repeating) })}</span>
+          )}
+          {cell.shown.map((t) => {
             const tone =
               isOverdue(t, today) || t.priority === "urgent" ? "is-red" : isSharedTask(t) ? "is-shared" : "";
             return (
@@ -2707,7 +2714,7 @@ export function AdminTasksConsole({
               </span>
             );
           })}
-          {ev.length > 3 && <span className="atw-cc__more num">{fill(dict.w.calMore, { n: ev.length - 3 })}</span>}
+          {cell.more > 0 && <span className="atw-cc__more num">{fill(dict.w.calMore, { n: cell.more })}</span>}
         </div>,
       );
     }
@@ -3606,6 +3613,12 @@ export function AdminTasksConsole({
       statusDraft && statusDraft.id === t.id && realStatus === statusDraft.from
         ? statusDraft.status
         : realStatus;
+    const pill = statusPillView({
+      shownStatus,
+      recurring,
+      occDone,
+      completingNow: completing.has(motionKey),
+    });
     const ownTask = isMine(t, meId);
     // 편집 · 삭제 단추를 보일지. 「누가 지시했나」 같은 표시는 실제 작성자(ownTask)로 가른다.
     // 프로젝트 주인도 멤버 할 일을 고친다(2026-10-28, 서버 canEditTaskCore 와 같은 규칙).
@@ -3632,12 +3645,13 @@ export function AdminTasksConsole({
             after: () => setSel((cur) => (cur === t.id ? null : cur)),
           }),
       });
-    const schedText: ReactNode = d ? (
+    const shownD = detailScheduleDate(recurring, occ, d);
+    const schedText: ReactNode = shownD ? (
       <>
-        {dayLabel(d)}
+        {dayLabel(shownD)}
         {trng ? ` ${trng}` : ""}
         {t.durationMinutes && durText(t.durationMinutes) ? ` · ${durText(t.durationMinutes)}` : ""}
-        {isOverdue(t, today) && <span className="is-red"> · {dict.stOverdue}</span>}
+        {!recurring && isOverdue(t, today) && <span className="is-red"> · {dict.stOverdue}</span>}
       </>
     ) : (
       <span className="is-soft">{dict.dpNoDate}</span>
@@ -3788,43 +3802,23 @@ export function AdminTasksConsole({
             </>
           )}
 
-          {/* 대기 / 진행 중 / 완료. `shownStatus` 가 낙관적 값이라 누르는 즉시 손잡이가 움직인다. */}
-          <div className="atw-status" data-active={shownStatus} role="group" aria-label={dict.dpStatus}>
-            <span className="atw-status__thumb" aria-hidden="true" />
-            {STATUS_SEGMENTS.map((seg) => (
-              <button
-                key={seg.status}
-                type="button"
-                className={shownStatus === seg.status ? "on" : ""}
-                aria-pressed={shownStatus === seg.status}
-                disabled={seg.status === "completed" && !canComplete}
-                onClick={() => {
-                  if (shownStatus === seg.status) return;
-                  if (seg.status === "completed" && !canComplete) return;
-                  setStatusDraft({ id: t.id, from: realStatus, status: seg.status });
-                  if (seg.status === "completed") haptic("success");
-                  const occArg = occ ?? undefined;
-                  // 완료된 반복 회차를 「진행 중」으로: 그 회차를 먼저 되살린다(모바일 상세와 같은 순서).
-                  const reopenFirst = recurring && occDone && seg.status === "in_progress";
-                  run(
-                    async () => {
-                      if (reopenFirst) {
-                        const r = await setConsoleTaskStatus(t.id, "open", occArg);
-                        if (!r.ok) return r;
-                      }
-                      return setConsoleTaskStatus(t.id, seg.status, occArg);
-                    },
-                    {
-                      toast: seg.status === "completed" ? dict.tCompleted : undefined,
-                      onError: () => setStatusDraft(null),
-                    },
-                  );
-                }}
-              >
-                {dict[seg.labelKey]}
-              </button>
-            ))}
-          </div>
+          {/* 상태 알약: 글자는 지금 상태, 누르면 대기 ↔ 진행 중. `shownStatus` 가 낙관적 값이라 바로 바뀐다. */}
+          <button
+            type="button"
+            className={`atw-prog${pill.pressed ? " on" : ""}${pill.isDone ? " is-done" : ""}`}
+            aria-pressed={pill.pressed}
+            aria-label={`${dict.dpStatus}: ${dict[pill.labelKey]}`}
+            disabled={pill.disabled}
+            onClick={() => {
+              setStatusDraft({ id: t.id, from: realStatus, status: pill.next });
+              run(() => setConsoleTaskStatus(t.id, pill.next, occ ?? undefined), {
+                onError: () => setStatusDraft(null),
+              });
+            }}
+          >
+            <span className="atw-prog__dot" aria-hidden="true" />
+            {dict[pill.labelKey]}
+          </button>
           {!canComplete && <p className="atw-soft atw-d__lock">{dict.dpCompleteNeedsOccurrence}</p>}
 
           {!editing && (mine || t.imageUrls.length > 0) && (
@@ -3881,7 +3875,10 @@ export function AdminTasksConsole({
                 schedText
               )}
               {t.recurrenceRule && (
-                <span className="atw-d__sub">↻ {repeatLabel(t.recurrenceRule, d, today, locale, dict)}</span>
+                <span className="atw-d__sub">
+                  ↻ {repeatLabel(t.recurrenceRule, d, today, locale, dict)}
+                  {recurring && d ? ` · ${fill(dict.dpRepeatSince, { date: md(d) })}` : ""}
+                </span>
               )}
             </dd>
             <dt>{dict.w.dlPriority}</dt>
@@ -3990,7 +3987,6 @@ export function AdminTasksConsole({
               const upcoming = selectUpcomingSkippedDays(states, tokyoToday());
               if (days.length === 0 && upcoming.length === 0) return null;
               const open = skExpanded.has(t.id);
-              const more = Math.max(0, days.length - SKIPPED_DAYS_VISIBLE);
               const skRow = (day: string) => (
                 <div
                   key={day}
@@ -4010,6 +4006,21 @@ export function AdminTasksConsole({
                   </div>
                 </div>
               );
+              if (!open)
+                return (
+                  <section className="atw-d__sk" aria-label={dict.skDaysTitle}>
+                    <button
+                      type="button"
+                      className="atw-d__sksum"
+                      aria-expanded={false}
+                      onClick={() => setSkExpanded((cur) => new Set(cur).add(t.id))}
+                    >
+                      <b>{dict.skDaysTitle}</b>
+                      <span className="num">{fill(dict.skDaysSummary, { past: String(days.length), next: String(upcoming.length) })}</span>
+                      <ChevronDown size={16} aria-hidden="true" />
+                    </button>
+                  </section>
+                );
               return (
                 <section className="atw-d__sk" aria-label={dict.skDaysTitle}>
                   {upcoming.length > 0 && (
@@ -4026,16 +4037,7 @@ export function AdminTasksConsole({
                       <span>{dict.skDaysRange}</span>
                     </div>
                   )}
-                  {(open ? days : days.slice(0, SKIPPED_DAYS_VISIBLE)).map(skRow)}
-                  {!open && more > 0 && (
-                    <button
-                      type="button"
-                      className="atw-d__skb atw-d__skmore"
-                      onClick={() => setSkExpanded((cur) => new Set(cur).add(t.id))}
-                    >
-                      {fill(more === 1 ? dict.skDaysMoreOne : dict.skDaysMore, { count: more })}
-                    </button>
-                  )}
+                  {days.map(skRow)}
                 </section>
               );
             })()}

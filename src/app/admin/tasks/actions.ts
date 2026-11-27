@@ -414,7 +414,7 @@ async function completeInternal(
     // 성공으로 돌려 화면의 체크를 그대로 둔다 — 판정은 쓰기가 한다(2026-11-25, 동시에 눌러도 기록 · 알림 한 번).
     if (saved === "failed") return { ok: false };
     if (saved === "already") return { ok: true, recorded: occ };
-    // 밀린 회차는 이 완료가 흡수한다 — 오늘 줄의 「N일 밀림」 배지가 함께 사라진다(2026-09-08).
+    // 밀린 회차는 이 완료가 흡수한다 — 오늘 줄의 「N회 밀림」 배지가 함께 사라진다(2026-09-08).
     await absorbEarlierOccurrences({
       taskId: task.id,
       organizationId: session.organization.id,

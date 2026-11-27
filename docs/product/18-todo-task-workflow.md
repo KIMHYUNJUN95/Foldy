@@ -28,7 +28,7 @@
 - 줄(`TaskCard`): 상자 없음. 앞 고리 = 우선순위(긴급 빨강 링 #d8455a + #fdf3f4, 중요 주황 #d98a1f + #fdf6ea, 보통 파랑 #2f6fde,
   없음 회색 #b4b1bf). 제목 15px, 회색 메타 한 줄 — 「긴급 · / 중요 ·」 → 날짜(오늘/내일 목록에서는 생략, 지연 · 관리함은 표시) →
   시간(「09:00 – 10:00」) → 연결(건물 · 객실) → 진행 중(보라) → 「지시 · 보낸 사람」 또는 남이 만든 작업의 작성자 → 「↻ 반복」 →
-  태그 → 사진 n장 → 공유 n명 → N일 밀림(빨강). 지연은 메타 전체가 빨강. 완료 = 회색으로 채운 고리 + 흰 체크 + 취소선.
+  태그 → 사진 n장 → 공유 n명 → N회 밀림(모바일 카드는 빨강, PC 콘솔 줄은 회색 — 2026-11-26 「N일」→「N회」, 날이 아니라 밀린 회차 수). 지연은 메타 전체가 빨강. 완료 = 회색으로 채운 고리 + 흰 체크 + 취소선.
   예전의 날짜 칩 · 깃발 · 「마감」 꼬리말은 없앴다.
 - 그대로 둔 동작: 밀어서 내일로/오늘로(반복 · 이미 그 날짜면 안 열림), 손잡이로 순서 바꾸기(필터 · 선택 중 꺼짐), 길게 눌러
   메뉴(편집 · 선택 · 삭제, 반복 회차는 「이 날짜만 건너뛰기 / 전체 삭제」), 선택 모드 일괄 삭제, 실행 취소 토스트(완료 · 삭제 ·
@@ -141,7 +141,7 @@ quick add + detailed create/edit, task detail with unified update log, multi-sel
 author/participant rules are implemented. Recurrence is the **occurrence model (2026-07-30, supersedes
 the 2026-06-16 roll-forward model)** — a recurring task is **one live row** with a FIXED anchor; it shows
 on **every** scheduled date independently (completion no longer rolls the row forward), per-occurrence
-completion lives in `task_occurrence_state`, and overdue occurrences persist (grouped "N일 밀림" with
+completion lives in `task_occurrence_state`, and overdue occurrences persist (grouped "N회 밀림" with
 오늘로 가져오기 / 삭제). See the Recurrence section + `docs/planning/01-decision-log.md`. The calendar header has a
 **"반복 숨기기" (Hide recurring) toggle** (2026-07-29) — a session-only client switch (default off, resets on
 reload) that hides fixed/standard-recurring occurrences across the whole calendar (month grid, month agenda,
@@ -767,7 +767,7 @@ As-built (2026-07-30, occurrence model — **supersedes** the 2026-06-16 roll-fo
 - **Overdue occurrences persist forever — no auto-skip, no auto-delete.** An occurrence whose date has
   passed with no recorded state is **overdue** and stays so (연차·연휴·업무 사정으로 며칠 밀려도 사라지지
   않는다). Overdue occurrences of a recurring task are collapsed into **one grouped item per task**
-  ("○○ · N일 밀림") in the Today tab's overdue area, with two actions:
+  ("○○ · N회 밀림") in the Today tab's overdue area, with two actions:
   - **(2026-09-08 폐기)** 예전에는 「오늘로 가져오기」/「삭제」 2택을 지연 섹션에 두었다. 지금은
     반복이 지연 섹션에 뜨지 않으므로 그 두 액션도 없다 — 아래 「반복 지연은 오늘 줄의 배지」 참고.
   One-off overdue tasks keep the existing bulk 오늘로 가져오기 / 지난 미완료 삭제 prompt (author-scoped).
@@ -1719,6 +1719,8 @@ Design in this order:
   (머리 줄은 제목만, 가까운 날부터 전부, 줄 · 「되살리기」 · 토스트는 위와 같다). 지난 날과 섞지 않는 이유: 「최근 30일」 표시가 틀려진다.
   앞날을 되살리면 그냥 평소 회차로 돌아간다(밀림 아님). 두 묶음 사이는 20px 띄움, 세로줄 없음. 선택은 `selectUpcomingSkippedDays`.
   문구 `tasks.skippedDaysUpcomingTitle` · 콘솔 `skDaysUpcomingTitle`(ko 「앞으로 건너뛸 날」 · ja 「今後スキップする日」 · en 「Upcoming skips」).
+- **2026-11-26 PC 콘솔은 접힌 한 줄부터** — 「건너뛴 날 · 지난 N · 앞으로 N ⌄」(`skDaysSummary`), 누르면 두 묶음을 전부 펼친다
+  (5줄 + 「더 보기」 단계 없음). 모바일은 위 규칙 그대로. 상세: `docs/product/28-admin-todoist-console.md` 「2026-11-26 반복 다듬기」.
 
 모바일 작업 상세의 `…` 옵션 메뉴는 메뉴와 트리거 바깥을 누르면 즉시 닫힌다. 바깥 화면의 원래
 동작은 막지 않으며, 키보드 사용 시 `Escape` 로도 닫을 수 있다.

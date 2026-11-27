@@ -93,7 +93,7 @@ export function contextLabelOf(
  *
  * 카드 상자 없이 얇은 가로 줄로 나뉜다. 앞의 고리는 우선순위 색(긴급 · 중요 · 보통 · 없음)이고, 누르면 채워지며 체크가
  * 그려진 뒤 완료된다(낙관적 반영은 워크스페이스가 맡는다). 제목 아래 회색 메타 한 줄 — 「긴급 · / 중요 ·」으로 시작해
- * 날짜 · 시간 · 연결 · 진행 중 · 지시 · 반복 · 태그 · 사진 · 공유 n명 · N일 밀림 순서. 지연은 메타가 빨강.
+ * 날짜 · 시간 · 연결 · 진행 중 · 지시 · 반복 · 태그 · 사진 · 공유 n명 · N회 밀림 순서. 지연은 메타가 빨강.
  *
  * 동작은 전과 같다: 밀어서 오늘로/내일로, 손잡이로 순서 바꾸기, 길게 눌러 메뉴, 선택 모드, 태블릿 2분할에서 오른쪽 칸.
  * 본문은 **상세 주소를 가진 링크**다 — 태블릿 2분할(`SplitList`)이 고른 줄을 옅은 보라 바탕으로 표시하려면 링크여야 한다.
@@ -200,7 +200,7 @@ export function TaskCard({
   const nextOccurrenceDate = recurringRow
     ? nextRecurringOccurrence(task.recurrenceRule, dueDate ?? task.scheduledDate ?? null, today)
     : null;
-  /** 지연 판정에서 반복을 뺀다 — 반복의 밀림은 「N일 밀림」(behindDays)이 맡는다. */
+  /** 지연 판정에서 반복을 뺀다 — 반복의 밀림은 「N회 밀림」(behindDays, 밀린 회차 수)이 맡는다. */
   const overdue = !occurrence && !recurringRow && !done && !!dueDate && dueDate < today;
 
   // 스와이프 액션 하나 (today / tomorrow), 단일 버튼 크기에 맞춘 고정 폭으로 노출된다.

@@ -132,7 +132,7 @@ export function overdueOccurrenceDatesOf(
  * 지연·오늘 **두 줄**로 나타났다.
  *
  * 이제 반복은 어느 경우든 **오늘 한 줄**이고, 밀렸다는 사실은 `overdueOccurrenceDatesOf` 로 센
- * 「N일 밀림」 배지로 붙는다. 완료하면 서버가 밀린 회차까지 흡수하므로 배지도 함께 사라진다
+ * 「N회 밀림」 배지로 붙는다. 완료하면 서버가 밀린 회차까지 흡수하므로 배지도 함께 사라진다
  * (`absorbEarlierOccurrences`).
  */
 export function showsOnTodayList(

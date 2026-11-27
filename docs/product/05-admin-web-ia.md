@@ -270,6 +270,8 @@ Electron 은 쓰지 않는다(설치 파일이 크다).
 - Todoist (투두이스트) — 대시보드 콘솔은 다른 어드민 모듈의 "관리형" 패턴이 **아니라** Todoist 본연의
   워크스페이스(모바일 코어 패리티) + 사무실 **업무 지시**만. 기획 스펙: `docs/product/28-admin-todoist-console.md`.
   현재 라우트는 `/admin/tasks`이며 legacy `/admin/recurring-work`는 해당 화면으로 리다이렉트한다.
+  2026-11-26 반복 다듬기: 줄 「N회 밀림」 회색 + 7회 넘으면 「밀린 회차 정리」, 상세 상태는 알약 하나(대기 ↔ 진행 중, 완료는 고리),
+  건너뛴 날은 접힌 한 줄부터, 캘린더 칸은 「↻ 반복 N」 한 줄 + 나머지 2개. 상세는 28번 문서 같은 날짜 절.
 - Settings (설정)
 
 향후 모듈(Linen Return · Complaints · Tasks/Projects · Suggestions · Bug Reports · Notifications ·

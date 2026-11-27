@@ -31,7 +31,7 @@ export type AdminTasksDictionary = {
   overdueReschedule: string;
   overdueClear: string;
   previewOnlyHint: string; // 다가오는 일정에서 완료 불가 안내(툴팁)
-  odDaysBehind: string; // 반복 지연 묶음 "{n}일 밀림"
+  odDaysBehind: string; // 반복 밀린 회차 수 "{n}회 밀림"(날이 아니라 회차를 센다)
   inboxNote: string;
   // 우선순위 / 상태 / 반복 / 소요 시간
   prioNormal: string; // 우선순위 4 (기본)
@@ -212,10 +212,12 @@ export type AdminTasksDictionary = {
   recurDeleteAllSub: string;
   recurSkippedToast: string;
   skDaysTitle: string;
+  odCatchUp: string; // 밀린 회차가 많은 반복 줄 — 상세를 열어 정리
+  dpRepeatSince: string; // 상세 일정 아래 「↻ 매일 · {date}부터」
+  skDaysSummary: string; // 건너뛴 날 접힌 한 줄 「지난 {past} · 앞으로 {next}」
+  calRepeatN: string; // 캘린더 칸의 반복 묶음 「↻ 반복 {n}」
   skDaysRange: string;
   skDaysUpcomingTitle: string;
-  skDaysMore: string;
-  skDaysMoreOne: string;
   skDaysRestore: string;
   skDaysRestoreFor: string;
   skDaysRestoredToast: string;
@@ -509,7 +511,7 @@ const ko: AdminTasksDictionary = {
   secOverdue: "지연", secToday: "오늘",
   overdueTitle: "지난(지연) 작업 {n}건", overdueSub: "마감이 지난 작업입니다. 오늘로 옮기거나 정리하세요.",
   overdueReschedule: "일정 변경", overdueClear: "지난 미완료 삭제",
-  odDaysBehind: "{n}일 밀림", previewOnlyHint: "다가오는 일정에서는 완료할 수 없습니다. 그날 「오늘」에서 처리하세요.",
+  odDaysBehind: "{n}회 밀림", previewOnlyHint: "다가오는 일정에서는 완료할 수 없습니다. 그날 「오늘」에서 처리하세요.",
   inboxNote: "프로젝트 밖의 모든 작업이 여기 모입니다. 날짜를 정하면 오늘·캘린더에도 함께 표시됩니다.",
   prioNormal: "우선순위 4", prioImportant: "우선순위 2", prioUrgent: "우선순위 1", prioMedium: "우선순위 3",
   stOpen: "대기", stInProgress: "진행 중", stCompleted: "완료", stOverdue: "지연",
@@ -550,7 +552,8 @@ const ko: AdminTasksDictionary = {
   recurDeleteTitle: "반복되는 작업입니다", recurSkipOne: "{date}만 건너뛰기",
   recurSkipOneSub: "이 날짜만 넘어가고 반복은 계속됩니다", recurDeleteAll: "반복 전체 삭제",
   recurDeleteAllSub: "모든 날짜에서 사라집니다", recurSkippedToast: "{date} 건너뜀",
-  skDaysTitle: "건너뛴 날", skDaysRange: "최근 30일", skDaysUpcomingTitle: "앞으로 건너뛸 날", skDaysMore: "{count}개 더 보기", skDaysMoreOne: "1개 더 보기", skDaysRestore: "되살리기", skDaysRestoreFor: "{date} 되살리기", skDaysRestoredToast: "{date}을 되살렸어요", skDaysSkipAgain: "다시 건너뛰기",
+  odCatchUp: "밀린 회차 정리", dpRepeatSince: "{date}부터", skDaysSummary: "지난 {past} · 앞으로 {next}", calRepeatN: "↻ 반복 {n}",
+  skDaysTitle: "건너뛴 날", skDaysRange: "최근 30일", skDaysUpcomingTitle: "앞으로 건너뛸 날", skDaysRestore: "되살리기", skDaysRestoreFor: "{date} 되살리기", skDaysRestoredToast: "{date}을 되살렸어요", skDaysSkipAgain: "다시 건너뛰기",
   instrRecv: "받은 지시", instrSent: "보낸 지시",
   instrSentNote: "지시한 업무는 대상자의 일정으로 잡힙니다. 내 “오늘” 목록에는 들어오지 않고, 이 화면에서 진행 상황만 챙깁니다.",
   instrRecvNote: "나에게 부여된 업무입니다. 내 “오늘 · 캘린더”에도 함께 표시되며, 상황을 바꾸면 지시한 사람에게 바로 공유됩니다.",
@@ -649,7 +652,7 @@ const ja: AdminTasksDictionary = {
   secOverdue: "遅延", secToday: "今日",
   overdueTitle: "過ぎた(遅延)タスク {n}件", overdueSub: "締切を過ぎたタスクです。今日に移すか整理してください。",
   overdueReschedule: "日程変更", overdueClear: "過去の未完了を削除",
-  odDaysBehind: "{n}日 遅延", previewOnlyHint: "予定リストでは完了にできません。当日「今日」で処理してください。",
+  odDaysBehind: "{n}回 未完了", previewOnlyHint: "予定リストでは完了にできません。当日「今日」で処理してください。",
   inboxNote: "プロジェクト外のすべてのタスクがここに集まります。日付を決めると今日・カレンダーにも表示されます。",
   prioNormal: "優先度 4", prioImportant: "優先度 2", prioUrgent: "優先度 1", prioMedium: "優先度 3",
   stOpen: "待機", stInProgress: "進行中", stCompleted: "完了", stOverdue: "遅延",
@@ -690,7 +693,8 @@ const ja: AdminTasksDictionary = {
   recurDeleteTitle: "繰り返しのタスクです", recurSkipOne: "{date}のみスキップ",
   recurSkipOneSub: "この日だけ飛ばし、繰り返しは続きます", recurDeleteAll: "繰り返しを全て削除",
   recurDeleteAllSub: "全ての日付から消えます", recurSkippedToast: "{date} をスキップ",
-  skDaysTitle: "スキップした日", skDaysRange: "直近30日", skDaysUpcomingTitle: "今後スキップする日", skDaysMore: "さらに{count}件を表示", skDaysMoreOne: "さらに1件を表示", skDaysRestore: "元に戻す", skDaysRestoreFor: "{date}を元に戻す", skDaysRestoredToast: "{date}を元に戻しました", skDaysSkipAgain: "もう一度スキップ",
+  odCatchUp: "未完了を整理", dpRepeatSince: "{date}から", skDaysSummary: "過去 {past} · 予定 {next}", calRepeatN: "↻ 繰り返し {n}",
+  skDaysTitle: "スキップした日", skDaysRange: "直近30日", skDaysUpcomingTitle: "今後スキップする日", skDaysRestore: "元に戻す", skDaysRestoreFor: "{date}を元に戻す", skDaysRestoredToast: "{date}を元に戻しました", skDaysSkipAgain: "もう一度スキップ",
   instrRecv: "受けた指示", instrSent: "送った指示",
   instrSentNote: "指示した業務は対象者の日程に入ります。自分の「今日」には入らず、この画面で進捗のみ確認します。",
   instrRecvNote: "自分に付与された業務です。自分の「今日 · カレンダー」にも表示され、状態を変えると指示者にすぐ共有されます。",
@@ -789,7 +793,7 @@ const en: AdminTasksDictionary = {
   secOverdue: "Overdue", secToday: "Today",
   overdueTitle: "{n} overdue task(s)", overdueSub: "Past their due date. Move them to today or clear them out.",
   overdueReschedule: "Reschedule", overdueClear: "Clear past unfinished",
-  odDaysBehind: "{n} days behind", previewOnlyHint: "Upcoming items can't be completed here — do it on the day, from Today.",
+  odDaysBehind: "{n} missed", previewOnlyHint: "Upcoming items can't be completed here — do it on the day, from Today.",
   inboxNote: "Every task outside a project lives here. Give it a date and it also shows in Today · Calendar.",
   prioNormal: "Priority 4", prioImportant: "Priority 2", prioUrgent: "Priority 1", prioMedium: "Priority 3",
   stOpen: "Open", stInProgress: "In progress", stCompleted: "Done", stOverdue: "Overdue",
@@ -830,7 +834,8 @@ const en: AdminTasksDictionary = {
   recurDeleteTitle: "This task repeats", recurSkipOne: "Skip {date} only",
   recurSkipOneSub: "Skips this date; the series keeps running", recurDeleteAll: "Delete the whole series",
   recurDeleteAllSub: "Removes it from every date", recurSkippedToast: "Skipped {date}",
-  skDaysTitle: "Skipped days", skDaysRange: "Last 30 days", skDaysUpcomingTitle: "Upcoming skips", skDaysMore: "Show {count} more", skDaysMoreOne: "Show 1 more", skDaysRestore: "Restore", skDaysRestoreFor: "Restore {date}", skDaysRestoredToast: "Restored {date}", skDaysSkipAgain: "Skip again",
+  odCatchUp: "Clear missed", dpRepeatSince: "since {date}", skDaysSummary: "{past} past · {next} upcoming", calRepeatN: "↻ {n} repeating",
+  skDaysTitle: "Skipped days", skDaysRange: "Last 30 days", skDaysUpcomingTitle: "Upcoming skips", skDaysRestore: "Restore", skDaysRestoreFor: "Restore {date}", skDaysRestoredToast: "Restored {date}", skDaysSkipAgain: "Skip again",
   instrRecv: "Received", instrSent: "Sent",
   instrSentNote: "Directives land on the recipient's schedule. They don't enter your Today; track progress here.",
   instrRecvNote: "Assigned to you. Also shown in your Today · Calendar; status changes are shared back to the sender.",
